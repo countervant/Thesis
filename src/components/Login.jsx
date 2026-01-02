@@ -21,6 +21,7 @@ const Login = () => {
       <div className="bt mt-30 flex items-stretch w-100 rounded-full h-14 justify-center  border-black border bg-[linear-gradient(60deg,rgba(224,77,175,1)_0%,rgba(176,16,186,1)_100%)]">
         <button className="text-black px-4 py-2 ">Sign in</button>
       </div>
+     <p className="text-[#9D9D9D] mt-2 text-[14px]">Forgot Password</p>
     </div>
   );
 };
