@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import logo from "../assets/CLIENTRA.png";
 import view from "../assets/view.png";
 import hide from "../assets/hide.png";
+import AuthenticationHelper from "./AuthenticationHelper.jsx";
 const LoginPage = () => {
      const [showPassword, setShowPassword] = useState(false);
   return (
@@ -41,10 +42,7 @@ const LoginPage = () => {
             Sign In
           </button>
           
-          <div className="flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-0 text-sm font-medium text-pink-500">
-            <a href="#" className="hover:text-pink-600">Create Account</a>
-            <a href="#" className="hover:text-pink-600">Forgot Password?</a>
-          </div>
+         <AuthenticationHelper />
         </div>
       </div>
     </>
