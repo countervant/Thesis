@@ -6,9 +6,9 @@ const Login = () => {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
      
-     <Welcome />
+     <Welcome order='2' order1='1' />
      
-     <LoginPage />
+     <LoginPage order='1' order1='2' />
 
       
     </div>

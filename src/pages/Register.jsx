@@ -1,8 +1,17 @@
 import React from 'react'
-import WelcomeRight from '../components/WelcomeRight.jsx';
+import Welcome from '../components/Welcome.jsx';
+import LoginPage from '../components/LoginPage.jsx';
+import RegisterPage from '../components/RegisterPage.jsx';
 const Register = () => {
   return (
     <>
+    <div className="flex min-h-screen flex-col md:flex-row">
+
+    <Welcome order='2' order1='1' />
+    <RegisterPage order='1' order1='2' />
+    
+    </div>
+
     
     </>
   )
