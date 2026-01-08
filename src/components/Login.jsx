@@ -14,10 +14,10 @@ const Login = () => {
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         <div className="absolute inset-0 bg-[rgba(224,58,175,0.7)]" />
-        <div className="relative z-10 h-full flex flex-col justify-center px-12 space-y-8">
+        <div className="relative z-10 h-full flex flex-col justify-center px-6 sm:px-10 md:px-12 py-10 md:py-0 space-y-6 sm:space-y-8">
           <div>
-            <p className="text-2xl font- mb-2">Welcome to</p>
-            <h1 className="text-5xl font-bold">Dream Light Visual</h1>
+            <p className="text-xl sm:text-2xl font-medium mb-2">Welcome to</p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold">Dream Light Visual</h1>
           </div>
           <div className="space-y-6">
             <div>
@@ -40,11 +40,11 @@ const Login = () => {
         </div>
       </div>
 
-      <div className="w-1/2 bg-gray-100 flex flex-col items-center justify-center px-12">
-        <img src={logo} alt="CLIENTRA" className="w-45 h-45 object-contain" />
-        <h2 className="text-3xl font-bold mb-10 tracking-wide uppercase" style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}>LOG IN</h2>
+      <div className="order-1 md:order-2 w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0">
+        <img src={logo} alt="CLIENTRA" className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain" />
+        <h2 className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase" style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}>LOG IN</h2>
 
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
           <div>
             <div className="border-b border-black mb-2">
               <input
@@ -74,7 +74,7 @@ const Login = () => {
             Sign In
           </button>
           
-          <div className="flex justify-between text-sm font-medium text-pink-500 mb-18">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-0 text-sm font-medium text-pink-500">
             <a href="#" className="hover:text-pink-600">Create Account</a>
             <a href="#" className="hover:text-pink-600">Forgot Password?</a>
           </div>
