@@ -1,20 +1,32 @@
 import React from "react";
+import Logo from "../Assets/Logo.png";
 
 const Login = () => {
+  
   return (
-    <div className="flex mt-30 mx-auto mb-0 max-w-130 h-100 items-center p-5 flex-col">
+    <div className="grid grid-cols-2" >
+
+<div> 
+  <img src="" alt="Logo" />
+
+</div>
+
+     <div>
+      
+       <div className=" flex mt-10 mx-auto mb-0 max-w-130 h-100 items-center p-5 flex-col mr-30">
+        <img src={Logo} alt="" className="h-30" />
       <h1 className="font-['Bruno_Ace_SC',sans-serif] text-[36px] ">Log in</h1>
 
-      <div className="flex h-5 flex-col gap-10 mt-20">
+      <div className="flex h-5 flex-col gap-10 mt-15">
         <input
-          type="text"
+          type="email"
           placeholder="Email"
-          className="border-black border-b w-100 pb-2"
+          className="border-black border-b w-100 pb-2 outline-none focus:border-[#df4baf]"
         />
         <input
-          type="text"
+          type="password"
           placeholder="Password"
-          className="border-black border-b w-100 pb-2"
+          className="border-black border-b w-100 pb-2 outline-none focus:border-[#df4baf]"
         />
       </div>
 
@@ -22,6 +34,10 @@ const Login = () => {
         <button className="text-black px-4 py-2 ">Sign in</button>
       </div>
      <p className="text-[#9D9D9D] mt-2 text-[14px]">Forgot Password</p>
+    </div>
+
+     </div>
+   
     </div>
   );
 };
