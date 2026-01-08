@@ -1,7 +1,7 @@
 import React from 'react'
 import backgroundImage from "../assets/backround.png";
 
-const Welcome = ({order, order1}) => {
+const Welcome = ({order, order1, text}) => {
   return (
     <>
        <div
@@ -11,7 +11,7 @@ const Welcome = ({order, order1}) => {
               <div className="absolute inset-0 bg-[rgba(224,58,175,0.7)]" />
               <div className="relative z-10 h-full flex flex-col justify-center px-6 sm:px-10 md:px-12 py-10 md:py-0 space-y-6 sm:space-y-8">
                 <div>
-                  <p className="text-xl sm:text-2xl font-medium mb-2">Welcome to</p>
+                  <p className="text-xl sm:text-2xl font-medium mb-2">{text}</p>
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold">Dream Light Visual</h1>
                 </div>
                 <div className="space-y-6">

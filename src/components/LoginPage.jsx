@@ -8,7 +8,7 @@ const LoginPage = ({order, order1}) => {
      const [showPassword, setShowPassword] = useState(false);
   return (
     <>
-    <div className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}>
+    <div className={`con order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}>
         <img src={logo} alt="CLIENTRA" className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain" />
         <h2 className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase" style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}>LOG IN</h2>
 
@@ -42,7 +42,7 @@ const LoginPage = ({order, order1}) => {
             Sign In
           </button>
           
-         <AuthenticationHelper link = '/register' Label = 'Create Account'/>
+         <AuthenticationHelper link = '/register' Label = 'Create Account' Label1 = 'Forgot Password?'/>
         </div>
       </div>
     </>
