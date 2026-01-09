@@ -10,9 +10,8 @@ import Login from "../pages/Login.jsx";
 import Register from "../pages/Register.jsx";
 import ForgotPassword from "../pages/ForgotPassword.jsx";
 
-
 const AppRoutes = () => {
-     const router = createBrowserRouter(
+  const router = createBrowserRouter(
     createRoutesFromElements(
       <>
         <Route index element={<Login />} />
@@ -21,12 +20,12 @@ const AppRoutes = () => {
       </>
     )
   );
-  
+
   return (
     <>
-    <RouterProvider router={router} />
+      <RouterProvider router={router} />
     </>
-  )
-}
+  );
+};
 
-export default AppRoutes
+export default AppRoutes;
