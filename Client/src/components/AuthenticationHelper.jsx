@@ -7,9 +7,9 @@ const AuthenticationHelper = ({ link, Label, Label1 }) => {
         <Link to={link} className="hover:text-pink-600">
           {Label}
         </Link>
-        <p href="#" className="hover:text-pink-600">
+        <Link to = '/ForgotPassword' className="hover:text-pink-600">
           {Label1}
-        </p>
+        </Link>
       </div>
     </>
   );
