@@ -18,7 +18,9 @@ mongoose.connect(mongoURI) .then(() => {
   console.error('Error connecting to MongoDB:', err);
 });
 
-
+async function adduser() {
+    
+}
 
 app.listen(5000, () => {
   console.log(`Server running on port 5000`);
