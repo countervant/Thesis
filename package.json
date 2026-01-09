@@ -36,7 +36,6 @@
     "client": "npm run dev --prefix client",
     "server": "npm run dev --prefix server",
     "dev": "concurrently \"npm run server\" \"npm run client\" "
-
   },
   "repository": {
     "type": "git",
