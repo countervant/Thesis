@@ -1,16 +1,26 @@
-
 import React, { useState } from "react";
 import logo from "../assets/CLIENTRA.png";
 import view from "../assets/view.png";
 import hide from "../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
-const LoginPage = ({order, order1}) => {
-     const [showPassword, setShowPassword] = useState(false);
+const LoginPage = ({ order, order1 }) => {
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <>
-    <div className={`con order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}>
-        <img src={logo} alt="CLIENTRA" className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain" />
-        <h2 className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase" style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}>LOG IN</h2>
+      <div
+        className={`con order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
+      >
+        <img
+          src={logo}
+          alt="CLIENTRA"
+          className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain"
+        />
+        <h2
+          className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase"
+          style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
+        >
+          LOG IN
+        </h2>
 
         <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
           <div>
@@ -34,19 +44,30 @@ const LoginPage = ({order, order1}) => {
               onClick={() => setShowPassword(!showPassword)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
             >
-              {showPassword ? <img src={hide} alt="Hide" className="w-5 h-5" /> : <img src={view} alt="Show" className="w-5 h-5" />}
+              {showPassword ? (
+                <img src={hide} alt="Hide" className="w-5 h-5" />
+              ) : (
+                <img src={view} alt="Show" className="w-5 h-5" />
+              )}
             </button>
           </div>
 
-          <button className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8">
+          <button
+            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600
+           hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8"
+          >
             Sign In
           </button>
-          
-         <AuthenticationHelper link = '/register' Label = 'Create Account' Label1 = 'Forgot Password?'/>
+
+          <AuthenticationHelper
+            link="/register"
+            Label="Create Account"
+            Label1="Forgot Password?"
+          />
         </div>
       </div>
     </>
-  )
-}
+  );
+};
 
-export default LoginPage
+export default LoginPage;
