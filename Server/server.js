@@ -1,6 +1,6 @@
 import express from 'express';
-import bodyParser from 'body-parser';
-import cors from 'cors';
+
+
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
@@ -8,5 +8,18 @@ const app = express();
 dotenv.config();
 
 app.use(express.json());
-app.use(cors());
 
+const mongoURI = process.env.MONGO_URI;
+const port = process.env.PORT
+
+mongoose.connect(mongoURI) .then(() => {
+  console.log('Connected to MongoDB');
+}).catch((err) => {
+  console.error('Error connecting to MongoDB:', err);
+});
+
+
+
+app.listen(5000, () => {
+  console.log(`Server running on port 5000`);
+});
