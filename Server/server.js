@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import dbConnect from './config/dbConnect.js';
+import {dbConnect} from './config/dbConnect.js';
 const app = express();
 dotenv.config();
 
