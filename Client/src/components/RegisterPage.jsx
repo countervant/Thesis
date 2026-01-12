@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import logo from "../assets/CLIENTRA.png";
 import view from "../assets/view.png";
 import hide from "../assets/hide.png";
+import ButtonGroup from "./Buttons.jsx";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +22,10 @@ const RegisterPage = ({ order, order1 }) => {
         >
           Create Account
         </h2>
+
+        <div className="flex gap-10 m-4">
+          <ButtonGroup />
+        </div>
 
         <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
           <div>
