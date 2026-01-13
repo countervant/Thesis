@@ -4,28 +4,69 @@ import {
   createBrowserRouter,
   createRoutesFromElements,
   RouterProvider,
+  Outlet,
 } from "react-router-dom";
 
 import Login from "../pages/Login.jsx";
 import Register from "../pages/Register.jsx";
 import ForgotPassword from "../pages/ForgotPassword.jsx";
+import Dashboard from "../pages/Dashboard.jsx";
+import Unauthorized from "../pages/Unauthorized.jsx";
+import ProtectedRoute from "../components/ProtectedRoute.jsx";
+import { AuthProvider } from "../context/AuthContext.jsx";
+
+// Layout component that wraps all routes with AuthProvider
+const AuthLayout = () => {
+  return (
+    <AuthProvider>
+      <Outlet />
+    </AuthProvider>
+  );
+};
 
 const AppRoutes = () => {
   const router = createBrowserRouter(
     createRoutesFromElements(
-      <>
+      <Route element={<AuthLayout />}>
         <Route index element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/ForgotPassword" element={<ForgotPassword />} />
-      </>
+        <Route path="/unauthorized" element={<Unauthorized />} />
+        
+        {/* Protected Routes - requires authentication */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin only routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute allowedRoles={["Admin"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Employee routes - accessible by Admin and Employee */}
+        <Route
+          path="/employee/*"
+          element={
+            <ProtectedRoute allowedRoles={["Admin", "Employee"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
     )
   );
 
-  return (
-    <>
-      <RouterProvider router={router} />
-    </>
-  );
+  return <RouterProvider router={router} />;
 };
 
 export default AppRoutes;

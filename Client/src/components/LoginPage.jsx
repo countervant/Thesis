@@ -1,10 +1,38 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import logo from "../assets/CLIENTRA.png";
 import view from "../assets/view.png";
 import hide from "../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
+import { authAPI } from "../services/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+
 const LoginPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const data = await authAPI.login(email, password);
+      login({ id: data.id, email: data.email, type: data.type }, data.token);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div
@@ -22,13 +50,22 @@ const LoginPage = ({ order, order1 }) => {
           LOG IN
         </h2>
 
-        <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
           <div>
             <div className="border-b border-black mb-2">
               <input
                 type="email"
                 placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                required
               />
             </div>
           </div>
@@ -37,7 +74,10 @@ const LoginPage = ({ order, order1 }) => {
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+              required
             />
             <button
               type="button"
@@ -53,10 +93,12 @@ const LoginPage = ({ order, order1 }) => {
           </div>
 
           <button
+            type="submit"
+            disabled={loading}
             className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600
-           hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8"
+           hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In
+            {loading ? "Signing In..." : "Sign In"}
           </button>
 
           <AuthenticationHelper
@@ -64,7 +106,7 @@ const LoginPage = ({ order, order1 }) => {
             Label="Create Account"
             Label1="Forgot Password?"
           />
-        </div>
+        </form>
       </div>
     </>
   );
