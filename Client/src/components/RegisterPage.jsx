@@ -121,7 +121,7 @@ const RegisterPage = ({ order, order1 }) => {
               onClick={() => setUserType(type)}
               className={`px-4 py-2 rounded text-black bg-white transition-colors duration-300 ${
                 userType === type
-                  ? "shadow-[10px_10px_20px] shadow-[#D149B3]"
+                  ? "bg-linear-to-r from-[#EF35A2] to-[#9E1DF4] text-white"
                   : "shadow-[10px_10px_20px] shadow-gray-500"
               }`}
             >
