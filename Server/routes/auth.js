@@ -78,8 +78,7 @@ router.post("/forgot-password", async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      // Avoid leaking which emails exist
-      return res.status(200).json({ message: "If that email is registered, reset instructions have been sent." });
+      return res.status(404).json({ message: "Email is not registered" });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();

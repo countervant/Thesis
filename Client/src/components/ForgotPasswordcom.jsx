@@ -9,6 +9,7 @@ const ForgotPasswordcom = () => {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const validateEmail = (value) => {
@@ -33,11 +34,13 @@ const ForgotPasswordcom = () => {
     try {
       setLoading(true);
       setMessage("");
+      setErrorMessage("");
       await authAPI.forgotPassword(email);
       setMessage("If that email is registered, we sent reset instructions.");
       navigate(`/reset-password?email=${encodeURIComponent(email.trim())}`);
     } catch (err) {
-      setMessage(err.response?.data?.message || "Unable to send reset email");
+      const msg = err.response?.data?.message || "Email is not registered";
+      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
@@ -76,6 +79,7 @@ const ForgotPasswordcom = () => {
             />
           </div>
           {emailError && <p className="text-sm text-red-500">{emailError}</p>}
+          {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
           {message && <p className="text-sm text-green-600">{message}</p>}
 
           <button
