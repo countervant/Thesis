@@ -4,7 +4,32 @@ import view from "../assets/view.png";
 import hide from "../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 const LoginPage = ({ order, order1 }) => {
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  const validateEmail = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "Email is required";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setEmail(value);
+    setEmailError(validateEmail(value));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const validationMessage = validateEmail(email);
+    setEmailError(validationMessage);
+    if (validationMessage) return;
+    // TODO: hook up real sign-in logic when available
+  };
+
+  const isEmailInvalid = !email || !!emailError;
   return (
     <>
       <div
@@ -22,15 +47,24 @@ const LoginPage = ({ order, order1 }) => {
           LOG IN
         </h2>
 
-        <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+        <form
+          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8"
+          onSubmit={handleSubmit}
+          noValidate
+        >
           <div>
             <div className="border-b border-black mb-2">
               <input
                 type="email"
                 placeholder="Email"
+                value={email}
+                onChange={handleEmailChange}
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
               />
             </div>
+            {emailError && (
+              <p className="text-sm text-red-500">{emailError}</p>
+            )}
           </div>
 
           <div className="border-b-2 border-gray-400 flex items-center">
@@ -53,8 +87,10 @@ const LoginPage = ({ order, order1 }) => {
           </div>
 
           <button
+            type="submit"
+            disabled={isEmailInvalid}
             className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600
-           hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8"
+           hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Sign In
           </button>
@@ -64,7 +100,7 @@ const LoginPage = ({ order, order1 }) => {
             Label="Create Account"
             Label1="Forgot Password?"
           />
-        </div>
+        </form>
       </div>
     </>
   );
