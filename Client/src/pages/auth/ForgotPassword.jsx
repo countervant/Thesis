@@ -1,6 +1,6 @@
 import React from 'react'
-import Welcome from '../components/Welcome.jsx'
-import ForgotPasswordcom from '../components/ForgotPasswordcom.jsx'
+import Welcome from '../../components/Welcome.jsx'
+import ForgotPasswordcom from '../../components/ForgotPasswordcom.jsx'
 const ForgotPassword = () => {
   
   return (

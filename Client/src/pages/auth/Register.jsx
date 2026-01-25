@@ -1,6 +1,6 @@
 import React from 'react'
-import Welcome from '../components/Welcome.jsx';
-import RegisterPage from '../components/RegisterPage.jsx';
+import Welcome from '../../components/Welcome.jsx';
+import RegisterPage from '../../components/RegisterPage.jsx';
 const Register = () => {
   return (
     <>
