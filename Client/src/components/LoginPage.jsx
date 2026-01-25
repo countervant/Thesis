@@ -8,18 +8,37 @@ import { authAPI } from "../services/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const LoginPage = ({ order, order1 }) => {
-  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const validateEmail = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "Email is required";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setEmail(value);
+    setEmailError(validateEmail(value));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    const emailValidation = validateEmail(email);
+    setEmailError(emailValidation);
+    if (emailValidation) return;
+
     setLoading(true);
 
     try {
@@ -32,6 +51,8 @@ const LoginPage = ({ order, order1 }) => {
       setLoading(false);
     }
   };
+
+  const isEmailInvalid = !email || !!emailError;
 
   return (
     <>
@@ -63,11 +84,14 @@ const LoginPage = ({ order, order1 }) => {
                 type="email"
                 placeholder="Email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={handleEmailChange}
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
                 required
               />
             </div>
+            {emailError && (
+              <p className="text-sm text-red-500">{emailError}</p>
+            )}
           </div>
 
           <div className="border-b-2 border-gray-400 flex items-center">
@@ -94,7 +118,7 @@ const LoginPage = ({ order, order1 }) => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isEmailInvalid}
             className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600
            hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed"
           >
