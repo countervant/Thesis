@@ -96,7 +96,7 @@ const ForgotPasswordcom = () => {
           <AuthenticationHelper
             link="/"
             Label="Back to Login"
-            Label1="Resend Code"
+            Label1=""
           />
         </div>
       </div>
