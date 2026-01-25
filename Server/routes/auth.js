@@ -2,6 +2,8 @@ import express from "express";
 import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 
 
 const router = express.Router();
@@ -60,6 +62,97 @@ router.post("/login", async (req, res) => {
   }
 }
 );
+
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+    return res.status(500).json({ message: "Email service not configured" });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // Avoid leaking which emails exist
+      return res.status(200).json({ message: "If that email is registered, reset instructions have been sent." });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+
+    user.resetPasswordOTP = hashedOTP;
+    user.resetPasswordOTPExpires = Date.now() + 1000 * 60 * 10; // 10 minutes
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      to: user.email,
+      from: process.env.GMAIL_USER,
+      subject: "Your password reset code",
+      html: `
+        <p>You requested a password reset.</p>
+        <p>Your one-time code is:</p>
+        <h2 style="letter-spacing: 4px;">${otp}</h2>
+        <p>This code expires in 10 minutes.</p>
+      `,
+    });
+
+    res.status(200).json({ message: "If that email is registered, reset instructions have been sent." });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Unable to send reset email" });
+  }
+});
+
+router.post("/reset-password", async (req, res) => {
+  const { email, otp, password } = req.body;
+
+  if (!email || !otp || !password) {
+    return res.status(400).json({ message: "Email, OTP, and new password are required" });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid email or OTP" });
+    }
+
+    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+
+    const isValid =
+      user.resetPasswordOTP === hashedOTP &&
+      user.resetPasswordOTPExpires &&
+      user.resetPasswordOTPExpires > Date.now();
+
+    if (!isValid) {
+      return res.status(400).json({ message: "OTP is invalid or has expired" });
+    }
+
+    user.password = password;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Unable to reset password" });
+  }
+});
 
     router.get('/me', protect,  async (req, res) => {
       res.status(200).json(req.user);

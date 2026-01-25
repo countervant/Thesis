@@ -10,6 +10,7 @@ import {
 import Login from "../pages/Login.jsx";
 import Register from "../pages/Register.jsx";
 import ForgotPassword from "../pages/ForgotPassword.jsx";
+import ResetPassword from "../pages/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import Unauthorized from "../pages/Unauthorized.jsx";
 import ProtectedRoute from "../components/ProtectedRoute.jsx";
@@ -31,6 +32,7 @@ const AppRoutes = () => {
         <Route index element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/ForgotPassword" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
         
         {/* Protected Routes - requires authentication */}
