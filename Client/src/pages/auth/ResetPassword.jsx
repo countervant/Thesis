@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Welcome from "../components/Welcome.jsx";
-import { authAPI } from "../services/api.js";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Welcome from "../../components/Welcome.jsx";
+import { authAPI } from "../../services/api.js";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
@@ -12,6 +13,11 @@ const ResetPassword = () => {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const prefill = searchParams.get("email") || "";
+    if (prefill) setEmail(prefill);
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

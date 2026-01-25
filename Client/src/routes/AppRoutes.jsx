@@ -7,12 +7,12 @@ import {
   Outlet,
 } from "react-router-dom";
 
-import Login from "../pages/Login.jsx";
-import Register from "../pages/Register.jsx";
-import ForgotPassword from "../pages/ForgotPassword.jsx";
-import ResetPassword from "../pages/ResetPassword.jsx";
+import Login from "../pages/auth/Login.jsx";
+import Register from "../pages/auth/Register.jsx";
+import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
+import ResetPassword from "../pages/auth/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
-import Unauthorized from "../pages/Unauthorized.jsx";
+import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/ProtectedRoute.jsx";
 import { AuthProvider } from "../context/AuthContext.jsx";
 
