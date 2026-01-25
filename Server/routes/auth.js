@@ -54,7 +54,7 @@ router.post("/login", async (req, res) => {
         return res.status(401).json({message: "Invalid email or password"});
     }
     const token = generateToken(user._id);
-    res.status(200).json({id: user._id, email: user.email, token});
+    res.status(200).json({id: user._id, email: user.email, type: user.type, token});
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
