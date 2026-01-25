@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/CLIENTRA.png";
 import view from "../assets/view.png";
 import hide from "../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../services/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,9 +14,9 @@ const RegisterPage = ({ order, order1 }) => {
   const [userType, setUserType] = useState("Client");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const userTypes = ["Admin", "Employee", "Client"];
 
@@ -38,9 +37,9 @@ const RegisterPage = ({ order, order1 }) => {
     setLoading(true);
 
     try {
-      const data = await authAPI.register(email, password, userType);
-      login({ id: data.id, email: data.email, type: data.type }, data.token);
-      navigate("/dashboard");
+      await authAPI.register(email, password, userType);
+      setSuccessMessage("Account created successfully. Please log in.");
+      setTimeout(() => navigate("/"), 1200);
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed. Please try again.");
     } finally {
@@ -48,11 +47,40 @@ const RegisterPage = ({ order, order1 }) => {
     }
   };
 
+  useEffect(() => {
+    if (!successMessage) return undefined;
+    const timer = setTimeout(() => setSuccessMessage(""), 4000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
   return (
     <>
       <div
         className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
       >
+        {successMessage && (
+          <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
+            <div className="flex items-start gap-3 p-4">
+              <div className="mt-1 h-3 w-3 rounded-full bg-linear-to-br from-pink-500 to-purple-600" aria-hidden="true" />
+              <div className="flex-1 text-sm text-gray-800">
+                <p className="font-semibold text-gray-900">Success</p>
+                <p>{successMessage}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccessMessage("")}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Close notification"
+              >
+                ×
+              </button>
+            </div>
+            <div className="h-1 w-full bg-pink-100">
+              <div className="h-1 w-full bg-linear-to-r from-pink-500 to-purple-600" />
+            </div>
+          </div>
+        )}
+
         <img
           src={logo}
           alt="CLIENTRA"
