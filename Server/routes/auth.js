@@ -103,10 +103,50 @@ router.post("/forgot-password", async (req, res) => {
       from: process.env.GMAIL_USER,
       subject: "Your password reset code",
       html: `
-        <p>You requested a password reset.</p>
-        <p>Your one-time code is:</p>
-        <h2 style="letter-spacing: 4px;">${otp}</h2>
-        <p>This code expires in 10 minutes.</p>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f6f7fb; padding: 32px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="520" style="background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.06);">
+                  <tr>
+                    <td style="text-align: center; padding-bottom: 12px;">
+                      <div style="display: inline-block; padding: 10px 14px; border-radius: 14px; background: linear-gradient(135deg, #ff72a1, #8c6ff0); color: #fff; font-weight: 700; letter-spacing: 0.5px;">
+                        Reset Request
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: center; color: #1f2937; font-size: 22px; font-weight: 700; padding: 4px 0 8px;">
+                      Here is your OTP
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: center; color: #4b5563; font-size: 15px; padding: 0 16px 18px;">
+                      Use this one-time code to reset your password. It will expire in 10 minutes.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: center; padding: 10px 0 24px;">
+                      <div style="display: inline-block; letter-spacing: 6px; font-size: 30px; font-weight: 800; color: #111827; background: #f5f3ff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 24px;">
+                        ${otp}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: center; color: #6b7280; font-size: 13px; padding-bottom: 6px;">
+                      If you did not request this, you can ignore this email.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="text-align: center; color: #9ca3af; font-size: 12px;">
+                      This is an automated message. Please do not reply.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </div>
       `,
     });
 

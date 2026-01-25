@@ -85,7 +85,7 @@ const ForgotPasswordcom = () => {
           <button
             type="submit"
             disabled={isEmailInvalid || loading}
-            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600
+            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600
            hover:to-purple-700 transition-all duration-200 shadow-lg mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Sending..." : "Send Verification Code"}
