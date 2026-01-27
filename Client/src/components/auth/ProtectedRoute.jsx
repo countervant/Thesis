@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 // Protected route component that checks authentication and roles
 const ProtectedRoute = ({ children, allowedRoles }) => {

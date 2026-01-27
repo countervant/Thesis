@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Welcome from "../../components/Welcome.jsx";
+import Welcome from "../../components/auth/Welcome.jsx";
 import { authAPI } from "../../services/api.js";
-import AuthenticationHelper from "../../components/AuthenticationHelper.jsx";
+import AuthenticationHelper from "../../components/auth/AuthenticationHelper.jsx";
 import hideIcon from "../../assets/hide.png";
 import viewIcon from "../../assets/view.png";
 

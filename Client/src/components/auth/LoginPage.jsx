@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import logo from "../assets/CLIENTRA.png";
-import view from "../assets/view.png";
-import hide from "../assets/hide.png";
+import logo from "../../assets/CLIENTRA.png";
+import view from "../../assets/view.png";
+import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
-import { authAPI } from "../services/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
+import { authAPI } from "../../services/api.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const LoginPage = ({ order, order1 }) => {
   const [email, setEmail] = useState("");

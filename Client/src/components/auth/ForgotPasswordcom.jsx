@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ForgotPasswordkey from "../assets/ForgotPassword-key.png";
+import ForgotPasswordkey from "../../assets/ForgotPassword-key.png";
 import AuthenticationHelper from "./AuthenticationHelper";
-import { authAPI } from "../services/api.js";
+import { authAPI } from "../../services/api.js";
 
 const ForgotPasswordcom = () => {
   const navigate = useNavigate();

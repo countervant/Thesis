@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import logo from "../assets/CLIENTRA.png";
-import view from "../assets/view.png";
-import hide from "../assets/hide.png";
+import logo from "../../assets/CLIENTRA.png";
+import view from "../../assets/view.png";
+import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
-import { authAPI } from "../services/api.js";
+import { authAPI } from "../../services/api.js";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -122,7 +122,7 @@ const RegisterPage = ({ order, order1 }) => {
               className={`px-4 py-2 rounded text-black bg-white transition-colors duration-300 ${
                 userType === type
                   ? "bg-linear-to-r from-[#EF35A2] to-[#9E1DF4] text-white"
-                  : "shadow-[10px_10px_20px] shadow-gray-500"
+                  : "shadow-[10px_10px_20px] shadow-gray-500 hover:shadow-[#EF35A2]"
               }`}
             >
               {type}

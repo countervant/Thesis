@@ -13,7 +13,7 @@ import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
 import ResetPassword from "../pages/auth/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
-import ProtectedRoute from "../components/ProtectedRoute.jsx";
+import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { AuthProvider } from "../context/AuthContext.jsx";
 
 // Layout component that wraps all routes with AuthProvider
