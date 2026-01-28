@@ -1,30 +1,84 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
+import { authAPI } from "../services/api.js";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const normalizeToken = (rawToken) => {
+    const value = typeof rawToken === "string" ? rawToken.trim() : "";
+    if (!value || value === "undefined" || value === "null") return null;
+    return value;
+  };
+
+  const [token, setToken] = useState(() => normalizeToken(localStorage.getItem("token")));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("token");
-    
-    if (storedUser && storedToken) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(JSON.parse(storedUser));
-      setToken(storedToken);
-    }
-    setLoading(false);
+    let isMounted = true;
+
+    const bootstrapAuth = async () => {
+      // Hydrate from localStorage, then validate token with /me.
+      const storedToken = normalizeToken(localStorage.getItem("token"));
+      const storedUserRaw = localStorage.getItem("user");
+
+      if (!storedToken) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        if (isMounted) {
+          setUser(null);
+          setToken(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      if (isMounted) setToken(storedToken);
+
+      if (storedUserRaw) {
+        try {
+          const parsedUser = JSON.parse(storedUserRaw);
+          if (isMounted) setUser(parsedUser);
+        } catch {
+          localStorage.removeItem("user");
+        }
+      }
+
+      try {
+        const me = await authAPI.getMe();
+        if (!isMounted) return;
+        setUser(me);
+        localStorage.setItem("user", JSON.stringify(me));
+      } catch {
+        // Token invalid/expired
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        if (isMounted) {
+          setUser(null);
+          setToken(null);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    bootstrapAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = (userData, authToken) => {
     setUser(userData);
-    setToken(authToken);
+    const normalized = normalizeToken(authToken);
+    setToken(normalized);
     localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("token", authToken);
+    if (normalized) {
+      localStorage.setItem("token", normalized);
+    } else {
+      localStorage.removeItem("token");
+    }
   };
 
   const logout = () => {
@@ -34,7 +88,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
   };
 
-  const isAuthenticated = !!token;
+  const isAuthenticated = useMemo(() => !!token && !!user, [token, user]);
 
   // Check if user has required role(s)
   const hasRole = (roles) => {

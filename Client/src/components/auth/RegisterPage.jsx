@@ -8,6 +8,7 @@ import { authAPI } from "../../services/api.js";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
@@ -164,8 +165,9 @@ const RegisterPage = ({ order, order1 }) => {
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowPassword((prev) => !prev)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
@@ -177,7 +179,7 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="border-b-2 border-gray-400 flex items-center">
             <input
-              type={showPassword ? "text" : "password"}
+              type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -186,10 +188,11 @@ const RegisterPage = ({ order, order1 }) => {
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
             >
-              {showPassword ? (
+              {showConfirmPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
               ) : (
                 <img src={view} alt="Show" className="w-5 h-5" />

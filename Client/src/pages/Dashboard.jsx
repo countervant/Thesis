@@ -1,40 +1,29 @@
-import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import SideBar from "../components/SideBar";
+
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  // const { user, logout } = useAuth();
+  // const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
+  // const handleLogout = () => {
+  //   logout();
+  //   navigate("/");
+  // };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-linear-to-r from-pink-500 to-purple-600 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">CLIENTRA</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm">
-              Welcome, <strong>{user?.email}</strong>
-            </span>
-            <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">
-              {user?.type}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-100 flex">
+      <SideBar />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 p-6">
+        <div className="rounded-lg bg-white p-6 shadow-sm">
+          <h1 className="text-2xl font-semibold text-gray-800">Dashboard</h1>
+          <p className="mt-2 text-gray-600">Main content goes here.</p>
+        </div>
+      </main>
+     
+     
+       {/* Main Content */}
+      {/* <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             Dashboard
@@ -43,7 +32,6 @@ const Dashboard = () => {
             You are logged in as <strong>{user?.type}</strong>
           </p>
 
-          {/* Role-specific content */}
           {user?.type === "Admin" && (
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
               <h3 className="font-semibold text-purple-800 mb-2">
@@ -80,7 +68,7 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-      </main>
+      </main> */}
     </div>
   );
 };
