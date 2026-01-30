@@ -16,7 +16,13 @@ const SideBar = () => {
             </div>
       </div>
 
-        <div className="flex-1 p-4">2</div>
+        <div className="flex-1 p-4">
+           <div className="flex w-50 flex-col justify-center items-center gap-5">
+            <div className="flex justify-center border border-amber-400 w-40 h-10">Dashboard</div>
+            <div>asjab</div>
+           </div>
+
+        </div>
       </aside>
 
       

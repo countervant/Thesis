@@ -11,7 +11,25 @@ export const AuthProvider = ({ children }) => {
     return value;
   };
 
-  const [token, setToken] = useState(() => normalizeToken(localStorage.getItem("token")));
+  const readStoredToken = () => {
+    return (
+      normalizeToken(localStorage.getItem("token")) ||
+      normalizeToken(sessionStorage.getItem("token"))
+    );
+  };
+
+  const readStoredUser = () => {
+    return localStorage.getItem("user") || sessionStorage.getItem("user");
+  };
+
+  const clearStorage = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+  };
+
+  const [token, setToken] = useState(() => readStoredToken());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,12 +37,11 @@ export const AuthProvider = ({ children }) => {
 
     const bootstrapAuth = async () => {
       // Hydrate from localStorage, then validate token with /me.
-      const storedToken = normalizeToken(localStorage.getItem("token"));
-      const storedUserRaw = localStorage.getItem("user");
+      const storedToken = readStoredToken();
+      const storedUserRaw = readStoredUser();
 
       if (!storedToken) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearStorage();
         if (isMounted) {
           setUser(null);
           setToken(null);
@@ -40,7 +57,7 @@ export const AuthProvider = ({ children }) => {
           const parsedUser = JSON.parse(storedUserRaw);
           if (isMounted) setUser(parsedUser);
         } catch {
-          localStorage.removeItem("user");
+          clearStorage();
         }
       }
 
@@ -51,8 +68,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem("user", JSON.stringify(me));
       } catch {
         // Token invalid/expired
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearStorage();
         if (isMounted) {
           setUser(null);
           setToken(null);
@@ -69,23 +85,23 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = (userData, authToken) => {
+  const login = (userData, authToken, remember = true) => {
     setUser(userData);
     const normalized = normalizeToken(authToken);
     setToken(normalized);
-    localStorage.setItem("user", JSON.stringify(userData));
+    const storage = remember ? localStorage : sessionStorage;
+    storage.setItem("user", JSON.stringify(userData));
     if (normalized) {
-      localStorage.setItem("token", normalized);
+      storage.setItem("token", normalized);
     } else {
-      localStorage.removeItem("token");
+      storage.removeItem("token");
     }
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearStorage();
   };
 
   const isAuthenticated = useMemo(() => !!token && !!user, [token, user]);
