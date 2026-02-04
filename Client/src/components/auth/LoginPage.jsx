@@ -46,7 +46,12 @@ const LoginPage = ({ order, order1 }) => {
       login({ id: data.id, email: data.email, type: data.type }, data.token);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please try again.");
+      const status = err.response?.status;
+      if (status === 401) {
+        setError("Incorrect credentials");
+      } else {
+        setError(err.response?.data?.message || "Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
