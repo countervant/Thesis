@@ -1,5 +1,5 @@
 import React from "react";
-import backgroundImage from "../assets/backround.png";
+import backgroundImage from "../../assets/backround.png";
 
 const Welcome = ({ order, order1, text }) => {
   return (

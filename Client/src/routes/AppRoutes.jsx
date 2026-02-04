@@ -7,12 +7,13 @@ import {
   Outlet,
 } from "react-router-dom";
 
-import Login from "../pages/Login.jsx";
-import Register from "../pages/Register.jsx";
-import ForgotPassword from "../pages/ForgotPassword.jsx";
+import Login from "../pages/auth/Login.jsx";
+import Register from "../pages/auth/Register.jsx";
+import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
+import ResetPassword from "../pages/auth/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
-import Unauthorized from "../pages/Unauthorized.jsx";
-import ProtectedRoute from "../components/ProtectedRoute.jsx";
+import Unauthorized from "../pages/auth/Unauthorized.jsx";
+import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { AuthProvider } from "../context/AuthContext.jsx";
 
 // Layout component that wraps all routes with AuthProvider
@@ -31,6 +32,7 @@ const AppRoutes = () => {
         <Route index element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/ForgotPassword" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
         
         {/* Protected Routes - requires authentication */}

@@ -1,5 +1,5 @@
-import LoginPage from "../components/LoginPage";
-import Welcome from "../components/Welcome";
+import LoginPage from "../../components/auth/LoginPage.jsx";
+import Welcome from "../../components/auth/Welcome.jsx";
 const Login = () => {
 
 
