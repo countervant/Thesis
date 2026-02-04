@@ -43,7 +43,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Admin only routes */}
+        {/* Admin routes */}
         <Route
           path="/admin/*"
           element={

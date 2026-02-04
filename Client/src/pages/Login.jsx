@@ -4,7 +4,7 @@ const Login = () => {
 
 
   return (
-    <div className="flex min-h-screen flex-col-reverse md:flex-row">
+    <div className="flex min-h-screen flex-col md:flex-row">
      
      <Welcome order='2' order1='1' text = 'Welcome to' />
      
