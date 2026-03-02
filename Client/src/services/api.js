@@ -29,7 +29,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const requestUrl = error.config?.url || "";
+    const isLoginRequest = requestUrl.includes("/login");
+    if (status === 401 && !isLoginRequest) {
       // Token expired or invalid - clear storage
       localStorage.removeItem("token");
       localStorage.removeItem("user");
