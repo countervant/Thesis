@@ -6,8 +6,9 @@ import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { validateEmail } from "../../utils/validation.js";
 
-const LoginPage = ({ order, order1 }) => {
+const LoginPage = ({ onToggle }) => {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
@@ -18,13 +19,6 @@ const LoginPage = ({ order, order1 }) => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
-
-  const validateEmail = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
-  };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
@@ -58,7 +52,7 @@ const LoginPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`con order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
+        className="h-full w-full bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0"
       >
         <img
           src={logo}
@@ -141,6 +135,7 @@ const LoginPage = ({ order, order1 }) => {
             link="/register"
             Label="Create Account"
             Label1="Forgot Password?"
+            onToggle={onToggle}
           />
         </form>
       </div>
