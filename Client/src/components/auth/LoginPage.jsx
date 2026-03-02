@@ -6,24 +6,19 @@ import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { validateEmail } from "../../utils/validation.js";
 
-const LoginPage = ({ order, order1 }) => {
+const LoginPage = ({ onToggle }) => {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const navigate = useNavigate();
   const { login } = useAuth();
-
-  const validateEmail = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
-  };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
@@ -43,7 +38,7 @@ const LoginPage = ({ order, order1 }) => {
 
     try {
       const data = await authAPI.login(email, password);
-      login({ id: data.id, email: data.email, type: data.type }, data.token);
+      login({ id: data.id, email: data.email, type: data.type }, data.token, rememberMe);
       navigate("/dashboard");
     } catch (err) {
       const status = err.response?.status;
@@ -62,7 +57,7 @@ const LoginPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`con order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
+        className="h-full w-full bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0"
       >
         <img
           src={logo}
@@ -130,10 +125,22 @@ const LoginPage = ({ order, order1 }) => {
             {loading ? "Signing In..." : "Sign In"}
           </button>
 
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-pink-500 focus:ring-pink-500"
+            />
+            Remember me
+          </label>
+        
+
           <AuthenticationHelper
             link="/register"
             Label="Create Account"
             Label1="Forgot Password?"
+            onToggle={onToggle}
           />
         </form>
       </div>

@@ -1,18 +1,20 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/auth";
+// Use Vite env var; in dev the proxy forwards /api to localhost:5000
+const API_URL = `${import.meta.env.VITE_API_URL || "/api"}/auth`;
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 15_000, // 15 s request timeout
 });
 
 // Add token to requests automatically
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -34,6 +36,8 @@ api.interceptors.response.use(
       // Token expired or invalid - clear storage
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
       window.location.href = "/";
     }
     return Promise.reject(error);

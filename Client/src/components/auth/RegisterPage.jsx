@@ -5,9 +5,11 @@ import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
+import { validateEmail } from "../../utils/validation.js";
 
-const RegisterPage = ({ order, order1 }) => {
+const RegisterPage = ({ onToggle }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
@@ -20,13 +22,6 @@ const RegisterPage = ({ order, order1 }) => {
   const navigate = useNavigate();
 
   const userTypes = ["Admin", "Employee", "Client"];
-
-  const validateEmail = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
-  };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
@@ -76,7 +71,7 @@ const RegisterPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
+        className="h-full w-full bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0"
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -164,8 +159,9 @@ const RegisterPage = ({ order, order1 }) => {
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowPassword((prev) => !prev)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
@@ -177,7 +173,7 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="border-b-2 border-gray-400 flex items-center">
             <input
-              type={showPassword ? "text" : "password"}
+              type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -186,10 +182,11 @@ const RegisterPage = ({ order, order1 }) => {
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
             >
-              {showPassword ? (
+              {showConfirmPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
               ) : (
                 <img src={view} alt="Show" className="w-5 h-5" />
@@ -209,6 +206,7 @@ const RegisterPage = ({ order, order1 }) => {
             link="/"
             Label="Already have an account? Log In"
             Label1=""
+            onToggle={onToggle}
           />
         </form>
       </div>
