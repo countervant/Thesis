@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React from "react";
 import {
   Route,
   createBrowserRouter,
@@ -7,78 +7,68 @@ import {
   Outlet,
 } from "react-router-dom";
 
+import Login from "../pages/auth/Login.jsx";
+import Register from "../pages/auth/Register.jsx";
+import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
+import ResetPassword from "../pages/auth/ResetPassword.jsx";
+import Dashboard from "../pages/Dashboard.jsx";
+import Unauthorized from "../pages/auth/Unauthorized.jsx";
+import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { AuthProvider } from "../context/AuthContext.jsx";
 
-// Lazy-load page components for code-splitting
-const AuthPage = lazy(() => import("../pages/auth/AuthPage.jsx"));
-const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword.jsx"));
-const ResetPassword = lazy(() => import("../pages/auth/ResetPassword.jsx"));
-const Dashboard = lazy(() => import("../pages/Dashboard.jsx"));
-const Unauthorized = lazy(() => import("../pages/auth/Unauthorized.jsx"));
-
-// Eagerly loaded because it wraps every protected route
-import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
-
-// Shared loading spinner for Suspense boundaries
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500" />
-  </div>
-);
-
 // Layout component that wraps all routes with AuthProvider
-const AuthLayout = () => (
-  <AuthProvider>
-    <Suspense fallback={<PageLoader />}>
+const AuthLayout = () => {
+  return (
+    <AuthProvider>
       <Outlet />
-    </Suspense>
-  </AuthProvider>
-);
+    </AuthProvider>
+  );
+};
 
-// Create router ONCE outside the component so it's stable across re-renders
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route element={<AuthLayout />}>
-      {/* Login & Register share the same component with a slide transition */}
-      <Route index element={<AuthPage />} />
-      <Route path="/register" element={<AuthPage />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/unauthorized" element={<Unauthorized />} />
+const AppRoutes = () => {
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <Route element={<AuthLayout />}>
+        <Route index element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/ForgotPassword" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
+        
+        {/* Protected Routes - requires authentication */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Protected Routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Admin routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute allowedRoles={["Admin"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Admin only */}
-      <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute allowedRoles={["Admin"]}>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Employee routes - accessible by Admin and Employee */}
+        <Route
+          path="/employee/*"
+          element={
+            <ProtectedRoute allowedRoles={["Admin", "Employee"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
+    )
+  );
 
-      {/* Employee (Admin + Employee) */}
-      <Route
-        path="/employee/*"
-        element={
-          <ProtectedRoute allowedRoles={["Admin", "Employee"]}>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-    </Route>
-  )
-);
-
-const AppRoutes = () => <RouterProvider router={router} />;
+  return <RouterProvider router={router} />;
+};
 
 export default AppRoutes;

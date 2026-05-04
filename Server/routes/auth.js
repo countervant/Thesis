@@ -4,61 +4,28 @@ import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
-import rateLimit from "express-rate-limit";
+
 
 const router = express.Router();
 
-// --------------- Helpers ---------------
-
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
-
-const PASSWORD_MIN_LENGTH = 6;
-
-// Reusable mail transporter (created once, lazily)
-let _transporter = null;
-const getTransporter = () => {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
-      },
-    });
-  }
-  return _transporter;
-};
-
-// Stricter rate limiter for auth-sensitive endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many attempts, please try again later." },
-});
-
-// --------------- Routes ---------------
-
-// Register
-router.post("/register", authLimiter, async (req, res) => {
+// Register route
+router.post("/register", async (req, res) => {
   const { email, password, type } = req.body;
+  // Default type to "Client" if not provided
   const userType = type || "Client";
 
   try {
     if (!email || !password) {
-      return res.status(400).json({ message: "Please provide email and password" });
+      return res
+        .status(400)
+        .json({ message: "Please provide email and password" });
     }
 
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      return res.status(400).json({ message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` });
-    }
-
+    // Validate type
     if (!["Admin", "Employee", "Client"].includes(userType)) {
-      return res.status(400).json({ message: "Invalid type. Must be Admin, Employee, or Client" });
+      return res
+        .status(400)
+        .json({ message: "Invalid type. Must be Admin, Employee, or Client" });
     }
 
     const userExists = await User.findOne({ email });
@@ -75,30 +42,28 @@ router.post("/register", authLimiter, async (req, res) => {
   }
 });
 
-// Login
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", async (req, res) => {
   const { email, password } = req.body;
+  try{
+  if (!email || !password) {    
+    return res
+    .status(400)
+    .json({ message: "Please provide email and password" });
+  }
+   const user = await User.findOne({ email });
 
-  try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Please provide email and password" });
+    if(!user || !(await user.matchPassword(password))){
+        return res.status(401).json({message: "Invalid email or password"});
     }
-
-    const user = await User.findOne({ email });
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
     const token = generateToken(user._id);
-    res.status(200).json({ id: user._id, email: user.email, type: user.type, token });
+    res.status(200).json({id: user._id, email: user.email, type: user.type, token});
   } catch (error) {
-    console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
   }
-});
+}
+);
 
-// Forgot password
-router.post("/forgot-password", authLimiter, async (req, res) => {
+router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
@@ -116,15 +81,24 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
       return res.status(404).json({ message: "Email is not registered" });
     }
 
-    // Cryptographically secure 6-digit OTP
-    const otp = crypto.randomInt(100000, 999999).toString();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
 
     user.resetPasswordOTP = hashedOTP;
     user.resetPasswordOTPExpires = Date.now() + 1000 * 60 * 10; // 10 minutes
     await user.save();
 
-    await getTransporter().sendMail({
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
       to: user.email,
       from: process.env.GMAIL_USER,
       subject: "Your password reset code",
@@ -183,7 +157,7 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
   }
 });
 
-router.post("/reset-password", authLimiter, async (req, res) => {
+router.post("/reset-password", async (req, res) => {
   const { email, otp, password } = req.body;
 
   if (!email || !otp || !password) {
@@ -219,8 +193,17 @@ router.post("/reset-password", authLimiter, async (req, res) => {
   }
 });
 
-router.get("/me", protect, async (req, res) => {
-  res.status(200).json(req.user);
-});
+    router.get('/me', protect,  async (req, res) => {
+      res.status(200).json(req.user);
+     }
+    );
 
-export default router;
+    // generate JWT token
+      const generateToken = (id) => {
+       return jwt.sign({id}, process.env.JWT_SECRET, {
+        expiresIn: '30d',
+       });
+
+      }
+
+    export default router;
