@@ -12,14 +12,11 @@ const RegisterPage = ({ order, order1 }) => {
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [userType, setUserType] = useState("Client");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
-
-  const userTypes = ["Admin", "Employee", "Client"];
 
   const validateEmail = (value) => {
     const trimmed = value.trim();
@@ -47,15 +44,20 @@ const RegisterPage = ({ order, order1 }) => {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+      setError("Password must include uppercase, lowercase, and number characters");
       return;
     }
 
     setLoading(true);
 
     try {
-      await authAPI.register(email, password, userType);
+      await authAPI.register(email, password);
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
     } catch (err) {
@@ -112,23 +114,6 @@ const RegisterPage = ({ order, order1 }) => {
         >
           Create Account
         </h2>
-
-        <div className="flex gap-4 mb-4">
-          {userTypes.map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setUserType(type)}
-              className={`px-4 py-2 rounded text-black bg-white transition-colors duration-300 ${
-                userType === type
-                  ? "bg-linear-to-r from-[#EF35A2] to-[#9E1DF4] text-white"
-                  : "shadow-[10px_10px_20px] shadow-gray-500 hover:shadow-[#EF35A2]"
-              }`}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
 
         <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
           {error && (

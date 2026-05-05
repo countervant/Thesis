@@ -7,6 +7,12 @@ import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 
+const dashboardPathByRole = {
+  client: "/client/dashboard",
+  employee: "/employee/dashboard",
+  admin: "/admin/dashboard",
+};
+
 const LoginPage = ({ order, order1 }) => {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -43,8 +49,8 @@ const LoginPage = ({ order, order1 }) => {
 
     try {
       const data = await authAPI.login(email, password);
-      login({ id: data.id, email: data.email, type: data.type }, data.token);
-      navigate("/dashboard");
+      login({ id: data.id, email: data.email, role: data.role }, data.token);
+      navigate(dashboardPathByRole[data.role] || "/client/dashboard");
     } catch (err) {
       const status = err.response?.status;
       if (status === 401) {

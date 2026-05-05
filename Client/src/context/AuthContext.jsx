@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext(null);
 
+const normalizeRole = (role) => role?.toLowerCase();
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
@@ -13,17 +15,27 @@ export const AuthProvider = ({ children }) => {
     const storedToken = localStorage.getItem("token");
     
     if (storedUser && storedToken) {
+      const parsedUser = JSON.parse(storedUser);
+      const normalizedUser = {
+        ...parsedUser,
+        role: normalizeRole(parsedUser.role || parsedUser.type),
+      };
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(JSON.parse(storedUser));
+      setUser(normalizedUser);
       setToken(storedToken);
+      localStorage.setItem("user", JSON.stringify(normalizedUser));
     }
     setLoading(false);
   }, []);
 
   const login = (userData, authToken) => {
-    setUser(userData);
+    const normalizedUser = {
+      ...userData,
+      role: normalizeRole(userData.role || userData.type),
+    };
+    setUser(normalizedUser);
     setToken(authToken);
-    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
     localStorage.setItem("token", authToken);
   };
 
@@ -40,9 +52,9 @@ export const AuthProvider = ({ children }) => {
   const hasRole = (roles) => {
     if (!user) return false;
     if (typeof roles === "string") {
-      return user.type === roles;
+      return user.role === roles;
     }
-    return roles.includes(user.type);
+    return roles.includes(user.role);
   };
 
   return (

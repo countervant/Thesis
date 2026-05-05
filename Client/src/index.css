@@ -4,3 +4,54 @@
 :root {
   --font-bruno: 'Bruno Ace SC', sans-serif;
 }
+
+.auth-screen {
+  overflow: hidden;
+}
+
+.auth-screen-exit-register {
+  pointer-events: none;
+}
+
+.auth-screen-exit-register > *:first-child {
+  animation: auth-visual-left-to-right 420ms ease-in-out forwards;
+}
+
+.auth-screen-exit-register > *:last-child {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.auth-screen-exit-login > *:first-child {
+  animation: auth-visual-right-to-left 420ms ease-in-out forwards;
+}
+
+.auth-screen-exit-login > *:last-child {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+@keyframes auth-visual-left-to-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes auth-visual-right-to-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-screen-exit-register > *,
+  .auth-screen-exit-login > * {
+    animation: none;
+  }
+}

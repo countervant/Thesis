@@ -5,6 +5,7 @@ import {
   createRoutesFromElements,
   RouterProvider,
   Outlet,
+  Navigate,
 } from "react-router-dom";
 
 import Login from "../pages/auth/Login.jsx";
@@ -14,7 +15,13 @@ import ResetPassword from "../pages/auth/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
-import { AuthProvider } from "../context/AuthContext.jsx";
+import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
+
+const dashboardPathByRole = {
+  client: "/client/dashboard",
+  employee: "/employee/dashboard",
+  admin: "/admin/dashboard",
+};
 
 // Layout component that wraps all routes with AuthProvider
 const AuthLayout = () => {
@@ -23,6 +30,11 @@ const AuthLayout = () => {
       <Outlet />
     </AuthProvider>
   );
+};
+
+const RoleDashboardRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
 };
 
 const AppRoutes = () => {
@@ -40,6 +52,15 @@ const AppRoutes = () => {
           path="/dashboard"
           element={
             <ProtectedRoute>
+              <RoleDashboardRedirect />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/client/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -47,19 +68,19 @@ const AppRoutes = () => {
 
         {/* Admin routes */}
         <Route
-          path="/admin/*"
+          path="/admin/dashboard"
           element={
-            <ProtectedRoute allowedRoles={["Admin"]}>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <Dashboard />
             </ProtectedRoute>
           }
         />
 
-        {/* Employee routes - accessible by Admin and Employee */}
+        {/* Employee routes */}
         <Route
-          path="/employee/*"
+          path="/employee/dashboard"
           element={
-            <ProtectedRoute allowedRoles={["Admin", "Employee"]}>
+            <ProtectedRoute allowedRoles={["employee"]}>
               <Dashboard />
             </ProtectedRoute>
           }

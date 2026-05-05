@@ -1,14 +1,20 @@
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import AdminDashboard from "./Dashboard/Admin.jsx";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const role = user?.role;
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
+
+  if (role === "admin") {
+    return <AdminDashboard onLogout={handleLogout} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -21,7 +27,7 @@ const Dashboard = () => {
               Welcome, <strong>{user?.email}</strong>
             </span>
             <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">
-              {user?.type}
+              {role}
             </span>
             <button
               onClick={handleLogout}
@@ -40,11 +46,11 @@ const Dashboard = () => {
             Dashboard
           </h2>
           <p className="text-gray-600 mb-6">
-            You are logged in as <strong>{user?.type}</strong>
+            You are logged in as <strong>{role}</strong>
           </p>
 
           {/* Role-specific content */}
-          {user?.type === "Admin" && (
+          {role === "admin" && (
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
               <h3 className="font-semibold text-purple-800 mb-2">
                 Admin Panel
@@ -56,7 +62,7 @@ const Dashboard = () => {
             </div>
           )}
 
-          {user?.type === "Employee" && (
+          {role === "employee" && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <h3 className="font-semibold text-blue-800 mb-2">
                 Employee Portal
@@ -68,7 +74,7 @@ const Dashboard = () => {
             </div>
           )}
 
-          {user?.type === "Client" && (
+          {role === "client" && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
               <h3 className="font-semibold text-green-800 mb-2">
                 Client Portal
