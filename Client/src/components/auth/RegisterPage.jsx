@@ -8,6 +8,8 @@ import { authAPI } from "../../services/api.js";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
@@ -19,6 +21,8 @@ const RegisterPage = ({ order, order1 }) => {
   const navigate = useNavigate();
 
   const resetForm = useCallback(() => {
+    setFirstName("");
+    setLastName("");
     setEmail("");
     setEmailError("");
     setPassword("");
@@ -47,6 +51,11 @@ const RegisterPage = ({ order, order1 }) => {
     setEmailError(emailValidation);
     if (emailValidation) return;
 
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First name and last name are required");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -65,7 +74,7 @@ const RegisterPage = ({ order, order1 }) => {
     setLoading(true);
 
     try {
-      await authAPI.register(email, password);
+      await authAPI.register(firstName.trim(), lastName.trim(), email, password);
       resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
@@ -140,6 +149,32 @@ const RegisterPage = ({ order, order1 }) => {
               {error}
             </div>
           )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="border-b border-black mb-2">
+              <input
+                type="text"
+                placeholder="First Name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                autoComplete="given-name"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                required
+              />
+            </div>
+
+            <div className="border-b border-black mb-2">
+              <input
+                type="text"
+                placeholder="Last Name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                autoComplete="family-name"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                required
+              />
+            </div>
+          </div>
 
           <div>
             <div className="border-b border-black mb-2">

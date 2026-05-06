@@ -47,8 +47,13 @@ export const authAPI = {
     return response.data;
   },
 
-  register: async (email, password) => {
-    const response = await api.post("/auth/register", { email, password });
+  register: async (firstName, lastName, email, password) => {
+    const response = await api.post("/auth/register", {
+      firstName,
+      lastName,
+      email,
+      password,
+    });
     return response.data;
   },
 

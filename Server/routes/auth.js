@@ -10,16 +10,24 @@ const router = express.Router();
 
 // Register route
 router.post("/register", async (req, res) => {
-  const { email, password } = req.body;
+  const { firstName, lastName, email, password } = req.body;
 
   try {
-    if (!email || !password) {
+    if (!firstName || !lastName || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Please provide email and password" });
+        .json({ message: "Please provide first name, last name, email, and password" });
     }
 
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
     const normalizedEmail = email.trim().toLowerCase();
+    if (!trimmedFirstName || !trimmedLastName) {
+      return res
+        .status(400)
+        .json({ message: "First name and last name are required" });
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(normalizedEmail)) {
       return res
@@ -44,12 +52,27 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const user = await User.create({ email: normalizedEmail, password });
+    const user = await User.create({
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      email: normalizedEmail,
+      password,
+    });
     const token = generateToken(user._id);
-    res.status(201).json({ id: user._id, email: user.email, role: user.role, token });
+    res.status(201).json({
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      token,
+    });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ message: "User already exists" });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
     }
     console.error("Registration error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
