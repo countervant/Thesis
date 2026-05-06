@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
 import peejong from "../../../assets/peejong.png";
+import progress from "../../../assets/progress.png";
+import pending from "../../../assets/pending.png";
+import review from "../../../assets/review.png";
+import done from "../../../assets/done.png";
 
 const navItems = [
   { id: "dashboard", label: "Home", icon: "grid" },
@@ -153,115 +157,24 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
 
   if (name === "progress") {
     return (
-      <svg
-        viewBox="0 0 52 52"
-        fill="none"
-        className={className}
-        aria-hidden="true"
-      >
-        <path
-          d="M15 8h20M17 8c0 10 18 10 18 20S17 38 17 48M35 8c0 10-18 10-18 20s18 10 18 20M15 48h20"
-          stroke={stroke}
-          strokeWidth="3.6"
-          strokeLinecap="round"
-        />
-        <circle
-          cx="36"
-          cy="36"
-          r="7"
-          fill="white"
-          stroke={stroke}
-          strokeWidth="3.2"
-        />
-        <path
-          d="M36 31v10M31 36h10"
-          stroke={stroke}
-          strokeWidth="3.2"
-          strokeLinecap="round"
-        />
-      </svg>
+    <img src={progress} alt="In Progress" className={className} aria-hidden="true" />
     );
   }
 
   if (name === "pending") {
     return (
-      <svg
-        viewBox="0 0 52 52"
-        fill="none"
-        className={className}
-        aria-hidden="true"
-      >
-        <circle
-          cx="26"
-          cy="26"
-          r="18"
-          stroke={stroke}
-          strokeWidth="3.5"
-          strokeDasharray="6 5"
-        />
-        <path
-          d="M26 15v12l8 8"
-          stroke={stroke}
-          strokeWidth="3.5"
-          strokeLinecap="round"
-        />
-      </svg>
+      <img src={pending} alt="Pending" className={className} aria-hidden="true" />
     );
   }
 
   if (name === "review") {
     return (
-      <svg
-        viewBox="0 0 52 52"
-        fill="none"
-        className={className}
-        aria-hidden="true"
-      >
-        <path
-          d="M12 14h25a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H25l-9 7v-7h-4a5 5 0 0 1-5-5V19a5 5 0 0 1 5-5z"
-          stroke={stroke}
-          strokeWidth="3.3"
-          strokeLinejoin="round"
-        />
-        <circle
-          cx="39"
-          cy="13"
-          r="7"
-          fill="white"
-          stroke={stroke}
-          strokeWidth="3"
-        />
-        <path
-          d="M39 9v5M39 18h.1"
-          stroke={stroke}
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-      </svg>
+      <img src={review} alt="In Review" className={className} aria-hidden="true" />
     );
   }
 
   return (
-    <svg
-      viewBox="0 0 52 52"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M42 27a16 16 0 1 1-4.7-11.3"
-        stroke={stroke}
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-      <path
-        d="m18 27 7 7 15-16"
-        stroke={stroke}
-        strokeWidth="4.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <img src={done} alt="Done" className={className} aria-hidden="true" />
   );
 };
 
