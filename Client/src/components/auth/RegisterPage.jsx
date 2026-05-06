@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
@@ -17,6 +17,14 @@ const RegisterPage = ({ order, order1 }) => {
   const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
+
+  const resetForm = useCallback(() => {
+    setEmail("");
+    setEmailError("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+  }, []);
 
   const validateEmail = (value) => {
     const trimmed = value.trim();
@@ -58,6 +66,7 @@ const RegisterPage = ({ order, order1 }) => {
 
     try {
       await authAPI.register(email, password);
+      resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
     } catch (err) {
@@ -68,6 +77,12 @@ const RegisterPage = ({ order, order1 }) => {
   };
 
   const isEmailInvalid = !email || !!emailError;
+
+  useEffect(() => {
+    resetForm();
+    const timer = setTimeout(resetForm, 100);
+    return () => clearTimeout(timer);
+  }, [resetForm]);
 
   useEffect(() => {
     if (!successMessage) return undefined;
@@ -115,7 +130,11 @@ const RegisterPage = ({ order, order1 }) => {
           Create Account
         </h2>
 
-        <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8"
+          autoComplete="off"
+        >
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
@@ -129,6 +148,7 @@ const RegisterPage = ({ order, order1 }) => {
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
+                autoComplete="off"
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
                 required
               />
@@ -144,6 +164,7 @@ const RegisterPage = ({ order, order1 }) => {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
               required
             />
@@ -166,6 +187,7 @@ const RegisterPage = ({ order, order1 }) => {
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
               className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
               required
             />

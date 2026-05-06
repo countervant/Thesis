@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import AdminDashboard from "./Dashboard/Admin.jsx";
+import AdminDashboard from "./Dashboard/Admin/Home.jsx";
+import AdminTasks from "./Dashboard/Admin/Tasks.jsx";
+import AdminBudget from "./Dashboard/Admin/Budget.jsx";
+import AdminClients from "./Dashboard/Admin/Client.jsx";
+import AdminEmployees from "./Dashboard/Admin/Employee.jsx";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const role = user?.role;
+  const [adminPage, setAdminPage] = useState("dashboard");
 
   const handleLogout = () => {
     logout();
@@ -13,7 +19,53 @@ const Dashboard = () => {
   };
 
   if (role === "admin") {
-    return <AdminDashboard onLogout={handleLogout} />;
+    if (adminPage === "tasks") {
+      return (
+        <AdminTasks
+          activePage={adminPage}
+          onLogout={handleLogout}
+          onNavigate={setAdminPage}
+        />
+      );
+    }
+
+    if (adminPage === "budget") {
+      return (
+        <AdminBudget
+          activePage={adminPage}
+          onLogout={handleLogout}
+          onNavigate={setAdminPage}
+        />
+      );
+    }
+
+    if (adminPage === "client") {
+      return (
+        <AdminClients
+          activePage={adminPage}
+          onLogout={handleLogout}
+          onNavigate={setAdminPage}
+        />
+      );
+    }
+
+    if (adminPage === "employee") {
+      return (
+        <AdminEmployees
+          activePage={adminPage}
+          onLogout={handleLogout}
+          onNavigate={setAdminPage}
+        />
+      );
+    }
+
+    return (
+      <AdminDashboard
+        activePage={adminPage}
+        onLogout={handleLogout}
+        onNavigate={setAdminPage}
+      />
+    );
   }
 
   return (

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import CLIENTRA2 from "../../assets/CLIENTRA2.png";
-import peejong from "../../assets/peejong.png";
+import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
+import peejong from "../../../assets/peejong.png";
 
 const navItems = [
-  { label: "Home", icon: "grid", active: true },
-  { label: "Tasks", icon: "tasks" },
-  { label: "Budget", icon: "budget" },
-  { label: "Client", icon: "client" },
-  { label: "Employee", icon: "employee" },
+  { id: "dashboard", label: "Home", icon: "grid" },
+  { id: "tasks", label: "Tasks", icon: "tasks" },
+  { id: "budget", label: "Budget", icon: "budget" },
+  { id: "client", label: "Client", icon: "client" },
+  { id: "employee", label: "Employee", icon: "employee" },
 ];
 
 const stats = [
@@ -49,7 +49,7 @@ const monthlyData = [
 
 const expenseCategories = [
   { label: "Groceries", value: 150, color: "#d64ab2" },
-  { label: "Bills", value: 139.95, color: "#9228c9" },
+  { label: "Bills", value: 100.95, color: "#9228c9" },
 ];
 
 const employees = [
@@ -430,7 +430,7 @@ const EmployeeTable = ({ title }) => (
   </section>
 );
 
-const AdminDashboard = ({ onLogout }) => {
+const AdminDashboard = ({ activePage = "dashboard", onLogout, onNavigate }) => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
 
@@ -528,8 +528,9 @@ const AdminDashboard = ({ onLogout }) => {
             <button
               key={item.label}
               type="button"
+              onClick={() => onNavigate?.(item.id)}
               className={`flex w-16 flex-col items-center gap-1 rounded-xl py-3 text-xs transition ${
-                item.active
+                activePage === item.id
                   ? "bg-linear-to-b from-[#df4bb4] to-[#7e22ce] text-white shadow-[0_4px_8px_rgba(126,34,206,0.35)]"
                   : "text-neutral-900 hover:bg-white hover:text-[#c72fb2]"
               }`}

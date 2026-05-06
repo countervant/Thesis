@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
@@ -23,6 +23,13 @@ const LoginPage = ({ order, order1 }) => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const resetForm = useCallback(() => {
+    setEmail("");
+    setEmailError("");
+    setPassword("");
+    setShowPassword(false);
+  }, []);
 
   const validateEmail = (value) => {
     const trimmed = value.trim();
@@ -50,6 +57,7 @@ const LoginPage = ({ order, order1 }) => {
     try {
       const data = await authAPI.login(email, password);
       login({ id: data.id, email: data.email, role: data.role }, data.token);
+      resetForm();
       navigate(dashboardPathByRole[data.role] || "/client/dashboard");
     } catch (err) {
       const status = err.response?.status;
@@ -64,6 +72,12 @@ const LoginPage = ({ order, order1 }) => {
   };
 
   const isEmailInvalid = !email || !!emailError;
+
+  useEffect(() => {
+    resetForm();
+    const timer = setTimeout(resetForm, 100);
+    return () => clearTimeout(timer);
+  }, [resetForm]);
 
   return (
     <>
@@ -82,7 +96,7 @@ const LoginPage = ({ order, order1 }) => {
           LOG IN
         </h2>
 
-        <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8" autoComplete="off">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
@@ -96,6 +110,7 @@ const LoginPage = ({ order, order1 }) => {
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
+                autoComplete="off"
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
                 required
               />
@@ -111,6 +126,7 @@ const LoginPage = ({ order, order1 }) => {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
               required
             />
