@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
 import peejong from "../../../assets/peejong.png";
+import { taskAPI } from "../../../services/api.js";
 
 const navItems = [
   { id: "dashboard", label: "Home", icon: "dashboard" },
@@ -10,37 +11,43 @@ const navItems = [
   { id: "employee", label: "Employee", icon: "employee" },
 ];
 
-const initialTasks = [
-  {
-    id: 1,
-    title: "Complete project proposal",
-    description: "Draft and finalize the project proposal for the new client",
-    dueDate: "12/27/2025",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    title: "Team meeting",
-    description: "Weekly sync with the development team",
-    dueDate: "12/16/2025",
-    status: "In progress",
-  },
-];
-
 const taskStatuses = ["All", "In progress", "Pending", "Done", "In review"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
+const statusToApi = {
+  Pending: "pending",
+  "In progress": "in_progress",
+  Done: "done",
+  "In review": "review",
+};
+const statusFromApi = {
+  pending: "Pending",
+  in_progress: "In progress",
+  done: "Done",
+  review: "In review",
+};
 
 const formatInputDate = (date) => date.toISOString().slice(0, 10);
 
 const toInputDate = (date) => {
+  if (!date) return formatInputDate(new Date());
+  if (date.includes("-")) return date.slice(0, 10);
   const [month, day, year] = date.split("/");
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
 const toDisplayDate = (date) => {
+  if (!date) return "";
   const [year, month, day] = date.split("-");
   return `${month}/${day}/${year}`;
 };
+
+const normalizeTask = (task) => ({
+  id: task._id || task.id,
+  title: task.title,
+  description: task.description || "",
+  dueDate: toDisplayDate((task.dueDate || "").slice(0, 10)),
+  status: statusFromApi[task.status] || task.status || "Pending",
+});
 
 const getDateStatus = (dueDate) => {
   const today = new Date();
@@ -282,9 +289,40 @@ const TaskCard = ({ onEdit, onToggleDone, task }) => (
 );
 
 const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [selectedTaskStatus, setSelectedTaskStatus] = useState("All");
   const [selectedDateStatus, setSelectedDateStatus] = useState("All");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTasks = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await taskAPI.getAll();
+        if (isMounted) {
+          setTasks(data.map(normalizeTask));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.response?.data?.message || "Unable to load tasks.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadTasks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const visibleTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -297,7 +335,7 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
     });
   }, [selectedDateStatus, selectedTaskStatus, tasks]);
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     const title = window.prompt("Task title");
 
     if (!title?.trim()) {
@@ -314,19 +352,22 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
       window.prompt("Status: In progress, Pending, Done, In review", "Pending") ||
       "Pending";
 
-    setTasks((currentTasks) => [
-      ...currentTasks,
-      {
-        id: Date.now(),
+    try {
+      setErrorMessage("");
+      const createdTask = await taskAPI.create({
         title: title.trim(),
         description: description.trim(),
-        dueDate: toDisplayDate(dueDate),
-        status,
-      },
-    ]);
+        dueDate,
+        status: statusToApi[status] || "pending",
+      });
+
+      setTasks((currentTasks) => [normalizeTask(createdTask), ...currentTasks]);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to add task.");
+    }
   };
 
-  const handleEditTask = (task) => {
+  const handleEditTask = async (task) => {
     const title = window.prompt("Task title", task.title);
 
     if (!title?.trim()) {
@@ -343,29 +384,48 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
       task.status
     ) || task.status;
 
-    setTasks((currentTasks) =>
-      currentTasks.map((currentTask) =>
-        currentTask.id === task.id
-          ? {
-              ...currentTask,
-              title: title.trim(),
-              description: description.trim(),
-              dueDate: toDisplayDate(dueDate),
-              status,
-            }
-          : currentTask
-      )
-    );
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.update(task.id, {
+        title: title.trim(),
+        description: description.trim(),
+        dueDate,
+        status: statusToApi[status] || statusToApi[task.status] || "pending",
+      });
+
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === task.id ? normalizeTask(updatedTask) : currentTask
+        )
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to update task.");
+    }
   };
 
-  const handleToggleDone = (taskId) => {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, status: task.status === "Done" ? "Pending" : "Done" }
-          : task
-      )
-    );
+  const handleToggleDone = async (taskId) => {
+    const task = tasks.find((currentTask) => currentTask.id === taskId);
+    if (!task) return;
+
+    const nextStatus = task.status === "Done" ? "Pending" : "Done";
+
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.update(taskId, {
+        title: task.title,
+        description: task.description,
+        dueDate: toInputDate(task.dueDate),
+        status: statusToApi[nextStatus],
+      });
+
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === taskId ? normalizeTask(updatedTask) : currentTask
+        )
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to update task.");
+    }
   };
 
   return (
@@ -442,7 +502,25 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
           </section>
 
           <section className="mt-4 space-y-5">
-            {visibleTasks.map((task) => (
+            {errorMessage && (
+              <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                {errorMessage}
+              </p>
+            )}
+
+            {isLoading && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)]">
+                Loading tasks...
+              </p>
+            )}
+
+            {!isLoading && visibleTasks.length === 0 && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)]">
+                No tasks found.
+              </p>
+            )}
+
+            {!isLoading && visibleTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 onEdit={handleEditTask}

@@ -4,6 +4,7 @@ import cors from 'cors';
 
 import {dbConnect} from './config/dbConnect.js';
 import auth from './routes/auth.js';
+import tasks from './routes/tasks.js';
 
 const app = express();
 dotenv.config();
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use('/api/auth', auth);
 // Back-compat / alternate base path (some clients call this as /api/user/*)
 app.use('/api/user', auth);
+app.use('/api/tasks', tasks);
 
 dbConnect();
 
