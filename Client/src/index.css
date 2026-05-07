@@ -5,6 +5,17 @@
   --font-bruno: 'Bruno Ace SC', sans-serif;
 }
 
+.top-nav-icon,
+.top-nav-icon-active {
+  transition: filter 180ms ease, transform 180ms ease;
+}
+
+.top-nav-icon-active,
+.group:hover .top-nav-icon {
+  filter: brightness(0) saturate(100%) invert(47%) sepia(62%) saturate(1827%)
+    hue-rotate(285deg) brightness(93%) contrast(91%);
+}
+
 .auth-screen {
   overflow: hidden;
 }

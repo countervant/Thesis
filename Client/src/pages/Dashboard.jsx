@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AdminDashboard from "./Dashboard/Admin/Home.jsx";
 import AdminTasks from "./Dashboard/Admin/Tasks.jsx";
 import AdminBudget from "./Dashboard/Admin/Budget.jsx";
@@ -31,6 +31,7 @@ const adminPages = new Set([
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const role = user?.role;
@@ -39,7 +40,12 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const [localPage, setLocalPage] = useState("dashboard");
+  const initialLocalPage = ["dashboard", "newsfeed", "messages"].includes(
+    location.state?.page
+  )
+    ? location.state.page
+    : "dashboard";
+  const [localPage, setLocalPage] = useState(initialLocalPage);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
   const [editingTask, setEditingTask] = useState(null);

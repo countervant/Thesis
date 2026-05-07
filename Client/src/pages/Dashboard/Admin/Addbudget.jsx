@@ -199,7 +199,7 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
             </div>
 
             <div className="space-y-1">
-              <FieldLabel>Amount ($)</FieldLabel>
+              <FieldLabel>Amount (₱)</FieldLabel>
               <input
                 type="text"
                 inputMode="decimal"

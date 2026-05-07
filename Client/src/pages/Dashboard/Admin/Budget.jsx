@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import balanceIcon from "../../../assets/balance.png";
+import totalExpenseIcon from "../../../assets/totalexpense.png";
+import totalIncomeIcon from "../../../assets/totalincome.png";
+
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -44,6 +48,24 @@ const normalizeEntry = (entry) => ({
       ? -Math.abs(Number(entry.amount) || 0)
       : Math.abs(Number(entry.amount) || 0),
 });
+
+const formatPeso = (amount, { signed = false } = {}) => {
+  const formattedAmount = new Intl.NumberFormat("en-PH", {
+    currency: "PHP",
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    style: "currency",
+  }).format(Math.abs(Number(amount) || 0));
+
+  if (!signed) return formattedAmount;
+  return `${amount < 0 ? "-" : "+"}${formattedAmount}`;
+};
+
+const budgetIcons = {
+  balance: balanceIcon,
+  expense: totalExpenseIcon,
+  income: totalIncomeIcon,
+};
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = {
@@ -109,20 +131,18 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
-  if (name === "money") {
+  if (budgetIcons[name]) {
     return (
-      <svg {...props}>
-        <circle cx="11" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
-        <path
-          d="M11 8v8M8.8 14.6c.7.8 3.6.8 4.1-.3.6-1.4-1.7-1.9-3-2.3-1.4-.4-1.7-2.7.3-3.2 1-.2 2.2.1 2.8.8M17 4l2-1M17 7h3M16.7 10l2 1.2"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <img
+        src={budgetIcons[name]}
+        alt=""
+        className={`${className} shrink-0 object-contain`}
+        aria-hidden="true"
+      />
     );
   }
+
+
 
   if (name === "wallet") {
     return (
@@ -187,13 +207,15 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
-  if (name === "down") {
+  if (name === "income-arrow" || name === "expense-arrow") {
+    const isIncome = name === "income-arrow";
+
     return (
       <svg {...props}>
         <path
-          d="M7 7h10v10M17 17 7 7"
+          d={isIncome ? "M7 17 17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9"}
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -214,9 +236,9 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const SummaryCard = ({ icon, label, value }) => (
-  <section className="flex h-20 items-center justify-center gap-8 rounded-lg bg-white px-5 shadow-[0_3px_4px_rgba(219,39,119,0.35)] ring-1 ring-pink-50">
-    <Icon name={icon} className="h-10 w-10 text-[#e347b3]" />
-    <div className="text-center leading-tight">
+  <section className="flex h-24 items-center justify-center gap-8 rounded-lg border-b-2 border-[#e347b3] bg-white px-6 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50">
+    <Icon name={icon} className="h-16 w-16" />
+    <div className="min-w-[110px] text-center leading-tight">
       <p className="text-3xl font-bold text-neutral-950">{value}</p>
       <p className="text-base text-neutral-500">{label}</p>
     </div>
@@ -228,7 +250,7 @@ const ExpenseBreakdown = ({ expenses, income }) => {
   const expenseHeight = `${Math.max((expenses / maxValue) * 100, 8)}%`;
   const incomeHeight = `${Math.max((income / maxValue) * 100, 8)}%`;
   const axisLabels = [1, 0.75, 0.5, 0.25, 0].map((multiplier) =>
-    Math.round(maxValue * multiplier).toLocaleString("en-US")
+    formatPeso(Math.round(maxValue * multiplier))
   );
 
   return (
@@ -244,12 +266,12 @@ const ExpenseBreakdown = ({ expenses, income }) => {
         <div
           className="w-24 max-w-[34%] rounded-t-sm bg-[#ff1f14]"
           style={{ height: expenseHeight }}
-          title={`Expenses: ${expenses.toLocaleString("en-US")}`}
+          title={`Expenses: ${formatPeso(expenses)}`}
         />
         <div
           className="w-24 max-w-[34%] rounded-t-sm bg-[#18a64f]"
           style={{ height: incomeHeight }}
-          title={`Income: ${income.toLocaleString("en-US")}`}
+          title={`Income: ${formatPeso(income)}`}
         />
         <span className="absolute -bottom-5 text-xs text-neutral-400">Dec 25</span>
       </div>
@@ -334,21 +356,21 @@ const ExpenseCategories = ({ entries }) => {
 
 const EntryType = ({ type }) => (
   <span
-    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold lowercase ${
       type === "income"
-        ? "bg-[#6bed9c] text-[#12853d]"
-        : "bg-[#ff7d7d] text-[#b31a1a]"
+        ? "bg-[#72e89d] text-[#1fb85b]"
+        : "bg-[#ec7a7d] text-[#e11f2a]"
     }`}
   >
-    <Icon name="down" className="h-3 w-3" />
+    <Icon
+      name={type === "income" ? "income-arrow" : "expense-arrow"}
+      className="h-3 w-3"
+    />
     {type}
   </span>
 );
 
-const formatCurrency = (amount) => {
-  const absoluteAmount = Math.abs(amount).toLocaleString("en-US");
-  return `${amount < 0 ? "-" : "+"}$${absoluteAmount}`;
-};
+const formatCurrency = (amount) => formatPeso(amount, { signed: true });
 
 const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const [budgetEntries, setBudgetEntries] = useState([]);
@@ -444,19 +466,19 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
           <section className="mt-10 grid gap-4 md:grid-cols-3">
             <SummaryCard
-              icon="money"
+              icon="income"
               label="Total Income"
-              value={`$${totals.income.toLocaleString("en-US")}`}
+              value={formatPeso(totals.income)}
             />
             <SummaryCard
-              icon="money"
+              icon="expense"
               label="Total Expense"
-              value={`$${totals.expenses.toLocaleString("en-US")}`}
+              value={formatPeso(totals.expenses)}
             />
             <SummaryCard
-              icon="wallet"
+              icon="balance"
               label="Balance"
-              value={`$${totals.balance.toLocaleString("en-US")}`}
+              value={formatPeso(totals.balance)}
             />
           </section>
 

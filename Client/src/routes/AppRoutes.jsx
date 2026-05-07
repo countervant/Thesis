@@ -16,6 +16,7 @@ import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
 import ResetPassword from "../pages/auth/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import Profile from "../pages/Profile.jsx";
+import PublicProfile from "../pages/PublicProfile.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
@@ -139,6 +140,15 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile/:userId"
+          element={
+            <ProtectedRoute>
+              <PublicProfile />
             </ProtectedRoute>
           }
         />

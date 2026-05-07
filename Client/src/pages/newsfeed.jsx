@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import defaultProfile from "../assets/default-profile.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { newsfeedAPI } from "../services/api.js";
@@ -58,6 +59,24 @@ const Avatar = ({ user, size = "h-10 w-10" }) => (
     className={`${size} shrink-0 rounded-full object-cover`}
   />
 );
+
+const ProfileButton = ({ children, className = "", user }) => {
+  const navigate = useNavigate();
+  const userId = getEntityId(user);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (userId) navigate(`/profile/${userId}`);
+      }}
+      disabled={!userId}
+      className={`${className} disabled:cursor-default`}
+    >
+      {children}
+    </button>
+  );
+};
 
 const HeartIcon = ({ filled }) => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -412,7 +431,7 @@ const Newsfeed = () => {
               key={post.id}
               className="rounded-lg bg-white p-5 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100"
             >
-              <div className="relative flex gap-4">
+              <div className="relative">
                 {canDeletePost && (
                   <div className="absolute right-0 top-0">
                     <button
@@ -449,12 +468,20 @@ const Newsfeed = () => {
                     )}
                   </div>
                 )}
-                <Avatar user={post.author} />
-                <div className="min-w-0 flex-1 pr-10">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <h2 className="text-sm font-bold text-neutral-950">
+                <div className="flex items-center gap-4 pr-10">
+                  <ProfileButton
+                    user={post.author}
+                    className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
+                  >
+                    <Avatar user={post.author} />
+                  </ProfileButton>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <ProfileButton
+                      user={post.author}
+                      className="text-left text-sm font-bold text-neutral-950 transition hover:text-[#c72fb2]"
+                    >
                       {getUserName(post.author)}
-                    </h2>
+                    </ProfileButton>
                     <span className="rounded-full bg-pink-50 px-2 py-0.5 text-[11px] font-semibold uppercase text-[#c72fb2]">
                       {post.author?.role || "user"}
                     </span>
@@ -462,7 +489,10 @@ const Newsfeed = () => {
                       {formatDateTime(post.createdAt)}
                     </span>
                   </div>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-neutral-800">
+                </div>
+
+                <div className="mt-3 pl-14">
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-800">
                     {post.content}
                   </p>
                   {post.media?.url && (
@@ -525,12 +555,20 @@ const Newsfeed = () => {
                     return (
                       <div key={commentId} className="space-y-3">
                         <div className="flex gap-3">
-                          <Avatar user={comment.user} size="h-8 w-8" />
+                          <ProfileButton
+                            user={comment.user}
+                            className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
+                          >
+                            <Avatar user={comment.user} size="h-8 w-8" />
+                          </ProfileButton>
                           <div className="flex-1 rounded-lg bg-neutral-50 px-4 py-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-xs font-bold text-neutral-900">
+                              <ProfileButton
+                                user={comment.user}
+                                className="text-left text-xs font-bold text-neutral-900 transition hover:text-[#c72fb2]"
+                              >
                                 {getUserName(comment.user)}
-                              </p>
+                              </ProfileButton>
                               <span className="text-[11px] font-medium text-neutral-500">
                                 {formatDateTime(comment.createdAt)}
                               </span>
@@ -575,12 +613,20 @@ const Newsfeed = () => {
                               <div className="ml-11 space-y-3">
                                 {comment.replies.map((reply) => (
                                   <div key={reply._id || reply.id} className="flex gap-3">
-                                    <Avatar user={reply.user} size="h-7 w-7" />
+                                    <ProfileButton
+                                      user={reply.user}
+                                      className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
+                                    >
+                                      <Avatar user={reply.user} size="h-7 w-7" />
+                                    </ProfileButton>
                                     <div className="flex-1 rounded-lg bg-white px-4 py-3 ring-1 ring-neutral-100">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-xs font-bold text-neutral-900">
+                                        <ProfileButton
+                                          user={reply.user}
+                                          className="text-left text-xs font-bold text-neutral-900 transition hover:text-[#c72fb2]"
+                                        >
                                           {getUserName(reply.user)}
-                                        </p>
+                                        </ProfileButton>
                                         <span className="text-[11px] font-medium text-neutral-500">
                                           {formatDateTime(reply.createdAt)}
                                         </span>

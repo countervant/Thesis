@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import budgetIcon from "../assets/budget.png";
+import clientIcon from "../assets/client.png";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
+import dashboardIcon from "../assets/dashboard.png";
 import defaultProfile from "../assets/default-profile.png";
+import employeeIcon from "../assets/employee.png";
+import messagesIcon from "../assets/messages.png";
+import newsfeedIcon from "../assets/newsfeed.png";
+import taskIcon from "../assets/task.png";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const sideNavItems = [
@@ -12,12 +19,33 @@ const sideNavItems = [
 ];
 
 const topNavItems = [
-  { id: "dashboard", label: "Dashboard", icon: "grid" },
-  { id: "newsfeed", label: "Newsfeed", icon: "monitor" },
-  { id: "messages", label: "Messages", icon: "message" },
+  { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { id: "newsfeed", label: "Newsfeed", icon: "newsfeed" },
+  { id: "messages", label: "Messages", icon: "messages" },
 ];
 
+const navIcons = {
+  budget: budgetIcon,
+  client: clientIcon,
+  dashboard: dashboardIcon,
+  employee: employeeIcon,
+  messages: messagesIcon,
+  newsfeed: newsfeedIcon,
+  tasks: taskIcon,
+};
+
 const Icon = ({ name, className = "h-6 w-6" }) => {
+  if (navIcons[name]) {
+    return (
+      <img
+        src={navIcons[name]}
+        alt=""
+        className={`${className} object-contain`}
+        aria-hidden="true"
+      />
+    );
+  }
+
   const props = {
     viewBox: "0 0 24 24",
     fill: "none",
@@ -120,7 +148,7 @@ const UserAvatar = ({ user }) => {
   );
 };
 
-const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
+const MainBars = ({ activePage, children, hideSideNav = false, onLogout, onNavigate }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -160,15 +188,22 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               key={item.id}
               type="button"
               onClick={() => onNavigate?.(item.id)}
-              className={`grid h-11 w-11 place-items-center rounded-lg transition ${
+              className={`group grid h-11 w-11 place-items-center rounded-lg transition duration-200 hover:-translate-y-0.5 active:scale-95 ${
                 activePage === item.id
-                  ? "text-[#df4bb4]"
+                  ? "bg-white text-[#df4bb4] shadow-sm"
                   : "text-neutral-950 hover:bg-white hover:text-[#c72fb2]"
               }`}
               aria-label={item.label}
               title={item.label}
             >
-              <Icon name={item.icon} className="h-6 w-6" />
+              <Icon
+                name={item.icon}
+                className={`h-6 w-6 transition duration-200 group-hover:scale-110 ${
+                  activePage === item.id
+                    ? "top-nav-icon-active"
+                    : "top-nav-icon"
+                }`}
+              />
             </button>
           ))}
         </nav>
@@ -228,27 +263,32 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         </div>
       </header>
 
-      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-4rem)] w-[90px] border-r border-neutral-300 bg-[#f5f5f5] md:block">
-        <nav className="flex flex-col items-center gap-5 pt-9">
-          {sideNavItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onNavigate?.(item.id)}
-              className={`flex w-16 flex-col items-center gap-1 rounded-xl py-3 text-xs transition ${
-                activePage === item.id
-                  ? "bg-linear-to-b from-[#df4bb4] to-[#7e22ce] text-white shadow-[0_4px_8px_rgba(126,34,206,0.35)]"
-                  : "text-neutral-900 hover:bg-white hover:text-[#c72fb2]"
-              }`}
-            >
-              <Icon name={item.icon} className="h-6 w-6" />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
+      {!hideSideNav && (
+        <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-4rem)] w-[90px] border-r border-neutral-300 bg-[#f5f5f5] md:block">
+          <nav className="flex flex-col items-center gap-5 pt-9">
+            {sideNavItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onNavigate?.(item.id)}
+                className={`flex w-16 flex-col items-center gap-1 rounded-xl py-3 text-xs transition ${
+                  activePage === item.id
+                    ? "bg-linear-to-b from-[#df4bb4] to-[#7e22ce] text-white shadow-[0_4px_8px_rgba(126,34,206,0.35)]"
+                    : "text-neutral-900 hover:bg-white hover:text-[#c72fb2]"
+                }`}
+              >
+                <Icon
+                  name={item.icon}
+                  className={`h-6 w-6 ${activePage === item.id ? "brightness-0 invert" : ""}`}
+                />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+      )}
 
-      <main className="px-4 pb-10 pt-24 md:ml-[90px] md:px-6 lg:px-8">
+      <main className={`px-4 pb-10 pt-24 md:px-6 lg:px-8 ${hideSideNav ? "" : "md:ml-[90px]"}`}>
         {children}
       </main>
     </div>
