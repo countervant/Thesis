@@ -1,39 +1,26 @@
-import { useMemo, useState } from "react";
-import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
-import peejong from "../../../assets/peejong.png";
-
-const navItems = [
-  { id: "dashboard", label: "Home", icon: "dashboard" },
-  { id: "tasks", label: "Tasks", icon: "tasks" },
-  { id: "budget", label: "Budget", icon: "budget" },
-  { id: "client", label: "Client", icon: "client" },
-  { id: "employee", label: "Employee", icon: "employee" },
-];
-
-const initialClients = [
-  {
-    id: 1,
-    initials: "JD",
-    name: "John Doe",
-    status: "Active",
-    company: "TechChorp Inc.",
-    email: "johndoe@techcorp.com",
-    phone: "+63 9568913984",
-    service: "Video Editing",
-  },
-  {
-    id: 2,
-    initials: "JD",
-    name: "Jane Doe",
-    status: "Inactive",
-    company: "TechBiz Inc.",
-    email: "janedoe@techbiz.com",
-    phone: "+63 9568314594",
-    service: "Graphic Design",
-  },
-];
+import { useEffect, useMemo, useState } from "react";
+import { clientAPI } from "../../../services/api.js";
 
 const filters = ["All", "Active", "Inactive"];
+
+const getInitials = (name = "") => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const initials = `${words[0]?.charAt(0) || ""}${words[1]?.charAt(0) || ""}`;
+  return initials.toUpperCase() || "CL";
+};
+
+const normalizeClient = (client) => ({
+  id: client._id || client.id,
+  initials: getInitials(client.contactPerson),
+  name: client.contactPerson || "",
+  status: client.isActive ? "Active" : "Inactive",
+  company: client.companyName || "",
+  email: client.email || "",
+  phone: client.phone || "",
+  service: client.service || "",
+  address: client.address || "",
+  notes: client.notes || "",
+});
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = {
@@ -170,15 +157,28 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
-  if (name === "edit") {
+  if (name === "delete") {
     return (
       <svg {...props}>
         <path
-          d="m14.7 5.3 4 4M4 20l4.4-1 10.2-10.2a2.8 2.8 0 0 0-4-4L4.4 15 4 20z"
+          d="M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 13h8l1-13"
           stroke="currentColor"
           strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "add") {
+    return (
+      <svg {...props}>
+        <path
+          d="M12 5v14M5 12h14"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
         />
       </svg>
     );
@@ -201,52 +201,6 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   return null;
 };
 
-const Sidebar = ({ activePage = "client", onLogout, onNavigate }) => (
-  <aside className="fixed left-0 top-0 z-20 hidden h-screen w-[230px] border-r border-neutral-300 bg-[#eeeeee] md:flex md:flex-col">
-    <div className="border-b border-neutral-300 px-4 py-4">
-      <div className="flex items-center gap-2">
-        <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
-        <span
-          className="text-xl uppercase text-neutral-950"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-          Clientra
-        </span>
-      </div>
-      <p className="mt-1 text-sm font-medium text-neutral-700">
-        Business Management
-      </p>
-    </div>
-
-    <nav className="flex flex-1 flex-col gap-4 px-3 pt-10">
-      {navItems.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onNavigate?.(item.id)}
-          className={`flex h-11 items-center gap-4 rounded-lg px-6 text-sm font-medium transition ${
-            activePage === item.id
-              ? "bg-linear-to-r from-[#8424d2] to-[#e347b3] text-white shadow-[0_4px_7px_rgba(126,34,206,0.35)]"
-              : "text-neutral-700 hover:bg-white hover:text-[#c72fb2]"
-          }`}
-        >
-          <Icon name={item.icon} className="h-6 w-6 shrink-0" />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </nav>
-
-    <button
-      type="button"
-      onClick={onLogout}
-      className="mb-8 ml-12 flex items-center gap-10 text-sm text-white transition hover:text-[#c72fb2]"
-    >
-      <span>Log out</span>
-      <Icon name="logout" className="h-6 w-6" />
-    </button>
-  </aside>
-);
-
 const FilterButton = ({ active, children, onClick }) => (
   <button
     type="button"
@@ -261,7 +215,7 @@ const FilterButton = ({ active, children, onClick }) => (
   </button>
 );
 
-const ClientCard = ({ client, onEdit }) => {
+const ClientCard = ({ client, onDelete }) => {
   const isActive = client.status === "Active";
 
   return (
@@ -308,23 +262,57 @@ const ClientCard = ({ client, onEdit }) => {
 
       <div className="mt-6 flex items-center justify-between border-t border-neutral-300 pt-3 text-xs font-medium text-neutral-700">
         <span>{client.service}</span>
-        <button
-          type="button"
-          onClick={() => onEdit(client)}
-          className="grid h-8 w-8 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2]"
-          aria-label={`Edit ${client.name}`}
-        >
-          <Icon name="edit" className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onDelete(client)}
+            className="grid h-8 w-8 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+            aria-label={`Delete ${client.name}`}
+          >
+            <Icon name="delete" className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </article>
   );
 };
 
-const AdminClients = ({ activePage = "client", onLogout, onNavigate }) => {
-  const [clients, setClients] = useState(initialClients);
+const AdminClients = () => {
+  const [clients, setClients] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadClients = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await clientAPI.getAll();
+
+        if (isMounted) {
+          setClients(data.map(normalizeClient));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.response?.data?.message || "Unable to load clients.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadClients();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const visibleClients = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -355,47 +343,23 @@ const AdminClients = ({ activePage = "client", onLogout, onNavigate }) => {
     return clients.filter((client) => client.status === filter).length;
   };
 
-  const editClient = (client) => {
-    const name = window.prompt("Client name", client.name);
+  const deleteClient = async (client) => {
+    const shouldDelete = window.confirm(`Delete client "${client.name}"?`);
+    if (!shouldDelete) return;
 
-    if (!name?.trim()) {
-      return;
-    }
-
-    const status =
-      window.prompt("Status: Active or Inactive", client.status) || client.status;
-    const company = window.prompt("Company", client.company) || client.company;
-    const email = window.prompt("Email", client.email) || client.email;
-    const phone = window.prompt("Phone", client.phone) || client.phone;
-    const service = window.prompt("Service", client.service) || client.service;
-
-    setClients((currentClients) =>
-      currentClients.map((currentClient) =>
-        currentClient.id === client.id
-          ? {
-              ...currentClient,
-              name: name.trim(),
-              status: status === "Active" ? "Active" : "Inactive",
-              company: company.trim(),
-              email: email.trim(),
-              phone: phone.trim(),
-              service: service.trim(),
-            }
-          : currentClient
+    try {
+      setErrorMessage("");
+      await clientAPI.delete(client.id);
+      setClients((currentClients) =>
+        currentClients.filter((currentClient) => currentClient.id !== client.id)
       )
-    );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete client.");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <Sidebar
-        activePage={activePage}
-        onLogout={onLogout}
-        onNavigate={onNavigate}
-      />
-
-      <main className="px-4 pb-12 pt-8 md:ml-[230px] md:px-10 lg:px-12">
-        <div className="mx-auto max-w-[1060px]">
+        <div className="mx-auto max-w-[1500px]">
           <header className="flex items-start justify-between gap-5">
             <div>
               <h1
@@ -407,15 +371,6 @@ const AdminClients = ({ activePage = "client", onLogout, onNavigate }) => {
               <p className="mt-2 text-xs font-medium text-neutral-600">
                 Manage your client relationships
               </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-px bg-neutral-300" />
-              <img
-                src={peejong}
-                alt="User"
-                className="h-10 w-10 rounded-full bg-slate-200 object-cover"
-              />
             </div>
           </header>
 
@@ -449,13 +404,33 @@ const AdminClients = ({ activePage = "client", onLogout, onNavigate }) => {
           </section>
 
           <section className="mt-6 grid gap-4 lg:grid-cols-2">
-            {visibleClients.map((client) => (
-              <ClientCard key={client.id} client={client} onEdit={editClient} />
+            {errorMessage && (
+              <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100 lg:col-span-2">
+                {errorMessage}
+              </p>
+            )}
+
+            {isLoading && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
+                Loading clients...
+              </p>
+            )}
+
+            {!isLoading && visibleClients.length === 0 && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
+                No clients found.
+              </p>
+            )}
+
+            {!isLoading && visibleClients.map((client) => (
+              <ClientCard
+                key={client.id}
+                client={client}
+                onDelete={deleteClient}
+              />
             ))}
           </section>
         </div>
-      </main>
-    </div>
   );
 };
 

@@ -46,6 +46,12 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    position: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

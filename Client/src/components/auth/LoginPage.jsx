@@ -6,6 +6,7 @@ import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { validateEmail } from "../../utils/emailValidation.js";
 
 const dashboardPathByRole = {
   client: "/client/dashboard",
@@ -30,13 +31,6 @@ const LoginPage = ({ order, order1 }) => {
     setPassword("");
     setShowPassword(false);
   }, []);
-
-  const validateEmail = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
-  };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;

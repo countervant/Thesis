@@ -4,6 +4,8 @@ import cors from 'cors';
 
 import {dbConnect} from './config/dbConnect.js';
 import auth from './routes/auth.js';
+import budgets from './routes/budgets.js';
+import clients from './routes/clients.js';
 import tasks from './routes/tasks.js';
 
 const app = express();
@@ -17,11 +19,14 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use('/api/auth', auth);
 // Back-compat / alternate base path (some clients call this as /api/user/*)
 app.use('/api/user', auth);
+app.use('/api/budgets', budgets);
+app.use('/api/clients', clients);
 app.use('/api/tasks', tasks);
 
 dbConnect();

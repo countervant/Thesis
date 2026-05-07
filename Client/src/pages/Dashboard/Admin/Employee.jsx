@@ -1,37 +1,23 @@
-import { useMemo, useState } from "react";
-import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
-import peejong from "../../../assets/peejong.png";
-
-const navItems = [
-  { id: "dashboard", label: "Home", icon: "dashboard" },
-  { id: "tasks", label: "Tasks", icon: "tasks" },
-  { id: "budget", label: "Budget", icon: "budget" },
-  { id: "client", label: "Client", icon: "client" },
-  { id: "employee", label: "Employee", icon: "employee" },
-];
-
-const initialEmployees = [
-  {
-    id: 1,
-    initials: "JD",
-    name: "Jericho Santiago",
-    status: "Inactive",
-    role: "Video Editor",
-    email: "Jericho@gmail.com",
-    phone: "+63 9568314594",
-  },
-  {
-    id: 2,
-    initials: "JD",
-    name: "Cyrell Panganiban",
-    status: "Inactive",
-    role: "ScriptWriter",
-    email: "Cyrell@gmail.com",
-    phone: "+63 9568314594",
-  },
-];
+import { useEffect, useMemo, useState } from "react";
+import { employeeAPI } from "../../../services/api.js";
 
 const filters = ["All", "Active", "Inactive"];
+
+const getInitials = (firstName = "", lastName = "") => {
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.trim();
+  return initials.toUpperCase() || "EM";
+};
+
+const normalizeEmployee = (employee) => ({
+  id: employee._id || employee.id,
+  initials: getInitials(employee.firstName, employee.lastName),
+  name: [employee.firstName, employee.lastName].filter(Boolean).join(" "),
+  status: employee.isActive ? "Active" : "Inactive",
+  role: employee.position || "Employee",
+  position: employee.position || "",
+  email: employee.email || "",
+  phone: employee.phone || "",
+});
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = {
@@ -174,6 +160,33 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
+  if (name === "delete") {
+    return (
+      <svg {...props}>
+        <path
+          d="M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 13h8l1-13"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "add") {
+    return (
+      <svg {...props}>
+        <path
+          d="M12 5v14M5 12h14"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
   if (name === "logout") {
     return (
       <svg {...props}>
@@ -191,52 +204,6 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   return null;
 };
 
-const Sidebar = ({ activePage = "employee", onLogout, onNavigate }) => (
-  <aside className="fixed left-0 top-0 z-20 hidden h-screen w-[230px] border-r border-neutral-300 bg-[#eeeeee] md:flex md:flex-col">
-    <div className="border-b border-neutral-300 px-4 py-4">
-      <div className="flex items-center gap-2">
-        <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
-        <span
-          className="text-xl uppercase text-neutral-950"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-          Clientra
-        </span>
-      </div>
-      <p className="mt-1 text-sm font-medium text-neutral-700">
-        Business Management
-      </p>
-    </div>
-
-    <nav className="flex flex-1 flex-col gap-4 px-3 pt-10">
-      {navItems.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onNavigate?.(item.id)}
-          className={`flex h-11 items-center gap-4 rounded-lg px-6 text-sm font-medium transition ${
-            activePage === item.id
-              ? "bg-linear-to-r from-[#8424d2] to-[#e347b3] text-white shadow-[0_4px_7px_rgba(126,34,206,0.35)]"
-              : "text-neutral-700 hover:bg-white hover:text-[#c72fb2]"
-          }`}
-        >
-          <Icon name={item.icon} className="h-6 w-6 shrink-0" />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </nav>
-
-    <button
-      type="button"
-      onClick={onLogout}
-      className="mb-8 ml-12 flex items-center gap-10 text-sm text-white transition hover:text-[#c72fb2]"
-    >
-      <span>Log out</span>
-      <Icon name="logout" className="h-6 w-6" />
-    </button>
-  </aside>
-);
-
 const FilterButton = ({ active, children, onClick }) => (
   <button
     type="button"
@@ -251,7 +218,7 @@ const FilterButton = ({ active, children, onClick }) => (
   </button>
 );
 
-const EmployeeCard = ({ employee, onEdit }) => {
+const EmployeeCard = ({ employee, onDelete, onEdit }) => {
   const isActive = employee.status === "Active";
 
   return (
@@ -289,7 +256,7 @@ const EmployeeCard = ({ employee, onEdit }) => {
         </p>
       </div>
 
-      <div className="mt-7 flex justify-end border-t border-neutral-400 pt-3">
+      <div className="mt-7 flex justify-end gap-2 border-t border-neutral-400 pt-3">
         <button
           type="button"
           onClick={() => onEdit(employee)}
@@ -298,15 +265,61 @@ const EmployeeCard = ({ employee, onEdit }) => {
         >
           <Icon name="edit" className="h-6 w-6" />
         </button>
+        <button
+          type="button"
+          onClick={() => onDelete(employee)}
+          className="grid h-8 w-8 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+          aria-label={`Delete ${employee.name}`}
+        >
+          <Icon name="delete" className="h-6 w-6" />
+        </button>
       </div>
     </article>
   );
 };
 
-const AdminEmployees = ({ activePage = "employee", onLogout, onNavigate }) => {
-  const [employees, setEmployees] = useState(initialEmployees);
+const AdminEmployees = ({
+  onAddEmployee,
+  onEditEmployee,
+  refreshKey = 0,
+}) => {
+  const [employees, setEmployees] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadEmployees = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await employeeAPI.getAll();
+
+        if (isMounted) {
+          setEmployees(data.map(normalizeEmployee));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(
+            error.response?.data?.message || "Unable to load employees."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadEmployees();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey]);
 
   const visibleEmployees = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -338,33 +351,22 @@ const AdminEmployees = ({ activePage = "employee", onLogout, onNavigate }) => {
   };
 
   const editEmployee = (employee) => {
-    const name = window.prompt("Employee name", employee.name);
+    onEditEmployee?.(employee);
+  };
 
-    if (!name?.trim()) {
-      return;
+  const deleteEmployee = async (employee) => {
+    const shouldDelete = window.confirm(`Delete employee "${employee.name}"?`);
+    if (!shouldDelete) return;
+
+    try {
+      setErrorMessage("");
+      await employeeAPI.delete(employee.id);
+      setEmployees((currentEmployees) =>
+        currentEmployees.filter((currentEmployee) => currentEmployee.id !== employee.id)
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete employee.");
     }
-
-    const status =
-      window.prompt("Status: Active or Inactive", employee.status) ||
-      employee.status;
-    const role = window.prompt("Role", employee.role) || employee.role;
-    const email = window.prompt("Email", employee.email) || employee.email;
-    const phone = window.prompt("Phone", employee.phone) || employee.phone;
-
-    setEmployees((currentEmployees) =>
-      currentEmployees.map((currentEmployee) =>
-        currentEmployee.id === employee.id
-          ? {
-              ...currentEmployee,
-              name: name.trim(),
-              status: status === "Active" ? "Active" : "Inactive",
-              role: role.trim(),
-              email: email.trim(),
-              phone: phone.trim(),
-            }
-          : currentEmployee
-      )
-    );
   };
 
   const exportEmployees = () => {
@@ -392,15 +394,7 @@ const AdminEmployees = ({ activePage = "employee", onLogout, onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <Sidebar
-        activePage={activePage}
-        onLogout={onLogout}
-        onNavigate={onNavigate}
-      />
-
-      <main className="px-4 pb-12 pt-9 md:ml-[230px] md:px-10 lg:px-12">
-        <div className="mx-auto max-w-[1060px]">
+        <div className="mx-auto max-w-[1500px]">
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
@@ -417,17 +411,20 @@ const AdminEmployees = ({ activePage = "employee", onLogout, onNavigate }) => {
             <div className="flex items-center gap-5">
               <button
                 type="button"
+                onClick={onAddEmployee}
+                className="flex h-12 items-center gap-2 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] px-5 text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+              >
+                <Icon name="add" className="h-5 w-5" />
+                <span>Add Employee</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={exportEmployees}
                 className="h-12 w-38 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
               >
                 Export
               </button>
-              <div className="h-12 w-px bg-neutral-300" />
-              <img
-                src={peejong}
-                alt="User"
-                className="h-10 w-10 rounded-full bg-slate-200 object-cover"
-              />
             </div>
           </header>
 
@@ -461,17 +458,34 @@ const AdminEmployees = ({ activePage = "employee", onLogout, onNavigate }) => {
           </section>
 
           <section className="mt-8 grid gap-4 lg:grid-cols-2">
-            {visibleEmployees.map((employee) => (
+            {errorMessage && (
+              <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100 lg:col-span-2">
+                {errorMessage}
+              </p>
+            )}
+
+            {isLoading && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
+                Loading employees...
+              </p>
+            )}
+
+            {!isLoading && visibleEmployees.length === 0 && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
+                No employees found.
+              </p>
+            )}
+
+            {!isLoading && visibleEmployees.map((employee) => (
               <EmployeeCard
                 key={employee.id}
                 employee={employee}
+                onDelete={deleteEmployee}
                 onEdit={editEmployee}
               />
             ))}
           </section>
         </div>
-      </main>
-    </div>
   );
 };
 

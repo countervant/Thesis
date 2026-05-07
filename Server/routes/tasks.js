@@ -20,14 +20,14 @@ const taskQueryForUser = (user) => {
 const normalizeTaskPayload = (body, userId) => {
   const title = body.title?.trim();
   const dueDate = body.dueDate ? new Date(body.dueDate) : null;
-  const status = body.status || "pending";
+  const status = body.status || "in_progress";
   const priority = body.priority || "medium";
 
   return {
     title,
     description: body.description?.trim() || "",
     dueDate,
-    status: allowedStatuses.includes(status) ? status : "pending",
+    status: allowedStatuses.includes(status) ? status : "in_progress",
     priority: allowedPriorities.includes(priority) ? priority : "medium",
     assignedTo: body.assignedTo || userId,
   };

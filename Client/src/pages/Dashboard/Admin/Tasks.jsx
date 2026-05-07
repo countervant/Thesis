@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
-import peejong from "../../../assets/peejong.png";
+import { useAuth } from "../../../context/AuthContext.jsx";
 import { taskAPI } from "../../../services/api.js";
 
-const navItems = [
-  { id: "dashboard", label: "Home", icon: "dashboard" },
-  { id: "tasks", label: "Tasks", icon: "tasks" },
-  { id: "budget", label: "Budget", icon: "budget" },
-  { id: "client", label: "Client", icon: "client" },
-  { id: "employee", label: "Employee", icon: "employee" },
-];
-
-const taskStatuses = ["All", "In progress", "Pending", "Done", "In review"];
+const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
 const statusToApi = {
   Pending: "pending",
@@ -41,12 +32,20 @@ const toDisplayDate = (date) => {
   return `${month}/${day}/${year}`;
 };
 
+const getEntityId = (entity) => {
+  if (!entity) return "";
+  if (typeof entity === "string") return entity;
+  return entity._id || entity.id || "";
+};
+
 const normalizeTask = (task) => ({
   id: task._id || task.id,
   title: task.title,
   description: task.description || "",
   dueDate: toDisplayDate((task.dueDate || "").slice(0, 10)),
   status: statusFromApi[task.status] || task.status || "Pending",
+  priority: task.priority || "medium",
+  assignedTo: task.assignedTo,
 });
 
 const getDateStatus = (dueDate) => {
@@ -167,6 +166,20 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
+  if (name === "delete") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 13h8l1-13"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
   if (name === "logout") {
     return (
       <svg {...commonProps}>
@@ -207,64 +220,32 @@ const FilterChip = ({ active, children, onClick }) => (
   </button>
 );
 
-const Sidebar = ({ activePage = "tasks", onLogout, onNavigate }) => (
-  <aside className="fixed left-0 top-0 z-20 hidden h-screen w-[230px] border-r border-neutral-300 bg-[#eeeeee] md:flex md:flex-col">
-    <div className="border-b border-neutral-300 px-4 py-4">
-      <div className="flex items-center gap-2">
-        <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
-        <span
-          className="text-xl uppercase text-neutral-950"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-          Clientra
-        </span>
-      </div>
-      <p className="mt-1 text-sm font-medium text-neutral-700">
-        Business Management
-      </p>
-    </div>
-
-    <nav className="flex flex-1 flex-col gap-4 px-3 pt-10">
-      {navItems.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          onClick={() => onNavigate?.(item.id)}
-          className={`flex h-11 items-center gap-4 rounded-lg px-6 text-sm font-medium transition ${
-            activePage === item.id
-              ? "bg-linear-to-r from-[#8424d2] to-[#e347b3] text-white shadow-[0_4px_7px_rgba(126,34,206,0.35)]"
-              : "text-neutral-700 hover:bg-white hover:text-[#c72fb2]"
-          }`}
-        >
-          <Icon name={item.icon} className="h-6 w-6 shrink-0" />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </nav>
-
-    <button
-      type="button"
-      onClick={onLogout}
-      className="mb-8 ml-12 flex items-center gap-10 text-sm text-white transition hover:text-[#c72fb2]"
-    >
-      <span>Log out</span>
-      <Icon name="logout" className="h-6 w-6" />
-    </button>
-  </aside>
-);
-
-const TaskCard = ({ onEdit, onToggleDone, task }) => (
+const TaskCard = ({
+  canToggleDone,
+  onDelete,
+  onEdit,
+  onToggleDone,
+  showStatus,
+  task,
+}) => (
   <article className="flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50 sm:px-5">
-    <button
-      type="button"
-      onClick={() => onToggleDone(task.id)}
-      className={`h-5 w-5 shrink-0 rounded-full border transition hover:border-[#c72fb2] ${
-        task.status === "Done"
-          ? "border-[#c72fb2] bg-[#c72fb2]"
-          : "border-neutral-400 bg-white"
-      }`}
-      aria-label={`Mark ${task.title} complete`}
-    />
+    {canToggleDone && (
+      <button
+        type="button"
+        onClick={() => onToggleDone(task.id)}
+        disabled={task.status === "Done"}
+        className={`h-5 w-5 shrink-0 rounded-full border transition ${
+          task.status === "Done"
+            ? "cursor-not-allowed border-[#c72fb2] bg-[#c72fb2]"
+            : "border-neutral-400 bg-white hover:border-[#c72fb2]"
+        }`}
+        aria-label={
+          task.status === "Done"
+            ? `${task.title} is already complete`
+            : `Mark ${task.title} complete`
+        }
+      />
+    )}
 
     <div className="min-w-0 flex-1">
       <h2 className="truncate text-sm font-semibold text-neutral-800">
@@ -277,18 +258,40 @@ const TaskCard = ({ onEdit, onToggleDone, task }) => (
       </p>
     </div>
 
-    <button
-      type="button"
-      onClick={() => onEdit(task)}
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2]"
-      aria-label={`Edit ${task.title}`}
-    >
-      <Icon name="edit" className="h-5 w-5" />
-    </button>
+    {showStatus && (
+      <p className="hidden min-w-[160px] text-sm font-medium text-neutral-800 md:block">
+        Status: {task.status}
+      </p>
+    )}
+
+    <div className="flex shrink-0 items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onEdit(task)}
+        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+        aria-label={`Edit ${task.title}`}
+      >
+        <Icon name="edit" className="h-5 w-5" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onDelete(task)}
+        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+        aria-label={`Delete ${task.title}`}
+      >
+        <Icon name="delete" className="h-5 w-5" />
+      </button>
+    </div>
   </article>
 );
 
-const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
+const Tasks = ({
+  onEditTask,
+  onNavigate,
+  refreshKey = 0,
+}) => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -322,7 +325,7 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   const visibleTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -335,79 +338,19 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
     });
   }, [selectedDateStatus, selectedTaskStatus, tasks]);
 
-  const handleAddTask = async () => {
-    const title = window.prompt("Task title");
-
-    if (!title?.trim()) {
-      return;
-    }
-
-    const description =
-      window.prompt("Task description", "Add task details here") ||
-      "Add task details here";
-    const dueDate =
-      window.prompt("Due date (YYYY-MM-DD)", formatInputDate(new Date())) ||
-      formatInputDate(new Date());
-    const status =
-      window.prompt("Status: In progress, Pending, Done, In review", "Pending") ||
-      "Pending";
-
-    try {
-      setErrorMessage("");
-      const createdTask = await taskAPI.create({
-        title: title.trim(),
-        description: description.trim(),
-        dueDate,
-        status: statusToApi[status] || "pending",
-      });
-
-      setTasks((currentTasks) => [normalizeTask(createdTask), ...currentTasks]);
-    } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to add task.");
-    }
+  const handleAddTask = () => {
+    onNavigate?.("add-task");
   };
 
-  const handleEditTask = async (task) => {
-    const title = window.prompt("Task title", task.title);
-
-    if (!title?.trim()) {
-      return;
-    }
-
-    const description =
-      window.prompt("Task description", task.description) || task.description;
-    const dueDate =
-      window.prompt("Due date (YYYY-MM-DD)", toInputDate(task.dueDate)) ||
-      toInputDate(task.dueDate);
-    const status = window.prompt(
-      "Status: In progress, Pending, Done, In review",
-      task.status
-    ) || task.status;
-
-    try {
-      setErrorMessage("");
-      const updatedTask = await taskAPI.update(task.id, {
-        title: title.trim(),
-        description: description.trim(),
-        dueDate,
-        status: statusToApi[status] || statusToApi[task.status] || "pending",
-      });
-
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? normalizeTask(updatedTask) : currentTask
-        )
-      );
-    } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to update task.");
-    }
+  const handleEditTask = (task) => {
+    onEditTask?.(task);
   };
 
   const handleToggleDone = async (taskId) => {
     const task = tasks.find((currentTask) => currentTask.id === taskId);
     if (!task) return;
-
-    const nextStatus = task.status === "Done" ? "Pending" : "Done";
+    if (getEntityId(task.assignedTo) !== getEntityId(user)) return;
+    if (task.status === "Done") return;
 
     try {
       setErrorMessage("");
@@ -415,7 +358,7 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
         title: task.title,
         description: task.description,
         dueDate: toInputDate(task.dueDate),
-        status: statusToApi[nextStatus],
+        status: statusToApi.Done,
       });
 
       setTasks((currentTasks) =>
@@ -428,16 +371,23 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <Sidebar
-        activePage={activePage}
-        onLogout={onLogout}
-        onNavigate={onNavigate}
-      />
+  const handleDeleteTask = async (task) => {
+    const shouldDelete = window.confirm(`Delete task "${task.title}"?`);
+    if (!shouldDelete) return;
 
-      <main className="px-4 pb-12 pt-8 md:ml-[230px] md:px-10 lg:px-12">
-        <div className="mx-auto max-w-[1060px]">
+    try {
+      setErrorMessage("");
+      await taskAPI.delete(task.id);
+      setTasks((currentTasks) =>
+        currentTasks.filter((currentTask) => currentTask.id !== task.id)
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete task.");
+    }
+  };
+
+  return (
+        <div className="mx-auto max-w-[1500px]">
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
@@ -460,14 +410,6 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
                 <Icon className="h-5 w-5" />
                 <span>Add Task</span>
               </button>
-
-              <div className="h-12 w-px bg-neutral-300" />
-
-              <img
-                src={peejong}
-                alt="User"
-                className="h-10 w-10 rounded-full bg-slate-200 object-cover"
-              />
             </div>
           </header>
 
@@ -523,15 +465,16 @@ const Tasks = ({ activePage = "tasks", onLogout, onNavigate }) => {
             {!isLoading && visibleTasks.map((task) => (
               <TaskCard
                 key={task.id}
+                canToggleDone={getEntityId(task.assignedTo) === getEntityId(user)}
+                onDelete={handleDeleteTask}
                 onEdit={handleEditTask}
                 onToggleDone={handleToggleDone}
+                showStatus={selectedTaskStatus === "All"}
                 task={task}
               />
             ))}
           </section>
         </div>
-      </main>
-    </div>
   );
 };
 

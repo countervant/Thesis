@@ -5,6 +5,7 @@ import { authAPI } from "../../services/api.js";
 import AuthenticationHelper from "../../components/auth/AuthenticationHelper.jsx";
 import hideIcon from "../../assets/hide.png";
 import viewIcon from "../../assets/view.png";
+import { validateEmail } from "../../utils/emailValidation.js";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -31,8 +32,9 @@ const ResetPassword = () => {
     setError("");
     setMessage("");
 
-    if (!email.trim()) {
-      setError("Email is required");
+    const emailValidation = validateEmail(email);
+    if (emailValidation) {
+      setError(emailValidation);
       return;
     }
 
@@ -68,8 +70,9 @@ const ResetPassword = () => {
     setMessage("");
     setResendMessage("");
 
-    if (!email.trim()) {
-      setError("Email is required to resend the code");
+    const emailValidation = validateEmail(email);
+    if (emailValidation) {
+      setError(emailValidation);
       return;
     }
 

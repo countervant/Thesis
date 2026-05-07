@@ -26,6 +26,17 @@ const clientSchema = new mongoose.Schema(
       default: "",
     },
 
+    service: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
     address: {
       type: String,
       default: "",

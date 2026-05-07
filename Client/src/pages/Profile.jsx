@@ -1,0 +1,456 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CLIENTRA2 from "../assets/CLIENTRA2.png";
+import { useAuth } from "../context/AuthContext.jsx";
+import { authAPI } from "../services/api.js";
+import { isValidEmail } from "../utils/emailValidation.js";
+import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+
+const emptyForm = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  position: "",
+  password: "",
+  confirmPassword: "",
+  avatar: "",
+};
+
+const fieldNames = {
+  firstName: `profile_given_${Date.now()}`,
+  lastName: `profile_family_${Date.now()}`,
+  email: `profile_contact_${Date.now()}`,
+  phone: `profile_optional_line_${Date.now()}`,
+  position: `profile_position_${Date.now()}`,
+  password: `profile_secret_${Date.now()}`,
+  confirmPassword: `profile_secret_confirm_${Date.now()}`,
+};
+
+const antiAutofillProps = {
+  autoComplete: "new-password",
+  autoCorrect: "off",
+  autoCapitalize: "none",
+  spellCheck: "false",
+  "data-lpignore": "true",
+  "data-1p-ignore": "true",
+  "data-bwignore": "true",
+  "data-form-type": "other",
+};
+
+const profileToForm = (profile) => ({
+  firstName: profile?.firstName || "",
+  lastName: profile?.lastName || "",
+  email: profile?.email || "",
+  phone: profile?.phone || "",
+  position: profile?.position || "",
+  password: "",
+  confirmPassword: "",
+  avatar: profile?.avatar || "",
+});
+
+const FieldLabel = ({ children }) => (
+  <label className="text-sm font-semibold text-neutral-800">{children}</label>
+);
+
+const preventAutofill = (event) => {
+  event.currentTarget.removeAttribute("readOnly");
+};
+
+const Profile = () => {
+  const navigate = useNavigate();
+  const { user, updateUser } = useAuth();
+  const [formData, setFormData] = useState(() => profileToForm(user) || emptyForm);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const initials = useMemo(() => {
+    const value = `${formData.firstName.charAt(0)}${formData.lastName.charAt(0)}`;
+    return value.toUpperCase() || "U";
+  }, [formData.firstName, formData.lastName]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await authAPI.getMe();
+
+        if (isMounted) {
+          const nextUser = {
+            id: data._id || data.id,
+            ...data,
+          };
+
+          updateUser(nextUser);
+          setFormData(profileToForm(data));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.response?.data?.message || "Unable to load profile.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [updateUser]);
+
+  const updateField = (field, value) => {
+    setFormData((currentData) => ({
+      ...currentData,
+      [field]: value,
+    }));
+  };
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Please choose an image file.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Avatar image must be 5MB or smaller.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateField("avatar", String(reader.result || ""));
+      setErrorMessage("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      setErrorMessage("First name and last name are required.");
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      setErrorMessage("Enter a valid email address.");
+      return;
+    }
+
+    if (!isValidPhoneNumber(formData.phone)) {
+      setErrorMessage("Enter a valid phone number.");
+      return;
+    }
+
+    if (formData.password || formData.confirmPassword) {
+      if (formData.password !== formData.confirmPassword) {
+        setErrorMessage("Passwords do not match.");
+        return;
+      }
+
+      if (formData.password.length < 8) {
+        setErrorMessage("Password must be at least 8 characters.");
+        return;
+      }
+
+      if (!/[A-Z]/.test(formData.password) || !/[a-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+        setErrorMessage("Password must include uppercase, lowercase, and number characters.");
+        return;
+      }
+    }
+
+    try {
+      setIsSaving(true);
+      const payload = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        position: formData.position.trim(),
+        avatar: formData.avatar,
+      };
+
+      if (formData.password) {
+        payload.password = formData.password;
+      }
+
+      const updatedProfile = await authAPI.updateMe(payload);
+      updateUser(updatedProfile);
+      setFormData({
+        ...profileToForm(updatedProfile),
+        password: "",
+        confirmPassword: "",
+      });
+      setSuccessMessage("Profile updated successfully.");
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to update profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
+      <header className="flex h-16 items-center justify-between border-b border-neutral-300 bg-[#f5f5f5] px-5">
+        <button
+          type="button"
+          onClick={() => navigate(`/${user?.role || "client"}/dashboard`)}
+          className="flex items-center gap-2"
+        >
+          <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
+          <span
+            className="text-2xl uppercase text-neutral-950"
+            style={{ fontFamily: "var(--font-bruno)" }}
+          >
+            Clientra
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="h-10 rounded-lg border border-[#9a55ff] px-5 text-sm font-semibold text-neutral-700 transition hover:bg-purple-50"
+        >
+          Back
+        </button>
+      </header>
+
+      <main className="mx-auto max-w-[980px] px-5 py-10">
+        <section className="rounded-lg bg-white p-6 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50 sm:p-8">
+          <div className="flex flex-col gap-6 border-b border-neutral-200 pb-7 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1
+                className="text-3xl uppercase leading-none text-neutral-950"
+                style={{ fontFamily: "var(--font-bruno)" }}
+              >
+                Profile
+              </h1>
+              <p className="mt-2 text-sm font-medium text-neutral-600">
+                Manage your account information and avatar.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-2xl font-bold text-white">
+                {formData.avatar ? (
+                  <img
+                    src={formData.avatar}
+                    alt="Avatar preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-lg bg-[#dc4fb2] px-5 text-sm font-semibold text-white transition hover:brightness-105">
+                Upload Avatar
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+          </div>
+
+          {isLoading && !formData.email ? (
+            <p className="mt-6 rounded-md bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-700">
+              Loading profile...
+            </p>
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              autoComplete="off"
+              data-form-type="other"
+              className="mt-7"
+            >
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="hidden"
+              />
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="hidden"
+              />
+
+              {isLoading && (
+                <p className="mb-5 rounded-md bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-700">
+                  Refreshing profile from database...
+                </p>
+              )}
+
+              {errorMessage && (
+                <p className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                  {errorMessage}
+                </p>
+              )}
+
+              {successMessage && (
+                <p className="mb-5 rounded-md bg-green-50 px-4 py-3 text-sm font-medium text-green-700 ring-1 ring-green-100">
+                  {successMessage}
+                </p>
+              )}
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <FieldLabel>First Name</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.firstName}
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.firstName}
+                    onChange={(event) => updateField("firstName", event.target.value)}
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <FieldLabel>Last Name</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.lastName}
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.lastName}
+                    onChange={(event) => updateField("lastName", event.target.value)}
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <FieldLabel>Email</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.email}
+                    inputMode="email"
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.email}
+                    onChange={(event) => updateField("email", event.target.value)}
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <FieldLabel>Phone</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.phone}
+                    inputMode="tel"
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.phone}
+                    onChange={(event) => updateField("phone", event.target.value)}
+                    placeholder="+63..."
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-1">
+                <FieldLabel>Position</FieldLabel>
+                <input
+                  type="text"
+                  name={fieldNames.position}
+                  {...antiAutofillProps}
+                  readOnly
+                  onFocus={preventAutofill}
+                  value={formData.position}
+                  onChange={(event) => updateField("position", event.target.value)}
+                  placeholder="Position or role..."
+                  className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                />
+              </div>
+
+              <div className="mt-7 grid gap-5 border-t border-neutral-200 pt-6 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <FieldLabel>New Password</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.password}
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.password}
+                    onChange={(event) => updateField("password", event.target.value)}
+                    placeholder="Leave blank to keep current"
+                    style={{ WebkitTextSecurity: "disc" }}
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <FieldLabel>Confirm Password</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.confirmPassword}
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.confirmPassword}
+                    onChange={(event) => updateField("confirmPassword", event.target.value)}
+                    placeholder="Confirm new password"
+                    style={{ WebkitTextSecurity: "disc" }}
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                {formData.avatar && (
+                  <button
+                    type="button"
+                    onClick={() => updateField("avatar", "")}
+                    className="h-10 rounded-lg border border-neutral-300 px-5 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50"
+                  >
+                    Remove Avatar
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="h-10 rounded-lg bg-[#dc4fb2] px-7 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+};
+
+export default Profile;

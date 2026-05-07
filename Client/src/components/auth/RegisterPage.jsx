@@ -5,6 +5,7 @@ import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
+import { validateEmail } from "../../utils/emailValidation.js";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -29,13 +30,6 @@ const RegisterPage = ({ order, order1 }) => {
     setConfirmPassword("");
     setShowPassword(false);
   }, []);
-
-  const validateEmail = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
-  };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;

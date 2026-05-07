@@ -62,6 +62,11 @@ export const authAPI = {
     return response.data;
   },
 
+  updateMe: async (profile) => {
+    const response = await api.put("/auth/me", profile);
+    return response.data;
+  },
+
   forgotPassword: async (email) => {
     const response = await api.post("/auth/forgot-password", { email });
     return response.data;
@@ -69,6 +74,11 @@ export const authAPI = {
 
   resetPassword: async (email, otp, password) => {
     const response = await api.post("/auth/reset-password", { email, otp, password });
+    return response.data;
+  },
+
+  getAssignees: async () => {
+    const response = await api.get("/auth/assignees");
     return response.data;
   },
 };
@@ -91,6 +101,72 @@ export const taskAPI = {
 
   delete: async (id) => {
     const response = await api.delete(`/tasks/${id}`);
+    return response.data;
+  },
+};
+
+export const employeeAPI = {
+  getAll: async () => {
+    const response = await api.get("/auth/employees");
+    return response.data;
+  },
+
+  create: async (employee) => {
+    const response = await api.post("/auth/employees", employee);
+    return response.data;
+  },
+
+  update: async (id, employee) => {
+    const response = await api.put(`/auth/employees/${id}`, employee);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/auth/employees/${id}`);
+    return response.data;
+  },
+};
+
+export const clientAPI = {
+  getAll: async () => {
+    const response = await api.get("/clients");
+    return response.data;
+  },
+
+  create: async (client) => {
+    const response = await api.post("/clients", client);
+    return response.data;
+  },
+
+  update: async (id, client) => {
+    const response = await api.put(`/clients/${id}`, client);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/clients/${id}`);
+    return response.data;
+  },
+};
+
+export const budgetAPI = {
+  getAll: async () => {
+    const response = await api.get("/budgets");
+    return response.data;
+  },
+
+  create: async (budget) => {
+    const response = await api.post("/budgets", budget);
+    return response.data;
+  },
+
+  update: async (id, budget) => {
+    const response = await api.put(`/budgets/${id}`, budget);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/budgets/${id}`);
     return response.data;
   },
 };

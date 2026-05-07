@@ -1,8 +1,21 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useCallback, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext(null);
 
 const normalizeRole = (role) => role?.toLowerCase();
+const userForStorage = (userData) => {
+  const storedUser = { ...(userData || {}) };
+  delete storedUser.avatar;
+  return storedUser;
+};
+
+const persistUser = (userData) => {
+  try {
+    localStorage.setItem("user", JSON.stringify(userForStorage(userData)));
+  } catch {
+    localStorage.removeItem("user");
+  }
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,7 +36,7 @@ export const AuthProvider = ({ children }) => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setUser(normalizedUser);
       setToken(storedToken);
-      localStorage.setItem("user", JSON.stringify(normalizedUser));
+      persistUser(normalizedUser);
     }
     setLoading(false);
   }, []);
@@ -35,7 +48,7 @@ export const AuthProvider = ({ children }) => {
     };
     setUser(normalizedUser);
     setToken(authToken);
-    localStorage.setItem("user", JSON.stringify(normalizedUser));
+    persistUser(normalizedUser);
     localStorage.setItem("token", authToken);
   };
 
@@ -45,6 +58,20 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
   };
+
+  const updateUser = useCallback((userData) => {
+    setUser((currentUser) => {
+      const normalizedUser = {
+        ...currentUser,
+        ...userData,
+        id: userData.id || userData._id || currentUser?.id,
+        role: normalizeRole(userData.role || userData.type || currentUser?.role),
+      };
+
+      persistUser(normalizedUser);
+      return normalizedUser;
+    });
+  }, []);
 
   const isAuthenticated = !!token;
 
@@ -65,6 +92,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
+        updateUser,
         isAuthenticated,
         hasRole,
       }}

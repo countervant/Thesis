@@ -6,140 +6,197 @@ import AdminTasks from "./Dashboard/Admin/Tasks.jsx";
 import AdminBudget from "./Dashboard/Admin/Budget.jsx";
 import AdminClients from "./Dashboard/Admin/Client.jsx";
 import AdminEmployees from "./Dashboard/Admin/Employee.jsx";
+import AdminAddTask from "./Dashboard/Admin/Addtask.jsx";
+import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
+import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
+import MainBars from "./MainBars.jsx";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const role = user?.role;
   const [adminPage, setAdminPage] = useState("dashboard");
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
+  const [employeeRefreshKey, setEmployeeRefreshKey] = useState(0);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
+  const handleTaskCreated = () => {
+    setTaskRefreshKey((currentKey) => currentKey + 1);
+    setEditingTask(null);
+    setAdminPage("tasks");
+  };
+
+  const handleEditTask = (task) => {
+    setEditingTask(task);
+    setAdminPage("edit-task");
+  };
+
+  const handleBudgetSaved = () => {
+    setBudgetRefreshKey((currentKey) => currentKey + 1);
+    setEditingBudgetEntry(null);
+    setAdminPage("budget");
+  };
+
+  const handleAddBudgetEntry = () => {
+    setEditingBudgetEntry(null);
+    setAdminPage("add-budget");
+  };
+
+  const handleEditBudgetEntry = (entry) => {
+    setEditingBudgetEntry(entry);
+    setAdminPage("edit-budget");
+  };
+
+  const handleEmployeeSaved = () => {
+    setEmployeeRefreshKey((currentKey) => currentKey + 1);
+    setEditingEmployee(null);
+    setAdminPage("employee");
+  };
+
+  const handleAddEmployee = () => {
+    setEditingEmployee(null);
+    setAdminPage("add-employee");
+  };
+
+  const handleEditEmployee = (employee) => {
+    setEditingEmployee(employee);
+    setAdminPage("edit-employee");
+  };
+
   if (role === "admin") {
-    if (adminPage === "tasks") {
-      return (
-        <AdminTasks
-          activePage={adminPage}
-          onLogout={handleLogout}
-          onNavigate={setAdminPage}
-        />
-      );
-    }
+    const shellActivePage =
+      adminPage === "add-task" || adminPage === "edit-task"
+        ? "tasks"
+        : adminPage === "add-budget" || adminPage === "edit-budget"
+          ? "budget"
+        : adminPage === "add-employee" || adminPage === "edit-employee"
+          ? "employee"
+          : adminPage;
 
-    if (adminPage === "budget") {
-      return (
-        <AdminBudget
-          activePage={adminPage}
-          onLogout={handleLogout}
-          onNavigate={setAdminPage}
-        />
-      );
-    }
+    let adminContent = (
+      <AdminDashboard activePage={adminPage} />
+    );
 
-    if (adminPage === "client") {
-      return (
-        <AdminClients
-          activePage={adminPage}
-          onLogout={handleLogout}
-          onNavigate={setAdminPage}
-        />
+    if (adminPage === "tasks" || adminPage === "add-task" || adminPage === "edit-task") {
+      adminContent = (
+        <>
+          <AdminTasks
+            onEditTask={handleEditTask}
+            onNavigate={setAdminPage}
+            refreshKey={taskRefreshKey}
+          />
+          {(adminPage === "add-task" || adminPage === "edit-task") && (
+            <AdminAddTask
+              onNavigate={setAdminPage}
+              onTaskCreated={handleTaskCreated}
+              task={adminPage === "edit-task" ? editingTask : null}
+            />
+          )}
+        </>
       );
-    }
-
-    if (adminPage === "employee") {
-      return (
-        <AdminEmployees
-          activePage={adminPage}
-          onLogout={handleLogout}
-          onNavigate={setAdminPage}
-        />
+    } else if (
+      adminPage === "budget" ||
+      adminPage === "add-budget" ||
+      adminPage === "edit-budget"
+    ) {
+      adminContent = (
+        <>
+          <AdminBudget
+            onAddEntry={handleAddBudgetEntry}
+            onEditEntry={handleEditBudgetEntry}
+            refreshKey={budgetRefreshKey}
+          />
+          {(adminPage === "add-budget" || adminPage === "edit-budget") && (
+            <AdminAddBudget
+              entry={adminPage === "edit-budget" ? editingBudgetEntry : null}
+              onBudgetSaved={handleBudgetSaved}
+              onNavigate={setAdminPage}
+            />
+          )}
+        </>
+      );
+    } else if (adminPage === "client") {
+      adminContent = <AdminClients />;
+    } else if (
+      adminPage === "employee" ||
+      adminPage === "add-employee" ||
+      adminPage === "edit-employee"
+    ) {
+      adminContent = (
+        <>
+          <AdminEmployees
+            onAddEmployee={handleAddEmployee}
+            onEditEmployee={handleEditEmployee}
+            refreshKey={employeeRefreshKey}
+          />
+          {(adminPage === "add-employee" || adminPage === "edit-employee") && (
+            <AdminAddEmployee
+              employee={adminPage === "edit-employee" ? editingEmployee : null}
+              onEmployeeSaved={handleEmployeeSaved}
+              onNavigate={setAdminPage}
+            />
+          )}
+        </>
       );
     }
 
     return (
-      <AdminDashboard
-        activePage={adminPage}
+      <MainBars
+        activePage={shellActivePage}
         onLogout={handleLogout}
         onNavigate={setAdminPage}
-      />
+      >
+        {adminContent}
+      </MainBars>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-linear-to-r from-pink-500 to-purple-600 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">CLIENTRA</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm">
-              Welcome, <strong>{user?.email}</strong>
-            </span>
-            <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">
-              {role}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+    <MainBars
+      activePage={adminPage}
+      onLogout={handleLogout}
+      onNavigate={setAdminPage}
+    >
+      <div className="mx-auto max-w-[1500px]">
+        <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
+          <h1
+            className="text-3xl uppercase leading-none text-neutral-950"
+            style={{ fontFamily: "var(--font-bruno)" }}
+          >
             Dashboard
-          </h2>
-          <p className="text-gray-600 mb-6">
-            You are logged in as <strong>{role}</strong>
+          </h1>
+          <p className="mt-3 text-sm font-medium text-neutral-600">
+            You are logged in as <strong>{role}</strong>.
           </p>
 
-          {/* Role-specific content */}
-          {role === "admin" && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold text-purple-800 mb-2">
-                Admin Panel
-              </h3>
-              <p className="text-purple-600 text-sm">
-                You have full administrative access to manage users, settings,
-                and all system features.
-              </p>
-            </div>
-          )}
-
           {role === "employee" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold text-blue-800 mb-2">
-                Employee Portal
-              </h3>
-              <p className="text-blue-600 text-sm">
-                Access your assigned tasks, manage client interactions, and
-                update records.
+            <div className="mt-6 rounded-lg border border-blue-100 bg-blue-50 px-5 py-4">
+              <h2 className="font-semibold text-blue-800">Employee Portal</h2>
+              <p className="mt-2 text-sm text-blue-600">
+                Access your assigned tasks, manage client interactions, and update records.
               </p>
             </div>
           )}
 
           {role === "client" && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold text-green-800 mb-2">
-                Client Portal
-              </h3>
-              <p className="text-green-600 text-sm">
-                View your account information, submit requests, and track your
-                service status.
+            <div className="mt-6 rounded-lg border border-green-100 bg-green-50 px-5 py-4">
+              <h2 className="font-semibold text-green-800">Client Portal</h2>
+              <p className="mt-2 text-sm text-green-600">
+                View your account information, submit requests, and track your service status.
               </p>
             </div>
           )}
-        </div>
-      </main>
-    </div>
+        </section>
+      </div>
+    </MainBars>
   );
 };
 

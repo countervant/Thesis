@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ForgotPasswordkey from "../../assets/ForgotPassword-key.png";
 import AuthenticationHelper from "./AuthenticationHelper";
 import { authAPI } from "../../services/api.js";
+import { validateEmail } from "../../utils/emailValidation.js";
 
 const ForgotPasswordcom = () => {
   const navigate = useNavigate();
@@ -11,13 +12,6 @@ const ForgotPasswordcom = () => {
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const validateEmail = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(trimmed) ? "" : "Enter a valid email";
-  };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;

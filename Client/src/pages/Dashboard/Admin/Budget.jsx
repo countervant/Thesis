@@ -1,49 +1,48 @@
-import { useMemo, useState } from "react";
-import CLIENTRA2 from "../../../assets/CLIENTRA2.png";
-import peejong from "../../../assets/peejong.png";
+import { useEffect, useMemo, useState } from "react";
+import { budgetAPI } from "../../../services/api.js";
 
-const navItems = [
-  { id: "dashboard", label: "Home", icon: "dashboard" },
-  { id: "tasks", label: "Tasks", icon: "tasks" },
-  { id: "budget", label: "Budget", icon: "budget" },
-  { id: "client", label: "Client", icon: "client" },
-  { id: "employee", label: "Employee", icon: "employee" },
-];
+const formatInputDate = (value) => {
+  if (!value) {
+    return new Date().toISOString().slice(0, 10);
+  }
 
-const entries = [
-  {
-    id: 1,
-    type: "income",
-    description: "Monthly salary",
-    category: "Salary",
-    date: "12/26/2025",
-    amount: 5000,
-  },
-  {
-    id: 2,
-    type: "expense",
-    description: "Office rent",
-    category: "Rent",
-    date: "12/26/2025",
-    amount: -1200,
-  },
-  {
-    id: 3,
-    type: "expense",
-    description: "Software subscriptions",
-    category: "Software",
-    date: "12/26/2025",
-    amount: -350,
-  },
-  {
-    id: 4,
-    type: "income",
-    description: "Freelance project",
-    category: "Freelance",
-    date: "12/26/2025",
-    amount: 2500,
-  },
-];
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const formatDisplayDate = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
+
+const normalizeEntry = (entry) => ({
+  id: entry._id || entry.id,
+  type: entry.type || "expense",
+  description: entry.description || "",
+  category: entry.category || "",
+  date: formatDisplayDate(entry.date),
+  inputDate: formatInputDate(entry.date),
+  amount:
+    entry.type === "expense"
+      ? -Math.abs(Number(entry.amount) || 0)
+      : Math.abs(Number(entry.amount) || 0),
+});
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = {
@@ -213,52 +212,6 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   );
 };
 
-const Sidebar = ({ activePage = "budget", onLogout, onNavigate }) => (
-  <aside className="fixed left-0 top-0 z-20 hidden h-screen w-[230px] border-r border-neutral-300 bg-[#eeeeee] md:flex md:flex-col">
-    <div className="border-b border-neutral-300 px-4 py-4">
-      <div className="flex items-center gap-2">
-        <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
-        <span
-          className="text-xl uppercase text-neutral-950"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-          Clientra
-        </span>
-      </div>
-      <p className="mt-1 text-sm font-medium text-neutral-700">
-        Business Management
-      </p>
-    </div>
-
-    <nav className="flex flex-1 flex-col gap-4 px-3 pt-10">
-      {navItems.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onNavigate?.(item.id)}
-          className={`flex h-11 items-center gap-4 rounded-lg px-6 text-sm font-medium transition ${
-            activePage === item.id
-              ? "bg-linear-to-r from-[#8424d2] to-[#e347b3] text-white shadow-[0_4px_7px_rgba(126,34,206,0.35)]"
-              : "text-neutral-700 hover:bg-white hover:text-[#c72fb2]"
-          }`}
-        >
-          <Icon name={item.icon} className="h-6 w-6 shrink-0" />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </nav>
-
-    <button
-      type="button"
-      onClick={onLogout}
-      className="mb-8 ml-12 flex items-center gap-10 text-sm text-white transition hover:text-[#c72fb2]"
-    >
-      <span>Log out</span>
-      <Icon name="logout" className="h-6 w-6" />
-    </button>
-  </aside>
-);
-
 const SummaryCard = ({ icon, label, value }) => (
   <section className="flex h-20 items-center justify-center gap-8 rounded-lg bg-white px-5 shadow-[0_3px_4px_rgba(219,39,119,0.35)] ring-1 ring-pink-50">
     <Icon name={icon} className="h-10 w-10 text-[#e347b3]" />
@@ -273,21 +226,30 @@ const ExpenseBreakdown = ({ expenses, income }) => {
   const maxValue = Math.max(income, expenses, 1);
   const expenseHeight = `${Math.max((expenses / maxValue) * 100, 8)}%`;
   const incomeHeight = `${Math.max((income / maxValue) * 100, 8)}%`;
+  const axisLabels = [1, 0.75, 0.5, 0.25, 0].map((multiplier) =>
+    Math.round(maxValue * multiplier).toLocaleString("en-US")
+  );
 
   return (
-  <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
+  <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
     <h2 className="text-lg font-bold text-neutral-900">Expense Breakdown</h2>
-    <div className="mt-7 flex items-end gap-4">
-      <div className="flex h-28 flex-col justify-between text-xs text-neutral-500">
-        <span>8,000</span>
-        <span>6,000</span>
-        <span>4,000</span>
-        <span>2,000</span>
-        <span>0</span>
+    <div className="mt-6 flex flex-1 items-end gap-4">
+      <div className="flex h-52 w-12 flex-col justify-between text-right text-xs text-neutral-500">
+        {axisLabels.map((label, index) => (
+          <span key={`${label}-${index}`}>{label}</span>
+        ))}
       </div>
-      <div className="relative flex h-28 flex-1 items-end justify-center gap-5 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_19px)]">
-        <div className="w-24 bg-[#ff1f14]" style={{ height: expenseHeight }} />
-        <div className="w-24 bg-[#18a64f]" style={{ height: incomeHeight }} />
+      <div className="relative flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_52px)] px-8">
+        <div
+          className="w-24 max-w-[34%] rounded-t-sm bg-[#ff1f14]"
+          style={{ height: expenseHeight }}
+          title={`Expenses: ${expenses.toLocaleString("en-US")}`}
+        />
+        <div
+          className="w-24 max-w-[34%] rounded-t-sm bg-[#18a64f]"
+          style={{ height: incomeHeight }}
+          title={`Income: ${income.toLocaleString("en-US")}`}
+        />
         <span className="absolute -bottom-5 text-xs text-neutral-400">Dec 25</span>
       </div>
     </div>
@@ -315,38 +277,73 @@ const ExpenseCategories = ({ entries }) => {
   }, {});
   const categoryList = Object.entries(categories);
   const total = categoryList.reduce((sum, [, value]) => sum + value, 0);
-  const firstPercent = total > 0 ? (categoryList[0]?.[1] || 0) / total * 100 : 50;
+  const colors = ["#8d2bc8", "#d947b3", "#6d5dfc", "#f05f9f"];
+  const segments = categoryList.slice(0, 4).reduce(
+    (result, [category, value], index) => {
+      const start = result.currentPercent;
+      const percent = total > 0 ? (value / total) * 100 : 0;
+      const end = start + percent;
+      const middle = start + percent / 2;
+      const radians = (middle * 3.6 - 90) * (Math.PI / 180);
+      const radius = 24;
+
+      return {
+        currentPercent: end,
+        items: [
+          ...result.items,
+          {
+            category,
+            value,
+            color: colors[index % colors.length],
+            end,
+            start,
+            x: 50 + Math.cos(radians) * radius,
+            y: 50 + Math.sin(radians) * radius,
+          },
+        ],
+      };
+    },
+    { currentPercent: 0, items: [] }
+  ).items;
+  const chartBackground =
+    segments.length > 0
+      ? `conic-gradient(${segments
+          .map((segment) => `${segment.color} ${segment.start}% ${segment.end}%`)
+          .join(", ")})`
+      : "conic-gradient(#8d2bc8 0 50%, #d947b3 50% 100%)";
 
   return (
   <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
     <h2 className="text-lg font-bold text-neutral-900">Expense Categories</h2>
-    <div className="mt-3 flex flex-col items-center">
+    <div className="mt-4 flex flex-col items-center">
       <div
-        className="relative h-36 w-36 rounded-full"
-        style={{
-          background: `conic-gradient(#8d2bc8 0 ${firstPercent}%, #d947b3 ${firstPercent}% 100%)`,
-        }}
+        className="relative h-44 w-44 shrink-0 rounded-full sm:h-52 sm:w-52"
+        style={{ background: chartBackground }}
       >
-        <span className="absolute left-8 top-16 text-center text-[10px] font-semibold leading-tight text-white">
-          {categoryList[0]?.[0] || "None"}
-          <br />
-          {(categoryList[0]?.[1] || 0).toFixed(2)}
-        </span>
-        <span className="absolute right-8 top-16 text-center text-[10px] font-semibold leading-tight text-white">
-          {categoryList[1]?.[0] || "Other"}
-          <br />
-          {(categoryList[1]?.[1] || 0).toFixed(2)}
-        </span>
+        {segments.length === 0 && (
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-xs font-semibold leading-tight text-white">
+            None
+          </span>
+        )}
+        {segments.map((segment) => (
+          <span
+            key={segment.category}
+            className="absolute max-w-[72px] -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-semibold leading-none text-white"
+            style={{ left: `${segment.x}%`, top: `${segment.y}%` }}
+          >
+            <span className="block truncate">{segment.category}</span>
+            <span className="block">{segment.value.toFixed(2)}</span>
+          </span>
+        ))}
       </div>
-      <div className="mt-5 space-y-2 self-center text-xs text-neutral-500">
-        {categoryList.slice(0, 2).map(([category], index) => (
-          <span key={category} className="flex items-center gap-2">
+      <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 sm:grid-cols-4">
+        {segments.map((segment) => (
+          <span key={segment.category} className="flex items-center gap-2">
             <span
-              className={`h-2 w-2 rounded-full ${
-                index === 0 ? "bg-[#8d5cff]" : "bg-[#ff7b7b]"
-              }`}
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: segment.color }}
             />
-            {category}
+            <span className="min-w-0 truncate">{segment.category}</span>
           </span>
         ))}
       </div>
@@ -373,8 +370,42 @@ const formatCurrency = (amount) => {
   return `${amount < 0 ? "-" : "+"}$${absoluteAmount}`;
 };
 
-const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
-  const [budgetEntries, setBudgetEntries] = useState(entries);
+const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
+  const [budgetEntries, setBudgetEntries] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadBudgets = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await budgetAPI.getAll();
+
+        if (isMounted) {
+          setBudgetEntries(Array.isArray(data) ? data.map(normalizeEntry) : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(
+            error.response?.data?.message || "Unable to load budget entries."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadBudgets();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey]);
 
   const totals = useMemo(() => {
     const income = budgetEntries
@@ -391,87 +422,24 @@ const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
     };
   }, [budgetEntries]);
 
-  const addEntry = () => {
-    const type = window.prompt("Type: income or expense", "expense") || "expense";
-    const normalizedType = type.toLowerCase() === "income" ? "income" : "expense";
-    const description = window.prompt("Description", "New entry");
-
-    if (!description?.trim()) {
+  const deleteEntry = async (entryId) => {
+    if (!window.confirm("Delete this entry?")) {
       return;
     }
 
-    const category = window.prompt("Category", "General") || "General";
-    const date = window.prompt("Date (MM/DD/YYYY)", "12/26/2025") || "12/26/2025";
-    const amountValue = Number(window.prompt("Amount", "1")) || 1;
-
-    setBudgetEntries((currentEntries) => [
-      ...currentEntries,
-      {
-        id: Date.now(),
-        type: normalizedType,
-        description: description.trim(),
-        category: category.trim(),
-        date,
-        amount:
-          normalizedType === "expense"
-            ? -Math.abs(amountValue)
-            : Math.abs(amountValue),
-      },
-    ]);
-  };
-
-  const editEntry = (entry) => {
-    const type = window.prompt("Type: income or expense", entry.type) || entry.type;
-    const normalizedType = type.toLowerCase() === "income" ? "income" : "expense";
-    const description = window.prompt("Description", entry.description);
-
-    if (!description?.trim()) {
-      return;
-    }
-
-    const category = window.prompt("Category", entry.category) || entry.category;
-    const date = window.prompt("Date (MM/DD/YYYY)", entry.date) || entry.date;
-    const amountValue =
-      Number(window.prompt("Amount", String(Math.abs(entry.amount)))) ||
-      Math.abs(entry.amount);
-
-    setBudgetEntries((currentEntries) =>
-      currentEntries.map((currentEntry) =>
-        currentEntry.id === entry.id
-          ? {
-              ...currentEntry,
-              type: normalizedType,
-              description: description.trim(),
-              category: category.trim(),
-              date,
-              amount:
-                normalizedType === "expense"
-                  ? -Math.abs(amountValue)
-                  : Math.abs(amountValue),
-            }
-          : currentEntry
-      )
-    );
-  };
-
-  const deleteEntry = (entryId) => {
-    if (window.confirm("Delete this entry?")) {
+    try {
+      setErrorMessage("");
+      await budgetAPI.delete(entryId);
       setBudgetEntries((currentEntries) =>
         currentEntries.filter((entry) => entry.id !== entryId)
       );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete budget entry.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <Sidebar
-        activePage={activePage}
-        onLogout={onLogout}
-        onNavigate={onNavigate}
-      />
-
-      <main className="px-4 pb-10 pt-8 md:ml-[230px] md:px-10 lg:px-12">
-        <div className="mx-auto max-w-[1060px]">
+        <div className="mx-auto max-w-[1500px]">
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
@@ -488,18 +456,12 @@ const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={addEntry}
+                onClick={onAddEntry}
                 className="flex h-11 items-center gap-3 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] px-5 text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
               >
                 <Icon className="h-5 w-5" />
                 <span>Add Entry</span>
               </button>
-              <div className="h-12 w-px bg-neutral-300" />
-              <img
-                src={peejong}
-                alt="User"
-                className="h-10 w-10 rounded-full bg-slate-200 object-cover"
-              />
             </div>
           </header>
 
@@ -526,6 +488,12 @@ const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
             <ExpenseCategories entries={budgetEntries} />
           </section>
 
+          {errorMessage && (
+            <p className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
+              {errorMessage}
+            </p>
+          )}
+
           <section className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
             <table className="w-full min-w-[780px] text-left text-xs text-neutral-800">
               <thead className="border-b border-neutral-300">
@@ -539,7 +507,23 @@ const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
                 </tr>
               </thead>
               <tbody>
-                {budgetEntries.map((entry) => (
+                {isLoading && (
+                  <tr>
+                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600">
+                      Loading budget entries...
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && budgetEntries.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600">
+                      No budget entries found.
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && budgetEntries.map((entry) => (
                   <tr key={entry.id}>
                     <td className="px-5 py-4">
                       <EntryType type={entry.type} />
@@ -558,7 +542,7 @@ const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
                       <div className="flex justify-end gap-4">
                         <button
                           type="button"
-                          onClick={() => editEntry(entry)}
+                          onClick={() => onEditEntry?.(entry)}
                           className="text-neutral-900 transition hover:text-[#c72fb2]"
                           aria-label={`Edit ${entry.description}`}
                         >
@@ -580,8 +564,6 @@ const Budget = ({ activePage = "budget", onLogout, onNavigate }) => {
             </table>
           </section>
         </div>
-      </main>
-    </div>
   );
 };
 
