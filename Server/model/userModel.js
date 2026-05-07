@@ -46,6 +46,12 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    country: {
+      type: String,
+      default: "Philippines",
+      trim: true,
+    },
+
     position: {
       type: String,
       default: "",

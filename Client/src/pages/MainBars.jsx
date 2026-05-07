@@ -108,27 +108,16 @@ const Icon = ({ name, className = "h-6 w-6" }) => {
 };
 
 const UserAvatar = ({ user }) => {
-  const initials = `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase();
-
-  if (user?.avatar) {
-    return (
-      <img
-        src={user.avatar}
-        alt="User"
-        className="h-8 w-8 rounded-full object-cover"
-      />
-    );
-  }
-
-  if (initials) {
-    return (
-      <span className="grid h-8 w-8 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-xs font-bold text-white">
-        {initials}
-      </span>
-    );
-  }
-
-  return <img src={peejong} alt="User" className="h-8 w-8 rounded-full object-cover" />;
+  return (
+    <img
+      src={user?.avatar || peejong}
+      alt="User"
+      onError={(event) => {
+        event.currentTarget.src = peejong;
+      }}
+      className="h-8 w-8 rounded-full object-cover"
+    />
+  );
 };
 
 const MainBars = ({ activePage, children, onLogout, onNavigate }) => {

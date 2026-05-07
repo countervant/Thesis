@@ -16,6 +16,7 @@ const normalizeEmployee = (employee) => ({
   role: employee.position || "Employee",
   position: employee.position || "",
   email: employee.email || "",
+  country: employee.country || "",
   phone: employee.phone || "",
 });
 
@@ -332,6 +333,7 @@ const AdminEmployees = ({
         employee.status,
         employee.role,
         employee.email,
+        employee.country,
         employee.phone,
       ]
         .join(" ")
@@ -370,12 +372,13 @@ const AdminEmployees = ({
   };
 
   const exportEmployees = () => {
-    const header = ["Name", "Status", "Role", "Email", "Phone"];
+    const header = ["Name", "Status", "Role", "Email", "Country", "Phone"];
     const rows = visibleEmployees.map((employee) => [
       employee.name,
       employee.status,
       employee.role,
       employee.email,
+      employee.country,
       employee.phone,
     ]);
     const csv = [header, ...rows]

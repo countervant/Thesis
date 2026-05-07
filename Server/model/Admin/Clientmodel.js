@@ -26,6 +26,12 @@ const clientSchema = new mongoose.Schema(
       default: "",
     },
 
+    country: {
+      type: String,
+      default: "Philippines",
+      trim: true,
+    },
+
     service: {
       type: String,
       default: "",

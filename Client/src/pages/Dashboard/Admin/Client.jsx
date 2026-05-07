@@ -16,6 +16,7 @@ const normalizeClient = (client) => ({
   status: client.isActive ? "Active" : "Inactive",
   company: client.companyName || "",
   email: client.email || "",
+  country: client.country || "",
   phone: client.phone || "",
   service: client.service || "",
   address: client.address || "",
@@ -256,7 +257,7 @@ const ClientCard = ({ client, onDelete }) => {
         </p>
         <p className="flex items-center gap-2">
           <Icon name="phone" className="h-4 w-4 text-neutral-600" />
-          {client.phone}
+          {[client.country, client.phone].filter(Boolean).join(" - ")}
         </p>
       </div>
 
@@ -324,6 +325,7 @@ const AdminClients = () => {
         client.name,
         client.company,
         client.email,
+        client.country,
         client.phone,
         client.service,
       ]
@@ -358,9 +360,47 @@ const AdminClients = () => {
     }
   };
 
+  const exportClients = () => {
+    const header = [
+      "Client",
+      "Status",
+      "Company",
+      "Email",
+      "Country",
+      "Phone",
+      "Service",
+      "Address",
+      "Notes",
+    ];
+    const rows = visibleClients.map((client) => [
+      client.name,
+      client.status,
+      client.company,
+      client.email,
+      client.country,
+      client.phone,
+      client.service,
+      client.address,
+      client.notes,
+    ]);
+    const csv = [header, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "clients.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
         <div className="mx-auto max-w-[1500px]">
-          <header className="flex items-start justify-between gap-5">
+          <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
                 className="text-3xl uppercase leading-none text-neutral-950"
@@ -371,6 +411,15 @@ const AdminClients = () => {
               <p className="mt-2 text-xs font-medium text-neutral-600">
                 Manage your client relationships
               </p>
+            </div>
+            <div className="flex items-center gap-5">
+              <button
+                type="button"
+                onClick={exportClients}
+                className="h-12 w-38 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+              >
+                Export
+              </button>
             </div>
           </header>
 

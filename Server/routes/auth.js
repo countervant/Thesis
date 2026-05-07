@@ -23,7 +23,7 @@ const isValidEmail = (email) => {
 
 // Register route
 router.post("/register", async (req, res) => {
-  const { firstName, lastName, email, password } = req.body;
+  const { firstName, lastName, email, password, phone = "", country = "Philippines" } = req.body;
 
   try {
     if (!firstName || !lastName || !email || !password) {
@@ -59,6 +59,10 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    if (!isValidPhoneNumber(phone)) {
+      return res.status(400).json({ message: "Enter a valid phone number" });
+    }
+
     const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
@@ -69,6 +73,8 @@ router.post("/register", async (req, res) => {
       lastName: trimmedLastName,
       email: normalizedEmail,
       password,
+      phone: phone.trim(),
+      country: country.trim() || "Philippines",
     });
     const token = generateToken(user._id);
     res.status(201).json({
@@ -77,6 +83,8 @@ router.post("/register", async (req, res) => {
       lastName: user.lastName,
       email: user.email,
       role: user.role,
+      phone: user.phone,
+      country: user.country,
       token,
     });
   } catch (error) {
@@ -276,6 +284,7 @@ router.post("/reset-password", async (req, res) => {
           lastName,
           email,
           phone,
+          country,
           position,
           avatar,
           password,
@@ -320,6 +329,7 @@ router.post("/reset-password", async (req, res) => {
           }
           user.phone = phone.trim();
         }
+        if (country !== undefined) user.country = country.trim() || "Philippines";
         if (position !== undefined) user.position = position.trim();
         if (avatar !== undefined) user.avatar = avatar;
 
@@ -350,6 +360,7 @@ router.post("/reset-password", async (req, res) => {
           role: user.role,
           avatar: user.avatar,
           phone: user.phone,
+          country: user.country,
           position: user.position,
           isActive: user.isActive,
         });
@@ -389,7 +400,7 @@ router.post("/reset-password", async (req, res) => {
     router.get("/employees", protect, authorize("admin"), async (req, res) => {
       try {
         const employees = await User.find({ role: "employee" })
-          .select("firstName lastName email phone position role isActive")
+          .select("firstName lastName email phone country position role isActive")
           .sort({ createdAt: -1 });
 
         res.status(200).json(employees);
@@ -407,6 +418,7 @@ router.post("/reset-password", async (req, res) => {
           email,
           password,
           phone = "",
+          country = "Philippines",
           position = "",
           isActive = true,
         } = req.body;
@@ -445,6 +457,7 @@ router.post("/reset-password", async (req, res) => {
           email: normalizedEmail,
           password,
           phone: phone.trim(),
+          country: country.trim() || "Philippines",
           position: position.trim(),
           role: "employee",
           isActive: true,
@@ -456,6 +469,7 @@ router.post("/reset-password", async (req, res) => {
           lastName: employee.lastName,
           email: employee.email,
           phone: employee.phone,
+          country: employee.country,
           position: employee.position,
           role: employee.role,
           isActive: employee.isActive,
@@ -482,6 +496,7 @@ router.post("/reset-password", async (req, res) => {
           lastName,
           email,
           phone,
+          country,
           position,
           isActive,
           password,
@@ -502,6 +517,7 @@ router.post("/reset-password", async (req, res) => {
           }
           employee.phone = phone.trim();
         }
+        if (country !== undefined) employee.country = country.trim() || "Philippines";
         if (position !== undefined) employee.position = position.trim();
         if (isActive !== undefined) employee.isActive = isActive;
         if (password) {
@@ -521,6 +537,7 @@ router.post("/reset-password", async (req, res) => {
           lastName: employee.lastName,
           email: employee.email,
           phone: employee.phone,
+          country: employee.country,
           position: employee.position,
           role: employee.role,
           isActive: employee.isActive,

@@ -2,13 +2,20 @@ import { useEffect, useState } from "react";
 import { employeeAPI } from "../../../services/api.js";
 import { isValidEmail } from "../../../utils/emailValidation.js";
 import { isValidPhoneNumber } from "../../../utils/phoneValidation.js";
+import {
+  applyCountryDialCode,
+  countryOptions,
+  defaultCountry,
+  getCountryDialCode,
+} from "../../../utils/countries.js";
 
 const emptyForm = {
   firstName: "",
   lastName: "",
   email: "",
   password: "",
-  phone: "",
+  country: defaultCountry,
+  phone: getCountryDialCode(defaultCountry),
   position: "",
   isActive: true,
 };
@@ -58,7 +65,8 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
       lastName: lastNameParts.join(" "),
       email: employee.email || "",
       password: "",
-      phone: employee.phone || "",
+      country: employee.country || defaultCountry,
+      phone: employee.phone || getCountryDialCode(employee.country || defaultCountry),
       position: employee.position || employee.role || "",
       isActive: employee.status === "Active",
     });
@@ -68,6 +76,14 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
     setFormData((currentData) => ({
       ...currentData,
       [field]: value,
+    }));
+  };
+
+  const handleCountryChange = (nextCountry) => {
+    setFormData((currentData) => ({
+      ...currentData,
+      country: nextCountry,
+      phone: applyCountryDialCode(currentData.phone, nextCountry, currentData.country),
     }));
   };
 
@@ -111,6 +127,7 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
+        country: formData.country,
         phone: formData.phone.trim(),
         position: formData.position.trim(),
         isActive: isEditing ? formData.isActive : true,
@@ -228,6 +245,35 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
 
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="space-y-1">
+              <FieldLabel>Country</FieldLabel>
+              <select
+                value={formData.country}
+                onChange={(event) => handleCountryChange(event.target.value)}
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+              >
+                {countryOptions.map((option) => (
+                  <option key={option.name} value={option.name}>
+                    {option.name} ({option.dialCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <FieldLabel>Phone</FieldLabel>
+              <input
+                type="tel"
+                autoComplete="off"
+                value={formData.phone}
+                onChange={(event) => updateField("phone", event.target.value)}
+                placeholder="+ country code..."
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <div className="space-y-1">
               <FieldLabel>Password</FieldLabel>
               <input
                 type="text"
@@ -244,20 +290,6 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
             </div>
 
             <div className="space-y-1">
-              <FieldLabel>Phone</FieldLabel>
-              <input
-                type="tel"
-                autoComplete="off"
-                value={formData.phone}
-                onChange={(event) => updateField("phone", event.target.value)}
-                placeholder="+ country code..."
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
-              />
-            </div>
-          </div>
-
-          <div className={`mt-5 grid gap-5 ${isEditing ? "sm:grid-cols-2" : ""}`}>
-            <div className="space-y-1">
               <FieldLabel>Position</FieldLabel>
               <input
                 type="text"
@@ -268,7 +300,9 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
               />
             </div>
+          </div>
 
+          <div className={`mt-5 grid gap-5 ${isEditing ? "sm:grid-cols-2" : ""}`}>
             {isEditing && (
               <div className="space-y-1">
                 <FieldLabel>Status</FieldLabel>

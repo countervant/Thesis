@@ -6,6 +6,13 @@ import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { validateEmail } from "../../utils/emailValidation.js";
+import { isValidPhoneNumber } from "../../utils/phoneValidation.js";
+import {
+  applyCountryDialCode,
+  countryOptions,
+  defaultCountry,
+  getCountryDialCode,
+} from "../../utils/countries.js";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -13,6 +20,8 @@ const RegisterPage = ({ order, order1 }) => {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [country, setCountry] = useState(defaultCountry);
+  const [phone, setPhone] = useState(getCountryDialCode(defaultCountry));
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -26,6 +35,8 @@ const RegisterPage = ({ order, order1 }) => {
     setLastName("");
     setEmail("");
     setEmailError("");
+    setCountry(defaultCountry);
+    setPhone(getCountryDialCode(defaultCountry));
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -35,6 +46,11 @@ const RegisterPage = ({ order, order1 }) => {
     const value = e.target.value;
     setEmail(value);
     setEmailError(validateEmail(value));
+  };
+
+  const handleCountryChange = (nextCountry) => {
+    setPhone((currentPhone) => applyCountryDialCode(currentPhone, nextCountry, country));
+    setCountry(nextCountry);
   };
 
   const handleSubmit = async (e) => {
@@ -55,6 +71,11 @@ const RegisterPage = ({ order, order1 }) => {
       return;
     }
 
+    if (!isValidPhoneNumber(phone)) {
+      setError("Enter a valid phone number");
+      return;
+    }
+
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -68,7 +89,14 @@ const RegisterPage = ({ order, order1 }) => {
     setLoading(true);
 
     try {
-      await authAPI.register(firstName.trim(), lastName.trim(), email, password);
+      await authAPI.register(
+        firstName.trim(),
+        lastName.trim(),
+        email,
+        password,
+        phone.trim(),
+        country
+      );
       resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
@@ -185,6 +213,36 @@ const RegisterPage = ({ order, order1 }) => {
             {emailError && (
               <p className="text-sm text-red-500">{emailError}</p>
             )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6">
+            <div className="border-b border-black mb-2">
+              <select
+                value={country}
+                onChange={(event) => handleCountryChange(event.target.value)}
+                autoComplete="country-name"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800"
+                required
+              >
+                {countryOptions.map((option) => (
+                  <option key={option.name} value={option.name}>
+                    {option.name} ({option.dialCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="border-b border-black mb-2">
+              <input
+                type="tel"
+                placeholder="Phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                autoComplete="tel"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                required
+              />
+            </div>
           </div>
 
           <div className="border-b-2 border-gray-400 flex items-center">

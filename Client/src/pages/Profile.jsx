@@ -1,15 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
+import peejong from "../assets/peejong.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI } from "../services/api.js";
 import { isValidEmail } from "../utils/emailValidation.js";
 import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import {
+  applyCountryDialCode,
+  countryOptions,
+  defaultCountry,
+  getCountryDialCode,
+} from "../utils/countries.js";
 
 const emptyForm = {
   firstName: "",
   lastName: "",
   email: "",
+  country: defaultCountry,
   phone: "",
   position: "",
   password: "",
@@ -38,16 +46,21 @@ const antiAutofillProps = {
   "data-form-type": "other",
 };
 
-const profileToForm = (profile) => ({
-  firstName: profile?.firstName || "",
-  lastName: profile?.lastName || "",
-  email: profile?.email || "",
-  phone: profile?.phone || "",
-  position: profile?.position || "",
-  password: "",
-  confirmPassword: "",
-  avatar: profile?.avatar || "",
-});
+const profileToForm = (profile) => {
+  const country = profile?.country || defaultCountry;
+
+  return {
+    firstName: profile?.firstName || "",
+    lastName: profile?.lastName || "",
+    email: profile?.email || "",
+    country,
+    phone: profile?.phone || getCountryDialCode(country),
+    position: profile?.position || "",
+    password: "",
+    confirmPassword: "",
+    avatar: profile?.avatar || "",
+  };
+};
 
 const FieldLabel = ({ children }) => (
   <label className="text-sm font-semibold text-neutral-800">{children}</label>
@@ -65,11 +78,6 @@ const Profile = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
-  const initials = useMemo(() => {
-    const value = `${formData.firstName.charAt(0)}${formData.lastName.charAt(0)}`;
-    return value.toUpperCase() || "U";
-  }, [formData.firstName, formData.lastName]);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +119,14 @@ const Profile = () => {
     setFormData((currentData) => ({
       ...currentData,
       [field]: value,
+    }));
+  };
+
+  const handleCountryChange = (nextCountry) => {
+    setFormData((currentData) => ({
+      ...currentData,
+      country: nextCountry,
+      phone: applyCountryDialCode(currentData.phone, nextCountry, currentData.country),
     }));
   };
 
@@ -180,6 +196,7 @@ const Profile = () => {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
+        country: formData.country,
         phone: formData.phone.trim(),
         position: formData.position.trim(),
         avatar: formData.avatar,
@@ -247,15 +264,14 @@ const Profile = () => {
 
             <div className="flex items-center gap-4">
               <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-2xl font-bold text-white">
-                {formData.avatar ? (
-                  <img
-                    src={formData.avatar}
-                    alt="Avatar preview"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initials
-                )}
+                <img
+                  src={formData.avatar || peejong}
+                  alt="Avatar preview"
+                  onError={(event) => {
+                    event.currentTarget.src = peejong;
+                  }}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <label className="inline-flex h-10 cursor-pointer items-center rounded-lg bg-[#dc4fb2] px-5 text-sm font-semibold text-white transition hover:brightness-105">
                 Upload Avatar
@@ -362,6 +378,23 @@ const Profile = () => {
                 </div>
 
                 <div className="space-y-1">
+                  <FieldLabel>Country</FieldLabel>
+                  <select
+                    value={formData.country}
+                    onChange={(event) => handleCountryChange(event.target.value)}
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  >
+                    {countryOptions.map((option) => (
+                      <option key={option.name} value={option.name}>
+                        {option.name} ({option.dialCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <div className="space-y-1">
                   <FieldLabel>Phone</FieldLabel>
                   <input
                     type="text"
@@ -372,7 +405,7 @@ const Profile = () => {
                     onFocus={preventAutofill}
                     value={formData.phone}
                     onChange={(event) => updateField("phone", event.target.value)}
-                    placeholder="+ country code..."
+                    placeholder="Phone Number"
                     className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
                   />
                 </div>

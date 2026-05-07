@@ -23,6 +23,7 @@ const normalizeClientPayload = (body) => ({
   contactPerson: body.contactPerson?.trim() || "",
   email: body.email?.trim().toLowerCase() || "",
   phone: body.phone?.trim() || "",
+  country: body.country?.trim() || "Philippines",
   service: body.service?.trim() || "",
   address: body.address?.trim() || "",
   notes: body.notes?.trim() || "",
@@ -46,6 +47,7 @@ const clientUserToClient = (user) => ({
   contactPerson: [user.firstName, user.lastName].filter(Boolean).join(" "),
   email: user.email,
   phone: user.phone || "",
+  country: user.country || "Philippines",
   service: user.position || "",
   isActive: user.isActive,
   address: "",
@@ -117,6 +119,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
           [userClient.firstName, userClient.lastName].filter(Boolean).join(" "),
         email: req.body.email ?? userClient.email,
         phone: req.body.phone ?? userClient.phone,
+        country: req.body.country ?? userClient.country,
         service: req.body.service ?? userClient.position,
         isActive: req.body.isActive ?? userClient.isActive,
       });
@@ -140,6 +143,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       userClient.lastName = lastNameParts.join(" ") || userClient.lastName;
       userClient.email = payload.email;
       userClient.phone = payload.phone;
+      userClient.country = payload.country;
       userClient.position = payload.service;
       userClient.isActive = payload.isActive;
 
@@ -152,6 +156,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       contactPerson: req.body.contactPerson ?? client.contactPerson,
       email: req.body.email ?? client.email,
       phone: req.body.phone ?? client.phone,
+      country: req.body.country ?? client.country,
       service: req.body.service ?? client.service,
       address: req.body.address ?? client.address,
       notes: req.body.notes ?? client.notes,
@@ -177,6 +182,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
     client.contactPerson = payload.contactPerson;
     client.email = payload.email;
     client.phone = payload.phone;
+    client.country = payload.country;
     client.service = payload.service;
     client.address = payload.address;
     client.notes = payload.notes;
