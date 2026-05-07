@@ -147,6 +147,53 @@ export const taskAPI = {
   },
 };
 
+export const newsfeedAPI = {
+  getAll: async () => {
+    return cachedGet("/newsfeed");
+  },
+
+  create: async (post) => {
+    const response = await api.post("/newsfeed", post);
+    clearCache("/newsfeed");
+    return response.data;
+  },
+
+  toggleHeart: async (id) => {
+    const response = await api.patch(`/newsfeed/${id}/heart`);
+    clearCache("/newsfeed");
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/newsfeed/${id}`);
+    clearCache("/newsfeed");
+    return response.data;
+  },
+
+  comment: async (id, text) => {
+    const response = await api.post(`/newsfeed/${id}/comments`, { text });
+    clearCache("/newsfeed");
+    return response.data;
+  },
+
+  toggleCommentHeart: async (postId, commentId) => {
+    const response = await api.patch(
+      `/newsfeed/${postId}/comments/${commentId}/heart`
+    );
+    clearCache("/newsfeed");
+    return response.data;
+  },
+
+  reply: async (postId, commentId, text) => {
+    const response = await api.post(
+      `/newsfeed/${postId}/comments/${commentId}/replies`,
+      { text }
+    );
+    clearCache("/newsfeed");
+    return response.data;
+  },
+};
+
 export const employeeAPI = {
   getAll: async () => {
     return cachedGet("/auth/employees");

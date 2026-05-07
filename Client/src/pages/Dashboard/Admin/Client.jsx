@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { clientAPI } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -284,6 +285,7 @@ const AdminClients = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [clientToDelete, setClientToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -346,9 +348,6 @@ const AdminClients = () => {
   };
 
   const deleteClient = async (client) => {
-    const shouldDelete = window.confirm(`Delete client "${client.name}"?`);
-    if (!shouldDelete) return;
-
     try {
       setErrorMessage("");
       await clientAPI.delete(client.id);
@@ -475,10 +474,23 @@ const AdminClients = () => {
               <ClientCard
                 key={client.id}
                 client={client}
-                onDelete={deleteClient}
+                onDelete={setClientToDelete}
               />
             ))}
           </section>
+          <ConfirmDialog
+            confirmLabel="Yes , delete"
+            icon="delete"
+            isOpen={Boolean(clientToDelete)}
+            message={`Delete client "${clientToDelete?.name || ""}"?`}
+            onCancel={() => setClientToDelete(null)}
+            onConfirm={async () => {
+              const client = clientToDelete;
+              setClientToDelete(null);
+              if (client) await deleteClient(client);
+            }}
+            title="Delete"
+          />
         </div>
   );
 };

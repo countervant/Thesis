@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
-import peejong from "../assets/peejong.png";
+import defaultProfile from "../assets/default-profile.png";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const sideNavItems = [
@@ -110,10 +110,10 @@ const Icon = ({ name, className = "h-6 w-6" }) => {
 const UserAvatar = ({ user }) => {
   return (
     <img
-      src={user?.avatar || peejong}
+      src={user?.avatar || defaultProfile}
       alt="User"
       onError={(event) => {
-        event.currentTarget.src = peejong;
+        event.currentTarget.src = defaultProfile;
       }}
       className="h-8 w-8 rounded-full object-cover"
     />

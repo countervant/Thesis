@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
-import peejong from "../assets/peejong.png";
+import defaultProfile from "../assets/default-profile.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI } from "../services/api.js";
 import { isValidEmail } from "../utils/emailValidation.js";
@@ -265,10 +265,10 @@ const Profile = () => {
             <div className="flex items-center gap-4">
               <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-2xl font-bold text-white">
                 <img
-                  src={formData.avatar || peejong}
+                  src={formData.avatar || defaultProfile}
                   alt="Avatar preview"
                   onError={(event) => {
-                    event.currentTarget.src = peejong;
+                    event.currentTarget.src = defaultProfile;
                   }}
                   className="h-full w-full object-cover"
                 />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -353,6 +354,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const [budgetEntries, setBudgetEntries] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [entryToDelete, setEntryToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -402,10 +404,6 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   }, [budgetEntries]);
 
   const deleteEntry = async (entryId) => {
-    if (!window.confirm("Delete this entry?")) {
-      return;
-    }
-
     try {
       setErrorMessage("");
       await budgetAPI.delete(entryId);
@@ -529,7 +527,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => deleteEntry(entry.id)}
+                          onClick={() => setEntryToDelete(entry)}
                           className="text-red-600 transition hover:text-red-700"
                           aria-label={`Delete ${entry.description}`}
                         >
@@ -542,6 +540,19 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
               </tbody>
             </table>
           </section>
+          <ConfirmDialog
+            confirmLabel="Yes , delete"
+            icon="delete"
+            isOpen={Boolean(entryToDelete)}
+            message={`Delete "${entryToDelete?.description || "this entry"}"?`}
+            onCancel={() => setEntryToDelete(null)}
+            onConfirm={async () => {
+              const entry = entryToDelete;
+              setEntryToDelete(null);
+              if (entry) await deleteEntry(entry.id);
+            }}
+            title="Delete"
+          />
         </div>
   );
 };

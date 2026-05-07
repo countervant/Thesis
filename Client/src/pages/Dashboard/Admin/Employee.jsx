@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { employeeAPI } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -289,6 +290,7 @@ const AdminEmployees = ({
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -357,9 +359,6 @@ const AdminEmployees = ({
   };
 
   const deleteEmployee = async (employee) => {
-    const shouldDelete = window.confirm(`Delete employee "${employee.name}"?`);
-    if (!shouldDelete) return;
-
     try {
       setErrorMessage("");
       await employeeAPI.delete(employee.id);
@@ -483,11 +482,24 @@ const AdminEmployees = ({
               <EmployeeCard
                 key={employee.id}
                 employee={employee}
-                onDelete={deleteEmployee}
+                onDelete={setEmployeeToDelete}
                 onEdit={editEmployee}
               />
             ))}
           </section>
+          <ConfirmDialog
+            confirmLabel="Yes , delete"
+            icon="delete"
+            isOpen={Boolean(employeeToDelete)}
+            message={`Delete employee "${employeeToDelete?.name || ""}"?`}
+            onCancel={() => setEmployeeToDelete(null)}
+            onConfirm={async () => {
+              const employee = employeeToDelete;
+              setEmployeeToDelete(null);
+              if (employee) await deleteEmployee(employee);
+            }}
+            title="Delete"
+          />
         </div>
   );
 };

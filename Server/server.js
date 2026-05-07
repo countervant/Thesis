@@ -9,6 +9,7 @@ import auth from "./routes/auth.js";
 import budgets from "./routes/budgets.js";
 import clients from "./routes/clients.js";
 import tasks from "./routes/tasks.js";
+import newsfeed from "./routes/newsfeed.js";
 
 // Resolve .env relative to this file so it works regardless of cwd
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,6 +38,7 @@ app.use("/api/user", auth);
 app.use("/api/budgets", budgets);
 app.use("/api/clients", clients);
 app.use("/api/tasks", tasks);
+app.use("/api/newsfeed", newsfeed);
 
 dbConnect();
 

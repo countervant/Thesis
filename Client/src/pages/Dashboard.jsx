@@ -9,7 +9,9 @@ import AdminEmployees from "./Dashboard/Admin/Employee.jsx";
 import AdminAddTask from "./Dashboard/Admin/Addtask.jsx";
 import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
 import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
+import Newsfeed from "./newsfeed.jsx";
 import MainBars from "./MainBars.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
 const adminPages = new Set([
   "dashboard",
@@ -44,8 +46,14 @@ const Dashboard = () => {
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [employeeRefreshKey, setEmployeeRefreshKey] = useState(0);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   const handleLogout = () => {
+    setIsLogoutDialogOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutDialogOpen(false);
     logout();
     navigate("/", { replace: true });
   };
@@ -160,6 +168,8 @@ const Dashboard = () => {
           )}
         </>
       );
+    } else if (adminPage === "newsfeed") {
+      adminContent = <Newsfeed />;
     } else if (adminPage === "client") {
       adminContent = <AdminClients />;
     } else if (
@@ -186,22 +196,31 @@ const Dashboard = () => {
     }
 
     return (
-      <MainBars
-        activePage={shellActivePage}
-        onLogout={handleLogout}
-        onNavigate={handleAdminNavigate}
-      >
-        {adminContent}
-      </MainBars>
+      <>
+        <MainBars
+          activePage={shellActivePage}
+          onLogout={handleLogout}
+          onNavigate={handleAdminNavigate}
+        >
+          {adminContent}
+        </MainBars>
+        <ConfirmDialog
+          confirmLabel="Yes , log out"
+          icon="logout"
+          isOpen={isLogoutDialogOpen}
+          message="Are you sure you want to log out?"
+          onCancel={() => setIsLogoutDialogOpen(false)}
+          onConfirm={confirmLogout}
+          title="Logout"
+        />
+      </>
     );
   }
 
-  return (
-    <MainBars
-      activePage={localPage}
-      onLogout={handleLogout}
-      onNavigate={setLocalPage}
-    >
+  const regularContent =
+    localPage === "newsfeed" ? (
+      <Newsfeed />
+    ) : (
       <div className="mx-auto max-w-[1500px]">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
           <h1
@@ -233,7 +252,27 @@ const Dashboard = () => {
           )}
         </section>
       </div>
-    </MainBars>
+    );
+
+  return (
+    <>
+      <MainBars
+        activePage={localPage}
+        onLogout={handleLogout}
+        onNavigate={setLocalPage}
+      >
+        {regularContent}
+      </MainBars>
+      <ConfirmDialog
+        confirmLabel="Yes , log out"
+        icon="logout"
+        isOpen={isLogoutDialogOpen}
+        message="Are you sure you want to log out?"
+        onCancel={() => setIsLogoutDialogOpen(false)}
+        onConfirm={confirmLogout}
+        title="Logout"
+      />
+    </>
   );
 };
 

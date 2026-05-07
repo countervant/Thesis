@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { taskAPI } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
@@ -308,6 +309,7 @@ const Tasks = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedTaskStatus, setSelectedTaskStatus] = useState("All");
   const [selectedDateStatus, setSelectedDateStatus] = useState("All");
+  const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -357,15 +359,14 @@ const Tasks = ({
     onEditTask?.(task);
   };
 
-  const handleToggleDone = async (taskId) => {
-    const task = tasks.find((currentTask) => currentTask.id === taskId);
+  const completeTask = async (task) => {
     if (!task) return;
     if (getEntityId(task.assignedTo) !== getEntityId(user)) return;
     if (task.status === "Done") return;
 
     try {
       setErrorMessage("");
-      const updatedTask = await taskAPI.update(taskId, {
+      const updatedTask = await taskAPI.update(task.id, {
         title: task.title,
         description: task.description,
         startDate: toInputDate(task.startDate),
@@ -375,7 +376,7 @@ const Tasks = ({
 
       setTasks((currentTasks) =>
         currentTasks.map((currentTask) =>
-          currentTask.id === taskId ? normalizeTask(updatedTask) : currentTask
+          currentTask.id === task.id ? normalizeTask(updatedTask) : currentTask
         )
       );
     } catch (error) {
@@ -383,10 +384,19 @@ const Tasks = ({
     }
   };
 
-  const handleDeleteTask = async (task) => {
-    const shouldDelete = window.confirm(`Delete task "${task.title}"?`);
-    if (!shouldDelete) return;
+  const handleToggleDone = (taskId) => {
+    const task = tasks.find((currentTask) => currentTask.id === taskId);
+    if (!task) return;
+    setConfirmAction({
+      icon: "done",
+      title: "Done",
+      message: `Mark "${task.title}" as done?`,
+      confirmLabel: "Yes , mark done",
+      onConfirm: () => completeTask(task),
+    });
+  };
 
+  const handleDeleteTask = async (task) => {
     try {
       setErrorMessage("");
       await taskAPI.delete(task.id);
@@ -396,6 +406,25 @@ const Tasks = ({
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete task.");
     }
+  };
+
+  const requestDeleteTask = (task) => {
+    setConfirmAction({
+      icon: "delete",
+      title: "Delete",
+      message: `Delete task "${task.title}"?`,
+      confirmLabel: "Yes , delete",
+      onConfirm: () => handleDeleteTask(task),
+    });
+  };
+
+  const closeConfirm = () => setConfirmAction(null);
+
+  const confirmCurrentAction = async () => {
+    const action = confirmAction;
+    if (!action) return;
+    setConfirmAction(null);
+    await action.onConfirm();
   };
 
   return (
@@ -478,7 +507,7 @@ const Tasks = ({
               <TaskCard
                 key={task.id}
                 canToggleDone={getEntityId(task.assignedTo) === getEntityId(user)}
-                onDelete={handleDeleteTask}
+                onDelete={requestDeleteTask}
                 onEdit={handleEditTask}
                 onToggleDone={handleToggleDone}
                 showStatus={selectedTaskStatus === "All"}
@@ -486,6 +515,15 @@ const Tasks = ({
               />
             ))}
           </section>
+          <ConfirmDialog
+            confirmLabel={confirmAction?.confirmLabel}
+            icon={confirmAction?.icon}
+            isOpen={Boolean(confirmAction)}
+            message={confirmAction?.message}
+            onCancel={closeConfirm}
+            onConfirm={confirmCurrentAction}
+            title={confirmAction?.title}
+          />
         </div>
   );
 };
