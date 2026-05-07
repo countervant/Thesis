@@ -283,9 +283,6 @@ const ExpenseCategories = ({ entries }) => {
       const start = result.currentPercent;
       const percent = total > 0 ? (value / total) * 100 : 0;
       const end = start + percent;
-      const middle = start + percent / 2;
-      const radians = (middle * 3.6 - 90) * (Math.PI / 180);
-      const radius = 24;
 
       return {
         currentPercent: end,
@@ -297,8 +294,6 @@ const ExpenseCategories = ({ entries }) => {
             color: colors[index % colors.length],
             end,
             start,
-            x: 50 + Math.cos(radians) * radius,
-            y: 50 + Math.sin(radians) * radius,
           },
         ],
       };
@@ -319,23 +314,7 @@ const ExpenseCategories = ({ entries }) => {
       <div
         className="relative h-44 w-44 shrink-0 rounded-full sm:h-52 sm:w-52"
         style={{ background: chartBackground }}
-      >
-        {segments.length === 0 && (
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-xs font-semibold leading-tight text-white">
-            None
-          </span>
-        )}
-        {segments.map((segment) => (
-          <span
-            key={segment.category}
-            className="absolute max-w-[72px] -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-semibold leading-none text-white"
-            style={{ left: `${segment.x}%`, top: `${segment.y}%` }}
-          >
-            <span className="block truncate">{segment.category}</span>
-            <span className="block">{segment.value.toFixed(2)}</span>
-          </span>
-        ))}
-      </div>
+      />
       <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 sm:grid-cols-4">
         {segments.map((segment) => (
           <span key={segment.category} className="flex items-center gap-2">

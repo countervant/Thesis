@@ -6,6 +6,8 @@ import {
   RouterProvider,
   Outlet,
   Navigate,
+  Link,
+  useRouteError,
 } from "react-router-dom";
 
 import Login from "../pages/auth/Login.jsx";
@@ -38,10 +40,45 @@ const RoleDashboardRedirect = () => {
   return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
 };
 
+const RouteErrorBoundary = () => {
+  const error = useRouteError();
+  const message =
+    error?.statusText ||
+    error?.message ||
+    "Something went wrong while loading this page.";
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-6 text-white">
+      <section className="w-full max-w-md rounded-lg border border-white/10 bg-white/[0.06] p-8 shadow-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-300">
+          Application Error
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold">This page hit a problem.</h1>
+        <p className="mt-3 text-sm leading-6 text-neutral-300">{message}</p>
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="h-10 rounded-md bg-[#dc4fb2] px-4 text-sm font-semibold text-white transition hover:brightness-105"
+          >
+            Reload
+          </button>
+          <Link
+            to="/dashboard"
+            className="flex h-10 items-center rounded-md border border-white/15 px-4 text-sm font-semibold text-neutral-100 transition hover:bg-white/10"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+};
+
 const AppRoutes = () => {
   const router = createBrowserRouter(
     createRoutesFromElements(
-      <Route element={<AuthLayout />}>
+      <Route element={<AuthLayout />} errorElement={<RouteErrorBoundary />}>
         <Route index element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/ForgotPassword" element={<ForgotPassword />} />

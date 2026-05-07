@@ -39,6 +39,14 @@ const formatAssigneeName = (assignee) => {
   return assignee.isSelf ? `${label} (Myself)` : label;
 };
 
+const normalizeAssignees = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.assignees)) return data.assignees;
+  if (Array.isArray(data?.users)) return data.users;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800">{children}</label>
 );
@@ -63,16 +71,17 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     const loadAssignees = async () => {
       try {
         const data = await authAPI.getAssignees();
+        const nextAssignees = normalizeAssignees(data);
 
         if (isMounted) {
-          setAssignees(data);
+          setAssignees(nextAssignees);
 
           setFormData((currentData) => ({
             ...currentData,
             assignedTo:
               currentData.assignedTo ||
               getEntityId(task?.assignedTo) ||
-              getEntityId(data[0]) ||
+              getEntityId(nextAssignees[0]) ||
               getEntityId(user),
           }));
         }
@@ -165,6 +174,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     }
   };
 
+  const assigneeOptions = normalizeAssignees(assignees);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950">
       <section className="max-h-full w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl">
@@ -243,10 +254,10 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               onChange={(event) => updateField("assignedTo", event.target.value)}
               className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
             >
-              {assignees.length === 0 && (
+              {assigneeOptions.length === 0 && (
                 <option value={getEntityId(user)}>Myself</option>
               )}
-              {assignees.map((assignee) => (
+              {assigneeOptions.map((assignee) => (
                 <option key={getEntityId(assignee)} value={getEntityId(assignee)}>
                   {formatAssigneeName(assignee)}
                 </option>

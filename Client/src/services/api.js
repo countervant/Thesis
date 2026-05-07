@@ -16,12 +16,12 @@ const cachedGet = async (url) => {
   const cached = cache.get(url);
   const now = Date.now();
 
-  if (cached && now - cached.time < CACHE_TIME) {
-    return cached.data;
-  }
-
   if (cached?.promise) {
     return cached.promise;
+  }
+
+  if (cached?.data !== undefined && now - cached.time < CACHE_TIME) {
+    return cached.data;
   }
 
   const promise = api
