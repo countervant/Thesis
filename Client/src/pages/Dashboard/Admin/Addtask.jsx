@@ -30,6 +30,14 @@ const getEntityId = (entity) => {
   return entity._id || entity.id || "";
 };
 
+const normalizeAssignees = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.assignees)) return data.assignees;
+  if (Array.isArray(data?.users)) return data.users;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 const formatAssigneeName = (assignee) => {
   if (!assignee) return "Myself";
 
@@ -63,16 +71,17 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     const loadAssignees = async () => {
       try {
         const data = await authAPI.getAssignees();
+        const loadedAssignees = normalizeAssignees(data);
 
         if (isMounted) {
-          setAssignees(data);
+          setAssignees(loadedAssignees);
 
           setFormData((currentData) => ({
             ...currentData,
             assignedTo:
               currentData.assignedTo ||
               getEntityId(task?.assignedTo) ||
-              getEntityId(data[0]) ||
+              getEntityId(loadedAssignees[0]) ||
               getEntityId(user),
           }));
         }
@@ -165,6 +174,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     }
   };
 
+  const safeAssignees = normalizeAssignees(assignees);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950">
       <section className="max-h-full w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl">
@@ -243,10 +254,10 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               onChange={(event) => updateField("assignedTo", event.target.value)}
               className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
             >
-              {assignees.length === 0 && (
+              {safeAssignees.length === 0 && (
                 <option value={getEntityId(user)}>Myself</option>
               )}
-              {assignees.map((assignee) => (
+              {safeAssignees.map((assignee) => (
                 <option key={getEntityId(assignee)} value={getEntityId(assignee)}>
                   {formatAssigneeName(assignee)}
                 </option>
