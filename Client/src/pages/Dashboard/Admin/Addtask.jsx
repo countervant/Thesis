@@ -15,12 +15,23 @@ const statusToApi = {
   "In review": "review",
 };
 
-const formatInputDate = (date) => date.toISOString().slice(0, 10);
+const formatInputDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const todayInputDate = () => formatInputDate(new Date());
+
+const isPastInputDate = (date) => Boolean(date) && date < todayInputDate();
 
 const toInputDate = (date) => {
-  if (!date) return formatInputDate(new Date());
-  if (date.includes("-")) return date.slice(0, 10);
-  const [month, day, year] = date.split("/");
+  if (!date) return todayInputDate();
+  const dateValue = String(date);
+  if (dateValue.includes("-")) return dateValue.slice(0, 10);
+  const [month, day, year] = dateValue.split("/");
+  if (!month || !day || !year) return todayInputDate();
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
@@ -57,7 +68,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    dueDate: formatInputDate(new Date()),
+    startDate: todayInputDate(),
+    dueDate: todayInputDate(),
     priority: "medium",
     assignedTo: getEntityId(user),
   });
@@ -109,6 +121,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     setFormData({
       title: task.title || "",
       description: task.description || "",
+      startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
       dueDate: toInputDate(task.dueDate),
       priority: task.priority || "medium",
       assignedTo: getEntityId(task.assignedTo) || getEntityId(user),
@@ -139,6 +152,21 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
+    if (!formData.startDate) {
+      setErrorMessage("Start date is required.");
+      return;
+    }
+
+    if (isPastInputDate(formData.startDate) || isPastInputDate(formData.dueDate)) {
+      setErrorMessage("Past dates cannot be selected.");
+      return;
+    }
+
+    if (new Date(formData.startDate) > new Date(formData.dueDate)) {
+      setErrorMessage("Start date cannot be after due date.");
+      return;
+    }
+
     if (!formData.assignedTo) {
       setErrorMessage("Please choose who this task is assigned to.");
       return;
@@ -151,6 +179,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       const payload = {
         title: formData.title.trim(),
         description: formData.description.trim(),
+        startDate: formData.startDate,
         dueDate: formData.dueDate,
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
@@ -222,15 +251,29 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
 
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="space-y-1">
+              <FieldLabel>Start Date</FieldLabel>
+              <input
+                type="date"
+                min={todayInputDate()}
+                value={formData.startDate}
+                onChange={(event) => updateField("startDate", event.target.value)}
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+              />
+            </div>
+
+            <div className="space-y-1">
               <FieldLabel>Due Date</FieldLabel>
               <input
                 type="date"
+                min={formData.startDate || todayInputDate()}
                 value={formData.dueDate}
                 onChange={(event) => updateField("dueDate", event.target.value)}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
               />
             </div>
+          </div>
 
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="space-y-1">
               <FieldLabel>Priority</FieldLabel>
               <select

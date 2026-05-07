@@ -52,7 +52,9 @@ const LoginPage = ({ order, order1 }) => {
       const data = await authAPI.login(email, password);
       login({ id: data.id, email: data.email, role: data.role }, data.token);
       resetForm();
-      navigate(dashboardPathByRole[data.role] || "/client/dashboard");
+      navigate(dashboardPathByRole[data.role] || "/client/dashboard", {
+        replace: true,
+      });
     } catch (err) {
       const status = err.response?.status;
       if (status === 401) {

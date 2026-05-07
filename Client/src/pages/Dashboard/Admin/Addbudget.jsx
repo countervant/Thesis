@@ -1,17 +1,28 @@
 import { useEffect, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
 
+const formatDateValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const todayInputDate = () => formatDateValue(new Date());
+
+const isPastInputDate = (date) => Boolean(date) && date < todayInputDate();
+
 const formatInputDate = (value) => {
   if (!value) {
-    return new Date().toISOString().slice(0, 10);
+    return todayInputDate();
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString().slice(0, 10);
+    return todayInputDate();
   }
 
-  return date.toISOString().slice(0, 10);
+  return formatDateValue(date);
 };
 
 const emptyForm = {
@@ -75,6 +86,11 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
 
     if (!formData.date || Number.isNaN(new Date(formData.date).getTime())) {
       setErrorMessage("Valid date is required.");
+      return;
+    }
+
+    if (isPastInputDate(formData.date)) {
+      setErrorMessage("Past dates cannot be selected.");
       return;
     }
 
@@ -151,6 +167,7 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
               <FieldLabel>Date</FieldLabel>
               <input
                 type="date"
+                min={todayInputDate()}
                 value={formData.date}
                 onChange={(event) => updateField("date", event.target.value)}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"

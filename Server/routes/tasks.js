@@ -7,6 +7,13 @@ const router = express.Router();
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
 
+const startOfToday = () => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
+const isPastDate = (date) => date < startOfToday();
+
 const taskQueryForUser = (user) => {
   if (user.role === "admin") {
     return {};
@@ -20,12 +27,14 @@ const taskQueryForUser = (user) => {
 const normalizeTaskPayload = (body, userId) => {
   const title = body.title?.trim();
   const dueDate = body.dueDate ? new Date(body.dueDate) : null;
+  const startDate = body.startDate ? new Date(body.startDate) : dueDate;
   const status = body.status || "in_progress";
   const priority = body.priority || "medium";
 
   return {
     title,
     description: body.description?.trim() || "",
+    startDate,
     dueDate,
     status: allowedStatuses.includes(status) ? status : "in_progress",
     priority: allowedPriorities.includes(priority) ? priority : "medium",
@@ -57,6 +66,18 @@ router.post("/", protect, async (req, res) => {
 
     if (!payload.dueDate || Number.isNaN(payload.dueDate.getTime())) {
       return res.status(400).json({ message: "Valid due date is required" });
+    }
+
+    if (!payload.startDate || Number.isNaN(payload.startDate.getTime())) {
+      return res.status(400).json({ message: "Valid start date is required" });
+    }
+
+    if (payload.startDate > payload.dueDate) {
+      return res.status(400).json({ message: "Start date cannot be after due date" });
+    }
+
+    if (isPastDate(payload.startDate) || isPastDate(payload.dueDate)) {
+      return res.status(400).json({ message: "Past dates cannot be selected" });
     }
 
     const task = await Task.create({
@@ -91,6 +112,7 @@ router.put("/:id", protect, async (req, res) => {
       {
         title: req.body.title ?? task.title,
         description: req.body.description ?? task.description,
+        startDate: req.body.startDate ?? task.startDate ?? task.createdAt ?? task.dueDate,
         dueDate: req.body.dueDate ?? task.dueDate,
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
@@ -107,8 +129,24 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(400).json({ message: "Valid due date is required" });
     }
 
+    if (!payload.startDate || Number.isNaN(payload.startDate.getTime())) {
+      return res.status(400).json({ message: "Valid start date is required" });
+    }
+
+    if (payload.startDate > payload.dueDate) {
+      return res.status(400).json({ message: "Start date cannot be after due date" });
+    }
+
+    if (
+      (req.body.startDate !== undefined && isPastDate(payload.startDate)) ||
+      (req.body.dueDate !== undefined && isPastDate(payload.dueDate))
+    ) {
+      return res.status(400).json({ message: "Past dates cannot be selected" });
+    }
+
     task.title = payload.title;
     task.description = payload.description;
+    task.startDate = payload.startDate;
     task.dueDate = payload.dueDate;
     task.status = payload.status;
     task.priority = payload.priority;

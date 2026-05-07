@@ -250,7 +250,7 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
                 autoComplete="off"
                 value={formData.phone}
                 onChange={(event) => updateField("phone", event.target.value)}
-                placeholder="+63..."
+                placeholder="+ country code..."
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
               />
             </div>

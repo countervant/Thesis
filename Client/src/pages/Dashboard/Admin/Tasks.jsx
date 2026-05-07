@@ -21,14 +21,17 @@ const formatInputDate = (date) => date.toISOString().slice(0, 10);
 
 const toInputDate = (date) => {
   if (!date) return formatInputDate(new Date());
-  if (date.includes("-")) return date.slice(0, 10);
-  const [month, day, year] = date.split("/");
+  const dateValue = String(date);
+  if (dateValue.includes("-")) return dateValue.slice(0, 10);
+  const [month, day, year] = dateValue.split("/");
+  if (!month || !day || !year) return formatInputDate(new Date());
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
 const toDisplayDate = (date) => {
   if (!date) return "";
-  const [year, month, day] = date.split("-");
+  const [year, month, day] = String(date).split("-");
+  if (!year || !month || !day) return "";
   return `${month}/${day}/${year}`;
 };
 
@@ -38,14 +41,22 @@ const getEntityId = (entity) => {
   return entity._id || entity.id || "";
 };
 
+const normalizeTasks = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.tasks)) return data.tasks;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 const normalizeTask = (task) => ({
-  id: task._id || task.id,
-  title: task.title,
-  description: task.description || "",
-  dueDate: toDisplayDate((task.dueDate || "").slice(0, 10)),
-  status: statusFromApi[task.status] || task.status || "Pending",
-  priority: task.priority || "medium",
-  assignedTo: task.assignedTo,
+  id: task?._id || task?.id || "",
+  title: task?.title || "Untitled task",
+  description: task?.description || "",
+  startDate: toDisplayDate(String(task?.startDate || task?.createdAt || task?.dueDate || "").slice(0, 10)),
+  dueDate: toDisplayDate(String(task?.dueDate || "").slice(0, 10)),
+  status: statusFromApi[task?.status] || task?.status || "Pending",
+  priority: task?.priority || "medium",
+  assignedTo: task?.assignedTo,
 });
 
 const getDateStatus = (dueDate) => {
@@ -254,7 +265,7 @@ const TaskCard = ({
       <p className="mt-1 text-xs text-neutral-800">{task.description}</p>
       <p className="mt-1 flex items-center gap-1 text-xs font-medium text-neutral-800">
         <Icon name="calendar" className="h-4 w-4" />
-        {task.dueDate}
+        {task.startDate} - {task.dueDate}
       </p>
     </div>
 
@@ -307,7 +318,7 @@ const Tasks = ({
         setErrorMessage("");
         const data = await taskAPI.getAll();
         if (isMounted) {
-          setTasks(data.map(normalizeTask));
+          setTasks(normalizeTasks(data).map(normalizeTask));
         }
       } catch (error) {
         if (isMounted) {
@@ -357,6 +368,7 @@ const Tasks = ({
       const updatedTask = await taskAPI.update(taskId, {
         title: task.title,
         description: task.description,
+        startDate: toInputDate(task.startDate),
         dueDate: toInputDate(task.dueDate),
         status: statusToApi.Done,
       });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminDashboard from "./Dashboard/Admin/Home.jsx";
 import AdminTasks from "./Dashboard/Admin/Tasks.jsx";
 import AdminBudget from "./Dashboard/Admin/Budget.jsx";
@@ -11,11 +11,33 @@ import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
 import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
 import MainBars from "./MainBars.jsx";
 
+const adminPages = new Set([
+  "dashboard",
+  "newsfeed",
+  "messages",
+  "tasks",
+  "add-task",
+  "edit-task",
+  "budget",
+  "add-budget",
+  "edit-budget",
+  "client",
+  "employee",
+  "add-employee",
+  "edit-employee",
+]);
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const role = user?.role;
-  const [adminPage, setAdminPage] = useState("dashboard");
+  const requestedAdminPage = searchParams.get("page");
+  const adminPage =
+    role === "admin" && adminPages.has(requestedAdminPage)
+      ? requestedAdminPage
+      : "dashboard";
+  const [localPage, setLocalPage] = useState("dashboard");
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
@@ -25,50 +47,65 @@ const Dashboard = () => {
 
   const handleLogout = () => {
     logout();
-    navigate("/");
+    navigate("/", { replace: true });
+  };
+
+  const handleAdminNavigate = (page, options = {}) => {
+    if (!adminPages.has(page)) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (page === "dashboard") {
+      nextParams.delete("page");
+    } else {
+      nextParams.set("page", page);
+    }
+
+    setSearchParams(nextParams, { replace: options.replace === true });
   };
 
   const handleTaskCreated = () => {
     setTaskRefreshKey((currentKey) => currentKey + 1);
     setEditingTask(null);
-    setAdminPage("tasks");
+    handleAdminNavigate("tasks", { replace: true });
   };
 
   const handleEditTask = (task) => {
     setEditingTask(task);
-    setAdminPage("edit-task");
+    handleAdminNavigate("edit-task");
   };
 
   const handleBudgetSaved = () => {
     setBudgetRefreshKey((currentKey) => currentKey + 1);
     setEditingBudgetEntry(null);
-    setAdminPage("budget");
+    handleAdminNavigate("budget", { replace: true });
   };
 
   const handleAddBudgetEntry = () => {
     setEditingBudgetEntry(null);
-    setAdminPage("add-budget");
+    handleAdminNavigate("add-budget");
   };
 
   const handleEditBudgetEntry = (entry) => {
     setEditingBudgetEntry(entry);
-    setAdminPage("edit-budget");
+    handleAdminNavigate("edit-budget");
   };
 
   const handleEmployeeSaved = () => {
     setEmployeeRefreshKey((currentKey) => currentKey + 1);
     setEditingEmployee(null);
-    setAdminPage("employee");
+    handleAdminNavigate("employee", { replace: true });
   };
 
   const handleAddEmployee = () => {
     setEditingEmployee(null);
-    setAdminPage("add-employee");
+    handleAdminNavigate("add-employee");
   };
 
   const handleEditEmployee = (employee) => {
     setEditingEmployee(employee);
-    setAdminPage("edit-employee");
+    handleAdminNavigate("edit-employee");
   };
 
   if (role === "admin") {
@@ -90,12 +127,12 @@ const Dashboard = () => {
         <>
           <AdminTasks
             onEditTask={handleEditTask}
-            onNavigate={setAdminPage}
+            onNavigate={handleAdminNavigate}
             refreshKey={taskRefreshKey}
           />
           {(adminPage === "add-task" || adminPage === "edit-task") && (
             <AdminAddTask
-              onNavigate={setAdminPage}
+              onNavigate={handleAdminNavigate}
               onTaskCreated={handleTaskCreated}
               task={adminPage === "edit-task" ? editingTask : null}
             />
@@ -118,7 +155,7 @@ const Dashboard = () => {
             <AdminAddBudget
               entry={adminPage === "edit-budget" ? editingBudgetEntry : null}
               onBudgetSaved={handleBudgetSaved}
-              onNavigate={setAdminPage}
+              onNavigate={handleAdminNavigate}
             />
           )}
         </>
@@ -141,7 +178,7 @@ const Dashboard = () => {
             <AdminAddEmployee
               employee={adminPage === "edit-employee" ? editingEmployee : null}
               onEmployeeSaved={handleEmployeeSaved}
-              onNavigate={setAdminPage}
+              onNavigate={handleAdminNavigate}
             />
           )}
         </>
@@ -152,7 +189,7 @@ const Dashboard = () => {
       <MainBars
         activePage={shellActivePage}
         onLogout={handleLogout}
-        onNavigate={setAdminPage}
+        onNavigate={handleAdminNavigate}
       >
         {adminContent}
       </MainBars>
@@ -161,9 +198,9 @@ const Dashboard = () => {
 
   return (
     <MainBars
-      activePage={adminPage}
+      activePage={localPage}
       onLogout={handleLogout}
-      onNavigate={setAdminPage}
+      onNavigate={setLocalPage}
     >
       <div className="mx-auto max-w-[1500px]">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">

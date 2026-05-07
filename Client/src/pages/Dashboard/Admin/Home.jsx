@@ -12,8 +12,8 @@ const statItems = [
   { key: "done", label: "Done", icon: "done" },
 ];
 
-const timelineWeeks = ["May 04, 2026", "May 11, 2026", "May 18, 2026"];
 const timelineDays = ["M", "T", "W", "T", "F", "S", "S"];
+const timelineDayCount = 21;
 const timelineTasks = [
   {
     name: "Start",
@@ -64,15 +64,57 @@ const timelineTasks = [
 
 const expenseColors = ["#d64ab2", "#9228c9", "#7d5cff", "#ff7b8a"];
 
-const formatDate = (value) => {
-  if (!value) {
-    return "No date";
+const parseCalendarDate = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? null
+      : new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  if (typeof value === "string") {
+    const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoDate) {
+      return new Date(
+        Number(isoDate[1]),
+        Number(isoDate[2]) - 1,
+        Number(isoDate[3])
+      );
+    }
   }
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "No date";
-  }
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const addDays = (date, days) => {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+};
+
+const startOfWeek = (date) => {
+  const startDate = new Date(date);
+  const dayOffset = (startDate.getDay() + 6) % 7;
+  startDate.setDate(startDate.getDate() - dayOffset);
+  return startDate;
+};
+
+const daysBetween = (startDate, endDate) =>
+  Math.round((endDate - startDate) / (24 * 60 * 60 * 1000));
+
+const formatWeekLabel = (date) =>
+  date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+
+const formatDate = (value) => {
+  const date = parseCalendarDate(value);
+  if (!date) return "No date";
 
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -256,6 +298,17 @@ const StatCard = ({ item }) => (
   </section>
 );
 
+const DashboardLoading = () => (
+  <div className="mx-auto grid min-h-[60vh] max-w-[1500px] place-items-center">
+    <section className="grid place-items-center rounded-lg bg-white px-10 py-12 text-center shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-pink-100 border-t-[#dc4bb2]" />
+      <p className="mt-4 text-sm font-semibold text-neutral-700">
+        Loading dashboard data...
+      </p>
+    </section>
+  </div>
+);
+
 const ProgressRing = ({ value }) => (
   <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#a8a2ff] text-[10px] font-semibold text-[#9b91ff]">
     {value}
@@ -263,9 +316,34 @@ const ProgressRing = ({ value }) => (
 );
 
 const MonthlyChart = ({ tasks }) => {
-  const chartTasks = tasks.slice(0, 5).map((task, index) => {
-    const start = Math.min(index * 1.6 + 0.6, 8.2);
-    const width = task.status === "done" ? 0.8 : 1.4 + (index % 3) * 0.55;
+  const tasksWithDates = tasks
+    .map((task) => ({
+      ...task,
+      calendarStartDate: parseCalendarDate(task.startDate || task.createdAt || task.dueDate),
+      calendarDueDate: parseCalendarDate(task.dueDate),
+    }))
+    .filter((task) => task.calendarStartDate && task.calendarDueDate)
+    .sort((firstTask, secondTask) => firstTask.calendarStartDate - secondTask.calendarStartDate);
+
+  const timelineStart = startOfWeek(tasksWithDates[0]?.calendarStartDate || new Date());
+  const latestDueDayOffset = tasksWithDates.reduce(
+    (latestOffset, task) =>
+      Math.max(latestOffset, daysBetween(timelineStart, task.calendarDueDate)),
+    timelineDayCount - 1
+  );
+  const visibleWeekCount = Math.max(3, Math.ceil((latestDueDayOffset + 1) / 7));
+  const visibleDayCount = visibleWeekCount * 7;
+  const chartMinWidth = Math.max(720, visibleDayCount * 34);
+  const chartWeeks = Array.from({ length: visibleWeekCount }, (_, index) => index * 7).map((dayOffset) =>
+    formatWeekLabel(addDays(timelineStart, dayOffset))
+  );
+
+  const chartTasks = tasksWithDates.slice(0, 5).map((task, index) => {
+    const rawStart = daysBetween(timelineStart, task.calendarStartDate);
+    const rawEnd = Math.max(rawStart, daysBetween(timelineStart, task.calendarDueDate));
+    const start = Math.min(Math.max(rawStart + 0.1, 0), visibleDayCount - 1);
+    const end = Math.min(Math.max(rawEnd + 1, 0.8), visibleDayCount);
+    const width = Math.max(end - start, 0.8);
     const colors = ["#7da4e6", "#8a97ee", "#8d73dc", "#bd75e8", "#d46cdf"];
 
     return {
@@ -309,9 +387,12 @@ const MonthlyChart = ({ tasks }) => {
         ))}
       </div>
 
-      <div className="min-w-[720px]">
-        <div className="grid h-13 grid-cols-3 border-b border-neutral-100">
-          {timelineWeeks.map((week) => (
+      <div style={{ minWidth: `${chartMinWidth}px` }}>
+        <div
+          className="grid h-13 border-b border-neutral-100"
+          style={{ gridTemplateColumns: `repeat(${visibleWeekCount}, minmax(0, 1fr))` }}
+        >
+          {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
               <p className="text-center text-xs font-semibold text-neutral-600">
                 {week}
@@ -326,7 +407,12 @@ const MonthlyChart = ({ tasks }) => {
         </div>
 
         <div className="relative">
-          <div className="absolute inset-0 bg-[repeating-linear-gradient(to_right,#f1f1f1_0,#f1f1f1_1px,transparent_1px,transparent_calc(100%/21))]" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `repeating-linear-gradient(to right, #f1f1f1 0, #f1f1f1 1px, transparent 1px, transparent calc(100% / ${visibleDayCount}))`,
+            }}
+          />
           <div className="relative">
             {visibleTasks.map((task) => (
               <div
@@ -340,8 +426,10 @@ const MonthlyChart = ({ tasks }) => {
                       segment.diamond ? "aspect-square rotate-45" : ""
                     }`}
                     style={{
-                      left: `${(segment.start / 10) * 100}%`,
-                      width: segment.diamond ? "30px" : `${(segment.width / 10) * 100}%`,
+                      left: `${(segment.start / visibleDayCount) * 100}%`,
+                      width: segment.diamond
+                        ? "30px"
+                        : `${(segment.width / visibleDayCount) * 100}%`,
                       background: segment.striped
                         ? `repeating-linear-gradient(45deg, ${segment.color} 0, ${segment.color} 2px, #d8cbff 2px, #d8cbff 5px)`
                         : segment.color,
@@ -381,29 +469,18 @@ const ExpenseChart = ({ budgetEntries }) => {
     expenseCategories.length > 0
       ? expenseCategories
       : [{ label: "No expenses", value: 1, color: "#d64ab2" }];
-  const { stops: gradientStops, labels: chartLabels } = visibleCategories.reduce(
+  const gradientStops = visibleCategories.reduce(
     (result, category) => {
       const start = result.currentPercent;
       const end = total > 0 ? start + (category.value / total) * 100 : 100;
-      const middle = start + (end - start) / 2;
-      const radians = (middle * 3.6 - 90) * (Math.PI / 180);
-      const radius = 23;
 
       return {
         currentPercent: end,
         stops: [...result.stops, `${category.color} ${start}% ${end}%`],
-        labels: [
-          ...result.labels,
-          {
-            ...category,
-            x: 50 + Math.cos(radians) * radius,
-            y: 50 + Math.sin(radians) * radius,
-          },
-        ],
       };
     },
-    { currentPercent: 0, stops: [], labels: [] }
-  );
+    { currentPercent: 0, stops: [] }
+  ).stops;
 
   return (
     <section className="rounded-lg bg-white px-6 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
@@ -413,19 +490,7 @@ const ExpenseChart = ({ budgetEntries }) => {
       <div
         className="relative mx-auto h-56 w-56 rounded-full"
         style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
-      >
-        {chartLabels.map((category) => (
-          <span
-            key={category.label}
-            className="absolute -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-semibold leading-tight text-white"
-            style={{ left: `${category.x}%`, top: `${category.y}%` }}
-          >
-            {category.label}
-            <br />
-            {category.value.toFixed(2)}
-          </span>
-        ))}
-      </div>
+      />
       <div className="mt-4 space-y-2 text-xs text-neutral-500">
         {expenseCategories.length === 0 && (
           <span className="flex items-center gap-2">
@@ -505,6 +570,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [budgetEntries, setBudgetEntries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const activeTopTab = ["dashboard", "newsfeed", "messages"].includes(activePage)
     ? activePage
@@ -550,6 +616,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
     const loadHomeData = async () => {
       try {
+        setIsLoading(true);
         setLoadError("");
         const [taskData, employeeData, clientData, budgetData] = await Promise.all([
           taskAPI.getAll(),
@@ -574,6 +641,10 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
         setLoadError(
           error.response?.data?.message || "Unable to load dashboard data."
         );
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -583,6 +654,10 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
       isMounted = false;
     };
   }, []);
+
+  if (activeTopTab === "dashboard" && isLoading) {
+    return <DashboardLoading />;
+  }
 
   return (
         <div className="mx-auto max-w-[1500px] space-y-5">
