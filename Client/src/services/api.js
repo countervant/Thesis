@@ -9,6 +9,43 @@ const api = axios.create({
   },
 });
 
+const cache = new Map();
+const CACHE_TIME = 30 * 1000;
+
+const cachedGet = async (url) => {
+  const cached = cache.get(url);
+  const now = Date.now();
+
+  if (cached && now - cached.time < CACHE_TIME) {
+    return cached.data;
+  }
+
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = api
+    .get(url)
+    .then((response) => {
+      cache.set(url, {
+        data: response.data,
+        time: Date.now(),
+      });
+      return response.data;
+    })
+    .catch((error) => {
+      cache.delete(url);
+      throw error;
+    });
+
+  cache.set(url, { promise, time: now });
+  return promise;
+};
+
+const clearCache = (...urls) => {
+  urls.forEach((url) => cache.delete(url));
+};
+
 // Add token to requests automatically
 api.interceptors.request.use(
   (config) => {
@@ -32,6 +69,7 @@ api.interceptors.response.use(
     const isLoginRequest = requestUrl.includes("/login");
     if (status === 401 && !isLoginRequest) {
       // Token expired or invalid - clear storage
+      cache.clear();
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/";
@@ -64,6 +102,7 @@ export const authAPI = {
 
   updateMe: async (profile) => {
     const response = await api.put("/auth/me", profile);
+    clearCache("/auth/me", "/auth/employees", "/auth/assignees", "/clients");
     return response.data;
   },
 
@@ -78,95 +117,102 @@ export const authAPI = {
   },
 
   getAssignees: async () => {
-    const response = await api.get("/auth/assignees");
-    return response.data;
+    return cachedGet("/auth/assignees");
   },
 };
 
 export const taskAPI = {
   getAll: async () => {
-    const response = await api.get("/tasks");
-    return response.data;
+    return cachedGet("/tasks");
   },
 
   create: async (task) => {
     const response = await api.post("/tasks", task);
+    clearCache("/tasks");
     return response.data;
   },
 
   update: async (id, task) => {
     const response = await api.put(`/tasks/${id}`, task);
+    clearCache("/tasks");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/tasks/${id}`);
+    clearCache("/tasks");
     return response.data;
   },
 };
 
 export const employeeAPI = {
   getAll: async () => {
-    const response = await api.get("/auth/employees");
-    return response.data;
+    return cachedGet("/auth/employees");
   },
 
   create: async (employee) => {
     const response = await api.post("/auth/employees", employee);
+    clearCache("/auth/employees", "/auth/assignees");
     return response.data;
   },
 
   update: async (id, employee) => {
     const response = await api.put(`/auth/employees/${id}`, employee);
+    clearCache("/auth/employees", "/auth/assignees", "/clients");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/auth/employees/${id}`);
+    clearCache("/auth/employees", "/auth/assignees", "/clients");
     return response.data;
   },
 };
 
 export const clientAPI = {
   getAll: async () => {
-    const response = await api.get("/clients");
-    return response.data;
+    return cachedGet("/clients");
   },
 
   create: async (client) => {
     const response = await api.post("/clients", client);
+    clearCache("/clients");
     return response.data;
   },
 
   update: async (id, client) => {
     const response = await api.put(`/clients/${id}`, client);
+    clearCache("/clients");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/clients/${id}`);
+    clearCache("/clients");
     return response.data;
   },
 };
 
 export const budgetAPI = {
   getAll: async () => {
-    const response = await api.get("/budgets");
-    return response.data;
+    return cachedGet("/budgets");
   },
 
   create: async (budget) => {
     const response = await api.post("/budgets", budget);
+    clearCache("/budgets");
     return response.data;
   },
 
   update: async (id, budget) => {
     const response = await api.put(`/budgets/${id}`, budget);
+    clearCache("/budgets");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/budgets/${id}`);
+    clearCache("/budgets");
     return response.data;
   },
 };
