@@ -5,6 +5,7 @@ import { authAPI } from "../../services/api.js";
 import AuthenticationHelper from "../../components/auth/AuthenticationHelper.jsx";
 import hideIcon from "../../assets/hide.png";
 import viewIcon from "../../assets/view.png";
+import { validateEmail } from "../../utils/emailValidation.js";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -31,8 +32,9 @@ const ResetPassword = () => {
     setError("");
     setMessage("");
 
-    if (!email.trim()) {
-      setError("Email is required");
+    const emailValidation = validateEmail(email);
+    if (emailValidation) {
+      setError(emailValidation);
       return;
     }
 
@@ -68,8 +70,9 @@ const ResetPassword = () => {
     setMessage("");
     setResendMessage("");
 
-    if (!email.trim()) {
-      setError("Email is required to resend the code");
+    const emailValidation = validateEmail(email);
+    if (emailValidation) {
+      setError(emailValidation);
       return;
     }
 
@@ -85,10 +88,8 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="flex min-h-screen md:flex-row">
-      <div className="hidden md:block md:w-1/2">
-        <Welcome text="Reset Password" />
-      </div>
+    <div className="flex min-h-screen flex-col-reverse md:flex-row">
+      <Welcome order="2" order1="1" text="Reset Password" />
       <div className="w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0">
         <h2
           className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase"

@@ -1,25 +1,153 @@
 import express from "express";
 import User from "../model/userModel.js";
+import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
-import rateLimit from "express-rate-limit";
+import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+
 
 const router = express.Router();
+const emailRegex =
+  /^[A-Za-z0-9]+(?:[._%+-][A-Za-z0-9]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
 
-// --------------- Helpers ---------------
+const isValidEmail = (email) => {
+  const trimmedEmail = email.trim();
+  return (
+    trimmedEmail.length <= 254 &&
+    !trimmedEmail.includes("..") &&
+    emailRegex.test(trimmedEmail)
+  );
+};
 
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+// Register route
+router.post("/register", async (req, res) => {
+  const { firstName, lastName, email, password } = req.body;
 
-const PASSWORD_MIN_LENGTH = 6;
+  try {
+    if (!firstName || !lastName || !email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Please provide first name, last name, email, and password" });
+    }
 
-// Reusable mail transporter (created once, lazily)
-let _transporter = null;
-const getTransporter = () => {
-  if (!_transporter) {
-    _transporter = nodemailer.createTransport({
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!trimmedFirstName || !trimmedLastName) {
+      return res
+        .status(400)
+        .json({ message: "First name and last name are required" });
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      return res
+        .status(400)
+        .json({ message: "Enter a valid email" });
+    }
+
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters" });
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+      return res.status(400).json({
+        message: "Password must include uppercase, lowercase, and number characters",
+      });
+    }
+
+    const userExists = await User.findOne({ email: normalizedEmail });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const user = await User.create({
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      email: normalizedEmail,
+      password,
+    });
+    const token = generateToken(user._id);
+    res.status(201).json({
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      token,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try{
+  if (!email || !password) {    
+    return res
+    .status(400)
+    .json({ message: "Please provide email and password" });
+  }
+   const normalizedEmail = email.trim().toLowerCase();
+   if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ message: "Enter a valid email" });
+   }
+   const user = await User.findOne({ email: normalizedEmail });
+
+    if(!user || !(await user.matchPassword(password))){
+        return res.status(401).json({message: "Invalid email or password"});
+    }
+    const token = generateToken(user._id);
+    res.status(200).json({id: user._id, email: user.email, role: user.role, token});
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+}
+);
+
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ message: "Enter a valid email" });
+  }
+
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+    return res.status(500).json({ message: "Email service not configured" });
+  }
+
+  try {
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({ message: "Email is not registered" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+
+    user.resetPasswordOTP = hashedOTP;
+    user.resetPasswordOTPExpires = Date.now() + 1000 * 60 * 10; // 10 minutes
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
@@ -28,103 +156,8 @@ const getTransporter = () => {
         pass: process.env.GMAIL_PASS,
       },
     });
-  }
-  return _transporter;
-};
 
-// Stricter rate limiter for auth-sensitive endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many attempts, please try again later." },
-});
-
-// --------------- Routes ---------------
-
-// Register
-router.post("/register", authLimiter, async (req, res) => {
-  const { email, password, type } = req.body;
-  const userType = type || "Client";
-
-  try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Please provide email and password" });
-    }
-
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      return res.status(400).json({ message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` });
-    }
-
-    if (!["Admin", "Employee", "Client"].includes(userType)) {
-      return res.status(400).json({ message: "Invalid type. Must be Admin, Employee, or Client" });
-    }
-
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    const user = await User.create({ email, password, type: userType });
-    const token = generateToken(user._id);
-    res.status(201).json({ id: user._id, email: user.email, type: user.type, token });
-  } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// Login
-router.post("/login", authLimiter, async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Please provide email and password" });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    const token = generateToken(user._id);
-    res.status(200).json({ id: user._id, email: user.email, type: user.type, token });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Forgot password
-router.post("/forgot-password", authLimiter, async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ message: "Email is required" });
-  }
-
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
-    return res.status(500).json({ message: "Email service not configured" });
-  }
-
-  try {
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ message: "Email is not registered" });
-    }
-
-    // Cryptographically secure 6-digit OTP
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
-
-    user.resetPasswordOTP = hashedOTP;
-    user.resetPasswordOTPExpires = Date.now() + 1000 * 60 * 10; // 10 minutes
-    await user.save();
-
-    await getTransporter().sendMail({
+    await transporter.sendMail({
       to: user.email,
       from: process.env.GMAIL_USER,
       subject: "Your password reset code",
@@ -183,7 +216,7 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
   }
 });
 
-router.post("/reset-password", authLimiter, async (req, res) => {
+router.post("/reset-password", async (req, res) => {
   const { email, otp, password } = req.body;
 
   if (!email || !otp || !password) {
@@ -191,7 +224,13 @@ router.post("/reset-password", authLimiter, async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: "Enter a valid email" });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(400).json({ message: "Invalid email or OTP" });
     }
@@ -219,8 +258,306 @@ router.post("/reset-password", authLimiter, async (req, res) => {
   }
 });
 
-router.get("/me", protect, async (req, res) => {
-  res.status(200).json(req.user);
-});
+    router.get('/me', protect,  async (req, res) => {
+      res.status(200).json(req.user);
+     }
+    );
 
-export default router;
+    router.put("/me", protect, async (req, res) => {
+      try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        const {
+          firstName,
+          lastName,
+          email,
+          phone,
+          position,
+          avatar,
+          password,
+        } = req.body;
+
+        if (firstName !== undefined) {
+          if (!firstName.trim()) {
+            return res.status(400).json({ message: "First name is required" });
+          }
+          user.firstName = firstName.trim();
+        }
+
+        if (lastName !== undefined) {
+          if (!lastName.trim()) {
+            return res.status(400).json({ message: "Last name is required" });
+          }
+          user.lastName = lastName.trim();
+        }
+
+        if (email !== undefined) {
+          const normalizedEmail = email.trim().toLowerCase();
+
+          if (!isValidEmail(normalizedEmail)) {
+            return res.status(400).json({ message: "Enter a valid email" });
+          }
+
+          const emailOwner = await User.findOne({
+            email: normalizedEmail,
+            _id: { $ne: user._id },
+          });
+
+          if (emailOwner) {
+            return res.status(400).json({ message: "Email is already used" });
+          }
+
+          user.email = normalizedEmail;
+        }
+
+        if (phone !== undefined) {
+          if (!isValidPhoneNumber(phone)) {
+            return res.status(400).json({ message: "Enter a valid phone number" });
+          }
+          user.phone = phone.trim();
+        }
+        if (position !== undefined) user.position = position.trim();
+        if (avatar !== undefined) user.avatar = avatar;
+
+        if (password) {
+          if (password.length < 8) {
+            return res
+              .status(400)
+              .json({ message: "Password must be at least 8 characters" });
+          }
+
+          if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+            return res.status(400).json({
+              message: "Password must include uppercase, lowercase, and number characters",
+            });
+          }
+
+          user.password = password;
+        }
+
+        await user.save();
+
+        res.status(200).json({
+          id: user._id,
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar,
+          phone: user.phone,
+          position: user.position,
+          isActive: user.isActive,
+        });
+      } catch (error) {
+        console.error("Update profile error:", error);
+        res.status(500).json({ message: "Unable to update profile" });
+      }
+    });
+
+    router.get("/assignees", protect, async (req, res) => {
+      try {
+        const employees = await User.find({
+          role: "employee",
+          isActive: true,
+          _id: { $ne: req.user._id },
+        })
+          .select("firstName lastName email role")
+          .sort({ firstName: 1, lastName: 1 });
+
+        res.status(200).json([
+          {
+            _id: req.user._id,
+            firstName: req.user.firstName,
+            lastName: req.user.lastName,
+            email: req.user.email,
+            role: req.user.role,
+            isSelf: true,
+          },
+          ...employees,
+        ]);
+      } catch (error) {
+        console.error("Get assignees error:", error);
+        res.status(500).json({ message: "Unable to fetch assignees" });
+      }
+    });
+
+    router.get("/employees", protect, authorize("admin"), async (req, res) => {
+      try {
+        const employees = await User.find({ role: "employee" })
+          .select("firstName lastName email phone position role isActive")
+          .sort({ createdAt: -1 });
+
+        res.status(200).json(employees);
+      } catch (error) {
+        console.error("Get employees error:", error);
+        res.status(500).json({ message: "Unable to fetch employees" });
+      }
+    });
+
+    router.post("/employees", protect, authorize("admin"), async (req, res) => {
+      try {
+        const {
+          firstName,
+          lastName,
+          email,
+          password,
+          phone = "",
+          position = "",
+          isActive = true,
+        } = req.body;
+
+        if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
+          return res.status(400).json({
+            message: "First name, last name, email, and password are required",
+          });
+        }
+
+        if (password.length < 8) {
+          return res
+            .status(400)
+            .json({ message: "Password must be at least 8 characters" });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+
+        if (!isValidEmail(normalizedEmail)) {
+          return res.status(400).json({ message: "Enter a valid email" });
+        }
+
+        if (!isValidPhoneNumber(phone)) {
+          return res.status(400).json({ message: "Enter a valid phone number" });
+        }
+
+        const userExists = await User.findOne({ email: normalizedEmail });
+
+        if (userExists) {
+          return res.status(400).json({ message: "User already exists" });
+        }
+
+        const employee = await User.create({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: normalizedEmail,
+          password,
+          phone: phone.trim(),
+          position: position.trim(),
+          role: "employee",
+          isActive: true,
+        });
+
+        res.status(201).json({
+          _id: employee._id,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          phone: employee.phone,
+          position: employee.position,
+          role: employee.role,
+          isActive: employee.isActive,
+        });
+      } catch (error) {
+        console.error("Create employee error:", error);
+        res.status(500).json({ message: "Unable to create employee" });
+      }
+    });
+
+    router.put("/employees/:id", protect, authorize("admin"), async (req, res) => {
+      try {
+        const employee = await User.findOne({
+          _id: req.params.id,
+          role: "employee",
+        });
+
+        if (!employee) {
+          return res.status(404).json({ message: "Employee not found" });
+        }
+
+        const {
+          firstName,
+          lastName,
+          email,
+          phone,
+          position,
+          isActive,
+          password,
+        } = req.body;
+
+        if (firstName !== undefined) employee.firstName = firstName.trim();
+        if (lastName !== undefined) employee.lastName = lastName.trim();
+        if (email !== undefined) {
+          const normalizedEmail = email.trim().toLowerCase();
+          if (!isValidEmail(normalizedEmail)) {
+            return res.status(400).json({ message: "Enter a valid email" });
+          }
+          employee.email = normalizedEmail;
+        }
+        if (phone !== undefined) {
+          if (!isValidPhoneNumber(phone)) {
+            return res.status(400).json({ message: "Enter a valid phone number" });
+          }
+          employee.phone = phone.trim();
+        }
+        if (position !== undefined) employee.position = position.trim();
+        if (isActive !== undefined) employee.isActive = isActive;
+        if (password) {
+          if (password.length < 8) {
+            return res
+              .status(400)
+              .json({ message: "Password must be at least 8 characters" });
+          }
+          employee.password = password;
+        }
+
+        await employee.save();
+
+        res.status(200).json({
+          _id: employee._id,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          phone: employee.phone,
+          position: employee.position,
+          role: employee.role,
+          isActive: employee.isActive,
+        });
+      } catch (error) {
+        if (error.code === 11000) {
+          return res.status(400).json({ message: "Email is already used" });
+        }
+        console.error("Update employee error:", error);
+        res.status(500).json({ message: "Unable to update employee" });
+      }
+    });
+
+    router.delete("/employees/:id", protect, authorize("admin"), async (req, res) => {
+      try {
+        const employee = await User.findOneAndDelete({
+          _id: req.params.id,
+          role: "employee",
+        });
+
+        if (!employee) {
+          return res.status(404).json({ message: "Employee not found" });
+        }
+
+        res.status(200).json({ message: "Employee deleted" });
+      } catch (error) {
+        console.error("Delete employee error:", error);
+        res.status(500).json({ message: "Unable to delete employee" });
+      }
+    });
+
+    // generate JWT token
+      const generateToken = (id) => {
+       return jwt.sign({id}, process.env.JWT_SECRET, {
+        expiresIn: '30d',
+       });
+
+      }
+
+    export default router;

@@ -1,84 +1,142 @@
-import React, { lazy, Suspense } from "react";
+import React from "react";
 import {
   Route,
   createBrowserRouter,
   createRoutesFromElements,
   RouterProvider,
   Outlet,
+  Navigate,
+  Link,
+  useRouteError,
 } from "react-router-dom";
 
-import { AuthProvider } from "../context/AuthContext.jsx";
-
-// Lazy-load page components for code-splitting
-const AuthPage = lazy(() => import("../pages/auth/AuthPage.jsx"));
-const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword.jsx"));
-const ResetPassword = lazy(() => import("../pages/auth/ResetPassword.jsx"));
-const Dashboard = lazy(() => import("../pages/Dashboard.jsx"));
-const Unauthorized = lazy(() => import("../pages/auth/Unauthorized.jsx"));
-
-// Eagerly loaded because it wraps every protected route
+import Login from "../pages/auth/Login.jsx";
+import Register from "../pages/auth/Register.jsx";
+import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
+import ResetPassword from "../pages/auth/ResetPassword.jsx";
+import Dashboard from "../pages/Dashboard.jsx";
+import Profile from "../pages/Profile.jsx";
+import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
+import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
-// Shared loading spinner for Suspense boundaries
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500" />
-  </div>
-);
+const dashboardPathByRole = {
+  client: "/client/dashboard",
+  employee: "/employee/dashboard",
+  admin: "/admin/dashboard",
+};
 
 // Layout component that wraps all routes with AuthProvider
-const AuthLayout = () => (
-  <AuthProvider>
-    <Suspense fallback={<PageLoader />}>
+const AuthLayout = () => {
+  return (
+    <AuthProvider>
       <Outlet />
-    </Suspense>
-  </AuthProvider>
-);
+    </AuthProvider>
+  );
+};
 
-// Create router ONCE outside the component so it's stable across re-renders
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route element={<AuthLayout />}>
-      {/* Login & Register share the same component with a slide transition */}
-      <Route index element={<AuthPage />} />
-      <Route path="/register" element={<AuthPage />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/unauthorized" element={<Unauthorized />} />
+const RoleDashboardRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
+};
 
-      {/* Protected Routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+const RouteErrorBoundary = () => {
+  const error = useRouteError();
+  const message =
+    error?.statusText ||
+    error?.message ||
+    "Something went wrong while loading this page.";
 
-      {/* Admin only */}
-      <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute allowedRoles={["Admin"]}>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-6 text-white">
+      <section className="w-full max-w-md rounded-lg border border-white/10 bg-white/[0.06] p-8 shadow-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-300">
+          Application Error
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold">This page hit a problem.</h1>
+        <p className="mt-3 text-sm leading-6 text-neutral-300">{message}</p>
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="h-10 rounded-md bg-[#dc4fb2] px-4 text-sm font-semibold text-white transition hover:brightness-105"
+          >
+            Reload
+          </button>
+          <Link
+            to="/dashboard"
+            className="flex h-10 items-center rounded-md border border-white/15 px-4 text-sm font-semibold text-neutral-100 transition hover:bg-white/10"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+};
 
-      {/* Employee (Admin + Employee) */}
-      <Route
-        path="/employee/*"
-        element={
-          <ProtectedRoute allowedRoles={["Admin", "Employee"]}>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-    </Route>
-  )
-);
+const AppRoutes = () => {
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <Route element={<AuthLayout />} errorElement={<RouteErrorBoundary />}>
+        <Route index element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/ForgotPassword" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
+        
+        {/* Protected Routes - requires authentication */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <RoleDashboardRedirect />
+            </ProtectedRoute>
+          }
+        />
 
-const AppRoutes = () => <RouterProvider router={router} />;
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/client/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin routes */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Employee routes */}
+        <Route
+          path="/employee/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
+    )
+  );
+
+  return <RouterProvider router={router} />;
+};
 
 export default AppRoutes;

@@ -1,0 +1,491 @@
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { taskAPI } from "../../../services/api.js";
+
+const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
+const dateStatuses = ["All", "Today", "Week", "Overdue"];
+const statusToApi = {
+  Pending: "pending",
+  "In progress": "in_progress",
+  Done: "done",
+  "In review": "review",
+};
+const statusFromApi = {
+  pending: "Pending",
+  in_progress: "In progress",
+  done: "Done",
+  review: "In review",
+};
+
+const formatInputDate = (date) => date.toISOString().slice(0, 10);
+
+const toInputDate = (date) => {
+  if (!date) return formatInputDate(new Date());
+  const dateValue = String(date);
+  if (dateValue.includes("-")) return dateValue.slice(0, 10);
+  const [month, day, year] = dateValue.split("/");
+  if (!month || !day || !year) return formatInputDate(new Date());
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+};
+
+const toDisplayDate = (date) => {
+  if (!date) return "";
+  const [year, month, day] = String(date).split("-");
+  if (!year || !month || !day) return "";
+  return `${month}/${day}/${year}`;
+};
+
+const getEntityId = (entity) => {
+  if (!entity) return "";
+  if (typeof entity === "string") return entity;
+  return entity._id || entity.id || "";
+};
+
+const normalizeTasks = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.tasks)) return data.tasks;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
+const normalizeTask = (task) => ({
+  id: task?._id || task?.id || "",
+  title: task?.title || "Untitled task",
+  description: task?.description || "",
+  dueDate: toDisplayDate(String(task?.dueDate || "").slice(0, 10)),
+  status: statusFromApi[task?.status] || task?.status || "Pending",
+  priority: task?.priority || "medium",
+  assignedTo: task?.assignedTo,
+});
+
+const getDateStatus = (dueDate) => {
+  const today = new Date();
+  const due = new Date(toInputDate(dueDate));
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const dayDifference = (dueStart - todayStart) / 86400000;
+
+  if (dayDifference < 0) return "Overdue";
+  if (dayDifference === 0) return "Today";
+  if (dayDifference <= 7) return "Week";
+  return "Upcoming";
+};
+
+const Icon = ({ name, className = "h-5 w-5" }) => {
+  const commonProps = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    className,
+    "aria-hidden": "true",
+  };
+
+  if (name === "dashboard") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "tasks") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M8 4h8l1 3H7l1-3zM6 7h12v13H6zM9 12l1.5 1.5L14 10M9 17h6"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "budget") {
+    return (
+      <svg {...commonProps}>
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M12 3v9l7 4M5.8 18.5 12 12"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "client" || name === "employee") {
+    return (
+      <svg {...commonProps}>
+        <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="16" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="M3.5 19c.5-3.2 2.4-5 5.5-5s5 1.8 5.5 5M12.5 18.5c.6-2.4 2.1-3.7 4.4-3.7 2.4 0 3.9 1.3 4.4 3.7"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "filter") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M4 5h16l-6.2 7.2v5.3L10.2 19v-6.8L4 5z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "calendar") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M7 3v4M17 3v4M4.5 9h15M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "edit") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="m14.7 5.3 4 4M4 20l4.4-1 10.2-10.2a2.8 2.8 0 0 0-4-4L4.4 15 4 20z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "delete") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 13h8l1-13"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (name === "logout") {
+    return (
+      <svg {...commonProps}>
+        <path
+          d="M9 5H5v14h4M15 8l4 4-4 4M19 12H9"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps}>
+      <path
+        d="M12 5v14M5 12h14"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+};
+
+const FilterChip = ({ active, children, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`h-7 rounded-md px-3 text-xs font-medium shadow-[0_2px_5px_rgba(0,0,0,0.2)] transition ${
+      active
+        ? "bg-[#db4ab5] text-white"
+        : "bg-white text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2]"
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const TaskCard = ({
+  canToggleDone,
+  onDelete,
+  onEdit,
+  onToggleDone,
+  showStatus,
+  task,
+}) => (
+  <article className="flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50 sm:px-5">
+    {canToggleDone && (
+      <button
+        type="button"
+        onClick={() => onToggleDone(task.id)}
+        disabled={task.status === "Done"}
+        className={`h-5 w-5 shrink-0 rounded-full border transition ${
+          task.status === "Done"
+            ? "cursor-not-allowed border-[#c72fb2] bg-[#c72fb2]"
+            : "border-neutral-400 bg-white hover:border-[#c72fb2]"
+        }`}
+        aria-label={
+          task.status === "Done"
+            ? `${task.title} is already complete`
+            : `Mark ${task.title} complete`
+        }
+      />
+    )}
+
+    <div className="min-w-0 flex-1">
+      <h2 className="truncate text-sm font-semibold text-neutral-800">
+        {task.title}
+      </h2>
+      <p className="mt-1 text-xs text-neutral-800">{task.description}</p>
+      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-neutral-800">
+        <Icon name="calendar" className="h-4 w-4" />
+        {task.dueDate}
+      </p>
+    </div>
+
+    {showStatus && (
+      <p className="hidden min-w-[160px] text-sm font-medium text-neutral-800 md:block">
+        Status: {task.status}
+      </p>
+    )}
+
+    <div className="flex shrink-0 items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onEdit(task)}
+        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+        aria-label={`Edit ${task.title}`}
+      >
+        <Icon name="edit" className="h-5 w-5" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onDelete(task)}
+        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+        aria-label={`Delete ${task.title}`}
+      >
+        <Icon name="delete" className="h-5 w-5" />
+      </button>
+    </div>
+  </article>
+);
+
+const Tasks = ({
+  onEditTask,
+  onNavigate,
+  refreshKey = 0,
+}) => {
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [selectedTaskStatus, setSelectedTaskStatus] = useState("All");
+  const [selectedDateStatus, setSelectedDateStatus] = useState("All");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTasks = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await taskAPI.getAll();
+        if (isMounted) {
+          setTasks(normalizeTasks(data).map(normalizeTask));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.response?.data?.message || "Unable to load tasks.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadTasks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey]);
+
+  const visibleTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const matchesTaskStatus =
+        selectedTaskStatus === "All" || task.status === selectedTaskStatus;
+      const matchesDateStatus =
+        selectedDateStatus === "All" || getDateStatus(task.dueDate) === selectedDateStatus;
+
+      return matchesTaskStatus && matchesDateStatus;
+    });
+  }, [selectedDateStatus, selectedTaskStatus, tasks]);
+
+  const handleAddTask = () => {
+    onNavigate?.("add-task");
+  };
+
+  const handleEditTask = (task) => {
+    onEditTask?.(task);
+  };
+
+  const handleToggleDone = async (taskId) => {
+    const task = tasks.find((currentTask) => currentTask.id === taskId);
+    if (!task) return;
+    if (getEntityId(task.assignedTo) !== getEntityId(user)) return;
+    if (task.status === "Done") return;
+
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.update(taskId, {
+        title: task.title,
+        description: task.description,
+        dueDate: toInputDate(task.dueDate),
+        status: statusToApi.Done,
+      });
+
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === taskId ? normalizeTask(updatedTask) : currentTask
+        )
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to update task.");
+    }
+  };
+
+  const handleDeleteTask = async (task) => {
+    const shouldDelete = window.confirm(`Delete task "${task.title}"?`);
+    if (!shouldDelete) return;
+
+    try {
+      setErrorMessage("");
+      await taskAPI.delete(task.id);
+      setTasks((currentTasks) =>
+        currentTasks.filter((currentTask) => currentTask.id !== task.id)
+      );
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete task.");
+    }
+  };
+
+  return (
+        <div className="mx-auto max-w-[1500px]">
+          <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1
+                className="text-3xl uppercase leading-none text-neutral-950"
+                style={{ fontFamily: "var(--font-bruno)" }}
+              >
+                Task
+              </h1>
+              <p className="mt-2 text-xs font-medium text-neutral-600">
+                Assign and manage your task
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAddTask}
+                className="flex h-11 items-center gap-3 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] px-5 text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+              >
+                <Icon className="h-5 w-5" />
+                <span>Add Task</span>
+              </button>
+            </div>
+          </header>
+
+          <section className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Icon name="filter" className="h-5 w-5 text-neutral-900" />
+              <span className="text-xs font-medium text-neutral-700">Status:</span>
+              {taskStatuses.map((status) => (
+                <FilterChip
+                  key={status}
+                  active={selectedTaskStatus === status}
+                  onClick={() => setSelectedTaskStatus(status)}
+                >
+                  {status}
+                </FilterChip>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Icon name="calendar" className="h-5 w-5 text-neutral-900" />
+              <span className="text-xs font-medium text-neutral-700">Status:</span>
+              {dateStatuses.map((status) => (
+                <FilterChip
+                  key={status}
+                  active={selectedDateStatus === status}
+                  onClick={() => setSelectedDateStatus(status)}
+                >
+                  {status}
+                </FilterChip>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-4 space-y-5">
+            {errorMessage && (
+              <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
+                {errorMessage}
+              </p>
+            )}
+
+            {isLoading && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)]">
+                Loading tasks...
+              </p>
+            )}
+
+            {!isLoading && visibleTasks.length === 0 && (
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)]">
+                No tasks found.
+              </p>
+            )}
+
+            {!isLoading && visibleTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                canToggleDone={getEntityId(task.assignedTo) === getEntityId(user)}
+                onDelete={handleDeleteTask}
+                onEdit={handleEditTask}
+                onToggleDone={handleToggleDone}
+                showStatus={selectedTaskStatus === "All"}
+                task={task}
+              />
+            ))}
+          </section>
+        </div>
+  );
+};
+
+export default Tasks;

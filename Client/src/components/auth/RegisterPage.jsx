@@ -1,27 +1,35 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
-import { validateEmail } from "../../utils/validation.js";
+import { validateEmail } from "../../utils/emailValidation.js";
 
-const RegisterPage = ({ onToggle }) => {
+const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [userType, setUserType] = useState("Client");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
 
-  const userTypes = ["Admin", "Employee", "Client"];
+  const resetForm = useCallback(() => {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setEmailError("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+  }, []);
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
@@ -37,20 +45,31 @@ const RegisterPage = ({ onToggle }) => {
     setEmailError(emailValidation);
     if (emailValidation) return;
 
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First name and last name are required");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+      setError("Password must include uppercase, lowercase, and number characters");
       return;
     }
 
     setLoading(true);
 
     try {
-      await authAPI.register(email, password, userType);
+      await authAPI.register(firstName.trim(), lastName.trim(), email, password);
+      resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
     } catch (err) {
@@ -63,6 +82,12 @@ const RegisterPage = ({ onToggle }) => {
   const isEmailInvalid = !email || !!emailError;
 
   useEffect(() => {
+    resetForm();
+    const timer = setTimeout(resetForm, 100);
+    return () => clearTimeout(timer);
+  }, [resetForm]);
+
+  useEffect(() => {
     if (!successMessage) return undefined;
     const timer = setTimeout(() => setSuccessMessage(""), 4000);
     return () => clearTimeout(timer);
@@ -71,7 +96,7 @@ const RegisterPage = ({ onToggle }) => {
   return (
     <>
       <div
-        className="h-full w-full bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0"
+        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -108,29 +133,42 @@ const RegisterPage = ({ onToggle }) => {
           Create Account
         </h2>
 
-        <div className="flex gap-4 mb-4">
-          {userTypes.map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setUserType(type)}
-              className={`px-4 py-2 rounded text-black bg-white transition-colors duration-300 ${
-                userType === type
-                  ? "bg-linear-to-r from-[#EF35A2] to-[#9E1DF4] text-white"
-                  : "shadow-[10px_10px_20px] shadow-gray-500 hover:shadow-[#EF35A2]"
-              }`}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8"
+          autoComplete="off"
+        >
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="border-b border-black mb-2">
+              <input
+                type="text"
+                placeholder="First Name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                autoComplete="given-name"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                required
+              />
+            </div>
+
+            <div className="border-b border-black mb-2">
+              <input
+                type="text"
+                placeholder="Last Name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                autoComplete="family-name"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                required
+              />
+            </div>
+          </div>
 
           <div>
             <div className="border-b border-black mb-2">
@@ -139,6 +177,7 @@ const RegisterPage = ({ onToggle }) => {
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
+                autoComplete="off"
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
                 required
               />
@@ -154,14 +193,14 @@ const RegisterPage = ({ onToggle }) => {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
               required
             />
             <button
               type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
+              onClick={() => setShowPassword(!showPassword)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
-              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
@@ -173,20 +212,20 @@ const RegisterPage = ({ onToggle }) => {
 
           <div className="border-b-2 border-gray-400 flex items-center">
             <input
-              type={showConfirmPassword ? "text" : "password"}
+              type={showPassword ? "text" : "password"}
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
               className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
               required
             />
             <button
               type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              onClick={() => setShowPassword(!showPassword)}
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
-              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
             >
-              {showConfirmPassword ? (
+              {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
               ) : (
                 <img src={view} alt="Show" className="w-5 h-5" />
@@ -206,7 +245,6 @@ const RegisterPage = ({ onToggle }) => {
             link="/"
             Label="Already have an account? Log In"
             Label1=""
-            onToggle={onToggle}
           />
         </form>
       </div>

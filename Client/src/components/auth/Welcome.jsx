@@ -1,19 +1,11 @@
 import React from "react";
 import backgroundImage from "../../assets/backround.png";
 
-const Welcome = ({ text, order, order1 }) => {
-  const orderClasses = [
-    order ? `order-${order}` : "",
-    order1 ? `md:order-${order1}` : "",
-    order || order1 ? "hidden md:block" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
+const Welcome = ({ order, order1, text }) => {
   return (
     <>
       <div
-        className={`relative w-full h-full min-h-[40vh] md:min-h-screen bg-cover bg-center text-white ${orderClasses}`}
+        className={`relative order-${order} md:order-${order1} hidden md:block w-full md:w-1/2 sm:min-h-[40vh] md:min-h-screen bg-cover bg-center text-white`}
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         <div className="absolute inset-0 bg-[rgba(224,58,175,0.7)]" />

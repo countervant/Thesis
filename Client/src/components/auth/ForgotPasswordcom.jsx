@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ForgotPasswordkey from "../../assets/ForgotPassword-key.png";
 import AuthenticationHelper from "./AuthenticationHelper";
 import { authAPI } from "../../services/api.js";
-import { validateEmail } from "../../utils/validation.js";
+import { validateEmail } from "../../utils/emailValidation.js";
 
 const ForgotPasswordcom = () => {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ const ForgotPasswordcom = () => {
 
   return (
     <>
-      <div className="w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0 min-h-screen overflow-y-auto">
+      <div className="w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0">
         <img
           src={ForgotPasswordkey}
           alt="Forgot Password Key"
@@ -86,7 +86,7 @@ const ForgotPasswordcom = () => {
           </button>
         </form>
 
-        <div className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8 mt-5 pb-6">
+        <div className="w-100 max-w-sm sm:max-w-md space-y-6 sm:space-y-8 mt-5">
           <AuthenticationHelper
             link="/"
             Label="Back to Login"
