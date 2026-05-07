@@ -3,7 +3,7 @@ import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
-import { clientAPI, employeeAPI, taskAPI } from "../../../services/api.js";
+import { budgetAPI, clientAPI, employeeAPI, taskAPI } from "../../../services/api.js";
 
 const statItems = [
   { key: "in_progress", label: "In Progress", icon: "progress" },
@@ -62,10 +62,7 @@ const timelineTasks = [
   },
 ];
 
-const expenseCategories = [
-  { label: "Groceries", value: 150, color: "#d64ab2" },
-  { label: "Bills", value: 100.95, color: "#9228c9" },
-];
+const expenseColors = ["#d64ab2", "#9228c9", "#7d5cff", "#ff7b8a"];
 
 const formatDate = (value) => {
   if (!value) {
@@ -361,12 +358,33 @@ const MonthlyChart = ({ tasks }) => {
   );
 };
 
-const ExpenseChart = () => {
+const ExpenseChart = ({ budgetEntries }) => {
+  const expenseCategories = Object.entries(
+    budgetEntries
+      .filter((entry) => entry.type === "expense")
+      .reduce((result, entry) => {
+        const category = entry.category || "General";
+        return {
+          ...result,
+          [category]: (result[category] || 0) + Math.abs(Number(entry.amount) || 0),
+        };
+      }, {})
+  )
+    .slice(0, 4)
+    .map(([label, value], index) => ({
+      label,
+      value,
+      color: expenseColors[index % expenseColors.length],
+    }));
   const total = expenseCategories.reduce((sum, category) => sum + category.value, 0);
-  const { stops: gradientStops, labels: chartLabels } = expenseCategories.reduce(
+  const visibleCategories =
+    expenseCategories.length > 0
+      ? expenseCategories
+      : [{ label: "No expenses", value: 1, color: "#d64ab2" }];
+  const { stops: gradientStops, labels: chartLabels } = visibleCategories.reduce(
     (result, category) => {
       const start = result.currentPercent;
-      const end = total > 0 ? start + (category.value / total) * 100 : start;
+      const end = total > 0 ? start + (category.value / total) * 100 : 100;
       const middle = start + (end - start) / 2;
       const radians = (middle * 3.6 - 90) * (Math.PI / 180);
       const radius = 23;
@@ -409,6 +427,12 @@ const ExpenseChart = () => {
         ))}
       </div>
       <div className="mt-4 space-y-2 text-xs text-neutral-500">
+        {expenseCategories.length === 0 && (
+          <span className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
+            No expenses
+          </span>
+        )}
         {expenseCategories.map((category) => (
           <span key={category.label} className="flex items-center gap-2">
             <span
@@ -480,6 +504,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
+  const [budgetEntries, setBudgetEntries] = useState([]);
   const [loadError, setLoadError] = useState("");
   const activeTopTab = ["dashboard", "newsfeed", "messages"].includes(activePage)
     ? activePage
@@ -526,10 +551,11 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
     const loadHomeData = async () => {
       try {
         setLoadError("");
-        const [taskData, employeeData, clientData] = await Promise.all([
+        const [taskData, employeeData, clientData, budgetData] = await Promise.all([
           taskAPI.getAll(),
           employeeAPI.getAll(),
           clientAPI.getAll(),
+          budgetAPI.getAll(),
         ]);
 
         if (!isMounted) {
@@ -539,6 +565,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
         setTasks(Array.isArray(taskData) ? taskData : []);
         setEmployees(Array.isArray(employeeData) ? employeeData : []);
         setClients(Array.isArray(clientData) ? clientData : []);
+        setBudgetEntries(Array.isArray(budgetData) ? budgetData : []);
       } catch (error) {
         if (!isMounted) {
           return;
@@ -575,7 +602,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
               <div className="grid gap-5 xl:grid-cols-[1.65fr_0.95fr]">
                 <MonthlyChart tasks={tasks} />
-                <ExpenseChart />
+                <ExpenseChart budgetEntries={budgetEntries} />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
