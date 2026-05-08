@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
+import incomeIcon from "../../../assets/income.png";
+import expenseIcon from "../../../assets/expense.png";
+import walletIcon from "../../../assets/wallet.png";
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -108,39 +111,21 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
-  if (name === "money") {
+  if (name === "income") {
     return (
-      <svg {...props}>
-        <circle cx="11" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
-        <path
-          d="M11 8v8M8.8 14.6c.7.8 3.6.8 4.1-.3.6-1.4-1.7-1.9-3-2.3-1.4-.4-1.7-2.7.3-3.2 1-.2 2.2.1 2.8.8M17 4l2-1M17 7h3M16.7 10l2 1.2"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <img src={incomeIcon} alt="Income" className={className} />
+    );
+  }
+
+  if (name === "expense") {
+    return (
+      <img src={expenseIcon} alt="Expense" className={className} />
     );
   }
 
   if (name === "wallet") {
     return (
-      <svg {...props}>
-        <path
-          d="M4 8.5h15a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M16 13h5v3h-5a1.5 1.5 0 0 1 0-3zM6 5l10 3.5"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+     <img src={walletIcon} alt="Wallet" className={className} /> 
     );
   }
 
@@ -255,11 +240,11 @@ const ExpenseBreakdown = ({ expenses, income }) => {
     </div>
     <div className="mt-9 flex justify-center gap-16 text-xs text-neutral-700">
       <span className="flex items-center gap-2">
-        <span className="h-3 w-6 bg-[#ff1f14]" />
+        <Icon name="expense" className="h-5 w-5" />
         Expenses
       </span>
       <span className="flex items-center gap-2">
-        <span className="h-3 w-6 bg-[#18a64f]" />
+        <Icon name="income" className="h-5 w-5" />
         Income
       </span>
     </div>
@@ -339,7 +324,7 @@ const EntryType = ({ type }) => (
         : "bg-[#ff7d7d] text-[#b31a1a]"
     }`}
   >
-    <Icon name="down" className="h-3 w-3" />
+    <Icon name={type === "income" ? "income" : "expense"} className="h-4 w-4" />
     {type}
   </span>
 );
@@ -446,12 +431,12 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
           <section className="mt-10 grid gap-4 md:grid-cols-3">
             <SummaryCard
-              icon="money"
+              icon="income"
               label="Total Income"
               value={`$${totals.income.toLocaleString("en-US")}`}
             />
             <SummaryCard
-              icon="money"
+              icon="expense"
               label="Total Expense"
               value={`$${totals.expenses.toLocaleString("en-US")}`}
             />
