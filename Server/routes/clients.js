@@ -3,7 +3,7 @@ import Client from "../model/Admin/Clientmodel.js";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
-import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 
 const router = express.Router();
 const emailRegex =
@@ -36,8 +36,7 @@ const validateClientPayload = (payload) => {
   if (!payload.companyName) return "Company name is required";
   if (!payload.email) return "Email is required";
   if (!isValidEmail(payload.email)) return "Enter a valid email";
-  if (!isValidPhoneNumber(payload.phone)) return "Enter a valid phone number";
-  return "";
+  return getPhoneValidationMessage(payload.phone, payload.country);
 };
 
 const clientUserToClient = (user) => ({
@@ -61,14 +60,16 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
     const clients = await Client.find()
       .populate("assignedEmployee", "firstName lastName email role")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     const clientUsers = await User.find({ role: "client" })
-      .select("-password -resetPasswordToken -resetPasswordOTP")
-      .sort({ createdAt: -1 });
+      .select("firstName lastName companyName email phone country position role isActive createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json([
       ...clientUsers.map(clientUserToClient),
-      ...clients.map((client) => ({ ...client.toObject(), source: "client" })),
+      ...clients.map((client) => ({ ...client, source: "client" })),
     ]);
   } catch (error) {
     console.error("Get clients error:", error);

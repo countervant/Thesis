@@ -4,11 +4,12 @@ import path from "path";
 import express from "express";
 import cors from "cors";
 
-import { dbConnect } from "./config/dbConnect.js";
+import { dbConnect, isDbConnected } from "./config/dbConnect.js";
 import auth from "./routes/auth.js";
 import budgets from "./routes/budgets.js";
 import clients from "./routes/clients.js";
 import tasks from "./routes/tasks.js";
+import newsfeed from "./routes/newsfeed.js";
 
 // Resolve .env relative to this file so it works regardless of cwd
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,15 +32,35 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+app.get("/api/health", (req, res) => {
+  res.status(isDbConnected() ? 200 : 503).json({
+    ok: isDbConnected(),
+    database: isDbConnected() ? "connected" : "disconnected",
+  });
+});
+
+app.use("/api", (req, res, next) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ message: "Database unavailable" });
+  }
+
+  return next();
+});
+
 app.use("/api/auth", auth);
 // Back-compat / alternate base path (some clients call this as /api/user/*)
 app.use("/api/user", auth);
 app.use("/api/budgets", budgets);
 app.use("/api/clients", clients);
 app.use("/api/tasks", tasks);
+app.use("/api/newsfeed", newsfeed);
 
-dbConnect();
+try {
+  await dbConnect();
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+} catch {
+  process.exit(1);
+}

@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
-import incomeIcon from "../../../assets/income.png";
-import expenseIcon from "../../../assets/expense.png";
-import walletIcon from "../../../assets/wallet.png";
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -46,6 +43,24 @@ const normalizeEntry = (entry) => ({
       ? -Math.abs(Number(entry.amount) || 0)
       : Math.abs(Number(entry.amount) || 0),
 });
+
+const formatPeso = (amount, { signed = false } = {}) => {
+  const formattedAmount = new Intl.NumberFormat("en-PH", {
+    currency: "PHP",
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    style: "currency",
+  }).format(Math.abs(Number(amount) || 0));
+
+  if (!signed) return formattedAmount;
+  return `${amount < 0 ? "-" : "+"}${formattedAmount}`;
+};
+
+const budgetIcons = {
+  balance: balanceIcon,
+  expense: totalExpenseIcon,
+  income: totalIncomeIcon,
+};
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = {
@@ -111,17 +126,22 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
-  if (name === "income") {
+  if (name === "money") {
     return (
-      <img src={incomeIcon} alt="Income" className={className} />
+      <svg {...props}>
+        <circle cx="11" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
+        <path
+          d="M11 8v8M8.8 14.6c.7.8 3.6.8 4.1-.3.6-1.4-1.7-1.9-3-2.3-1.4-.4-1.7-2.7.3-3.2 1-.2 2.2.1 2.8.8M17 4l2-1M17 7h3M16.7 10l2 1.2"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     );
   }
 
-  if (name === "expense") {
-    return (
-      <img src={expenseIcon} alt="Expense" className={className} />
-    );
-  }
+
 
   if (name === "wallet") {
     return (
@@ -171,13 +191,15 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
     );
   }
 
-  if (name === "down") {
+  if (name === "income-arrow" || name === "expense-arrow") {
+    const isIncome = name === "income-arrow";
+
     return (
       <svg {...props}>
         <path
-          d="M7 7h10v10M17 17 7 7"
+          d={isIncome ? "M7 17 17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9"}
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -198,11 +220,11 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const SummaryCard = ({ icon, label, value }) => (
-  <section className="flex h-20 items-center justify-center gap-8 rounded-lg bg-white px-5 shadow-[0_3px_4px_rgba(219,39,119,0.35)] ring-1 ring-pink-50">
-    <Icon name={icon} className="h-10 w-10 text-[#e347b3]" />
-    <div className="text-center leading-tight">
-      <p className="text-3xl font-bold text-neutral-950">{value}</p>
-      <p className="text-base text-neutral-500">{label}</p>
+  <section className="flex h-24 items-center justify-center gap-8 rounded-lg border-b-2 border-[#e347b3] bg-white px-6 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <Icon name={icon} className="h-16 w-16" />
+    <div className="min-w-[110px] text-center leading-tight">
+      <p className="text-3xl font-bold text-neutral-950 dark:text-white">{value}</p>
+      <p className="text-base text-neutral-500 dark:text-neutral-400">{label}</p>
     </div>
   </section>
 );
@@ -212,33 +234,33 @@ const ExpenseBreakdown = ({ expenses, income }) => {
   const expenseHeight = `${Math.max((expenses / maxValue) * 100, 8)}%`;
   const incomeHeight = `${Math.max((income / maxValue) * 100, 8)}%`;
   const axisLabels = [1, 0.75, 0.5, 0.25, 0].map((multiplier) =>
-    Math.round(maxValue * multiplier).toLocaleString("en-US")
+    formatPeso(Math.round(maxValue * multiplier))
   );
 
   return (
-  <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
-    <h2 className="text-lg font-bold text-neutral-900">Expense Breakdown</h2>
+  <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Expense Breakdown</h2>
     <div className="mt-6 flex flex-1 items-end gap-4">
-      <div className="flex h-52 w-12 flex-col justify-between text-right text-xs text-neutral-500">
+      <div className="flex h-52 w-12 flex-col justify-between text-right text-xs text-neutral-500 dark:text-neutral-500">
         {axisLabels.map((label, index) => (
           <span key={`${label}-${index}`}>{label}</span>
         ))}
       </div>
-      <div className="relative flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_52px)] px-8">
+      <div className="relative flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_52px)] px-8 dark:border-neutral-700 dark:bg-[repeating-linear-gradient(to_bottom,#474747_0,#474747_1px,transparent_1px,transparent_52px)]">
         <div
           className="w-24 max-w-[34%] rounded-t-sm bg-[#ff1f14]"
           style={{ height: expenseHeight }}
-          title={`Expenses: ${expenses.toLocaleString("en-US")}`}
+          title={`Expenses: ${formatPeso(expenses)}`}
         />
         <div
           className="w-24 max-w-[34%] rounded-t-sm bg-[#18a64f]"
           style={{ height: incomeHeight }}
-          title={`Income: ${income.toLocaleString("en-US")}`}
+          title={`Income: ${formatPeso(income)}`}
         />
         <span className="absolute -bottom-5 text-xs text-neutral-400">Dec 25</span>
       </div>
     </div>
-    <div className="mt-9 flex justify-center gap-16 text-xs text-neutral-700">
+    <div className="mt-9 flex justify-center gap-16 text-xs text-neutral-700 dark:text-neutral-300">
       <span className="flex items-center gap-2">
         <Icon name="expense" className="h-5 w-5" />
         Expenses
@@ -293,14 +315,14 @@ const ExpenseCategories = ({ entries }) => {
       : "conic-gradient(#8d2bc8 0 50%, #d947b3 50% 100%)";
 
   return (
-  <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
-    <h2 className="text-lg font-bold text-neutral-900">Expense Categories</h2>
+  <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Expense Categories</h2>
     <div className="mt-4 flex flex-col items-center">
       <div
         className="relative h-44 w-44 shrink-0 rounded-full sm:h-52 sm:w-52"
         style={{ background: chartBackground }}
       />
-      <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 sm:grid-cols-4">
+      <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 dark:text-neutral-300 sm:grid-cols-4">
         {segments.map((segment) => (
           <span key={segment.category} className="flex items-center gap-2">
             <span
@@ -318,26 +340,24 @@ const ExpenseCategories = ({ entries }) => {
 
 const EntryType = ({ type }) => (
   <span
-    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold lowercase ${
       type === "income"
-        ? "bg-[#6bed9c] text-[#12853d]"
-        : "bg-[#ff7d7d] text-[#b31a1a]"
+        ? "bg-[#72e89d] text-[#1fb85b]"
+        : "bg-[#ec7a7d] text-[#e11f2a]"
     }`}
   >
-    <Icon name={type === "income" ? "income" : "expense"} className="h-4 w-4" />
+    <Icon name="down" className="h-3 w-3" />
     {type}
   </span>
 );
 
-const formatCurrency = (amount) => {
-  const absoluteAmount = Math.abs(amount).toLocaleString("en-US");
-  return `${amount < 0 ? "-" : "+"}$${absoluteAmount}`;
-};
+const formatCurrency = (amount) => formatPeso(amount, { signed: true });
 
 const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const [budgetEntries, setBudgetEntries] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [entryToDelete, setEntryToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -387,10 +407,6 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   }, [budgetEntries]);
 
   const deleteEntry = async (entryId) => {
-    if (!window.confirm("Delete this entry?")) {
-      return;
-    }
-
     try {
       setErrorMessage("");
       await budgetAPI.delete(entryId);
@@ -407,12 +423,12 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-3xl uppercase leading-none text-neutral-950"
+                className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Budget Planner
               </h1>
-              <p className="mt-2 text-xs font-medium text-neutral-600">
+              <p className="mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
                 Track your income and expenses
               </p>
             </div>
@@ -433,17 +449,17 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             <SummaryCard
               icon="income"
               label="Total Income"
-              value={`$${totals.income.toLocaleString("en-US")}`}
+              value={formatPeso(totals.income)}
             />
             <SummaryCard
               icon="expense"
               label="Total Expense"
-              value={`$${totals.expenses.toLocaleString("en-US")}`}
+              value={formatPeso(totals.expenses)}
             />
             <SummaryCard
-              icon="wallet"
+              icon="balance"
               label="Balance"
-              value={`$${totals.balance.toLocaleString("en-US")}`}
+              value={formatPeso(totals.balance)}
             />
           </section>
 
@@ -458,9 +474,9 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             </p>
           )}
 
-          <section className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
-            <table className="w-full min-w-[780px] text-left text-xs text-neutral-800">
-              <thead className="border-b border-neutral-300">
+          <section className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+            <table className="w-full min-w-[780px] text-left text-xs text-neutral-800 dark:text-neutral-200">
+              <thead className="border-b border-neutral-300 dark:border-neutral-700">
                 <tr>
                   <th className="px-5 py-4 font-medium">Type</th>
                   <th className="px-5 py-4 font-medium">Description</th>
@@ -473,7 +489,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
               <tbody>
                 {isLoading && (
                   <tr>
-                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600">
+                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600 dark:text-neutral-400">
                       Loading budget entries...
                     </td>
                   </tr>
@@ -481,7 +497,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
                 {!isLoading && budgetEntries.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600">
+                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600 dark:text-neutral-400">
                       No budget entries found.
                     </td>
                   </tr>
@@ -494,7 +510,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
                     </td>
                     <td className="px-5 py-4 font-medium">{entry.description}</td>
                     <td className="px-5 py-4">{entry.category}</td>
-                    <td className="px-5 py-4 text-neutral-500">{entry.date}</td>
+                    <td className="px-5 py-4 text-neutral-500 dark:text-neutral-400">{entry.date}</td>
                     <td
                       className={`px-5 py-4 font-bold ${
                         entry.amount < 0 ? "text-red-600" : "text-green-600"
@@ -507,14 +523,14 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
                         <button
                           type="button"
                           onClick={() => onEditEntry?.(entry)}
-                          className="text-neutral-900 transition hover:text-[#c72fb2]"
+                          className="text-neutral-900 transition hover:text-[#c72fb2] dark:text-neutral-300"
                           aria-label={`Edit ${entry.description}`}
                         >
                           <Icon name="edit" className="h-5 w-5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => deleteEntry(entry.id)}
+                          onClick={() => setEntryToDelete(entry)}
                           className="text-red-600 transition hover:text-red-700"
                           aria-label={`Delete ${entry.description}`}
                         >
@@ -527,6 +543,19 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
               </tbody>
             </table>
           </section>
+          <ConfirmDialog
+            confirmLabel="Yes , delete"
+            icon="delete"
+            isOpen={Boolean(entryToDelete)}
+            message={`Delete "${entryToDelete?.description || "this entry"}"?`}
+            onCancel={() => setEntryToDelete(null)}
+            onConfirm={async () => {
+              const entry = entryToDelete;
+              setEntryToDelete(null);
+              if (entry) await deleteEntry(entry.id);
+            }}
+            title="Delete"
+          />
         </div>
   );
 };

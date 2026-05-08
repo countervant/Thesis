@@ -4,13 +4,14 @@ const API_URL = "http://localhost:5000/api";
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 const cache = new Map();
-const CACHE_TIME = 30 * 1000;
+const CACHE_TIME = 2 * 60 * 1000;
 
 const cachedGet = async (url) => {
   const cached = cache.get(url);
@@ -44,6 +45,56 @@ const cachedGet = async (url) => {
 
 const clearCache = (...urls) => {
   urls.forEach((url) => cache.delete(url));
+};
+
+const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
+
+const mergeCachedPost = (currentPost, nextPost) => ({
+  ...currentPost,
+  ...nextPost,
+  media: {
+    ...(currentPost?.media || {}),
+    ...(nextPost?.media || {}),
+  },
+});
+
+const updateCachedPost = (postId, updater) => {
+  ["/newsfeed", "/newsfeed/activity"].forEach((url) => {
+    const cached = cache.get(url);
+
+    if (!Array.isArray(cached?.data)) {
+      return;
+    }
+
+    cache.set(url, {
+      data: cached.data.map((post) =>
+        getEntityId(post) === postId ? updater(post) : post
+      ),
+      time: Date.now(),
+    });
+  });
+};
+
+const replaceCachedPost = (updatedPost) => {
+  const postId = getEntityId(updatedPost);
+  if (!postId) return;
+
+  updateCachedPost(postId, (post) => mergeCachedPost(post, updatedPost));
+};
+
+const removeCachedPost = (postId) => {
+  ["/newsfeed", "/newsfeed/activity"].forEach((url) => {
+    const cached = cache.get(url);
+
+    if (!Array.isArray(cached?.data)) {
+      return;
+    }
+
+    cache.set(url, {
+      data: cached.data.filter((post) => getEntityId(post) !== postId),
+      time: Date.now(),
+    });
+  });
 };
 
 // Add token to requests automatically
@@ -85,10 +136,19 @@ export const authAPI = {
     return response.data;
   },
 
-  register: async (firstName, lastName, email, password, phone = "", country = "") => {
+  register: async (
+    firstName,
+    lastName,
+    companyName,
+    email,
+    password,
+    phone = "",
+    country = ""
+  ) => {
     const response = await api.post("/auth/register", {
       firstName,
       lastName,
+      companyName,
       email,
       password,
       phone,
@@ -98,8 +158,11 @@ export const authAPI = {
   },
 
   getMe: async () => {
-    const response = await api.get("/auth/me");
-    return response.data;
+    return cachedGet("/auth/me");
+  },
+
+  getPublicProfile: async (id) => {
+    return cachedGet(`/auth/users/${id}`);
   },
 
   updateMe: async (profile) => {
@@ -143,6 +206,73 @@ export const taskAPI = {
   delete: async (id) => {
     const response = await api.delete(`/tasks/${id}`);
     clearCache("/tasks");
+    return response.data;
+  },
+};
+
+export const newsfeedAPI = {
+  getAll: async () => {
+    return cachedGet("/newsfeed");
+  },
+
+  updateCachedPost,
+
+  clearCachedPosts: () => {
+    clearCache("/newsfeed", "/newsfeed/activity");
+  },
+
+  getActivity: async () => {
+    return cachedGet("/newsfeed/activity");
+  },
+
+  getMedia: async (id) => {
+    return cachedGet(`/newsfeed/${id}/media`);
+  },
+
+  create: async (post) => {
+    const response = await api.post("/newsfeed", post);
+    clearCache("/newsfeed", "/newsfeed/activity");
+    return response.data;
+  },
+
+  toggleHeart: async (id) => {
+    const response = await api.patch(`/newsfeed/${id}/heart`);
+    replaceCachedPost(response.data);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/newsfeed/${id}`);
+    removeCachedPost(id);
+    return response.data;
+  },
+
+  comment: async (id, text) => {
+    const response = await api.post(`/newsfeed/${id}/comments`, { text });
+    replaceCachedPost(response.data);
+    return response.data;
+  },
+
+  deleteComment: async (postId, commentId) => {
+    const response = await api.delete(`/newsfeed/${postId}/comments/${commentId}`);
+    replaceCachedPost(response.data);
+    return response.data;
+  },
+
+  toggleCommentHeart: async (postId, commentId) => {
+    const response = await api.patch(
+      `/newsfeed/${postId}/comments/${commentId}/heart`
+    );
+    replaceCachedPost(response.data);
+    return response.data;
+  },
+
+  reply: async (postId, commentId, text) => {
+    const response = await api.post(
+      `/newsfeed/${postId}/comments/${commentId}/replies`,
+      { text }
+    );
+    replaceCachedPost(response.data);
     return response.data;
   },
 };

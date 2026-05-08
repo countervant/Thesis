@@ -6,7 +6,10 @@ import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { validateEmail } from "../../utils/emailValidation.js";
-import { isValidPhoneNumber } from "../../utils/phoneValidation.js";
+import {
+  getPhoneValidationMessage,
+  limitPhoneNumberLength,
+} from "../../utils/phoneValidation.js";
 import {
   applyCountryDialCode,
   countryOptions,
@@ -14,10 +17,36 @@ import {
   getCountryDialCode,
 } from "../../utils/countries.js";
 
+const fieldNames = {
+  firstName: `register_given_${Date.now()}`,
+  lastName: `register_family_${Date.now()}`,
+  companyName: `register_company_${Date.now()}`,
+  email: `register_contact_${Date.now()}`,
+  phone: `register_line_${Date.now()}`,
+  password: `register_secret_${Date.now()}`,
+  confirmPassword: `register_secret_confirm_${Date.now()}`,
+};
+
+const antiAutofillProps = {
+  autoComplete: "new-password",
+  autoCorrect: "off",
+  autoCapitalize: "none",
+  spellCheck: "false",
+  "data-lpignore": "true",
+  "data-1p-ignore": "true",
+  "data-bwignore": "true",
+  "data-form-type": "other",
+};
+
+const preventAutofill = (event) => {
+  event.currentTarget.removeAttribute("readOnly");
+};
+
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [country, setCountry] = useState(defaultCountry);
@@ -33,6 +62,7 @@ const RegisterPage = ({ order, order1 }) => {
   const resetForm = useCallback(() => {
     setFirstName("");
     setLastName("");
+    setCompanyName("");
     setEmail("");
     setEmailError("");
     setCountry(defaultCountry);
@@ -66,13 +96,19 @@ const RegisterPage = ({ order, order1 }) => {
       return;
     }
 
+    if (!companyName.trim()) {
+      setError("Company name is required");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (!isValidPhoneNumber(phone)) {
-      setError("Enter a valid phone number");
+    const phoneValidation = getPhoneValidationMessage(phone, country);
+    if (phoneValidation) {
+      setError(phoneValidation);
       return;
     }
 
@@ -92,6 +128,7 @@ const RegisterPage = ({ order, order1 }) => {
       await authAPI.register(
         firstName.trim(),
         lastName.trim(),
+        companyName.trim(),
         email,
         password,
         phone.trim(),
@@ -124,7 +161,7 @@ const RegisterPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
+        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0 dark:bg-[#111111] dark:px-4 dark:py-4`}
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -149,64 +186,111 @@ const RegisterPage = ({ order, order1 }) => {
           </div>
         )}
 
-        <img
-          src={logo}
-          alt="CLIENTRA"
-          className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain"
-        />
-        <h2
-          className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-10 tracking-wide uppercase"
-          style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
-        >
-          Create Account
-        </h2>
-
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8"
+          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8 dark:max-w-[640px] dark:space-y-4 dark:rounded-2xl dark:border dark:border-pink-200/90 dark:px-10 dark:py-7 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
+          data-form-type="other"
         >
+          <div className="flex flex-col items-center">
+            <img
+              src={logo}
+              alt="CLIENTRA"
+              className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain dark:h-24 dark:w-24"
+            />
+            <h2
+              className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-10 tracking-wide uppercase dark:mb-2 dark:text-3xl dark:text-white"
+              style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
+            >
+              Create Account
+            </h2>
+          </div>
+
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="hidden"
+          />
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="hidden"
+          />
+
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="border-b border-black mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 dark:gap-4">
+            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
               <input
                 type="text"
+                name={fieldNames.firstName}
                 placeholder="First Name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                autoComplete="given-name"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
 
-            <div className="border-b border-black mb-2">
+            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
               <input
                 type="text"
+                name={fieldNames.lastName}
                 placeholder="Last Name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                autoComplete="family-name"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
           </div>
 
           <div>
-            <div className="border-b border-black mb-2">
+            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
               <input
-                type="email"
+                type="text"
+                name={fieldNames.companyName}
+                placeholder="Company Name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
+              <input
+                type="text"
+                name={fieldNames.email}
+                inputMode="email"
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
-                autoComplete="off"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
@@ -215,13 +299,13 @@ const RegisterPage = ({ order, order1 }) => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6">
-            <div className="border-b border-black mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6 dark:gap-4">
+            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
               <select
                 value={country}
                 onChange={(event) => handleCountryChange(event.target.value)}
                 autoComplete="country-name"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 dark:h-9 dark:pb-0 dark:text-white"
                 required
               >
                 {countryOptions.map((option) => (
@@ -232,33 +316,42 @@ const RegisterPage = ({ order, order1 }) => {
               </select>
             </div>
 
-            <div className="border-b border-black mb-2">
+            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
               <input
                 type="tel"
+                name={fieldNames.phone}
                 placeholder="Phone"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                autoComplete="tel"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                onChange={(event) =>
+                  setPhone(limitPhoneNumberLength(event.target.value, country))
+                }
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
           </div>
 
-          <div className="border-b-2 border-gray-400 flex items-center">
+          <div className="border-b-2 border-gray-400 flex items-center dark:border-transparent dark:bg-[#283241]">
             <input
-              type={showPassword ? "text" : "password"}
+              type="text"
+              name={fieldNames.password}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+              {...antiAutofillProps}
+              readOnly
+              onFocus={preventAutofill}
+              style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
+              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3 dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
@@ -268,20 +361,24 @@ const RegisterPage = ({ order, order1 }) => {
             </button>
           </div>
 
-          <div className="border-b-2 border-gray-400 flex items-center">
+          <div className="border-b-2 border-gray-400 flex items-center dark:border-transparent dark:bg-[#283241]">
             <input
-              type={showPassword ? "text" : "password"}
+              type="text"
+              name={fieldNames.confirmPassword}
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+              {...antiAutofillProps}
+              readOnly
+              onFocus={preventAutofill}
+              style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
+              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3 dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5" />
@@ -294,7 +391,7 @@ const RegisterPage = ({ order, order1 }) => {
           <button
             type="submit"
             disabled={loading || isEmailInvalid}
-            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed dark:mt-6 dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)]"
           >
             {loading ? "Creating Account..." : "Create Account"}
           </button>

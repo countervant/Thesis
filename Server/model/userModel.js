@@ -22,6 +22,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    companyName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     email: {
       type: String,
       required: true,
@@ -102,6 +108,9 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
     this.password
   );
 };
+
+userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ role: 1, isActive: 1, firstName: 1, lastName: 1 });
 
 const User = mongoose.model("User", userSchema);
 

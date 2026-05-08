@@ -29,7 +29,7 @@ const validateBudgetPayload = (payload) => {
 
 router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
-    const budgets = await Budget.find().sort({ date: -1, createdAt: -1 });
+    const budgets = await Budget.find().sort({ date: -1, createdAt: -1 }).lean();
     res.status(200).json(budgets);
   } catch (error) {
     console.error("Get budgets error:", error);

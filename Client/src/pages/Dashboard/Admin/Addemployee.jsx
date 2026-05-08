@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { employeeAPI } from "../../../services/api.js";
 import { isValidEmail } from "../../../utils/emailValidation.js";
-import { isValidPhoneNumber } from "../../../utils/phoneValidation.js";
+import {
+  getPhoneValidationMessage,
+  limitPhoneNumberLength,
+} from "../../../utils/phoneValidation.js";
 import {
   applyCountryDialCode,
   countryOptions,
@@ -109,8 +112,9 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
       return;
     }
 
-    if (!isValidPhoneNumber(formData.phone)) {
-      setErrorMessage("Enter a valid phone number.");
+    const phoneValidation = getPhoneValidationMessage(formData.phone, formData.country);
+    if (phoneValidation) {
+      setErrorMessage(phoneValidation);
       return;
     }
 
@@ -265,7 +269,12 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
                 type="tel"
                 autoComplete="off"
                 value={formData.phone}
-                onChange={(event) => updateField("phone", event.target.value)}
+                onChange={(event) =>
+                  updateField(
+                    "phone",
+                    limitPhoneNumberLength(event.target.value, formData.country)
+                  )
+                }
                 placeholder="+ country code..."
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
               />

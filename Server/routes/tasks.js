@@ -47,7 +47,8 @@ router.get("/", protect, async (req, res) => {
     const tasks = await Task.find(taskQueryForUser(req.user))
       .populate("assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json(tasks);
   } catch (error) {
@@ -88,7 +89,8 @@ router.post("/", protect, async (req, res) => {
 
     const createdTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role");
+      .populate("createdBy", "firstName lastName email role")
+      .lean();
 
     res.status(201).json(createdTask);
   } catch (error) {
@@ -157,7 +159,8 @@ router.put("/:id", protect, async (req, res) => {
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role");
+      .populate("createdBy", "firstName lastName email role")
+      .lean();
 
     res.status(200).json(updatedTask);
   } catch (error) {

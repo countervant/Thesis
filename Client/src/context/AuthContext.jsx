@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useState, useEffect } from "react";
+import { authAPI } from "../services/api.js";
 
 const AuthContext = createContext(null);
 
 const normalizeRole = (role) => role?.toLowerCase();
 const userForStorage = (userData) => {
   const storedUser = { ...(userData || {}) };
-  delete storedUser.avatar;
+  delete storedUser.password;
   return storedUser;
 };
 
@@ -23,22 +24,52 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("token");
-    
-    if (storedUser && storedToken) {
-      const parsedUser = JSON.parse(storedUser);
-      const normalizedUser = {
-        ...parsedUser,
-        role: normalizeRole(parsedUser.role || parsedUser.type),
-      };
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(normalizedUser);
-      setToken(storedToken);
-      persistUser(normalizedUser);
-    }
-    setLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        const storedToken = localStorage.getItem("token");
+
+        if (storedToken) {
+          setToken(storedToken);
+        }
+
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            const normalizedUser = {
+              ...parsedUser,
+              role: normalizeRole(parsedUser.role || parsedUser.type),
+            };
+            setUser(normalizedUser);
+            persistUser(normalizedUser);
+          } catch {
+            localStorage.removeItem("user");
+          }
+        }
+
+        if (storedToken) {
+          try {
+            const profile = await authAPI.getMe();
+            const normalizedProfile = {
+              id: profile._id || profile.id,
+              ...profile,
+              role: normalizeRole(profile.role || profile.type),
+            };
+            setUser(normalizedProfile);
+            persistUser(normalizedProfile);
+          } catch {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            setToken(null);
+            setUser(null);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, []);
 
   const login = (userData, authToken) => {

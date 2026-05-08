@@ -63,6 +63,10 @@ const clientSchema = new mongoose.Schema(
   }
 );
 
+clientSchema.index({ createdAt: -1 });
+clientSchema.index({ email: 1 });
+clientSchema.index({ assignedEmployee: 1 });
+
 const Client = mongoose.model("Client", clientSchema);
 
 export default Client;

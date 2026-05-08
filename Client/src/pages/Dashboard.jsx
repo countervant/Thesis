@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AdminDashboard from "./Dashboard/Admin/Home.jsx";
 import AdminTasks from "./Dashboard/Admin/Tasks.jsx";
 import AdminBudget from "./Dashboard/Admin/Budget.jsx";
@@ -9,7 +9,9 @@ import AdminEmployees from "./Dashboard/Admin/Employee.jsx";
 import AdminAddTask from "./Dashboard/Admin/Addtask.jsx";
 import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
 import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
+import Newsfeed from "./newsfeed.jsx";
 import MainBars from "./MainBars.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
 const adminPages = new Set([
   "dashboard",
@@ -27,8 +29,25 @@ const adminPages = new Set([
   "edit-employee",
 ]);
 
+const MessagesPanel = () => (
+  <div className="mx-auto max-w-[1500px]">
+    <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
+      <h1
+        className="text-3xl uppercase leading-none text-neutral-950"
+        style={{ fontFamily: "var(--font-bruno)" }}
+      >
+        Messages
+      </h1>
+      <p className="mt-3 text-sm font-medium text-neutral-600">
+        Your conversations will appear here.
+      </p>
+    </section>
+  </div>
+);
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const role = user?.role;
@@ -37,15 +56,26 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const [localPage, setLocalPage] = useState("dashboard");
+  const initialLocalPage = ["dashboard", "newsfeed", "messages", "tasks"].includes(
+    location.state?.page
+  )
+    ? location.state.page
+    : "dashboard";
+  const [localPage, setLocalPage] = useState(initialLocalPage);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [employeeRefreshKey, setEmployeeRefreshKey] = useState(0);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   const handleLogout = () => {
+    setIsLogoutDialogOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutDialogOpen(false);
     logout();
     navigate("/", { replace: true });
   };
@@ -160,6 +190,10 @@ const Dashboard = () => {
           )}
         </>
       );
+    } else if (adminPage === "newsfeed") {
+      adminContent = <Newsfeed />;
+    } else if (adminPage === "messages") {
+      adminContent = <MessagesPanel />;
     } else if (adminPage === "client") {
       adminContent = <AdminClients />;
     } else if (
@@ -186,22 +220,35 @@ const Dashboard = () => {
     }
 
     return (
-      <MainBars
-        activePage={shellActivePage}
-        onLogout={handleLogout}
-        onNavigate={handleAdminNavigate}
-      >
-        {adminContent}
-      </MainBars>
+      <>
+        <MainBars
+          activePage={shellActivePage}
+          onLogout={handleLogout}
+          onNavigate={handleAdminNavigate}
+        >
+          {adminContent}
+        </MainBars>
+        <ConfirmDialog
+          confirmLabel="Yes , log out"
+          icon="logout"
+          isOpen={isLogoutDialogOpen}
+          message="Are you sure you want to log out?"
+          onCancel={() => setIsLogoutDialogOpen(false)}
+          onConfirm={confirmLogout}
+          title="Logout"
+        />
+      </>
     );
   }
 
-  return (
-    <MainBars
-      activePage={localPage}
-      onLogout={handleLogout}
-      onNavigate={setLocalPage}
-    >
+  const regularContent =
+    localPage === "newsfeed" ? (
+      <Newsfeed />
+    ) : localPage === "tasks" ? (
+      <AdminTasks />
+    ) : localPage === "messages" ? (
+      <MessagesPanel />
+    ) : (
       <div className="mx-auto max-w-[1500px]">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
           <h1
@@ -233,7 +280,27 @@ const Dashboard = () => {
           )}
         </section>
       </div>
-    </MainBars>
+    );
+
+  return (
+    <>
+      <MainBars
+        activePage={localPage}
+        onLogout={handleLogout}
+        onNavigate={setLocalPage}
+      >
+        {regularContent}
+      </MainBars>
+      <ConfirmDialog
+        confirmLabel="Yes , log out"
+        icon="logout"
+        isOpen={isLogoutDialogOpen}
+        message="Are you sure you want to log out?"
+        onCancel={() => setIsLogoutDialogOpen(false)}
+        onConfirm={confirmLogout}
+        title="Logout"
+      />
+    </>
   );
 };
 
