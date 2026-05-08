@@ -236,11 +236,11 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const SummaryCard = ({ icon, label, value }) => (
-  <section className="flex h-24 items-center justify-center gap-8 rounded-lg border-b-2 border-[#e347b3] bg-white px-6 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50">
+  <section className="flex h-24 items-center justify-center gap-8 rounded-lg border-b-2 border-[#e347b3] bg-white px-6 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
     <Icon name={icon} className="h-16 w-16" />
     <div className="min-w-[110px] text-center leading-tight">
-      <p className="text-3xl font-bold text-neutral-950">{value}</p>
-      <p className="text-base text-neutral-500">{label}</p>
+      <p className="text-3xl font-bold text-neutral-950 dark:text-white">{value}</p>
+      <p className="text-base text-neutral-500 dark:text-neutral-400">{label}</p>
     </div>
   </section>
 );
@@ -254,15 +254,15 @@ const ExpenseBreakdown = ({ expenses, income }) => {
   );
 
   return (
-  <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
-    <h2 className="text-lg font-bold text-neutral-900">Expense Breakdown</h2>
+  <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Expense Breakdown</h2>
     <div className="mt-6 flex flex-1 items-end gap-4">
-      <div className="flex h-52 w-12 flex-col justify-between text-right text-xs text-neutral-500">
+      <div className="flex h-52 w-12 flex-col justify-between text-right text-xs text-neutral-500 dark:text-neutral-500">
         {axisLabels.map((label, index) => (
           <span key={`${label}-${index}`}>{label}</span>
         ))}
       </div>
-      <div className="relative flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_52px)] px-8">
+      <div className="relative flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_52px)] px-8 dark:border-neutral-700 dark:bg-[repeating-linear-gradient(to_bottom,#474747_0,#474747_1px,transparent_1px,transparent_52px)]">
         <div
           className="w-24 max-w-[34%] rounded-t-sm bg-[#ff1f14]"
           style={{ height: expenseHeight }}
@@ -276,7 +276,7 @@ const ExpenseBreakdown = ({ expenses, income }) => {
         <span className="absolute -bottom-5 text-xs text-neutral-400">Dec 25</span>
       </div>
     </div>
-    <div className="mt-9 flex justify-center gap-16 text-xs text-neutral-700">
+    <div className="mt-9 flex justify-center gap-16 text-xs text-neutral-700 dark:text-neutral-300">
       <span className="flex items-center gap-2">
         <span className="h-3 w-6 bg-[#ff1f14]" />
         Expenses
@@ -331,14 +331,14 @@ const ExpenseCategories = ({ entries }) => {
       : "conic-gradient(#8d2bc8 0 50%, #d947b3 50% 100%)";
 
   return (
-  <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
-    <h2 className="text-lg font-bold text-neutral-900">Expense Categories</h2>
+  <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Expense Categories</h2>
     <div className="mt-4 flex flex-col items-center">
       <div
         className="relative h-44 w-44 shrink-0 rounded-full sm:h-52 sm:w-52"
         style={{ background: chartBackground }}
       />
-      <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 sm:grid-cols-4">
+      <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 dark:text-neutral-300 sm:grid-cols-4">
         {segments.map((segment) => (
           <span key={segment.category} className="flex items-center gap-2">
             <span
@@ -442,12 +442,12 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-3xl uppercase leading-none text-neutral-950"
+                className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Budget Planner
               </h1>
-              <p className="mt-2 text-xs font-medium text-neutral-600">
+              <p className="mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
                 Track your income and expenses
               </p>
             </div>
@@ -493,9 +493,9 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             </p>
           )}
 
-          <section className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50">
-            <table className="w-full min-w-[780px] text-left text-xs text-neutral-800">
-              <thead className="border-b border-neutral-300">
+          <section className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+            <table className="w-full min-w-[780px] text-left text-xs text-neutral-800 dark:text-neutral-200">
+              <thead className="border-b border-neutral-300 dark:border-neutral-700">
                 <tr>
                   <th className="px-5 py-4 font-medium">Type</th>
                   <th className="px-5 py-4 font-medium">Description</th>
@@ -508,7 +508,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
               <tbody>
                 {isLoading && (
                   <tr>
-                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600">
+                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600 dark:text-neutral-400">
                       Loading budget entries...
                     </td>
                   </tr>
@@ -516,7 +516,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
                 {!isLoading && budgetEntries.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600">
+                    <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600 dark:text-neutral-400">
                       No budget entries found.
                     </td>
                   </tr>
@@ -529,7 +529,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
                     </td>
                     <td className="px-5 py-4 font-medium">{entry.description}</td>
                     <td className="px-5 py-4">{entry.category}</td>
-                    <td className="px-5 py-4 text-neutral-500">{entry.date}</td>
+                    <td className="px-5 py-4 text-neutral-500 dark:text-neutral-400">{entry.date}</td>
                     <td
                       className={`px-5 py-4 font-bold ${
                         entry.amount < 0 ? "text-red-600" : "text-green-600"
@@ -542,7 +542,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
                         <button
                           type="button"
                           onClick={() => onEditEntry?.(entry)}
-                          className="text-neutral-900 transition hover:text-[#c72fb2]"
+                          className="text-neutral-900 transition hover:text-[#c72fb2] dark:text-neutral-300"
                           aria-label={`Edit ${entry.description}`}
                         >
                           <Icon name="edit" className="h-5 w-5" />

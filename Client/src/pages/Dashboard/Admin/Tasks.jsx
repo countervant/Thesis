@@ -226,7 +226,7 @@ const FilterChip = ({ active, children, onClick }) => (
     className={`h-7 rounded-md px-3 text-xs font-medium shadow-[0_2px_5px_rgba(0,0,0,0.2)] transition ${
       active
         ? "bg-[#db4ab5] text-white"
-        : "bg-white text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2]"
+        : "bg-white text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2] dark:bg-[#1a1a1a] dark:text-neutral-300 dark:hover:bg-[#242424] dark:hover:text-[#e347b3]"
     }`}
   >
     {children}
@@ -244,8 +244,8 @@ const TaskCard = ({
 }) => (
   <article
     id={`task-card-${task.id}`}
-    className={`flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 transition sm:px-5 ${
-      isFocused ? "ring-2 ring-blue-300" : "ring-pink-50"
+    className={`flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 transition dark:bg-[#141414] dark:shadow-none sm:px-5 ${
+      isFocused ? "ring-2 ring-blue-300 dark:ring-[#dc4fb2]" : "ring-pink-50 dark:ring-neutral-800"
     }`}
   >
     {canToggleDone && (
@@ -256,7 +256,7 @@ const TaskCard = ({
         className={`h-5 w-5 shrink-0 rounded-full border transition ${
           task.status === "Done"
             ? "cursor-not-allowed border-[#c72fb2] bg-[#c72fb2]"
-            : "border-neutral-400 bg-white hover:border-[#c72fb2]"
+            : "border-neutral-400 bg-white hover:border-[#c72fb2] dark:border-neutral-500 dark:bg-transparent"
         }`}
         aria-label={
           task.status === "Done"
@@ -267,18 +267,18 @@ const TaskCard = ({
     )}
 
     <div className="min-w-0 flex-1">
-      <h2 className="truncate text-sm font-semibold text-neutral-800">
+      <h2 className="truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">
         {task.title}
       </h2>
-      <p className="mt-1 text-xs text-neutral-800">{task.description}</p>
-      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-neutral-800">
+      <p className="mt-1 text-xs text-neutral-800 dark:text-neutral-400">{task.description}</p>
+      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-neutral-800 dark:text-neutral-400">
         <Icon name="calendar" className="h-4 w-4" />
         {task.startDate} - {task.dueDate}
       </p>
     </div>
 
     {showStatus && (
-      <p className="hidden min-w-[160px] text-sm font-medium text-neutral-800 md:block">
+      <p className="hidden min-w-[160px] text-sm font-medium text-neutral-800 dark:text-neutral-300 md:block">
         Status: {task.status}
       </p>
     )}
@@ -287,7 +287,7 @@ const TaskCard = ({
       <button
         type="button"
         onClick={() => onEdit(task)}
-        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-neutral-300 dark:hover:bg-neutral-800"
         aria-label={`Edit ${task.title}`}
       >
         <Icon name="edit" className="h-5 w-5" />
@@ -296,7 +296,7 @@ const TaskCard = ({
       <button
         type="button"
         onClick={() => onDelete(task)}
-        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+        className="grid h-9 w-9 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
         aria-label={`Delete ${task.title}`}
       >
         <Icon name="delete" className="h-5 w-5" />
@@ -473,12 +473,12 @@ const Tasks = ({
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-3xl uppercase leading-none text-neutral-950"
+                className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Task
               </h1>
-              <p className="mt-2 text-xs font-medium text-neutral-600">
+              <p className="mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
                 Assign and manage your task
               </p>
             </div>
@@ -497,8 +497,8 @@ const Tasks = ({
 
           <section className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Icon name="filter" className="h-5 w-5 text-neutral-900" />
-              <span className="text-xs font-medium text-neutral-700">Status:</span>
+              <Icon name="filter" className="h-5 w-5 text-neutral-900 dark:text-neutral-300" />
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Status:</span>
               {taskStatuses.map((status) => (
                 <FilterChip
                   key={status}
@@ -511,8 +511,8 @@ const Tasks = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Icon name="calendar" className="h-5 w-5 text-neutral-900" />
-              <span className="text-xs font-medium text-neutral-700">Status:</span>
+              <Icon name="calendar" className="h-5 w-5 text-neutral-900 dark:text-neutral-300" />
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Status:</span>
               {dateStatuses.map((status) => (
                 <FilterChip
                   key={status}
@@ -533,13 +533,13 @@ const Tasks = ({
             )}
 
             {isLoading && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)]">
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] dark:bg-[#141414] dark:text-neutral-300 dark:shadow-none dark:ring-1 dark:ring-neutral-800">
                 Loading tasks...
               </p>
             )}
 
             {!isLoading && visibleTasks.length === 0 && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)]">
+              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] dark:bg-[#141414] dark:text-neutral-300 dark:shadow-none dark:ring-1 dark:ring-neutral-800">
                 No tasks found.
               </p>
             )}

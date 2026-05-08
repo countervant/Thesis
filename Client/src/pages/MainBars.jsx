@@ -10,12 +10,18 @@ import heartIcon from "../assets/heart.png";
 import messagesIcon from "../assets/messages.png";
 import newsfeedIcon from "../assets/newsfeed.png";
 import notificationIcon from "../assets/notification.png";
+import logoutIcon from "../assets/logout.png";
+import profileIcon from "../assets/profile.png";
 import taskIcon from "../assets/task.png";
+import themeIcon from "../assets/theme.png";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { newsfeedAPI, taskAPI } from "../services/api.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const notificationReadKeyPrefix = "clientraReadNotifications";
+const notificationHiddenKeyPrefix = "clientraHiddenNotifications";
+const themeStorageKey = "clientraTheme";
 
 const sideNavItems = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -70,9 +76,21 @@ const formatNotificationTime = (value) => {
 const getNotificationReadKey = (userId) =>
   `${notificationReadKeyPrefix}:${userId || "guest"}`;
 
+const getNotificationHiddenKey = (userId) =>
+  `${notificationHiddenKeyPrefix}:${userId || "guest"}`;
+
 const readStoredNotificationIds = (userId) => {
   try {
     const storedIds = JSON.parse(localStorage.getItem(getNotificationReadKey(userId)) || "[]");
+    return Array.isArray(storedIds) ? storedIds : [];
+  } catch {
+    return [];
+  }
+};
+
+const readHiddenNotificationIds = (userId) => {
+  try {
+    const storedIds = JSON.parse(localStorage.getItem(getNotificationHiddenKey(userId)) || "[]");
     return Array.isArray(storedIds) ? storedIds : [];
   } catch {
     return [];
@@ -276,28 +294,55 @@ const UserAvatar = ({ user }) => {
   );
 };
 
+const AccountMenuIcon = ({ src }) => (
+  <img
+    src={src}
+    alt=""
+    className="h-7 w-7 shrink-0 object-contain dark:brightness-0 dark:invert"
+    aria-hidden="true"
+  />
+);
+
 const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => localStorage.getItem(themeStorageKey) === "dark"
+  );
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [readNotificationIds, setReadNotificationIds] = useState([]);
+  const [hiddenNotificationIds, setHiddenNotificationIds] = useState([]);
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [isNotificationOptionsOpen, setIsNotificationOptionsOpen] = useState(false);
+  const [openNotificationMenuId, setOpenNotificationMenuId] = useState("");
+  const [notificationDeleteAction, setNotificationDeleteAction] = useState(null);
   const [isNotificationLoading, setIsNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState("");
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const userId = getEntityId(user);
   const readNotificationSet = new Set(readNotificationIds);
+  const hiddenNotificationSet = new Set(hiddenNotificationIds);
   const visibleNotifications =
     notificationFilter === "unread"
-      ? notifications.filter((notification) => !readNotificationSet.has(notification.id))
-      : notifications;
+      ? notifications.filter(
+          (notification) =>
+            !readNotificationSet.has(notification.id) &&
+            !hiddenNotificationSet.has(notification.id)
+        )
+      : notifications.filter((notification) => !hiddenNotificationSet.has(notification.id));
   const unreadCount = notifications.filter(
-    (notification) => !readNotificationSet.has(notification.id)
+    (notification) =>
+      !readNotificationSet.has(notification.id) &&
+      !hiddenNotificationSet.has(notification.id)
   ).length;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    localStorage.setItem(themeStorageKey, isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -306,6 +351,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       }
       if (!notificationMenuRef.current?.contains(event.target)) {
         setIsNotificationOpen(false);
+        setOpenNotificationMenuId("");
       }
     };
 
@@ -335,6 +381,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         if (isMounted) {
           setNotifications(nextNotifications);
           setReadNotificationIds(readStoredNotificationIds(userId));
+          setHiddenNotificationIds(readHiddenNotificationIds(userId));
         }
       } catch (error) {
         if (isMounted) {
@@ -375,9 +422,73 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     setIsNotificationOptionsOpen(false);
   };
 
+  const removeAllNotifications = () => {
+    const nextHiddenIds = Array.from(
+      new Set([
+        ...hiddenNotificationIds,
+        ...notifications.map((notification) => notification.id),
+      ])
+    );
+    setHiddenNotificationIds(nextHiddenIds);
+    localStorage.setItem(getNotificationHiddenKey(userId), JSON.stringify(nextHiddenIds));
+    setIsNotificationOptionsOpen(false);
+    setOpenNotificationMenuId("");
+  };
+
+  const requestRemoveAllNotifications = () => {
+    setNotificationDeleteAction({
+      confirmLabel: "Yes, remove all",
+      message: "Are you sure you want to remove all notifications?",
+      onConfirm: removeAllNotifications,
+      title: "Remove Notifications",
+    });
+    setIsNotificationOptionsOpen(false);
+  };
+
+  const deleteNotification = (notificationId) => {
+    const nextHiddenIds = Array.from(new Set([...hiddenNotificationIds, notificationId]));
+    setHiddenNotificationIds(nextHiddenIds);
+    localStorage.setItem(getNotificationHiddenKey(userId), JSON.stringify(nextHiddenIds));
+    setOpenNotificationMenuId("");
+  };
+
+  const requestDeleteNotification = (event, notificationId) => {
+    event.stopPropagation();
+    setNotificationDeleteAction({
+      confirmLabel: "Yes, delete",
+      message: "Are you sure you want to delete this notification?",
+      onConfirm: () => deleteNotification(notificationId),
+      title: "Delete Notification",
+    });
+    setOpenNotificationMenuId("");
+  };
+
+  const closeNotificationDeleteDialog = () => setNotificationDeleteAction(null);
+
+  const confirmNotificationDeleteAction = () => {
+    const action = notificationDeleteAction;
+    if (!action) return;
+    setNotificationDeleteAction(null);
+    action.onConfirm();
+  };
+
+  const handleProfileClick = () => {
+    setIsAccountMenuOpen(false);
+    navigate("/profile");
+  };
+
+  const handleThemeClick = () => {
+    setIsDarkMode((currentMode) => !currentMode);
+  };
+
+  const handleLogoutClick = () => {
+    setIsAccountMenuOpen(false);
+    onLogout?.();
+  };
+
   return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <header className="fixed inset-x-0 top-0 z-30 grid h-16 grid-cols-[1fr_auto_1fr] items-center border-b border-neutral-300 bg-[#f5f5f5] px-4">
+    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950 dark:bg-neutral-950 dark:text-white">
+      <header className="fixed inset-x-0 top-0 z-30 grid h-16 grid-cols-[1fr_auto_1fr] items-center border-b border-neutral-300 bg-[#f5f5f5] px-4 dark:border-neutral-800 dark:bg-neutral-950">
         <button
           type="button"
           onClick={() => onNavigate?.("dashboard")}
@@ -385,7 +496,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         >
           <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
           <span
-            className="text-2xl uppercase text-neutral-950"
+            className="text-2xl uppercase text-neutral-950 dark:text-white"
             style={{ fontFamily: "var(--font-bruno)" }}
           >
             Clientra
@@ -399,7 +510,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsNotificationOpen((isOpen) => !isOpen)}
-              className="relative grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-white text-neutral-900 shadow-sm transition hover:border-pink-200 hover:text-[#c72fb2]"
+              className="relative grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-white text-neutral-900 shadow-sm transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               aria-label="Notifications"
               aria-expanded={isNotificationOpen}
               aria-haspopup="dialog"
@@ -453,6 +564,14 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                             role="menuitem"
                           >
                             Mark all as read
+                          </button>
+                          <button
+                            type="button"
+                            onClick={requestRemoveAllNotifications}
+                            className="block w-full px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                            role="menuitem"
+                          >
+                            Delete all notifications
                           </button>
                         </div>
                       )}
@@ -560,6 +679,62 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                           {isUnread && (
                             <span className="mt-4 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
                           )}
+                          <span className="relative -mr-1 shrink-0">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenNotificationMenuId((currentId) =>
+                                  currentId === notification.id ? "" : notification.id
+                                );
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setOpenNotificationMenuId((currentId) =>
+                                    currentId === notification.id ? "" : notification.id
+                                  );
+                                }
+                              }}
+                              className="grid h-8 w-8 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+                              aria-label="Notification actions"
+                              aria-haspopup="menu"
+                              aria-expanded={openNotificationMenuId === notification.id}
+                            >
+                              <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
+                                <circle cx="4" cy="10" r="1.6" fill="currentColor" />
+                                <circle cx="10" cy="10" r="1.6" fill="currentColor" />
+                                <circle cx="16" cy="10" r="1.6" fill="currentColor" />
+                              </svg>
+                            </span>
+
+                            {openNotificationMenuId === notification.id && (
+                              <span
+                                className="absolute right-0 top-9 z-50 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white py-2 text-sm shadow-lg"
+                                role="menu"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <span
+                                  role="menuitem"
+                                  tabIndex={0}
+                                  onClick={(event) =>
+                                    requestDeleteNotification(event, notification.id)
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.preventDefault();
+                                      requestDeleteNotification(event, notification.id);
+                                    }
+                                  }}
+                                  className="block w-full cursor-pointer px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                                >
+                                  Delete notification
+                                </span>
+                              </span>
+                            )}
+                          </span>
                         </button>
                       );
                     })}
@@ -572,7 +747,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
-              className="flex h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 text-neutral-900 shadow-sm transition hover:border-pink-200 hover:text-[#c72fb2]"
+              className="flex h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 text-neutral-900 shadow-sm transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               aria-label="Account menu"
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
@@ -592,31 +767,48 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
             {isAccountMenuOpen && (
               <div
-                className="absolute right-0 top-14 z-40 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 text-sm text-neutral-800 shadow-lg"
+                className="absolute right-0 top-14 z-40 w-52 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2.5 py-2.5 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
                 role="menu"
               >
                 <button
                   type="button"
-                  onClick={() => navigate("/profile")}
-                  className="block w-full px-4 py-2 text-left hover:bg-pink-50 hover:text-[#c72fb2]"
+                  onClick={handleProfileClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   role="menuitem"
                 >
-                  Profile
+                  <AccountMenuIcon src={profileIcon} />
+                  <span>Profile</span>
                 </button>
                 <button
                   type="button"
-                  className="block w-full px-4 py-2 text-left hover:bg-pink-50 hover:text-[#c72fb2]"
-                  role="menuitem"
+                  onClick={handleThemeClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  role="menuitemcheckbox"
+                  aria-checked={isDarkMode}
                 >
-                  Settings
+                  <AccountMenuIcon src={themeIcon} />
+                  <span className="flex-1">Theme</span>
+                  <span
+                    className={`flex h-5 w-10 shrink-0 items-center rounded-full p-1 transition ${
+                      isDarkMode ? "bg-[#dc4fb2]" : "bg-neutral-300"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className={`h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                        isDarkMode ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </span>
                 </button>
                 <button
                   type="button"
-                  onClick={onLogout}
-                  className="block w-full px-4 py-2 text-left text-red-600 hover:bg-red-50"
+                  onClick={handleLogoutClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   role="menuitem"
                 >
-                  Logout
+                  <AccountMenuIcon src={logoutIcon} />
+                  <span>Log out</span>
                 </button>
               </div>
             )}
@@ -624,7 +816,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         </div>
       </header>
 
-      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-4rem)] w-[112px] border-r border-neutral-300 bg-[#f5f5f5] md:block">
+      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-4rem)] w-[112px] border-r border-neutral-300 bg-[#f5f5f5] dark:border-neutral-800 dark:bg-neutral-950 md:block">
         <nav className="flex flex-col items-center gap-2 overflow-y-auto px-2 py-5">
           {sideNavItems.map((item) => (
             <button
@@ -634,14 +826,16 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               className={`flex w-20 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] leading-tight transition active:scale-95 ${
                 activePage === item.id
                   ? "bg-linear-to-b from-[#df4bb4] to-[#7e22ce] text-white shadow-[0_4px_8px_rgba(126,34,206,0.35)]"
-                  : "text-neutral-900 hover:bg-white hover:text-[#c72fb2]"
+                  : "text-neutral-900 hover:bg-white hover:text-[#c72fb2] dark:text-white dark:hover:bg-linear-to-b dark:hover:from-[#df4bb4] dark:hover:to-[#7e22ce] dark:hover:text-white dark:hover:shadow-[0_4px_14px_rgba(223,75,180,0.45)]"
               }`}
               aria-label={item.label}
               title={item.label}
             >
               <Icon
                 name={item.icon}
-                className={`h-6 w-6 ${activePage === item.id ? "brightness-0 invert" : ""}`}
+                className={`h-6 w-6 ${
+                  activePage === item.id ? "brightness-0 invert" : "dark:brightness-0 dark:invert"
+                }`}
               />
               <span className="max-w-full break-words text-center">{item.label}</span>
             </button>
@@ -652,6 +846,15 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       <main className="px-4 pb-10 pt-24 md:ml-[112px] md:px-6 lg:px-8">
         {children}
       </main>
+      <ConfirmDialog
+        confirmLabel={notificationDeleteAction?.confirmLabel}
+        icon="delete"
+        isOpen={Boolean(notificationDeleteAction)}
+        message={notificationDeleteAction?.message}
+        onCancel={closeNotificationDeleteDialog}
+        onConfirm={confirmNotificationDeleteAction}
+        title={notificationDeleteAction?.title}
+      />
     </div>
   );
 };
