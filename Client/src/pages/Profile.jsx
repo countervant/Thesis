@@ -5,17 +5,22 @@ import defaultProfile from "../assets/default-profile.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI } from "../services/api.js";
 import { isValidEmail } from "../utils/emailValidation.js";
-import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import {
+  getPhoneValidationMessage,
+  limitPhoneNumberLength,
+} from "../utils/phoneValidation.js";
 import {
   applyCountryDialCode,
   countryOptions,
   defaultCountry,
+  ensureCountryDialCode,
   getCountryDialCode,
 } from "../utils/countries.js";
 
 const emptyForm = {
   firstName: "",
   lastName: "",
+  companyName: "",
   email: "",
   country: defaultCountry,
   phone: "",
@@ -28,6 +33,7 @@ const emptyForm = {
 const fieldNames = {
   firstName: `profile_given_${Date.now()}`,
   lastName: `profile_family_${Date.now()}`,
+  companyName: `profile_company_${Date.now()}`,
   email: `profile_contact_${Date.now()}`,
   phone: `profile_optional_line_${Date.now()}`,
   position: `profile_position_${Date.now()}`,
@@ -48,14 +54,16 @@ const antiAutofillProps = {
 
 const profileToForm = (profile) => {
   const country = profile?.country || defaultCountry;
+  const role = profile?.role?.toLowerCase() || "";
 
   return {
     firstName: profile?.firstName || "",
     lastName: profile?.lastName || "",
+    companyName: profile?.companyName || "",
     email: profile?.email || "",
     country,
-    phone: profile?.phone || getCountryDialCode(country),
-    position: profile?.position || "",
+    phone: ensureCountryDialCode(profile?.phone || getCountryDialCode(country), country),
+    position: role === "client" ? "Client" : profile?.position || "",
     password: "",
     confirmPassword: "",
     avatar: profile?.avatar || "",
@@ -68,6 +76,25 @@ const FieldLabel = ({ children }) => (
 
 const preventAutofill = (event) => {
   event.currentTarget.removeAttribute("readOnly");
+};
+
+const formatRole = (role = "") => {
+  const value = String(role || "").trim();
+  if (!value) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+};
+
+const getPositionDisplay = (formData, role) => {
+  const normalizedRole = role?.toLowerCase() || "";
+  const position = formData.position.trim();
+
+  if (normalizedRole === "client") return "Client";
+  if (normalizedRole === "employee") {
+    return ["Employee", position].filter(Boolean).join(" - ");
+  }
+  if (normalizedRole === "admin") return ["Admin", position].filter(Boolean).join(" - ");
+
+  return position || formatRole(role);
 };
 
 const Profile = () => {
@@ -126,8 +153,21 @@ const Profile = () => {
     setFormData((currentData) => ({
       ...currentData,
       country: nextCountry,
-      phone: applyCountryDialCode(currentData.phone, nextCountry, currentData.country),
+      phone: ensureCountryDialCode(
+        applyCountryDialCode(currentData.phone, nextCountry, currentData.country),
+        nextCountry
+      ),
     }));
+  };
+
+  const handlePhoneChange = (value) => {
+    updateField(
+      "phone",
+      limitPhoneNumberLength(
+        ensureCountryDialCode(value, formData.country),
+        formData.country
+      )
+    );
   };
 
   const handleAvatarChange = (event) => {
@@ -163,13 +203,19 @@ const Profile = () => {
       return;
     }
 
+    if (user?.role === "client" && !formData.companyName.trim()) {
+      setErrorMessage("Company name is required.");
+      return;
+    }
+
     if (!isValidEmail(formData.email)) {
       setErrorMessage("Enter a valid email address.");
       return;
     }
 
-    if (!isValidPhoneNumber(formData.phone)) {
-      setErrorMessage("Enter a valid phone number.");
+    const phoneValidation = getPhoneValidationMessage(formData.phone, formData.country);
+    if (phoneValidation) {
+      setErrorMessage(phoneValidation);
       return;
     }
 
@@ -195,10 +241,11 @@ const Profile = () => {
       const payload = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
+        companyName: formData.companyName.trim(),
         email: formData.email.trim(),
         country: formData.country,
         phone: formData.phone.trim(),
-        position: formData.position.trim(),
+        position: user?.role === "client" ? "Client" : formData.position.trim(),
         avatar: formData.avatar,
       };
 
@@ -363,6 +410,21 @@ const Profile = () => {
 
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 <div className="space-y-1">
+                  <FieldLabel>Company Name</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.companyName}
+                    {...antiAutofillProps}
+                    readOnly
+                    onFocus={preventAutofill}
+                    value={formData.companyName}
+                    onChange={(event) => updateField("companyName", event.target.value)}
+                    placeholder="Company name..."
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <FieldLabel>Email</FieldLabel>
                   <input
                     type="text"
@@ -404,26 +466,22 @@ const Profile = () => {
                     readOnly
                     onFocus={preventAutofill}
                     value={formData.phone}
-                    onChange={(event) => updateField("phone", event.target.value)}
+                    onChange={(event) => handlePhoneChange(event.target.value)}
                     placeholder="Phone Number"
                     className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
                   />
                 </div>
-              </div>
 
-              <div className="mt-5 space-y-1">
-                <FieldLabel>Position</FieldLabel>
-                <input
-                  type="text"
-                  name={fieldNames.position}
-                  {...antiAutofillProps}
-                  readOnly
-                  onFocus={preventAutofill}
-                  value={formData.position}
-                  onChange={(event) => updateField("position", event.target.value)}
-                  placeholder="Position or role..."
-                  className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
-                />
+                <div className="space-y-1">
+                  <FieldLabel>Position</FieldLabel>
+                  <input
+                    type="text"
+                    name={fieldNames.position}
+                    value={getPositionDisplay(formData, user?.role)}
+                    readOnly
+                    className="h-10 w-full rounded-lg border border-neutral-300 bg-neutral-50 px-4 text-sm font-medium text-neutral-800 outline-none"
+                  />
+                </div>
               </div>
 
               <div className="mt-7 grid gap-5 border-t border-neutral-200 pt-6 sm:grid-cols-2">

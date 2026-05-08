@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import defaultProfile from "../assets/default-profile.png";
+import companyIcon from "../assets/company.png";
+import emailIcon from "../assets/email.png";
+import heartIcon from "../assets/heart.png";
+import phoneIcon from "../assets/phonenumber.png";
 import { useAuth } from "../context/AuthContext.jsx";
-import { newsfeedAPI } from "../services/api.js";
+import { authAPI, newsfeedAPI } from "../services/api.js";
+import { getCountryFlag } from "../utils/countries.js";
 import MainBars from "./MainBars.jsx";
 
 const getEntityId = (entity) => {
@@ -15,6 +20,28 @@ const getEntityId = (entity) => {
 const getUserName = (user) => {
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
   return name || user?.email || "Unknown user";
+};
+
+const getEmailComposeUrl = (email) =>
+  `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`;
+
+const getUserCountry = (user) => user?.country?.trim() || "";
+
+const CountryBadge = ({ user }) => {
+  const country = getUserCountry(user);
+  const flag = getCountryFlag(country);
+
+  if (!country || !flag) return null;
+
+  return (
+    <img
+      src={flag}
+      alt=""
+      aria-label={country}
+      className="h-4 w-5 rounded-[2px] object-cover"
+      title={country}
+    />
+  );
 };
 
 const formatDateTime = (value) => {
@@ -31,10 +58,19 @@ const formatDateTime = (value) => {
   });
 };
 
+const normalizeComment = (comment) => ({
+  ...comment,
+  id: comment?._id || comment?.id || "",
+  hearts: Array.isArray(comment?.hearts) ? comment.hearts : [],
+  replies: Array.isArray(comment?.replies) ? comment.replies : [],
+});
+
 const normalizePost = (post) => ({
   id: post?._id || post?.id || "",
   author: post?.author,
-  comments: Array.isArray(post?.comments) ? post.comments : [],
+  comments: Array.isArray(post?.comments)
+    ? post.comments.map(normalizeComment)
+    : [],
   content: post?.content || "",
   createdAt: post?.createdAt,
   hearts: Array.isArray(post?.hearts) ? post.hearts : [],
@@ -71,18 +107,33 @@ const Avatar = ({ user, size = "h-24 w-24" }) => (
 );
 
 const HeartIcon = ({ filled = false }) => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-    <path
-      d="M12 20.5S4.5 16.1 3 10.4C2.1 7 4.1 4.3 7.2 4.3c1.8 0 3.4 1 4.3 2.5.9-1.5 2.5-2.5 4.3-2.5 3.1 0 5.1 2.7 4.2 6.1-1.5 5.7-9 10.1-9 10.1z"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-    />
-  </svg>
+  <img
+    src={heartIcon}
+    alt=""
+    className={`h-5 w-5 object-contain transition ${
+      filled ? "opacity-100" : "opacity-55 grayscale"
+    }`}
+  />
 );
 
-const PostPreview = ({ isCommentsVisible, onToggleComments, post }) => (
+const PostPreview = ({
+  commentDraft,
+  currentUser,
+  hasHearted,
+  isCommentsVisible,
+  onCommentChange,
+  onDeleteComment,
+  onReplyChange,
+  onSubmitComment,
+  onSubmitReply,
+  onToggleCommentHeart,
+  onToggleComments,
+  onToggleHeart,
+  onToggleReplies,
+  post,
+  replyDrafts,
+  visibleReplies,
+}) => (
   <article className="rounded-lg bg-white p-5 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
     <div className="flex items-center gap-4">
       <Avatar user={post.author} size="h-10 w-10" />
@@ -90,6 +141,7 @@ const PostPreview = ({ isCommentsVisible, onToggleComments, post }) => (
         <h3 className="text-sm font-bold text-neutral-950">
           {getUserName(post.author)}
         </h3>
+        <CountryBadge user={post.author} />
         <span className="rounded-full bg-pink-50 px-2 py-0.5 text-[11px] font-semibold uppercase text-[#c72fb2]">
           {post.author?.role || "user"}
         </span>
@@ -126,10 +178,19 @@ const PostPreview = ({ isCommentsVisible, onToggleComments, post }) => (
     </div>
 
     <div className="mt-4 flex items-center gap-3 border-y border-neutral-100 py-3">
-      <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-neutral-50 px-3 text-sm font-semibold text-neutral-700">
-        <HeartIcon />
+      <button
+        type="button"
+        onClick={onToggleHeart}
+        className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${
+          hasHearted
+            ? "bg-pink-100 text-[#c72fb2]"
+            : "bg-neutral-50 text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2]"
+        }`}
+        aria-label={hasHearted ? "Remove heart" : "Heart post"}
+      >
+        <HeartIcon filled={hasHearted} />
         <span>{post.hearts.length}</span>
-      </span>
+      </button>
       <span className="text-sm font-medium text-neutral-500">
         {post.comments.length} comments
       </span>
@@ -146,38 +207,142 @@ const PostPreview = ({ isCommentsVisible, onToggleComments, post }) => (
 
     {isCommentsVisible && (
       <div className="mt-4 space-y-4">
-        {post.comments.map((comment) => (
-          <div key={comment._id || comment.id} className="flex gap-3">
-            <Avatar user={comment.user} size="h-8 w-8" />
-            <div className="flex-1 rounded-lg bg-neutral-50 px-4 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold text-neutral-900">
-                  {getUserName(comment.user)}
-                </p>
-                <span className="text-[11px] font-medium text-neutral-500">
-                  {formatDateTime(comment.createdAt)}
-                </span>
+        {post.comments.map((comment) => {
+          const commentId = comment._id || comment.id;
+          const canDeleteComment =
+            currentUser?.role === "admin" ||
+            getEntityId(comment.user) === getEntityId(currentUser);
+          const hasHeartedComment = comment.hearts.some(
+            (heart) => getEntityId(heart) === getEntityId(currentUser)
+          );
+          const areRepliesVisible = visibleReplies[commentId] === true;
+
+          return (
+            <div key={commentId} className="space-y-3">
+              <div className="flex gap-3">
+                <Avatar user={comment.user} size="h-8 w-8" />
+                <div className="flex-1 rounded-lg bg-neutral-50 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-bold text-neutral-900">
+                      {getUserName(comment.user)}
+                    </p>
+                    <CountryBadge user={comment.user} />
+                    <span className="text-[11px] font-medium text-neutral-500">
+                      {formatDateTime(comment.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-neutral-800">{comment.text}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onToggleCommentHeart(commentId)}
+                      className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition ${
+                        hasHeartedComment
+                          ? "bg-pink-100 text-[#c72fb2]"
+                          : "text-neutral-600 hover:bg-pink-50 hover:text-[#c72fb2]"
+                      }`}
+                      aria-label={
+                        hasHeartedComment
+                          ? "Remove heart from comment"
+                          : "Heart comment"
+                      }
+                    >
+                      <HeartIcon filled={hasHeartedComment} />
+                      <span>{comment.hearts.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleReplies(commentId)}
+                      className="h-8 rounded-md px-2 text-xs font-semibold text-neutral-600 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+                    >
+                      {areRepliesVisible
+                        ? "Hide replies"
+                        : comment.replies.length > 0
+                          ? `View replies (${comment.replies.length})`
+                          : "Reply"}
+                    </button>
+                    {canDeleteComment && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteComment(commentId)}
+                        className="h-8 rounded-md px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <p className="mt-1 text-sm text-neutral-800">{comment.text}</p>
+
+              {areRepliesVisible && (
+                <>
+                  {comment.replies.length > 0 && (
+                    <div className="ml-11 space-y-3">
+                      {comment.replies.map((reply) => (
+                        <div key={reply._id || reply.id} className="flex gap-3">
+                          <Avatar user={reply.user} size="h-7 w-7" />
+                          <div className="flex-1 rounded-lg bg-white px-4 py-3 ring-1 ring-neutral-100">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-xs font-bold text-neutral-900">
+                                {getUserName(reply.user)}
+                              </p>
+                              <CountryBadge user={reply.user} />
+                              <span className="text-[11px] font-medium text-neutral-500">
+                                {formatDateTime(reply.createdAt)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm text-neutral-800">{reply.text}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={(event) => onSubmitReply(event, commentId)}
+                    className="ml-11 flex gap-3"
+                  >
+                    <Avatar user={currentUser} size="h-7 w-7" />
+                    <input
+                      type="text"
+                      value={replyDrafts[commentId] || ""}
+                      onChange={(event) => onReplyChange(commentId, event.target.value)}
+                      placeholder="Reply to this comment..."
+                      maxLength={500}
+                      className="h-9 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                    />
+                    <button
+                      type="submit"
+                      className="h-9 rounded-lg bg-[#dc4fb2] px-3 text-xs font-semibold text-white transition hover:brightness-105"
+                    >
+                      Reply
+                    </button>
+                  </form>
+                </>
+                )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     )}
 
-    <div className="mt-4 flex gap-3">
-      <Avatar user={null} size="h-8 w-8" />
-      <div className="h-10 flex-1 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-400">
-        Write a comment...
-      </div>
+    <form onSubmit={onSubmitComment} className="mt-4 flex gap-3">
+      <Avatar user={currentUser} size="h-8 w-8" />
+      <input
+        type="text"
+        value={commentDraft}
+        onChange={(event) => onCommentChange(event.target.value)}
+        placeholder="Write a comment..."
+        maxLength={500}
+        className="h-10 flex-1 rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+      />
       <button
-        type="button"
-        disabled
-        className="h-10 rounded-lg bg-[#dc4fb2] px-4 text-sm font-semibold text-white opacity-80"
+        type="submit"
+        className="h-10 rounded-lg bg-[#dc4fb2] px-4 text-sm font-semibold text-white transition hover:brightness-105"
       >
         Comment
       </button>
-    </div>
+    </form>
   </article>
 );
 
@@ -186,10 +351,15 @@ const PublicProfile = () => {
   const { userId = "" } = useParams();
   const { logout, user } = useAuth();
   const [posts, setPosts] = useState([]);
+  const [directProfileUser, setDirectProfileUser] = useState(null);
+  const [commentDrafts, setCommentDrafts] = useState({});
+  const [replyDrafts, setReplyDrafts] = useState({});
   const [visibleComments, setVisibleComments] = useState({});
+  const [visibleReplies, setVisibleReplies] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -199,9 +369,11 @@ const PublicProfile = () => {
         setIsLoading(true);
         setErrorMessage("");
         const data = await newsfeedAPI.getAll();
+        const profileData = userId ? await authAPI.getPublicProfile(userId) : null;
 
         if (isMounted) {
           setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
+          setDirectProfileUser(profileData);
         }
       } catch (error) {
         if (isMounted) {
@@ -217,24 +389,138 @@ const PublicProfile = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [userId]);
 
   const { profileUser, userPosts } = useMemo(() => {
     const users = collectUsers(posts);
     const foundUser = users.get(userId) || null;
     const authoredPosts = posts.filter((post) => getEntityId(post.author) === userId);
+    const postProfileUser = foundUser || authoredPosts[0]?.author || null;
 
     return {
-      profileUser: foundUser || authoredPosts[0]?.author || null,
+      profileUser:
+        directProfileUser && postProfileUser
+          ? { ...postProfileUser, ...directProfileUser }
+          : directProfileUser || postProfileUser,
       userPosts: authoredPosts,
     };
-  }, [posts, userId]);
+  }, [directProfileUser, posts, userId]);
 
   const toggleComments = (postId) => {
     setVisibleComments((currentVisibility) => ({
       ...currentVisibility,
       [postId]: !currentVisibility[postId],
     }));
+  };
+
+  const replacePost = (updatedPost) => {
+    const normalizedPost = normalizePost(updatedPost);
+    setPosts((currentPosts) =>
+      currentPosts.map((post) =>
+        post.id === normalizedPost.id ? normalizedPost : post
+      )
+    );
+  };
+
+  const handleCommentChange = (postId, value) => {
+    setCommentDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [postId]: value,
+    }));
+  };
+
+  const handleReplyChange = (commentId, value) => {
+    setReplyDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [commentId]: value,
+    }));
+  };
+
+  const toggleReplies = (commentId) => {
+    setVisibleReplies((currentVisibility) => ({
+      ...currentVisibility,
+      [commentId]: !currentVisibility[commentId],
+    }));
+  };
+
+  const handleToggleHeart = async (postId) => {
+    try {
+      setErrorMessage("");
+      const updatedPost = await newsfeedAPI.toggleHeart(postId);
+      replacePost(updatedPost);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to update heart.");
+    }
+  };
+
+  const handleToggleCommentHeart = async (postId, commentId) => {
+    try {
+      setErrorMessage("");
+      const updatedPost = await newsfeedAPI.toggleCommentHeart(postId, commentId);
+      replacePost(updatedPost);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to update comment heart.");
+    }
+  };
+
+  const handleAddComment = async (event, postId) => {
+    event.preventDefault();
+    const text = commentDrafts[postId]?.trim();
+
+    if (!text) {
+      setErrorMessage("Comment is required.");
+      return;
+    }
+
+    try {
+      setErrorMessage("");
+      const updatedPost = await newsfeedAPI.comment(postId, text);
+      replacePost(updatedPost);
+      handleCommentChange(postId, "");
+      setVisibleComments((currentVisibility) => ({
+        ...currentVisibility,
+        [postId]: true,
+      }));
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to add comment.");
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    try {
+      setErrorMessage("");
+      const updatedPost = await newsfeedAPI.deleteComment(postId, commentId);
+      replacePost(updatedPost);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete comment.");
+    }
+  };
+
+  const handleAddReply = async (event, postId, commentId) => {
+    event.preventDefault();
+    const text = replyDrafts[commentId]?.trim();
+
+    if (!text) {
+      setErrorMessage("Reply is required.");
+      return;
+    }
+
+    try {
+      setErrorMessage("");
+      const updatedPost = await newsfeedAPI.reply(postId, commentId, text);
+      replacePost(updatedPost);
+      handleReplyChange(commentId, "");
+      setVisibleComments((currentVisibility) => ({
+        ...currentVisibility,
+        [postId]: true,
+      }));
+      setVisibleReplies((currentVisibility) => ({
+        ...currentVisibility,
+        [commentId]: true,
+      }));
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to add reply.");
+    }
   };
 
   const handleNavigate = (page) => {
@@ -288,19 +574,55 @@ const PublicProfile = () => {
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <Avatar user={profileUser} />
                 <div className="min-w-0">
-                  <h1
-                    className="text-3xl uppercase leading-none text-neutral-950"
-                    style={{ fontFamily: "var(--font-bruno)" }}
-                  >
-                    {getUserName(profileUser)}
-                  </h1>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1
+                      className="text-3xl uppercase leading-none text-neutral-950"
+                      style={{ fontFamily: "var(--font-bruno)" }}
+                    >
+                      {getUserName(profileUser)}
+                    </h1>
+                    <CountryBadge user={profileUser} />
+                  </div>
                   <p className="mt-2 text-sm font-semibold text-[#c72fb2]">
                     {profileUser.role || "user"}
                   </p>
-                  {profileUser.email && (
-                    <p className="mt-1 text-sm font-medium text-neutral-600">
-                      {profileUser.email}
+                  {profileUser.companyName && (
+                    <p className="mt-3 flex w-fit items-center gap-2 text-sm font-semibold text-neutral-800">
+                      <img src={companyIcon} alt="" className="h-5 w-5 object-contain" />
+                      {profileUser.companyName}
                     </p>
+                  )}
+                  {profileUser.email && (
+                    <a
+                      href={getEmailComposeUrl(profileUser.email)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="group mt-3 inline-flex w-fit items-center gap-2 text-sm font-medium text-neutral-600 transition duration-200 hover:-translate-y-0.5 hover:text-[#c72fb2] active:translate-y-0 active:scale-95"
+                    >
+                      <img
+                        src={emailIcon}
+                        alt=""
+                        className="h-5 w-5 object-contain transition duration-200 group-hover:scale-110 group-hover:rotate-[-6deg] group-active:scale-90"
+                      />
+                      <span className="transition duration-200 group-hover:translate-x-0.5">
+                        {profileUser.email}
+                      </span>
+                    </a>
+                  )}
+                  {profileUser.phone && (
+                    <a
+                      href={`tel:${profileUser.phone}`}
+                      className="group mt-2 flex w-fit items-center gap-2 text-sm font-medium text-neutral-600 transition duration-200 hover:-translate-y-0.5 hover:text-[#c72fb2] active:translate-y-0 active:scale-95"
+                    >
+                      <img
+                        src={phoneIcon}
+                        alt=""
+                        className="h-5 w-5 object-contain transition duration-200 group-hover:scale-110 group-hover:rotate-[-6deg] group-active:scale-90"
+                      />
+                      <span className="transition duration-200 group-hover:translate-x-0.5">
+                        {profileUser.phone}
+                      </span>
+                    </a>
                   )}
                 </div>
               </div>
@@ -316,14 +638,39 @@ const PublicProfile = () => {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {userPosts.map((post) => (
-                    <PostPreview
-                      key={post.id}
-                      isCommentsVisible={visibleComments[post.id] === true}
-                      onToggleComments={() => toggleComments(post.id)}
-                      post={post}
-                    />
-                  ))}
+                  {userPosts.map((post) => {
+                    const hasHearted = post.hearts.some(
+                      (heart) => getEntityId(heart) === getEntityId(user)
+                    );
+
+                    return (
+                      <PostPreview
+                        key={post.id}
+                        commentDraft={commentDrafts[post.id] || ""}
+                        currentUser={user}
+                        hasHearted={hasHearted}
+                        isCommentsVisible={visibleComments[post.id] === true}
+                        onCommentChange={(value) => handleCommentChange(post.id, value)}
+                        onDeleteComment={(commentId) =>
+                          setCommentToDelete({ postId: post.id, commentId })
+                        }
+                        onReplyChange={handleReplyChange}
+                        onSubmitComment={(event) => handleAddComment(event, post.id)}
+                        onSubmitReply={(event, commentId) =>
+                          handleAddReply(event, post.id, commentId)
+                        }
+                        onToggleCommentHeart={(commentId) =>
+                          handleToggleCommentHeart(post.id, commentId)
+                        }
+                        onToggleComments={() => toggleComments(post.id)}
+                        onToggleHeart={() => handleToggleHeart(post.id)}
+                        onToggleReplies={toggleReplies}
+                        post={post}
+                        replyDrafts={replyDrafts}
+                        visibleReplies={visibleReplies}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -339,6 +686,19 @@ const PublicProfile = () => {
         onCancel={() => setIsLogoutDialogOpen(false)}
         onConfirm={confirmLogout}
         title="Logout"
+      />
+      <ConfirmDialog
+        confirmLabel="Yes , delete"
+        icon="delete"
+        isOpen={Boolean(commentToDelete)}
+        message="Are you sure you want to delete this comment?"
+        onCancel={() => setCommentToDelete(null)}
+        onConfirm={async () => {
+          const comment = commentToDelete;
+          setCommentToDelete(null);
+          if (comment) await handleDeleteComment(comment.postId, comment.commentId);
+        }}
+        title="Delete Comment"
       />
     </>
   );

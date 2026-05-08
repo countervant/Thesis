@@ -1,7 +1,13 @@
+import deleteIcon from "../assets/delete.png";
+import logoutIcon from "../assets/logout.png";
+
 const iconPaths = {
-  logout: "M9 5H5v14h4M15 8l4 4-4 4M19 12H9",
-  delete: "M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 13h8l1-13",
   done: "m5 12 4 4L19 6",
+};
+
+const imageIcons = {
+  delete: deleteIcon,
+  logout: logoutIcon,
 };
 
 const ConfirmDialog = ({
@@ -16,20 +22,26 @@ const ConfirmDialog = ({
 }) => {
   if (!isOpen) return null;
 
+  const imageIcon = imageIcons[icon];
+
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-5 text-neutral-950">
       <section className="w-full max-w-[460px] bg-white px-7 py-8 text-center shadow-2xl ring-1 ring-black/10 sm:px-10">
         <div className="mx-auto grid h-14 w-14 place-items-center text-neutral-950">
-          <svg viewBox="0 0 24 24" className="h-14 w-14" aria-hidden="true">
-            <path
-              d={iconPaths[icon] || iconPaths.logout}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {imageIcon ? (
+            <img src={imageIcon} alt="" className="h-14 w-14 object-contain" />
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-14 w-14" aria-hidden="true">
+              <path
+                d={iconPaths[icon] || iconPaths.done}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </div>
         <h2 className="mt-2 text-3xl font-bold text-neutral-950">{title}</h2>
         <p className="mt-4 text-sm font-medium text-neutral-700">{message}</p>

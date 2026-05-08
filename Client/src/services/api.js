@@ -85,10 +85,19 @@ export const authAPI = {
     return response.data;
   },
 
-  register: async (firstName, lastName, email, password, phone = "", country = "") => {
+  register: async (
+    firstName,
+    lastName,
+    companyName,
+    email,
+    password,
+    phone = "",
+    country = ""
+  ) => {
     const response = await api.post("/auth/register", {
       firstName,
       lastName,
+      companyName,
       email,
       password,
       phone,
@@ -99,6 +108,11 @@ export const authAPI = {
 
   getMe: async () => {
     const response = await api.get("/auth/me");
+    return response.data;
+  },
+
+  getPublicProfile: async (id) => {
+    const response = await api.get(`/auth/users/${id}`);
     return response.data;
   },
 
@@ -172,6 +186,12 @@ export const newsfeedAPI = {
 
   comment: async (id, text) => {
     const response = await api.post(`/newsfeed/${id}/comments`, { text });
+    clearCache("/newsfeed");
+    return response.data;
+  },
+
+  deleteComment: async (postId, commentId) => {
+    const response = await api.delete(`/newsfeed/${postId}/comments/${commentId}`);
     clearCache("/newsfeed");
     return response.data;
   },

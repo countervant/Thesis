@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { employeeAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import defaultProfile from "../../../assets/default-profile.png";
+import { getCountryFlag } from "../../../utils/countries.js";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -13,6 +15,7 @@ const normalizeEmployee = (employee) => ({
   id: employee._id || employee.id,
   initials: getInitials(employee.firstName, employee.lastName),
   name: [employee.firstName, employee.lastName].filter(Boolean).join(" "),
+  avatar: employee.avatar || "",
   status: employee.isActive ? "Active" : "Inactive",
   role: employee.position || "Employee",
   position: employee.position || "",
@@ -222,13 +225,25 @@ const FilterButton = ({ active, children, onClick }) => (
 
 const EmployeeCard = ({ employee, onDelete, onEdit }) => {
   const isActive = employee.status === "Active";
+  const countryFlag = getCountryFlag(employee.country);
 
   return (
     <article className="rounded-lg bg-white px-7 pb-4 pt-6 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50">
       <div className="flex items-center gap-4">
-        <div className="grid h-13 w-13 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-lg font-bold text-white">
-          {employee.initials}
-        </div>
+        {employee.avatar ? (
+          <img
+            src={employee.avatar}
+            alt=""
+            onError={(event) => {
+              event.currentTarget.src = defaultProfile;
+            }}
+            className="h-13 w-13 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="grid h-13 w-13 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-lg font-bold text-white">
+            {employee.initials}
+          </div>
+        )}
         <div>
           <h2 className="text-lg font-bold text-neutral-900">{employee.name}</h2>
           <span
@@ -255,6 +270,17 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
         <p className="flex items-center gap-2">
           <Icon name="phone" className="h-4 w-4" />
           {employee.phone}
+        </p>
+        <p className="flex items-center gap-2">
+          {countryFlag && (
+            <img
+              src={countryFlag}
+              alt=""
+              className="h-4 w-5 rounded-[2px] object-cover"
+              title={employee.country}
+            />
+          )}
+          {employee.country || "No country"}
         </p>
       </div>
 

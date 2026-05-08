@@ -5,6 +5,7 @@ import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
+const notificationTargetKey = "clientraNotificationTarget";
 const statusToApi = {
   Pending: "pending",
   "In progress": "in_progress",
@@ -234,13 +235,19 @@ const FilterChip = ({ active, children, onClick }) => (
 
 const TaskCard = ({
   canToggleDone,
+  isFocused,
   onDelete,
   onEdit,
   onToggleDone,
   showStatus,
   task,
 }) => (
-  <article className="flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50 sm:px-5">
+  <article
+    id={`task-card-${task.id}`}
+    className={`flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 transition sm:px-5 ${
+      isFocused ? "ring-2 ring-blue-300" : "ring-pink-50"
+    }`}
+  >
     {canToggleDone && (
       <button
         type="button"
@@ -310,6 +317,7 @@ const Tasks = ({
   const [selectedTaskStatus, setSelectedTaskStatus] = useState("All");
   const [selectedDateStatus, setSelectedDateStatus] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
+  const [focusedTaskId, setFocusedTaskId] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -339,6 +347,39 @@ const Tasks = ({
       isMounted = false;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    const focusTarget = () => {
+      const rawTarget = sessionStorage.getItem(notificationTargetKey);
+      if (!rawTarget) return;
+
+      try {
+        const target = JSON.parse(rawTarget);
+        if (target?.page !== "tasks" || !target?.taskId) return;
+
+        setSelectedTaskStatus("All");
+        setSelectedDateStatus("All");
+        setFocusedTaskId(target.taskId);
+
+        window.setTimeout(() => {
+          document.getElementById(`task-card-${target.taskId}`)?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          sessionStorage.removeItem(notificationTargetKey);
+        }, 160);
+      } catch {
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    };
+
+    if (!isLoading) {
+      focusTarget();
+    }
+
+    window.addEventListener("clientra:notification-target", focusTarget);
+    return () => window.removeEventListener("clientra:notification-target", focusTarget);
+  }, [isLoading, tasks]);
 
   const visibleTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -507,6 +548,7 @@ const Tasks = ({
               <TaskCard
                 key={task.id}
                 canToggleDone={getEntityId(task.assignedTo) === getEntityId(user)}
+                isFocused={focusedTaskId === task.id}
                 onDelete={requestDeleteTask}
                 onEdit={handleEditTask}
                 onToggleDone={handleToggleDone}

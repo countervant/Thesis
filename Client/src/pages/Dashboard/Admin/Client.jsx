@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { clientAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import defaultProfile from "../../../assets/default-profile.png";
+import { getCountryFlag } from "../../../utils/countries.js";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -14,6 +16,7 @@ const normalizeClient = (client) => ({
   id: client._id || client.id,
   initials: getInitials(client.contactPerson),
   name: client.contactPerson || "",
+  avatar: client.avatar || "",
   status: client.isActive ? "Active" : "Inactive",
   company: client.companyName || "",
   email: client.email || "",
@@ -219,6 +222,7 @@ const FilterButton = ({ active, children, onClick }) => (
 
 const ClientCard = ({ client, onDelete }) => {
   const isActive = client.status === "Active";
+  const countryFlag = getCountryFlag(client.country);
 
   return (
     <article className="relative rounded-lg bg-white px-6 pb-4 pt-5 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50">
@@ -230,11 +234,33 @@ const ClientCard = ({ client, onDelete }) => {
       )}
 
       <div className="flex items-center gap-4">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-lg font-bold text-white">
-          {client.initials}
-        </div>
+        {client.avatar ? (
+          <img
+            src={client.avatar}
+            alt=""
+            onError={(event) => {
+              event.currentTarget.src = defaultProfile;
+            }}
+            className="h-12 w-12 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-lg font-bold text-white">
+            {client.initials}
+          </div>
+        )}
         <div>
-          <h2 className="text-lg font-bold text-neutral-900">{client.name}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-bold text-neutral-900">{client.name}</h2>
+            {countryFlag && (
+              <img
+                src={countryFlag}
+                alt=""
+                aria-label={client.country}
+                className="h-4 w-5 rounded-[2px] object-cover"
+                title={client.country}
+              />
+            )}
+          </div>
           <span
             className={`mt-1 inline-flex h-5 items-center rounded-full px-4 text-xs font-medium shadow-[0_2px_5px_rgba(0,0,0,0.18)] ${
               isActive
@@ -258,7 +284,7 @@ const ClientCard = ({ client, onDelete }) => {
         </p>
         <p className="flex items-center gap-2">
           <Icon name="phone" className="h-4 w-4 text-neutral-600" />
-          {[client.country, client.phone].filter(Boolean).join(" - ")}
+          {client.phone}
         </p>
       </div>
 

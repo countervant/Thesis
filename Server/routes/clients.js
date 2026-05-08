@@ -3,7 +3,7 @@ import Client from "../model/Admin/Clientmodel.js";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
-import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 
 const router = express.Router();
 const emailRegex =
@@ -36,8 +36,7 @@ const validateClientPayload = (payload) => {
   if (!payload.companyName) return "Company name is required";
   if (!payload.email) return "Email is required";
   if (!isValidEmail(payload.email)) return "Enter a valid email";
-  if (!isValidPhoneNumber(payload.phone)) return "Enter a valid phone number";
-  return "";
+  return getPhoneValidationMessage(payload.phone, payload.country);
 };
 
 const clientUserToClient = (user) => ({
@@ -49,6 +48,7 @@ const clientUserToClient = (user) => ({
   phone: user.phone || "",
   country: user.country || "Philippines",
   service: user.position || "",
+  avatar: user.avatar || "",
   isActive: user.isActive,
   address: "",
   notes: "",

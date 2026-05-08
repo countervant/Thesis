@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import defaultProfile from "../assets/default-profile.png";
+import emojiIcon from "../assets/emoji.png";
+import heartIcon from "../assets/heart.png";
+import insertImageIcon from "../assets/insertimage.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { newsfeedAPI } from "../services/api.js";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import { getCountryFlag } from "../utils/countries.js";
+
+const notificationTargetKey = "clientraNotificationTarget";
+
+const quickEmojis = ["😀", "😂", "😍", "🔥", "👏", "💜", "👍", "🎉", "🥹", "💯"];
 
 const getEntityId = (entity) => {
   if (!entity) return "";
@@ -14,6 +22,25 @@ const getEntityId = (entity) => {
 const getUserName = (user) => {
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
   return name || user?.email || "Unknown user";
+};
+
+const getUserCountry = (user) => user?.country?.trim() || "";
+
+const CountryBadge = ({ user }) => {
+  const country = getUserCountry(user);
+  const flag = getCountryFlag(country);
+
+  if (!country || !flag) return null;
+
+  return (
+    <img
+      src={flag}
+      alt=""
+      aria-label={country}
+      className="h-4 w-5 rounded-[2px] object-cover"
+      title={country}
+    />
+  );
 };
 
 const formatDateTime = (value) => {
@@ -79,15 +106,13 @@ const ProfileButton = ({ children, className = "", user }) => {
 };
 
 const HeartIcon = ({ filled }) => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-    <path
-      d="M12 20.5S4.5 16.1 3 10.4C2.1 7 4.1 4.3 7.2 4.3c1.8 0 3.4 1 4.3 2.5.9-1.5 2.5-2.5 4.3-2.5 3.1 0 5.1 2.7 4.2 6.1-1.5 5.7-9 10.1-9 10.1z"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinejoin="round"
-    />
-  </svg>
+  <img
+    src={heartIcon}
+    alt=""
+    className={`h-5 w-5 object-contain transition ${
+      filled ? "opacity-100" : "opacity-55 grayscale"
+    }`}
+  />
 );
 
 const Newsfeed = () => {
@@ -100,7 +125,10 @@ const Newsfeed = () => {
   const [visibleComments, setVisibleComments] = useState({});
   const [visibleReplies, setVisibleReplies] = useState({});
   const [openPostMenuId, setOpenPostMenuId] = useState("");
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
+  const [commentToDelete, setCommentToDelete] = useState(null);
+  const [focusedTarget, setFocusedTarget] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
@@ -136,6 +164,55 @@ const Newsfeed = () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const focusTarget = () => {
+      const rawTarget = sessionStorage.getItem(notificationTargetKey);
+      if (!rawTarget) return;
+
+      try {
+        const target = JSON.parse(rawTarget);
+        if (target?.page !== "newsfeed" || !target?.postId) return;
+
+        setVisibleComments((currentVisibility) => ({
+          ...currentVisibility,
+          [target.postId]: true,
+        }));
+
+        if (target.commentId) {
+          setVisibleReplies((currentVisibility) => ({
+            ...currentVisibility,
+            [target.commentId]: Boolean(target.replyId) || currentVisibility[target.commentId],
+          }));
+        }
+
+        setFocusedTarget(target);
+
+        window.setTimeout(() => {
+          const targetId = target.replyId
+            ? `newsfeed-reply-${target.replyId}`
+            : target.commentId
+              ? `newsfeed-comment-${target.commentId}`
+              : `newsfeed-post-${target.postId}`;
+
+          document.getElementById(targetId)?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          sessionStorage.removeItem(notificationTargetKey);
+        }, 160);
+      } catch {
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    };
+
+    if (!isLoading) {
+      focusTarget();
+    }
+
+    window.addEventListener("clientra:notification-target", focusTarget);
+    return () => window.removeEventListener("clientra:notification-target", focusTarget);
+  }, [isLoading, posts]);
 
   const hasAnyPosts = useMemo(() => posts.length > 0, [posts]);
 
@@ -180,6 +257,11 @@ const Newsfeed = () => {
       setErrorMessage("");
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleInsertEmoji = (emoji) => {
+    setPostContent((currentContent) => `${currentContent}${emoji}`.slice(0, 1200));
+    setIsEmojiPickerOpen(false);
   };
 
   const handleCreatePost = async (event) => {
@@ -291,6 +373,16 @@ const Newsfeed = () => {
     }
   };
 
+  const handleDeleteComment = async (postId, commentId) => {
+    try {
+      setErrorMessage("");
+      const updatedPost = await newsfeedAPI.deleteComment(postId, commentId);
+      replacePost(updatedPost);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete comment.");
+    }
+  };
+
   const handleAddReply = async (event, postId, commentId) => {
     event.preventDefault();
     const text = replyDrafts[commentId]?.trim();
@@ -359,8 +451,8 @@ const Newsfeed = () => {
               <span className="text-xs font-medium text-neutral-500">
                 {postContent.length}/1200
               </span>
-              <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700 transition hover:bg-pink-50 hover:text-[#c72fb2]">
-                Add Media
+              <label className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg border border-neutral-300 transition hover:bg-pink-50">
+                <img src={insertImageIcon} alt="Add media" className="h-5 w-5 object-contain" />
                 <input
                   type="file"
                   accept="image/*,video/*"
@@ -368,6 +460,31 @@ const Newsfeed = () => {
                   className="sr-only"
                 />
               </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsEmojiPickerOpen((isOpen) => !isOpen)}
+                  className="grid h-10 w-10 place-items-center rounded-lg border border-neutral-300 transition hover:bg-pink-50"
+                  aria-label="Add emoji"
+                  aria-expanded={isEmojiPickerOpen}
+                >
+                  <img src={emojiIcon} alt="" className="h-5 w-5 object-contain" />
+                </button>
+                {isEmojiPickerOpen && (
+                  <div className="absolute left-0 top-12 z-10 grid w-44 grid-cols-5 gap-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
+                    {quickEmojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => handleInsertEmoji(emoji)}
+                        className="grid h-8 w-8 place-items-center rounded-md text-lg transition hover:bg-pink-50"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               {postMedia && (
@@ -429,7 +546,12 @@ const Newsfeed = () => {
           return (
             <article
               key={post.id}
-              className="rounded-lg bg-white p-5 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100"
+              id={`newsfeed-post-${post.id}`}
+              className={`rounded-lg bg-white p-5 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 transition ${
+                focusedTarget?.postId === post.id
+                  ? "ring-2 ring-blue-300"
+                  : "ring-pink-100"
+              }`}
             >
               <div className="relative">
                 {canDeletePost && (
@@ -482,6 +604,7 @@ const Newsfeed = () => {
                     >
                       {getUserName(post.author)}
                     </ProfileButton>
+                    <CountryBadge user={post.author} />
                     <span className="rounded-full bg-pink-50 px-2 py-0.5 text-[11px] font-semibold uppercase text-[#c72fb2]">
                       {post.author?.role || "user"}
                     </span>
@@ -551,9 +674,17 @@ const Newsfeed = () => {
                     const hasHeartedComment = comment.hearts.some(
                       (heart) => getEntityId(heart) === userId
                     );
+                    const canDeleteComment =
+                      user?.role === "admin" || getEntityId(comment.user) === userId;
 
                     return (
-                      <div key={commentId} className="space-y-3">
+                      <div
+                        key={commentId}
+                        id={`newsfeed-comment-${commentId}`}
+                        className={`space-y-3 rounded-lg transition ${
+                          focusedTarget?.commentId === commentId ? "bg-blue-50/70 p-2" : ""
+                        }`}
+                      >
                         <div className="flex gap-3">
                           <ProfileButton
                             user={comment.user}
@@ -569,6 +700,7 @@ const Newsfeed = () => {
                               >
                                 {getUserName(comment.user)}
                               </ProfileButton>
+                              <CountryBadge user={comment.user} />
                               <span className="text-[11px] font-medium text-neutral-500">
                                 {formatDateTime(comment.createdAt)}
                               </span>
@@ -603,6 +735,17 @@ const Newsfeed = () => {
                                     ? `View replies (${comment.replies.length})`
                                     : "Reply"}
                               </button>
+                              {canDeleteComment && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCommentToDelete({ postId: post.id, commentId })
+                                  }
+                                  className="h-8 rounded-md px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -611,8 +754,19 @@ const Newsfeed = () => {
                           <>
                             {comment.replies.length > 0 && (
                               <div className="ml-11 space-y-3">
-                                {comment.replies.map((reply) => (
-                                  <div key={reply._id || reply.id} className="flex gap-3">
+                                {comment.replies.map((reply) => {
+                                  const replyId = reply._id || reply.id;
+
+                                  return (
+                                  <div
+                                    key={replyId}
+                                    id={`newsfeed-reply-${replyId}`}
+                                    className={`flex gap-3 rounded-lg transition ${
+                                      focusedTarget?.replyId === replyId
+                                        ? "bg-blue-50/70 p-2"
+                                        : ""
+                                    }`}
+                                  >
                                     <ProfileButton
                                       user={reply.user}
                                       className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
@@ -627,6 +781,7 @@ const Newsfeed = () => {
                                         >
                                           {getUserName(reply.user)}
                                         </ProfileButton>
+                                        <CountryBadge user={reply.user} />
                                         <span className="text-[11px] font-medium text-neutral-500">
                                           {formatDateTime(reply.createdAt)}
                                         </span>
@@ -634,7 +789,8 @@ const Newsfeed = () => {
                                       <p className="mt-1 text-sm text-neutral-800">{reply.text}</p>
                                     </div>
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
 
@@ -703,6 +859,19 @@ const Newsfeed = () => {
           if (post) await handleDeletePost(post);
         }}
         title="Delete"
+      />
+      <ConfirmDialog
+        confirmLabel="Yes , delete"
+        icon="delete"
+        isOpen={Boolean(commentToDelete)}
+        message="Are you sure you want to delete this comment?"
+        onCancel={() => setCommentToDelete(null)}
+        onConfirm={async () => {
+          const comment = commentToDelete;
+          setCommentToDelete(null);
+          if (comment) await handleDeleteComment(comment.postId, comment.commentId);
+        }}
+        title="Delete Comment"
       />
     </div>
   );

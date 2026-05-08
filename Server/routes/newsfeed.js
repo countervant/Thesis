@@ -4,14 +4,15 @@ import { protect } from "../middleware/protectedjwt.js";
 
 const router = express.Router();
 const postAllowedRoles = ["admin", "client"];
+const userPublicFields = "firstName lastName companyName email phone country role avatar";
 
 const populatePost = (query) =>
   query
-    .populate("author", "firstName lastName email role avatar")
-    .populate("hearts", "firstName lastName email role")
-    .populate("comments.user", "firstName lastName email role avatar")
-    .populate("comments.hearts", "firstName lastName email role")
-    .populate("comments.replies.user", "firstName lastName email role avatar");
+    .populate("author", userPublicFields)
+    .populate("hearts", userPublicFields)
+    .populate("comments.user", userPublicFields)
+    .populate("comments.hearts", userPublicFields)
+    .populate("comments.replies.user", userPublicFields);
 
 router.get("/", protect, async (req, res) => {
   try {
@@ -178,6 +179,38 @@ router.patch("/:id/comments/:commentId/heart", protect, async (req, res) => {
   } catch (error) {
     console.error("Toggle comment heart error:", error);
     res.status(500).json({ message: "Unable to update comment heart" });
+  }
+});
+
+router.delete("/:id/comments/:commentId", protect, async (req, res) => {
+  try {
+    const post = await NewsfeedPost.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const comment = post.comments.id(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    const isCommentAuthor = String(comment.user) === String(req.user._id);
+    const isAdmin = req.user.role === "admin";
+
+    if (!isCommentAuthor && !isAdmin) {
+      return res.status(403).json({ message: "You cannot delete this comment" });
+    }
+
+    comment.deleteOne();
+    await post.save();
+    const updatedPost = await populatePost(NewsfeedPost.findById(post._id));
+
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error("Delete comment error:", error);
+    res.status(500).json({ message: "Unable to delete comment" });
   }
 });
 

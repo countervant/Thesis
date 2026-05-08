@@ -5,7 +5,7 @@ import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
-import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 
 
 const router = express.Router();
@@ -23,22 +23,37 @@ const isValidEmail = (email) => {
 
 // Register route
 router.post("/register", async (req, res) => {
-  const { firstName, lastName, email, password, phone = "", country = "Philippines" } = req.body;
+  const {
+    firstName,
+    lastName,
+    companyName = "",
+    email,
+    password,
+    phone = "",
+    country = "Philippines",
+  } = req.body;
 
   try {
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !companyName || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Please provide first name, last name, email, and password" });
+        .json({
+          message: "Please provide first name, last name, company name, email, and password",
+        });
     }
 
     const trimmedFirstName = firstName.trim();
     const trimmedLastName = lastName.trim();
+    const trimmedCompanyName = companyName.trim();
     const normalizedEmail = email.trim().toLowerCase();
     if (!trimmedFirstName || !trimmedLastName) {
       return res
         .status(400)
         .json({ message: "First name and last name are required" });
+    }
+
+    if (!trimmedCompanyName) {
+      return res.status(400).json({ message: "Company name is required" });
     }
 
     if (!isValidEmail(normalizedEmail)) {
@@ -59,8 +74,9 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    if (!isValidPhoneNumber(phone)) {
-      return res.status(400).json({ message: "Enter a valid phone number" });
+    const phoneValidation = getPhoneValidationMessage(phone, country);
+    if (phoneValidation) {
+      return res.status(400).json({ message: phoneValidation });
     }
 
     const userExists = await User.findOne({ email: normalizedEmail });
@@ -71,6 +87,7 @@ router.post("/register", async (req, res) => {
     const user = await User.create({
       firstName: trimmedFirstName,
       lastName: trimmedLastName,
+      companyName: trimmedCompanyName,
       email: normalizedEmail,
       password,
       phone: phone.trim(),
@@ -81,6 +98,7 @@ router.post("/register", async (req, res) => {
       id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
+      companyName: user.companyName,
       email: user.email,
       role: user.role,
       phone: user.phone,
@@ -271,6 +289,23 @@ router.post("/reset-password", async (req, res) => {
      }
     );
 
+    router.get("/users/:id", protect, async (req, res) => {
+      try {
+        const user = await User.findById(req.params.id).select(
+          "firstName lastName companyName email phone country role avatar position isActive"
+        );
+
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json(user);
+      } catch (error) {
+        console.error("Get public profile error:", error);
+        res.status(500).json({ message: "Unable to load profile" });
+      }
+    });
+
     router.put("/me", protect, async (req, res) => {
       try {
         const user = await User.findById(req.user._id);
@@ -282,6 +317,7 @@ router.post("/reset-password", async (req, res) => {
         const {
           firstName,
           lastName,
+          companyName,
           email,
           phone,
           country,
@@ -304,6 +340,8 @@ router.post("/reset-password", async (req, res) => {
           user.lastName = lastName.trim();
         }
 
+        if (companyName !== undefined) user.companyName = companyName.trim();
+
         if (email !== undefined) {
           const normalizedEmail = email.trim().toLowerCase();
 
@@ -324,8 +362,9 @@ router.post("/reset-password", async (req, res) => {
         }
 
         if (phone !== undefined) {
-          if (!isValidPhoneNumber(phone)) {
-            return res.status(400).json({ message: "Enter a valid phone number" });
+          const phoneValidation = getPhoneValidationMessage(phone, country ?? user.country);
+          if (phoneValidation) {
+            return res.status(400).json({ message: phoneValidation });
           }
           user.phone = phone.trim();
         }
@@ -356,6 +395,7 @@ router.post("/reset-password", async (req, res) => {
           _id: user._id,
           firstName: user.firstName,
           lastName: user.lastName,
+          companyName: user.companyName,
           email: user.email,
           role: user.role,
           avatar: user.avatar,
@@ -400,7 +440,7 @@ router.post("/reset-password", async (req, res) => {
     router.get("/employees", protect, authorize("admin"), async (req, res) => {
       try {
         const employees = await User.find({ role: "employee" })
-          .select("firstName lastName email phone country position role isActive")
+          .select("firstName lastName email phone country position role avatar isActive")
           .sort({ createdAt: -1 });
 
         res.status(200).json(employees);
@@ -441,8 +481,9 @@ router.post("/reset-password", async (req, res) => {
           return res.status(400).json({ message: "Enter a valid email" });
         }
 
-        if (!isValidPhoneNumber(phone)) {
-          return res.status(400).json({ message: "Enter a valid phone number" });
+        const phoneValidation = getPhoneValidationMessage(phone, country);
+        if (phoneValidation) {
+          return res.status(400).json({ message: phoneValidation });
         }
 
         const userExists = await User.findOne({ email: normalizedEmail });
@@ -472,6 +513,7 @@ router.post("/reset-password", async (req, res) => {
           country: employee.country,
           position: employee.position,
           role: employee.role,
+          avatar: employee.avatar,
           isActive: employee.isActive,
         });
       } catch (error) {
@@ -512,8 +554,9 @@ router.post("/reset-password", async (req, res) => {
           employee.email = normalizedEmail;
         }
         if (phone !== undefined) {
-          if (!isValidPhoneNumber(phone)) {
-            return res.status(400).json({ message: "Enter a valid phone number" });
+          const phoneValidation = getPhoneValidationMessage(phone, country ?? employee.country);
+          if (phoneValidation) {
+            return res.status(400).json({ message: phoneValidation });
           }
           employee.phone = phone.trim();
         }
@@ -540,6 +583,7 @@ router.post("/reset-password", async (req, res) => {
           country: employee.country,
           position: employee.position,
           role: employee.role,
+          avatar: employee.avatar,
           isActive: employee.isActive,
         });
       } catch (error) {

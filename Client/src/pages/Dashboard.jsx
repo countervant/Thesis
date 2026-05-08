@@ -29,6 +29,22 @@ const adminPages = new Set([
   "edit-employee",
 ]);
 
+const MessagesPanel = () => (
+  <div className="mx-auto max-w-[1500px]">
+    <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
+      <h1
+        className="text-3xl uppercase leading-none text-neutral-950"
+        style={{ fontFamily: "var(--font-bruno)" }}
+      >
+        Messages
+      </h1>
+      <p className="mt-3 text-sm font-medium text-neutral-600">
+        Your conversations will appear here.
+      </p>
+    </section>
+  </div>
+);
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -40,7 +56,7 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const initialLocalPage = ["dashboard", "newsfeed", "messages"].includes(
+  const initialLocalPage = ["dashboard", "newsfeed", "messages", "tasks"].includes(
     location.state?.page
   )
     ? location.state.page
@@ -176,6 +192,8 @@ const Dashboard = () => {
       );
     } else if (adminPage === "newsfeed") {
       adminContent = <Newsfeed />;
+    } else if (adminPage === "messages") {
+      adminContent = <MessagesPanel />;
     } else if (adminPage === "client") {
       adminContent = <AdminClients />;
     } else if (
@@ -226,6 +244,10 @@ const Dashboard = () => {
   const regularContent =
     localPage === "newsfeed" ? (
       <Newsfeed />
+    ) : localPage === "tasks" ? (
+      <AdminTasks />
+    ) : localPage === "messages" ? (
+      <MessagesPanel />
     ) : (
       <div className="mx-auto max-w-[1500px]">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
