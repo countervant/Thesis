@@ -107,13 +107,11 @@ export const authAPI = {
   },
 
   getMe: async () => {
-    const response = await api.get("/auth/me");
-    return response.data;
+    return cachedGet("/auth/me");
   },
 
   getPublicProfile: async (id) => {
-    const response = await api.get(`/auth/users/${id}`);
-    return response.data;
+    return cachedGet(`/auth/users/${id}`);
   },
 
   updateMe: async (profile) => {

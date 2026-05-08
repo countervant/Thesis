@@ -100,10 +100,11 @@ const getPositionDisplay = (formData, role) => {
 const Profile = () => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const hasCachedProfile = Boolean(user?.email);
   const [formData, setFormData] = useState(() => profileToForm(user) || emptyForm);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasCachedProfile);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -111,7 +112,7 @@ const Profile = () => {
 
     const loadProfile = async () => {
       try {
-        setIsLoading(true);
+        setIsLoading(!hasCachedProfile);
         setErrorMessage("");
         const data = await authAPI.getMe();
 
@@ -140,7 +141,7 @@ const Profile = () => {
     return () => {
       isMounted = false;
     };
-  }, [updateUser]);
+  }, [hasCachedProfile, updateUser]);
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({

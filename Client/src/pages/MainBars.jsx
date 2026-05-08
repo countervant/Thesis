@@ -324,7 +324,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         setNotificationError("");
         const [posts, tasks] = await Promise.all([
           newsfeedAPI.getAll(),
-          taskAPI.getAll(),
+          user?.role === "employee" ? taskAPI.getAll() : Promise.resolve([]),
         ]);
 
         const nextNotifications = [

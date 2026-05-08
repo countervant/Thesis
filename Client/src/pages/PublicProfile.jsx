@@ -368,8 +368,10 @@ const PublicProfile = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await newsfeedAPI.getAll();
-        const profileData = userId ? await authAPI.getPublicProfile(userId) : null;
+        const [data, profileData] = await Promise.all([
+          newsfeedAPI.getAll(),
+          userId ? authAPI.getPublicProfile(userId) : Promise.resolve(null),
+        ]);
 
         if (isMounted) {
           setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
