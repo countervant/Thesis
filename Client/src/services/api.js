@@ -138,6 +138,7 @@ export const authAPI = {
 
   register: async (
     firstName,
+    middleInitial,
     lastName,
     companyName,
     email,
@@ -147,6 +148,7 @@ export const authAPI = {
   ) => {
     const response = await api.post("/auth/register", {
       firstName,
+      middleInitial,
       lastName,
       companyName,
       email,

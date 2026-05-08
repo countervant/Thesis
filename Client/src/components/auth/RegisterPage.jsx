@@ -19,6 +19,7 @@ import {
 
 const fieldNames = {
   firstName: `register_given_${Date.now()}`,
+  middleInitial: `register_middle_${Date.now()}`,
   lastName: `register_family_${Date.now()}`,
   companyName: `register_company_${Date.now()}`,
   email: `register_contact_${Date.now()}`,
@@ -45,6 +46,7 @@ const preventAutofill = (event) => {
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
+  const [middleInitial, setMiddleInitial] = useState("");
   const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -61,6 +63,7 @@ const RegisterPage = ({ order, order1 }) => {
 
   const resetForm = useCallback(() => {
     setFirstName("");
+    setMiddleInitial("");
     setLastName("");
     setCompanyName("");
     setEmail("");
@@ -127,6 +130,7 @@ const RegisterPage = ({ order, order1 }) => {
     try {
       await authAPI.register(
         firstName.trim(),
+        middleInitial.trim(),
         lastName.trim(),
         companyName.trim(),
         email,
@@ -161,7 +165,7 @@ const RegisterPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0 dark:bg-[#111111] dark:px-4 dark:py-4`}
+        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0 dark:bg-[#111111]`}
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -188,7 +192,7 @@ const RegisterPage = ({ order, order1 }) => {
 
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8 dark:max-w-[640px] dark:space-y-4 dark:rounded-2xl dark:border dark:border-pink-200/90 dark:px-10 dark:py-7 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="w-full max-w-sm sm:max-w-md md:max-w-2xl -translate-y-4 space-y-6 rounded-2xl border border-transparent px-10 py-7 sm:space-y-8 dark:border-pink-200/90 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
           data-form-type="other"
         >
@@ -196,10 +200,10 @@ const RegisterPage = ({ order, order1 }) => {
             <img
               src={logo}
               alt="CLIENTRA"
-              className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain dark:h-24 dark:w-24"
+              className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain"
             />
             <h2
-              className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-10 tracking-wide uppercase dark:mb-2 dark:text-3xl dark:text-white"
+              className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-10 tracking-wide uppercase dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
             >
               Create Account
@@ -224,13 +228,13 @@ const RegisterPage = ({ order, order1 }) => {
           />
 
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded dark:border-red-400/60 dark:bg-red-500/10 dark:text-red-200">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 dark:gap-4">
-            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_0.75fr_1fr] gap-6">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
                 type="text"
                 name={fieldNames.firstName}
@@ -240,12 +244,26 @@ const RegisterPage = ({ order, order1 }) => {
                 {...antiAutofillProps}
                 readOnly
                 onFocus={preventAutofill}
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
 
-            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
+            <div className="border-b border-black mb-2 dark:border-white/40">
+              <input
+                type="text"
+                name={fieldNames.middleInitial}
+                placeholder="Middle Initial (Optional)"
+                value={middleInitial}
+                onChange={(e) => setMiddleInitial(e.target.value.slice(0, 5))}
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
+              />
+            </div>
+
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
                 type="text"
                 name={fieldNames.lastName}
@@ -255,31 +273,14 @@ const RegisterPage = ({ order, order1 }) => {
                 {...antiAutofillProps}
                 readOnly
                 onFocus={preventAutofill}
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
           </div>
 
-          <div>
-            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
-              <input
-                type="text"
-                name={fieldNames.companyName}
-                placeholder="Company Name"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                {...antiAutofillProps}
-                readOnly
-                onFocus={preventAutofill}
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
                 type="text"
                 name={fieldNames.email}
@@ -290,22 +291,37 @@ const RegisterPage = ({ order, order1 }) => {
                 {...antiAutofillProps}
                 readOnly
                 onFocus={preventAutofill}
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
             {emailError && (
-              <p className="text-sm text-red-500">{emailError}</p>
+              <p className="text-sm text-red-500 sm:col-start-1 sm:row-start-2 dark:text-red-300">{emailError}</p>
             )}
+
+            <div className="border-b border-black mb-2 dark:border-white/40">
+              <input
+                type="text"
+                name={fieldNames.companyName}
+                placeholder="Company Name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
+                required
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6 dark:gap-4">
-            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <select
                 value={country}
                 onChange={(event) => handleCountryChange(event.target.value)}
                 autoComplete="country-name"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 dark:h-9 dark:pb-0 dark:text-white"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 dark:text-white"
                 required
               >
                 {countryOptions.map((option) => (
@@ -316,7 +332,7 @@ const RegisterPage = ({ order, order1 }) => {
               </select>
             </div>
 
-            <div className="border-b border-black mb-2 dark:border-transparent dark:bg-[#283241]">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
                 type="tel"
                 name={fieldNames.phone}
@@ -328,13 +344,13 @@ const RegisterPage = ({ order, order1 }) => {
                 {...antiAutofillProps}
                 readOnly
                 onFocus={preventAutofill}
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
           </div>
 
-          <div className="border-b-2 border-gray-400 flex items-center dark:border-transparent dark:bg-[#283241]">
+          <div className="border-b-2 border-gray-400 flex items-center dark:border-white/40">
             <input
               type="text"
               name={fieldNames.password}
@@ -345,7 +361,7 @@ const RegisterPage = ({ order, order1 }) => {
               readOnly
               onFocus={preventAutofill}
               style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
               required
             />
             <button
@@ -354,14 +370,14 @@ const RegisterPage = ({ order, order1 }) => {
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3 dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
-                <img src={hide} alt="Hide" className="w-5 h-5" />
+                <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
               ) : (
-                <img src={view} alt="Show" className="w-5 h-5" />
+                <img src={view} alt="Show" className="w-5 h-5 dark:invert" />
               )}
             </button>
           </div>
 
-          <div className="border-b-2 border-gray-400 flex items-center dark:border-transparent dark:bg-[#283241]">
+          <div className="border-b-2 border-gray-400 flex items-center dark:border-white/40">
             <input
               type="text"
               name={fieldNames.confirmPassword}
@@ -372,7 +388,7 @@ const RegisterPage = ({ order, order1 }) => {
               readOnly
               onFocus={preventAutofill}
               style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:h-9 dark:pb-0 dark:text-white dark:placeholder:text-white/85"
+              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
               required
             />
             <button
@@ -381,9 +397,9 @@ const RegisterPage = ({ order, order1 }) => {
               className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3 dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
-                <img src={hide} alt="Hide" className="w-5 h-5" />
+                <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
               ) : (
-                <img src={view} alt="Show" className="w-5 h-5" />
+                <img src={view} alt="Show" className="w-5 h-5 dark:invert" />
               )}
             </button>
           </div>
@@ -391,7 +407,7 @@ const RegisterPage = ({ order, order1 }) => {
           <button
             type="submit"
             disabled={loading || isEmailInvalid}
-            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed dark:mt-6 dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)]"
+            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)]"
           >
             {loading ? "Creating Account..." : "Create Account"}
           </button>

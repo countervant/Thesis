@@ -25,6 +25,7 @@ const isValidEmail = (email) => {
 router.post("/register", async (req, res) => {
   const {
     firstName,
+    middleInitial = "",
     lastName,
     companyName = "",
     email,
@@ -43,6 +44,7 @@ router.post("/register", async (req, res) => {
     }
 
     const trimmedFirstName = firstName.trim();
+    const trimmedMiddleInitial = middleInitial.trim();
     const trimmedLastName = lastName.trim();
     const trimmedCompanyName = companyName.trim();
     const normalizedEmail = email.trim().toLowerCase();
@@ -86,6 +88,7 @@ router.post("/register", async (req, res) => {
 
     const user = await User.create({
       firstName: trimmedFirstName,
+      middleInitial: trimmedMiddleInitial,
       lastName: trimmedLastName,
       companyName: trimmedCompanyName,
       email: normalizedEmail,
@@ -97,6 +100,7 @@ router.post("/register", async (req, res) => {
     res.status(201).json({
       id: user._id,
       firstName: user.firstName,
+      middleInitial: user.middleInitial,
       lastName: user.lastName,
       companyName: user.companyName,
       email: user.email,
@@ -292,7 +296,7 @@ router.post("/reset-password", async (req, res) => {
     router.get("/users/:id", protect, async (req, res) => {
       try {
         const user = await User.findById(req.params.id).select(
-          "firstName lastName companyName email phone country role avatar position isActive"
+          "firstName middleInitial lastName companyName email phone country role avatar position isActive"
         ).lean();
 
         if (!user) {
@@ -316,6 +320,7 @@ router.post("/reset-password", async (req, res) => {
 
         const {
           firstName,
+          middleInitial,
           lastName,
           companyName,
           email,
@@ -339,6 +344,8 @@ router.post("/reset-password", async (req, res) => {
           }
           user.lastName = lastName.trim();
         }
+
+        if (middleInitial !== undefined) user.middleInitial = middleInitial.trim();
 
         if (companyName !== undefined) user.companyName = companyName.trim();
 
@@ -394,6 +401,7 @@ router.post("/reset-password", async (req, res) => {
           id: user._id,
           _id: user._id,
           firstName: user.firstName,
+          middleInitial: user.middleInitial,
           lastName: user.lastName,
           companyName: user.companyName,
           email: user.email,
