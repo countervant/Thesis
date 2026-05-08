@@ -543,7 +543,11 @@ const Newsfeed = () => {
                 {postContent.length}/1200
               </span>
               <label className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg border border-neutral-300 transition hover:bg-pink-50 dark:border-[#dc4fb2] dark:hover:bg-[#2a1325]">
-                <img src={insertImageIcon} alt="Add media" className="h-5 w-5 object-contain" />
+                <img
+                  src={insertImageIcon}
+                  alt="Add media"
+                  className="h-5 w-5 object-contain dark:drop-shadow-[0_0_5px_rgba(236,92,199,0.85)]"
+                />
                 <input
                   type="file"
                   accept="image/*,video/*"
@@ -559,7 +563,11 @@ const Newsfeed = () => {
                   aria-label="Add emoji"
                   aria-expanded={isEmojiPickerOpen}
                 >
-                  <img src={emojiIcon} alt="" className="h-5 w-5 object-contain" />
+                  <img
+                    src={emojiIcon}
+                    alt=""
+                    className="h-5 w-5 object-contain dark:drop-shadow-[0_0_5px_rgba(236,92,199,0.85)]"
+                  />
                 </button>
                 {isEmojiPickerOpen && (
                   <div className="absolute left-0 top-12 z-10 grid w-44 grid-cols-5 gap-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">

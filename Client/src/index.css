@@ -13,6 +13,7 @@
 .dark .bg-white,
 .dark .bg-neutral-50,
 .dark .bg-neutral-100,
+.dark .bg-gray-100,
 .dark [class~="bg-[#f1f1f1]"],
 .dark [class~="bg-[#f5f5f5]"] {
   background-color: #101010 !important;
@@ -28,18 +29,26 @@
 .dark .text-neutral-900,
 .dark .text-neutral-800,
 .dark .text-neutral-700,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
 .dark .text-black {
   color: #f5f5f5 !important;
 }
 
 .dark .text-neutral-600,
 .dark .text-neutral-500,
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400,
 .dark .text-slate-700 {
   color: #b6b6b6 !important;
 }
 
 .dark .border-neutral-300,
 .dark .border-neutral-200,
+.dark .border-gray-400,
+.dark .border-black,
 .dark .border-slate-200,
 .dark .border-slate-100 {
   border-color: #292929 !important;
@@ -105,20 +114,12 @@
 .dark img[src*="assets/profile-"],
 .dark img[src*="assets/theme"],
 .dark img[src*="assets/logout"],
-.dark img[src*="assets/delete"],
-.dark img[src*="assets/insertimage"],
-.dark img[src*="assets/emoji"] {
+.dark img[src*="assets/delete"] {
   filter: brightness(0) invert(1);
 }
 
-.dark img[src*="assets/insertimage"],
-.dark img[src*="assets/emoji"] {
-  filter: brightness(0) invert(1) drop-shadow(0 0 5px rgba(236, 92, 199, 0.65));
-}
-
 .dark img[src*="assets/client-"],
-.dark img[src*="assets/profile-"],
-.dark img[src*="assets/default-profile"] {
+.dark img[src*="assets/profile-"] {
   filter: brightness(0) invert(1) drop-shadow(0 0 5px rgba(255, 255, 255, 0.55));
 }
 
