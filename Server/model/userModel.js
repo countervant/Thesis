@@ -109,6 +109,9 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   );
 };
 
+userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ role: 1, isActive: 1, firstName: 1, lastName: 1 });
+
 const User = mongoose.model("User", userSchema);
 
 export default User;

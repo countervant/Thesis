@@ -10,7 +10,7 @@ const api = axios.create({
 });
 
 const cache = new Map();
-const CACHE_TIME = 30 * 1000;
+const CACHE_TIME = 2 * 60 * 1000;
 
 const cachedGet = async (url) => {
   const cached = cache.get(url);

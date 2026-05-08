@@ -38,6 +38,8 @@ const budgetSchema = new mongoose.Schema(
   }
 );
 
+budgetSchema.index({ date: -1, createdAt: -1 });
+
 const Budget = mongoose.model("Budget", budgetSchema);
 
 export default Budget;

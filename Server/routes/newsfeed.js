@@ -12,7 +12,8 @@ const populatePost = (query) =>
     .populate("hearts", userPublicFields)
     .populate("comments.user", userPublicFields)
     .populate("comments.hearts", userPublicFields)
-    .populate("comments.replies.user", userPublicFields);
+    .populate("comments.replies.user", userPublicFields)
+    .lean();
 
 router.get("/", protect, async (req, res) => {
   try {

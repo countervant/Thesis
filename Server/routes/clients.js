@@ -61,14 +61,16 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
     const clients = await Client.find()
       .populate("assignedEmployee", "firstName lastName email role")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     const clientUsers = await User.find({ role: "client" })
-      .select("-password -resetPasswordToken -resetPasswordOTP")
-      .sort({ createdAt: -1 });
+      .select("firstName lastName companyName email phone country position role avatar isActive createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json([
       ...clientUsers.map(clientUserToClient),
-      ...clients.map((client) => ({ ...client.toObject(), source: "client" })),
+      ...clients.map((client) => ({ ...client, source: "client" })),
     ]);
   } catch (error) {
     console.error("Get clients error:", error);

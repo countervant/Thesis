@@ -79,7 +79,7 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: phoneValidation });
     }
 
-    const userExists = await User.findOne({ email: normalizedEmail });
+    const userExists = await User.exists({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -293,7 +293,7 @@ router.post("/reset-password", async (req, res) => {
       try {
         const user = await User.findById(req.params.id).select(
           "firstName lastName companyName email phone country role avatar position isActive"
-        );
+        ).lean();
 
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -418,7 +418,8 @@ router.post("/reset-password", async (req, res) => {
           _id: { $ne: req.user._id },
         })
           .select("firstName lastName email role")
-          .sort({ firstName: 1, lastName: 1 });
+          .sort({ firstName: 1, lastName: 1 })
+          .lean();
 
         res.status(200).json([
           {
@@ -441,7 +442,8 @@ router.post("/reset-password", async (req, res) => {
       try {
         const employees = await User.find({ role: "employee" })
           .select("firstName lastName email phone country position role avatar isActive")
-          .sort({ createdAt: -1 });
+          .sort({ createdAt: -1 })
+          .lean();
 
         res.status(200).json(employees);
       } catch (error) {
@@ -486,7 +488,7 @@ router.post("/reset-password", async (req, res) => {
           return res.status(400).json({ message: phoneValidation });
         }
 
-        const userExists = await User.findOne({ email: normalizedEmail });
+        const userExists = await User.exists({ email: normalizedEmail });
 
         if (userExists) {
           return res.status(400).json({ message: "User already exists" });
