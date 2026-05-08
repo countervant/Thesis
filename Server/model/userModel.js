@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    middleInitial: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     lastName: {
       type: String,
       required: true,
