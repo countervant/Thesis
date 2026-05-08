@@ -276,7 +276,7 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
             <img
               src={countryFlag}
               alt=""
-              className="h-4 w-5 rounded-[2px] object-cover"
+              className="h-4 w-6 shrink-0 rounded-[2px] object-contain"
               title={employee.country}
             />
           )}

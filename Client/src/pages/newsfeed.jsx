@@ -37,7 +37,7 @@ const CountryBadge = ({ user }) => {
       src={flag}
       alt=""
       aria-label={country}
-      className="h-4 w-5 rounded-[2px] object-cover"
+      className="h-4 w-6 shrink-0 rounded-[2px] object-contain"
       title={country}
     />
   );
