@@ -129,7 +129,7 @@ router.post("/login", async (req, res) => {
    if (!isValidEmail(normalizedEmail)) {
     return res.status(400).json({ message: "Enter a valid email" });
    }
-   const user = await User.findOne({ email: normalizedEmail });
+   const user = await User.findOne({ email: normalizedEmail }).select("password role email");
 
     if(!user || !(await user.matchPassword(password))){
         return res.status(401).json({message: "Invalid email or password"});

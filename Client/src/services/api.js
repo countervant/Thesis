@@ -4,6 +4,7 @@ const API_URL = "http://localhost:5000/api";
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -44,6 +45,56 @@ const cachedGet = async (url) => {
 
 const clearCache = (...urls) => {
   urls.forEach((url) => cache.delete(url));
+};
+
+const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
+
+const mergeCachedPost = (currentPost, nextPost) => ({
+  ...currentPost,
+  ...nextPost,
+  media: {
+    ...(currentPost?.media || {}),
+    ...(nextPost?.media || {}),
+  },
+});
+
+const updateCachedPost = (postId, updater) => {
+  ["/newsfeed", "/newsfeed/activity"].forEach((url) => {
+    const cached = cache.get(url);
+
+    if (!Array.isArray(cached?.data)) {
+      return;
+    }
+
+    cache.set(url, {
+      data: cached.data.map((post) =>
+        getEntityId(post) === postId ? updater(post) : post
+      ),
+      time: Date.now(),
+    });
+  });
+};
+
+const replaceCachedPost = (updatedPost) => {
+  const postId = getEntityId(updatedPost);
+  if (!postId) return;
+
+  updateCachedPost(postId, (post) => mergeCachedPost(post, updatedPost));
+};
+
+const removeCachedPost = (postId) => {
+  ["/newsfeed", "/newsfeed/activity"].forEach((url) => {
+    const cached = cache.get(url);
+
+    if (!Array.isArray(cached?.data)) {
+      return;
+    }
+
+    cache.set(url, {
+      data: cached.data.filter((post) => getEntityId(post) !== postId),
+      time: Date.now(),
+    });
+  });
 };
 
 // Add token to requests automatically
@@ -164,33 +215,47 @@ export const newsfeedAPI = {
     return cachedGet("/newsfeed");
   },
 
+  updateCachedPost,
+
+  clearCachedPosts: () => {
+    clearCache("/newsfeed", "/newsfeed/activity");
+  },
+
+  getActivity: async () => {
+    return cachedGet("/newsfeed/activity");
+  },
+
+  getMedia: async (id) => {
+    return cachedGet(`/newsfeed/${id}/media`);
+  },
+
   create: async (post) => {
     const response = await api.post("/newsfeed", post);
-    clearCache("/newsfeed");
+    clearCache("/newsfeed", "/newsfeed/activity");
     return response.data;
   },
 
   toggleHeart: async (id) => {
     const response = await api.patch(`/newsfeed/${id}/heart`);
-    clearCache("/newsfeed");
+    replaceCachedPost(response.data);
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/newsfeed/${id}`);
-    clearCache("/newsfeed");
+    removeCachedPost(id);
     return response.data;
   },
 
   comment: async (id, text) => {
     const response = await api.post(`/newsfeed/${id}/comments`, { text });
-    clearCache("/newsfeed");
+    replaceCachedPost(response.data);
     return response.data;
   },
 
   deleteComment: async (postId, commentId) => {
     const response = await api.delete(`/newsfeed/${postId}/comments/${commentId}`);
-    clearCache("/newsfeed");
+    replaceCachedPost(response.data);
     return response.data;
   },
 
@@ -198,7 +263,7 @@ export const newsfeedAPI = {
     const response = await api.patch(
       `/newsfeed/${postId}/comments/${commentId}/heart`
     );
-    clearCache("/newsfeed");
+    replaceCachedPost(response.data);
     return response.data;
   },
 
@@ -207,7 +272,7 @@ export const newsfeedAPI = {
       `/newsfeed/${postId}/comments/${commentId}/replies`,
       { text }
     );
-    clearCache("/newsfeed");
+    replaceCachedPost(response.data);
     return response.data;
   },
 };

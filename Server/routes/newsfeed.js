@@ -4,7 +4,7 @@ import { protect } from "../middleware/protectedjwt.js";
 
 const router = express.Router();
 const postAllowedRoles = ["admin", "client"];
-const userPublicFields = "firstName lastName companyName email phone country role avatar";
+const userPublicFields = "firstName lastName companyName email phone country role";
 
 const populatePost = (query) =>
   query
@@ -18,13 +18,46 @@ const populatePost = (query) =>
 router.get("/", protect, async (req, res) => {
   try {
     const posts = await populatePost(
-      NewsfeedPost.find().sort({ createdAt: -1 })
+      NewsfeedPost.find().select("-media.url").sort({ createdAt: -1 }).limit(10)
     );
 
     res.status(200).json(posts);
   } catch (error) {
     console.error("Get newsfeed error:", error);
     res.status(500).json({ message: "Unable to fetch newsfeed posts" });
+  }
+});
+
+router.get("/activity", protect, async (req, res) => {
+  try {
+    const posts = await populatePost(
+      NewsfeedPost.find()
+        .select("author content hearts comments createdAt updatedAt")
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .limit(50)
+    );
+
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error("Get newsfeed activity error:", error);
+    res.status(500).json({ message: "Unable to fetch newsfeed activity" });
+  }
+});
+
+router.get("/:id/media", protect, async (req, res) => {
+  try {
+    const post = await NewsfeedPost.findById(req.params.id)
+      .select("media")
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.status(200).json(post.media || { type: "", url: "", name: "" });
+  } catch (error) {
+    console.error("Get newsfeed media error:", error);
+    res.status(500).json({ message: "Unable to fetch post media" });
   }
 });
 
@@ -62,7 +95,9 @@ router.post("/", protect, async (req, res) => {
           }
         : undefined,
     });
-    const createdPost = await populatePost(NewsfeedPost.findById(post._id));
+    const createdPost = await populatePost(
+      NewsfeedPost.findById(post._id).select("-media.url")
+    );
 
     res.status(201).json(createdPost);
   } catch (error) {
@@ -87,7 +122,9 @@ router.patch("/:id/heart", protect, async (req, res) => {
       : [...post.hearts, req.user._id];
 
     await post.save();
-    const updatedPost = await populatePost(NewsfeedPost.findById(post._id));
+    const updatedPost = await populatePost(
+      NewsfeedPost.findById(post._id).select("-media.url")
+    );
 
     res.status(200).json(updatedPost);
   } catch (error) {
@@ -143,7 +180,9 @@ router.post("/:id/comments", protect, async (req, res) => {
     });
 
     await post.save();
-    const updatedPost = await populatePost(NewsfeedPost.findById(post._id));
+    const updatedPost = await populatePost(
+      NewsfeedPost.findById(post._id).select("-media.url")
+    );
 
     res.status(201).json(updatedPost);
   } catch (error) {
@@ -174,7 +213,9 @@ router.patch("/:id/comments/:commentId/heart", protect, async (req, res) => {
       : [...comment.hearts, req.user._id];
 
     await post.save();
-    const updatedPost = await populatePost(NewsfeedPost.findById(post._id));
+    const updatedPost = await populatePost(
+      NewsfeedPost.findById(post._id).select("-media.url")
+    );
 
     res.status(200).json(updatedPost);
   } catch (error) {
@@ -206,7 +247,9 @@ router.delete("/:id/comments/:commentId", protect, async (req, res) => {
 
     comment.deleteOne();
     await post.save();
-    const updatedPost = await populatePost(NewsfeedPost.findById(post._id));
+    const updatedPost = await populatePost(
+      NewsfeedPost.findById(post._id).select("-media.url")
+    );
 
     res.status(200).json(updatedPost);
   } catch (error) {
@@ -245,7 +288,9 @@ router.post("/:id/comments/:commentId/replies", protect, async (req, res) => {
     });
 
     await post.save();
-    const updatedPost = await populatePost(NewsfeedPost.findById(post._id));
+    const updatedPost = await populatePost(
+      NewsfeedPost.findById(post._id).select("-media.url")
+    );
 
     res.status(201).json(updatedPost);
   } catch (error) {

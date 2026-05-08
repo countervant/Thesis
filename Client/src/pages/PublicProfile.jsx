@@ -6,6 +6,7 @@ import companyIcon from "../assets/company.png";
 import emailIcon from "../assets/email.png";
 import heartIcon from "../assets/heart.png";
 import phoneIcon from "../assets/phonenumber.png";
+import redHeartIcon from "../assets/redheart.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI, newsfeedAPI } from "../services/api.js";
 import { getCountryFlag } from "../utils/countries.js";
@@ -95,6 +96,18 @@ const collectUsers = (posts) => {
   return users;
 };
 
+const toggleUserHeart = (hearts, user) => {
+  const userId = getEntityId(user);
+  const safeHearts = Array.isArray(hearts) ? hearts : [];
+  const hasHearted = safeHearts.some((heart) => getEntityId(heart) === userId);
+
+  if (hasHearted) {
+    return safeHearts.filter((heart) => getEntityId(heart) !== userId);
+  }
+
+  return [...safeHearts, user];
+};
+
 const Avatar = ({ user, size = "h-24 w-24" }) => (
   <img
     src={user?.avatar || defaultProfile}
@@ -108,10 +121,12 @@ const Avatar = ({ user, size = "h-24 w-24" }) => (
 
 const HeartIcon = ({ filled = false }) => (
   <img
-    src={heartIcon}
+    src={filled ? redHeartIcon : heartIcon}
     alt=""
     className={`h-5 w-5 object-contain transition ${
-      filled ? "opacity-100" : "opacity-55 grayscale"
+      filled
+        ? "opacity-100"
+        : "opacity-80 dark:brightness-0 dark:invert dark:opacity-90"
     }`}
   />
 );
@@ -181,15 +196,11 @@ const PostPreview = ({
       <button
         type="button"
         onClick={onToggleHeart}
-        className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${
-          hasHearted
-            ? "bg-pink-100 text-[#c72fb2]"
-            : "bg-neutral-50 text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2]"
-        }`}
+        className="inline-flex h-9 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-neutral-700 transition hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
         aria-label={hasHearted ? "Remove heart" : "Heart post"}
       >
         <HeartIcon filled={hasHearted} />
-        <span>{post.hearts.length}</span>
+        <span className="text-neutral-700 dark:text-neutral-300">{post.hearts.length}</span>
       </button>
       <span className="text-sm font-medium text-neutral-500">
         {post.comments.length} comments
@@ -236,11 +247,7 @@ const PostPreview = ({
                     <button
                       type="button"
                       onClick={() => onToggleCommentHeart(commentId)}
-                      className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition ${
-                        hasHeartedComment
-                          ? "bg-pink-100 text-[#c72fb2]"
-                          : "text-neutral-600 hover:bg-pink-50 hover:text-[#c72fb2]"
-                      }`}
+                      className="inline-flex h-8 items-center gap-1 rounded-md px-1 text-xs font-semibold text-neutral-600 transition hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
                       aria-label={
                         hasHeartedComment
                           ? "Remove heart from comment"
@@ -248,7 +255,7 @@ const PostPreview = ({
                       }
                     >
                       <HeartIcon filled={hasHeartedComment} />
-                      <span>{comment.hearts.length}</span>
+                      <span className="text-neutral-600 dark:text-neutral-300">{comment.hearts.length}</span>
                     </button>
                     <button
                       type="button"
@@ -446,21 +453,68 @@ const PublicProfile = () => {
   };
 
   const handleToggleHeart = async (postId) => {
+    let previousPosts = [];
+
     try {
       setErrorMessage("");
+      setPosts((currentPosts) => {
+        previousPosts = currentPosts;
+        return currentPosts.map((post) =>
+          post.id === postId
+            ? { ...post, hearts: toggleUserHeart(post.hearts, user) }
+            : post
+        );
+      });
+      newsfeedAPI.updateCachedPost(postId, (post) => ({
+        ...post,
+        hearts: toggleUserHeart(post.hearts, user),
+      }));
+
       const updatedPost = await newsfeedAPI.toggleHeart(postId);
       replacePost(updatedPost);
     } catch (error) {
+      setPosts(previousPosts);
+      newsfeedAPI.clearCachedPosts();
       setErrorMessage(error.response?.data?.message || "Unable to update heart.");
     }
   };
 
   const handleToggleCommentHeart = async (postId, commentId) => {
+    let previousPosts = [];
+
     try {
       setErrorMessage("");
+      setPosts((currentPosts) => {
+        previousPosts = currentPosts;
+        return currentPosts.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments: post.comments.map((comment) =>
+                  (comment.id || comment._id) === commentId
+                    ? { ...comment, hearts: toggleUserHeart(comment.hearts, user) }
+                    : comment
+                ),
+              }
+            : post
+        );
+      });
+      newsfeedAPI.updateCachedPost(postId, (post) => ({
+        ...post,
+        comments: Array.isArray(post.comments)
+          ? post.comments.map((comment) =>
+              (comment.id || comment._id) === commentId
+                ? { ...comment, hearts: toggleUserHeart(comment.hearts, user) }
+                : comment
+            )
+          : [],
+      }));
+
       const updatedPost = await newsfeedAPI.toggleCommentHeart(postId, commentId);
       replacePost(updatedPost);
     } catch (error) {
+      setPosts(previousPosts);
+      newsfeedAPI.clearCachedPosts();
       setErrorMessage(error.response?.data?.message || "Unable to update comment heart.");
     }
   };
@@ -474,16 +528,47 @@ const PublicProfile = () => {
       return;
     }
 
+    const optimisticComment = normalizeComment({
+      id: `temp-comment-${Date.now()}`,
+      text,
+      user,
+      hearts: [],
+      replies: [],
+      createdAt: new Date().toISOString(),
+    });
+    let previousPosts = [];
+
     try {
       setErrorMessage("");
-      const updatedPost = await newsfeedAPI.comment(postId, text);
-      replacePost(updatedPost);
+      setPosts((currentPosts) => {
+        previousPosts = currentPosts;
+        return currentPosts.map((post) =>
+          post.id === postId
+            ? { ...post, comments: [...post.comments, optimisticComment] }
+            : post
+        );
+      });
+      newsfeedAPI.updateCachedPost(postId, (post) => ({
+        ...post,
+        comments: [...(post.comments || []), optimisticComment],
+      }));
       handleCommentChange(postId, "");
       setVisibleComments((currentVisibility) => ({
         ...currentVisibility,
         [postId]: true,
       }));
+
+      const updatedPost = await newsfeedAPI.comment(postId, text);
+      replacePost(updatedPost);
     } catch (error) {
+      setPosts(previousPosts);
+      newsfeedAPI.updateCachedPost(postId, (post) => ({
+        ...post,
+        comments: (post.comments || []).filter(
+          (comment) => (comment.id || comment._id) !== optimisticComment.id
+        ),
+      }));
+      handleCommentChange(postId, text);
       setErrorMessage(error.response?.data?.message || "Unable to add comment.");
     }
   };

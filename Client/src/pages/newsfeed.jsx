@@ -123,13 +123,15 @@ const HeartIcon = ({ filled }) => (
     src={filled ? redHeartIcon : heartIcon}
     alt=""
     className={`h-5 w-5 object-contain transition ${
-      filled ? "opacity-100" : "opacity-55 grayscale"
-    } ${filled ? "" : "dark:brightness-0 dark:invert dark:opacity-100 dark:drop-shadow-[0_0_5px_rgba(255,255,255,0.55)]"}`}
+      filled
+        ? "opacity-100"
+        : "opacity-80 dark:brightness-0 dark:invert dark:opacity-90"
+    }`}
   />
 );
 
 const Newsfeed = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [posts, setPosts] = useState([]);
   const [postContent, setPostContent] = useState("");
   const [postMedia, setPostMedia] = useState(null);
@@ -149,6 +151,8 @@ const Newsfeed = () => {
   const userId = getEntityId(user);
 
   useEffect(() => {
+    if (authLoading) return;
+
     let isMounted = true;
 
     const loadPosts = async () => {
@@ -176,7 +180,54 @@ const Newsfeed = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authLoading]);
+
+  useEffect(() => {
+    const postsMissingMedia = posts.filter(
+      (post) => post.media?.type && !post.media?.url
+    );
+
+    if (postsMissingMedia.length === 0) return;
+
+    let isMounted = true;
+
+    postsMissingMedia.forEach(async (post) => {
+      try {
+        const media = await newsfeedAPI.getMedia(post.id);
+
+        if (!isMounted) return;
+
+        setPosts((currentPosts) =>
+          currentPosts.map((currentPost) =>
+            currentPost.id === post.id
+              ? {
+                  ...currentPost,
+                  media: {
+                    type: media?.type || "",
+                    url: media?.url || "",
+                    name: media?.name || "",
+                  },
+                }
+              : currentPost
+          )
+        );
+      } catch {
+        if (!isMounted) return;
+
+        setPosts((currentPosts) =>
+          currentPosts.map((currentPost) =>
+            currentPost.id === post.id
+              ? { ...currentPost, media: { type: "", url: "", name: "" } }
+              : currentPost
+          )
+        );
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [posts]);
 
   useEffect(() => {
     const focusTarget = () => {

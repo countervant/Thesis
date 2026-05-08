@@ -132,6 +132,15 @@ const getUserName = (value) => {
   return name || value?.email || "Unassigned";
 };
 
+const getLoadErrorMessage = (label, error) => {
+  const message =
+    error?.response?.data?.message ||
+    error?.message ||
+    "Unable to load this data.";
+
+  return `${label}: ${message}`;
+};
+
 const Icon = ({ name, className = "h-8 w-8" }) => {
   const stroke = "currentColor";
 
@@ -618,21 +627,51 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
       try {
         setIsLoading(true);
         setLoadError("");
-        const [taskData, employeeData, clientData, budgetData] = await Promise.all([
-          taskAPI.getAll(),
-          employeeAPI.getAll(),
-          clientAPI.getAll(),
-          budgetAPI.getAll(),
-        ]);
+        const [taskResult, employeeResult, clientResult, budgetResult] =
+          await Promise.allSettled([
+            taskAPI.getAll(),
+            employeeAPI.getAll(),
+            clientAPI.getAll(),
+            budgetAPI.getAll(),
+          ]);
 
         if (!isMounted) {
           return;
         }
 
-        setTasks(Array.isArray(taskData) ? taskData : []);
-        setEmployees(Array.isArray(employeeData) ? employeeData : []);
-        setClients(Array.isArray(clientData) ? clientData : []);
-        setBudgetEntries(Array.isArray(budgetData) ? budgetData : []);
+        setTasks(
+          taskResult.status === "fulfilled" && Array.isArray(taskResult.value)
+            ? taskResult.value
+            : []
+        );
+        setEmployees(
+          employeeResult.status === "fulfilled" && Array.isArray(employeeResult.value)
+            ? employeeResult.value
+            : []
+        );
+        setClients(
+          clientResult.status === "fulfilled" && Array.isArray(clientResult.value)
+            ? clientResult.value
+            : []
+        );
+        setBudgetEntries(
+          budgetResult.status === "fulfilled" && Array.isArray(budgetResult.value)
+            ? budgetResult.value
+            : []
+        );
+
+        const failedRequests = [
+          ["Tasks", taskResult],
+          ["Employees", employeeResult],
+          ["Clients", clientResult],
+          ["Budgets", budgetResult],
+        ].filter(([, result]) => result.status === "rejected");
+
+        setLoadError(
+          failedRequests
+            .map(([label, result]) => getLoadErrorMessage(label, result.reason))
+            .join(" ")
+        );
       } catch (error) {
         if (!isMounted) {
           return;

@@ -125,7 +125,7 @@ const buildTaskNotifications = (tasks, user) => {
 };
 
 const Notification = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,6 +135,8 @@ const Notification = () => {
   const currentUserId = useMemo(() => getEntityId(user), [user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     let isMounted = true;
 
     const loadNotifications = async () => {
@@ -143,8 +145,8 @@ const Notification = () => {
 
       try {
         const [posts, tasks] = await Promise.all([
-          newsfeedAPI.getAll(),
-          taskAPI.getAll(),
+          newsfeedAPI.getActivity(),
+          user?.role === "employee" ? taskAPI.getAll() : Promise.resolve([]),
         ]);
 
         const nextNotifications = [
@@ -171,7 +173,7 @@ const Notification = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentUserId, user]);
+  }, [authLoading, currentUserId, user]);
 
   const handleNavigate = (page) => {
     const dashboardPath = dashboardPathByRole[user?.role] || "/client/dashboard";

@@ -48,7 +48,6 @@ const clientUserToClient = (user) => ({
   phone: user.phone || "",
   country: user.country || "Philippines",
   service: user.position || "",
-  avatar: user.avatar || "",
   isActive: user.isActive,
   address: "",
   notes: "",
@@ -64,7 +63,7 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
     const clientUsers = await User.find({ role: "client" })
-      .select("firstName lastName companyName email phone country position role avatar isActive createdAt updatedAt")
+      .select("firstName lastName companyName email phone country position role isActive createdAt updatedAt")
       .sort({ createdAt: -1 })
       .lean();
 

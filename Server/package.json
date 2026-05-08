@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js",
+    "dev": "node --use-system-ca ./node_modules/nodemon/bin/nodemon.js server.js",
+    "start": "node --use-system-ca server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
