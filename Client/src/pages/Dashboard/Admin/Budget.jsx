@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import balanceIcon from "../../../assets/balance.png";
+import totalExpenseIcon from "../../../assets/totalexpense.png";
+import totalIncomeIcon from "../../../assets/totalincome.png";
+import walletIcon from "../../../assets/wallet.png";
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -63,6 +68,12 @@ const budgetIcons = {
 };
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
+  const imageIcon = budgetIcons[name];
+
+  if (imageIcon) {
+    return <img src={imageIcon} alt="" className={className} aria-hidden="true" />;
+  }
+
   const props = {
     viewBox: "0 0 24 24",
     fill: "none",

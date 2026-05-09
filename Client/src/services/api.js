@@ -279,6 +279,28 @@ export const newsfeedAPI = {
   },
 };
 
+export const messageAPI = {
+  getUsers: async () => {
+    return cachedGet("/messages/users");
+  },
+
+  getThreads: async () => {
+    return cachedGet("/messages/threads");
+  },
+
+  getThread: async (userId) => {
+    const response = await api.get(`/messages/threads/${userId}`);
+    clearCache("/messages/threads");
+    return response.data;
+  },
+
+  send: async (recipientId, text) => {
+    const response = await api.post("/messages", { recipientId, text });
+    clearCache("/messages/threads");
+    return response.data;
+  },
+};
+
 export const employeeAPI = {
   getAll: async () => {
     return cachedGet("/auth/employees");
