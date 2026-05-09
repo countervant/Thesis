@@ -10,7 +10,14 @@ const messageClients = new Map();
 
 const userFields = "firstName lastName email role avatar companyName isActive";
 
-const getUserId = (user) => String(user?._id || user?.id || "");
+const getUserId = (user) => {
+  if (!user) return "";
+  if (typeof user === "string") return user;
+  if (user._id) return String(user._id);
+  if (user.id && typeof user.id !== "function") return String(user.id);
+  if (typeof user.toString === "function") return user.toString();
+  return "";
+};
 
 const toParticipant = (user) => {
   if (!user) return null;

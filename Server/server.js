@@ -24,9 +24,13 @@ const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
   : [
       "http://localhost:5173",
+      "http://127.0.0.1:5173",
       "http://localhost:5174",
+      "http://127.0.0.1:5174",
       "http://localhost:3000",
+      "http://127.0.0.1:3000",
       "http://localhost:3001",
+      "http://127.0.0.1:3001",
     ];
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
