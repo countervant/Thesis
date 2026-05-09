@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AdminDashboard from "./Dashboard/Admin/Home.jsx";
@@ -271,10 +271,52 @@ const MessagesPanel = () => {
     }
   };
 
-  const refreshThreads = async () => {
+  const refreshThreads = useCallback(async () => {
     const nextThreads = await messageAPI.getThreads();
-    setThreads(Array.isArray(nextThreads) ? nextThreads : []);
-  };
+    setThreads(
+      Array.isArray(nextThreads)
+        ? nextThreads.map((thread) =>
+            getEntityId(thread.participant) === activeUserId
+              ? { ...thread, unreadCount: 0 }
+              : thread
+          )
+        : []
+    );
+  }, [activeUserId]);
+
+  useEffect(() => {
+    const closeMessages = messageAPI.subscribe({
+      onMessage: (message) => {
+        const senderId = getEntityId(message.sender);
+        const recipientId = getEntityId(message.recipient);
+        const conversationUserId =
+          senderId === currentUserId ? recipientId : senderId;
+
+        if (conversationUserId === activeUserId) {
+          setMessages((currentMessages) => {
+            if (
+              currentMessages.some(
+                (item) => getEntityId(item) === getEntityId(message)
+              )
+            ) {
+              return currentMessages;
+            }
+
+            return [...currentMessages, message];
+          });
+        }
+
+        refreshThreads();
+      },
+      onError: () => {
+        setErrorMessage(
+          "Realtime connection interrupted. Messages will refresh when reopened."
+        );
+      },
+    });
+
+    return closeMessages;
+  }, [activeUserId, currentUserId, refreshThreads]);
 
   const handleSendMessage = async (event) => {
     event.preventDefault();
@@ -286,7 +328,17 @@ const MessagesPanel = () => {
       setIsSending(true);
       setErrorMessage("");
       const savedMessage = await messageAPI.send(activeUserId, text);
-      setMessages((currentMessages) => [...currentMessages, savedMessage]);
+      setMessages((currentMessages) => {
+        if (
+          currentMessages.some(
+            (item) => getEntityId(item) === getEntityId(savedMessage)
+          )
+        ) {
+          return currentMessages;
+        }
+
+        return [...currentMessages, savedMessage];
+      });
       setDraft("");
       await refreshThreads();
     } catch (error) {
@@ -515,7 +567,7 @@ const MessagesPanel = () => {
           />
           <button
             type="button"
-            onClick={() => setDraft((currentDraft) => `${currentDraft} 🙂`)}
+            onClick={() => setDraft((currentDraft) => `${currentDraft} :)`)}
             disabled={!activeUserId || isSending}
             className="absolute right-4 top-1/2 grid -translate-y-1/2 place-items-center text-neutral-950 transition hover:text-[#dc4fb2] dark:text-white"
             aria-label="Choose emoji"

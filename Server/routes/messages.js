@@ -1,10 +1,12 @@
 import express from "express";
+import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { protect } from "../middleware/protectedjwt.js";
 import Message from "../model/messageModel.js";
 import User from "../model/userModel.js";
 
 const router = express.Router();
+const messageClients = new Map();
 
 const userFields = "firstName lastName email role avatar companyName isActive";
 
@@ -31,6 +33,81 @@ const getParticipantId = (message, currentUserId) => {
 
   return senderId === currentUserId ? recipientId : senderId;
 };
+
+const addMessageClient = (userId, res) => {
+  const clients = messageClients.get(userId) || new Set();
+  clients.add(res);
+  messageClients.set(userId, clients);
+};
+
+const removeMessageClient = (userId, res) => {
+  const clients = messageClients.get(userId);
+  if (!clients) return;
+
+  clients.delete(res);
+  if (clients.size === 0) {
+    messageClients.delete(userId);
+  }
+};
+
+const emitMessageEvent = (userId, payload) => {
+  const clients = messageClients.get(String(userId));
+  if (!clients) return;
+
+  clients.forEach((client) => {
+    client.write(`event: message\n`);
+    client.write(`data: ${JSON.stringify(payload)}\n\n`);
+  });
+};
+
+const toMessagePayload = (message) => ({
+  _id: message._id,
+  sender: getUserId(message.sender),
+  recipient: getUserId(message.recipient),
+  text: message.text,
+  readAt: message.readAt,
+  createdAt: message.createdAt,
+  updatedAt: message.updatedAt,
+});
+
+router.get("/events", async (req, res) => {
+  try {
+    const token = req.query.token;
+    if (!token) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select("_id").lean();
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized, user not found" });
+    }
+
+    const userId = getUserId(user);
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+    res.write(`event: connected\n`);
+    res.write(`data: {"ok":true}\n\n`);
+
+    addMessageClient(userId, res);
+
+    const heartbeat = setInterval(() => {
+      res.write(`event: ping\n`);
+      res.write(`data: {}\n\n`);
+    }, 25000);
+
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      removeMessageClient(userId, res);
+      res.end();
+    });
+  } catch (error) {
+    console.error("Message events error:", error);
+    res.status(401).json({ message: "Not authorized, token failed" });
+  }
+});
 
 router.get("/users", protect, async (req, res) => {
   try {
@@ -184,6 +261,10 @@ router.post("/", protect, async (req, res) => {
       recipient: recipientId,
       text,
     });
+
+    const payload = toMessagePayload(message);
+    emitMessageEvent(currentUserId, payload);
+    emitMessageEvent(recipientId, payload);
 
     res.status(201).json(message);
   } catch (error) {

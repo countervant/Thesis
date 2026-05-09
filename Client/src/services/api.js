@@ -299,6 +299,32 @@ export const messageAPI = {
     clearCache("/messages/threads");
     return response.data;
   },
+
+  subscribe: ({ onMessage, onError } = {}) => {
+    const token = localStorage.getItem("token");
+    if (!token || typeof EventSource === "undefined") {
+      return () => {};
+    }
+
+    const events = new EventSource(
+      `${API_URL}/messages/events?token=${encodeURIComponent(token)}`
+    );
+
+    events.addEventListener("message", (event) => {
+      try {
+        clearCache("/messages/threads");
+        onMessage?.(JSON.parse(event.data));
+      } catch {
+        onError?.("Unable to receive realtime message.");
+      }
+    });
+
+    events.addEventListener("error", () => {
+      onError?.("Realtime connection interrupted.");
+    });
+
+    return () => events.close();
+  },
 };
 
 export const employeeAPI = {
