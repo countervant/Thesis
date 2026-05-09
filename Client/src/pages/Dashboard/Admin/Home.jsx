@@ -308,7 +308,7 @@ const StatCard = ({ item }) => (
 );
 
 const DashboardLoading = () => (
-  <div className="mx-auto grid min-h-[60vh] max-w-[1500px] place-items-center">
+  <div className="-mx-4 -mb-10 -mt-8 grid min-h-[calc(100vh-4rem)] place-items-center bg-[#f1f1f1] px-4 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
     <section className="grid place-items-center rounded-lg bg-white px-10 py-12 text-center shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
       <div className="h-12 w-12 animate-spin rounded-full border-4 border-pink-100 border-t-[#dc4bb2]" />
       <p className="mt-4 text-sm font-semibold text-neutral-700">
@@ -699,7 +699,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }
 
   return (
-        <div className="mx-auto max-w-[1500px] space-y-5">
+        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}

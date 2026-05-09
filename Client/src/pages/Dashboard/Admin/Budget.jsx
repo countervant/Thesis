@@ -430,7 +430,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   };
 
   return (
-        <div className="mx-auto max-w-[1500px]">
+        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1

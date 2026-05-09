@@ -288,6 +288,15 @@ export const messageAPI = {
     return cachedGet("/messages/threads");
   },
 
+  getUnreadCount: async () => {
+    const response = await api.get("/messages/threads");
+    const threads = Array.isArray(response.data) ? response.data : [];
+    return threads.reduce(
+      (total, thread) => total + (Number(thread.unreadCount) || 0),
+      0
+    );
+  },
+
   getThread: async (userId) => {
     const response = await api.get(`/messages/threads/${userId}`);
     clearCache("/messages/threads");

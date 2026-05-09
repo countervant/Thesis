@@ -842,7 +842,7 @@ const Dashboard = () => {
     ) : localPage === "messages" ? (
       <MessagesPanel />
     ) : (
-      <div className="mx-auto max-w-[1500px]">
+      <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
           <h1
             className="text-3xl uppercase leading-none text-neutral-950"

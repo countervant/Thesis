@@ -16,7 +16,7 @@ import taskIcon from "../assets/task.png";
 import themeIcon from "../assets/theme.png";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { newsfeedAPI, taskAPI } from "../services/api.js";
+import { messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const notificationReadKeyPrefix = "clientraReadNotifications";
@@ -30,7 +30,6 @@ const sideNavItems = [
   { id: "budget", label: "Budget", icon: "budget" },
   { id: "client", label: "Client", icon: "client" },
   { id: "employee", label: "Employee", icon: "employee" },
-  { id: "messages", label: "Messages", icon: "messages" },
 ];
 
 const navIcons = {
@@ -320,6 +319,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const [notificationDeleteAction, setNotificationDeleteAction] = useState(null);
   const [isNotificationLoading, setIsNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState("");
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const userId = getEntityId(user);
@@ -343,6 +343,42 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     document.documentElement.classList.toggle("dark", isDarkMode);
     localStorage.setItem(themeStorageKey, isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (!userId) {
+      setUnreadMessageCount(0);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const loadUnreadMessages = async () => {
+      try {
+        const count = await messageAPI.getUnreadCount();
+        if (isMounted) {
+          setUnreadMessageCount(count);
+        }
+      } catch {
+        if (isMounted) {
+          setUnreadMessageCount(0);
+        }
+      }
+    };
+
+    loadUnreadMessages();
+
+    const closeMessages = messageAPI.subscribe({
+      onMessage: loadUnreadMessages,
+      onError: () => {},
+    });
+    const intervalId = setInterval(loadUnreadMessages, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      closeMessages();
+    };
+  }, [userId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -506,6 +542,32 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         <div aria-hidden="true" />
 
         <div className="flex items-center gap-3 justify-self-end">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("messages")}
+            className={`relative grid h-12 w-12 place-items-center rounded-2xl border shadow-sm transition hover:border-pink-200 hover:text-[#c72fb2] ${
+              activePage === "messages"
+                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-pink-500/40 dark:bg-neutral-900 dark:text-[#f472d0]"
+                : "border-slate-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+            }`}
+            aria-label="Messages"
+            title="Messages"
+          >
+            <img
+              src={messagesIcon}
+              alt=""
+              className={`h-6 w-6 object-contain ${
+                activePage === "messages" ? "top-nav-icon-active" : ""
+              }`}
+              aria-hidden="true"
+            />
+            {unreadMessageCount > 0 && (
+              <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[10px] font-bold leading-none text-white">
+                {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
+              </span>
+            )}
+          </button>
+
           <div ref={notificationMenuRef} className="relative">
             <button
               type="button"
