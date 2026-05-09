@@ -309,6 +309,18 @@ export const messageAPI = {
     return response.data;
   },
 
+  update: async (id, text) => {
+    const response = await api.put(`/messages/${id}`, { text });
+    clearCache("/messages/threads");
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/messages/${id}`);
+    clearCache("/messages/threads");
+    return response.data;
+  },
+
   subscribe: ({ onMessage, onError } = {}) => {
     const token = localStorage.getItem("token");
     if (!token || typeof EventSource === "undefined") {

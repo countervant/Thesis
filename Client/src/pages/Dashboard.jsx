@@ -127,6 +127,9 @@ const MessagesPanel = () => {
   const [activeParticipant, setActiveParticipant] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState("");
+  const [editingText, setEditingText] = useState("");
+  const [busyMessageId, setBusyMessageId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoadingInbox, setIsLoadingInbox] = useState(true);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
@@ -301,6 +304,8 @@ const MessagesPanel = () => {
     setActiveUserId(getEntityId(participant));
     setActiveParticipant(participant);
     setDraft("");
+    setEditingMessageId("");
+    setEditingText("");
   };
 
   const handleStartNewMessage = () => {
@@ -329,7 +334,9 @@ const MessagesPanel = () => {
 
   useEffect(() => {
     const closeMessages = messageAPI.subscribe({
-      onMessage: (message) => {
+      onMessage: (event) => {
+        const action = event?.action || "created";
+        const message = event?.message || event;
         const senderId = getEntityId(message.sender);
         const recipientId = getEntityId(message.recipient);
         const conversationUserId =
@@ -337,6 +344,18 @@ const MessagesPanel = () => {
 
         if (conversationUserId === activeUserIdRef.current) {
           setMessages((currentMessages) => {
+            if (action === "deleted") {
+              return currentMessages.filter(
+                (item) => getEntityId(item) !== getEntityId(message)
+              );
+            }
+
+            if (action === "updated") {
+              return currentMessages.map((item) =>
+                getEntityId(item) === getEntityId(message) ? message : item
+              );
+            }
+
             if (
               currentMessages.some(
                 (item) => getEntityId(item) === getEntityId(message)
@@ -392,6 +411,66 @@ const MessagesPanel = () => {
       setErrorMessage(error.response?.data?.message || "Unable to send message.");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleStartEditMessage = (message) => {
+    setEditingMessageId(getEntityId(message));
+    setEditingText(message.text || "");
+  };
+
+  const handleCancelEditMessage = () => {
+    setEditingMessageId("");
+    setEditingText("");
+  };
+
+  const handleUpdateMessage = async (event) => {
+    event.preventDefault();
+
+    const text = editingText.trim();
+    if (!editingMessageId || !text || busyMessageId) return;
+
+    try {
+      setBusyMessageId(editingMessageId);
+      setErrorMessage("");
+      const updatedMessage = await messageAPI.update(editingMessageId, text);
+      setMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          getEntityId(message) === getEntityId(updatedMessage)
+            ? updatedMessage
+            : message
+        )
+      );
+      setEditingMessageId("");
+      setEditingText("");
+      await refreshThreads();
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to edit message.");
+    } finally {
+      setBusyMessageId("");
+    }
+  };
+
+  const handleDeleteMessage = async (message) => {
+    const messageId = getEntityId(message);
+    if (!messageId || busyMessageId) return;
+
+    try {
+      setBusyMessageId(messageId);
+      setErrorMessage("");
+      await messageAPI.delete(messageId);
+      setMessages((currentMessages) =>
+        currentMessages.filter((item) => getEntityId(item) !== messageId)
+      );
+      if (editingMessageId === messageId) {
+        setEditingMessageId("");
+        setEditingText("");
+      }
+      await refreshThreads();
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to delete message.");
+    } finally {
+      setBusyMessageId("");
     }
   };
 
@@ -567,6 +646,8 @@ const MessagesPanel = () => {
 
           {messages.map((message) => {
             const isMine = getEntityId(message.sender) === currentUserId;
+            const messageId = getEntityId(message);
+            const isEditing = editingMessageId === messageId;
 
             return (
               <div
@@ -576,21 +657,75 @@ const MessagesPanel = () => {
                 {!isMine && (
                   <Avatar className="h-11 w-11 shrink-0" user={activeParticipant} />
                 )}
-                <div
-                  className={`max-w-[76%] rounded-3xl px-5 py-3 text-sm font-medium sm:max-w-[560px] ${
-                    isMine
-                      ? "bg-[#dc4fb2] text-black"
-                      : "bg-neutral-300 text-neutral-950 dark:bg-neutral-800 dark:text-white"
-                  }`}
-                >
-                  <p className="break-words">{message.text}</p>
-                  <p
-                    className={`mt-1 text-[10px] font-bold ${
-                      isMine ? "text-black/60" : "text-neutral-500 dark:text-neutral-400"
+                <div className={`flex max-w-[76%] flex-col ${isMine ? "items-end" : "items-start"} sm:max-w-[560px]`}>
+                  <div
+                    className={`rounded-3xl px-5 py-3 text-sm font-medium ${
+                      isMine
+                        ? "bg-[#dc4fb2] text-black"
+                        : "bg-neutral-300 text-neutral-950 dark:bg-neutral-800 dark:text-white"
                     }`}
                   >
-                    {formatMessageTime(message.createdAt)}
-                  </p>
+                    {isEditing ? (
+                      <form onSubmit={handleUpdateMessage} className="flex min-w-[240px] flex-col gap-2">
+                        <input
+                          type="text"
+                          value={editingText}
+                          onChange={(event) => setEditingText(event.target.value)}
+                          maxLength={1000}
+                          autoFocus
+                          className="h-10 rounded-full border border-black/20 bg-white px-4 text-sm text-neutral-950 outline-none focus:ring-2 focus:ring-white/80"
+                        />
+                        <span className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelEditMessage}
+                            className="rounded-full bg-black/10 px-3 py-1 text-xs font-bold"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!editingText.trim() || busyMessageId === messageId}
+                            className="rounded-full bg-black px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        </span>
+                      </form>
+                    ) : (
+                      <>
+                        <p className="break-words">{message.text}</p>
+                        <p
+                          className={`mt-1 text-[10px] font-bold ${
+                            isMine ? "text-black/60" : "text-neutral-500 dark:text-neutral-400"
+                          }`}
+                        >
+                          {formatMessageTime(message.createdAt)}
+                          {message.editedAt ? " · edited" : ""}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  {isMine && !isEditing && (
+                    <div className="mt-1 flex gap-2 pr-2 text-[11px] font-bold text-neutral-500 dark:text-neutral-400">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditMessage(message)}
+                        disabled={Boolean(busyMessageId)}
+                        className="transition hover:text-[#c72fb2] disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(message)}
+                        disabled={Boolean(busyMessageId)}
+                        className="transition hover:text-red-600 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {isMine && <Avatar className="h-11 w-11 shrink-0" user={user} />}
               </div>

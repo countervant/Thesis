@@ -67,12 +67,23 @@ const emitMessageEvent = (userId, payload) => {
   });
 };
 
+const emitMessageChange = (message, action = "message") => {
+  const payload = {
+    action,
+    message: toMessagePayload(message),
+  };
+
+  emitMessageEvent(getUserId(message.sender), payload);
+  emitMessageEvent(getUserId(message.recipient), payload);
+};
+
 const toMessagePayload = (message) => ({
   _id: message._id,
   sender: getUserId(message.sender),
   recipient: getUserId(message.recipient),
   text: message.text,
   readAt: message.readAt,
+  editedAt: message.editedAt,
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 });
@@ -269,14 +280,78 @@ router.post("/", protect, async (req, res) => {
       text,
     });
 
-    const payload = toMessagePayload(message);
-    emitMessageEvent(currentUserId, payload);
-    emitMessageEvent(recipientId, payload);
+    emitMessageChange(message, "created");
 
     res.status(201).json(message);
   } catch (error) {
     console.error("Send message error:", error);
     res.status(500).json({ message: "Unable to send message" });
+  }
+});
+
+router.put("/:id", protect, async (req, res) => {
+  try {
+    const currentUserId = getUserId(req.user);
+    const text = String(req.body.text || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid message" });
+    }
+
+    if (!text) {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    if (text.length > 1000) {
+      return res.status(400).json({ message: "Message must be 1000 characters or fewer" });
+    }
+
+    const message = await Message.findById(req.params.id);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (getUserId(message.sender) !== currentUserId) {
+      return res.status(403).json({ message: "You can only edit your own messages" });
+    }
+
+    message.text = text;
+    message.editedAt = new Date();
+    await message.save();
+
+    emitMessageChange(message, "updated");
+    res.status(200).json(message);
+  } catch (error) {
+    console.error("Update message error:", error);
+    res.status(500).json({ message: "Unable to update message" });
+  }
+});
+
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const currentUserId = getUserId(req.user);
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid message" });
+    }
+
+    const message = await Message.findById(req.params.id);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (getUserId(message.sender) !== currentUserId) {
+      return res.status(403).json({ message: "You can only delete your own messages" });
+    }
+
+    const payloadSource = message.toObject();
+    await message.deleteOne();
+
+    emitMessageChange(payloadSource, "deleted");
+    res.status(200).json({ message: "Message deleted" });
+  } catch (error) {
+    console.error("Delete message error:", error);
+    res.status(500).json({ message: "Unable to delete message" });
   }
 });
 
