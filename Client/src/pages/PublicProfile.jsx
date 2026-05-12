@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton.jsx";
-import defaultProfile from "../assets/default-profile.png";
 import companyIcon from "../assets/company.png";
 import emailIcon from "../assets/email.png";
 import heartIcon from "../assets/heart.png";
@@ -110,13 +110,10 @@ const toggleUserHeart = (hearts, user) => {
 };
 
 const Avatar = ({ user, size = "h-24 w-24" }) => (
-  <img
-    src={user?.avatar || defaultProfile}
-    alt=""
-    onError={(event) => {
-      event.currentTarget.src = defaultProfile;
-    }}
-    className={`${size} shrink-0 rounded-full object-cover`}
+  <InitialsAvatar
+    user={user}
+    className={size}
+    textClassName={size.includes("h-24") ? "text-3xl" : "text-xs"}
   />
 );
 

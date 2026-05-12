@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { clientAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
-import defaultProfile from "../../../assets/default-profile.png";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
 import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
@@ -235,20 +235,14 @@ const ClientCard = ({ client, onDelete }) => {
       )}
 
       <div className="flex items-start gap-6">
-        {client.avatar ? (
-          <img
-            src={client.avatar}
-            alt=""
-            onError={(event) => {
-              event.currentTarget.src = defaultProfile;
-            }}
-            className="h-16 w-16 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-2xl font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.24)]">
-            {client.initials}
-          </div>
-        )}
+        <InitialsAvatar
+          className="h-16 w-16"
+          fallback="CL"
+          initials={client.initials}
+          name={client.name}
+          src={client.avatar}
+          textClassName="text-2xl"
+        />
         <div className="min-w-0 pt-1">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="truncate text-xl font-extrabold text-neutral-950 dark:text-white">{client.name}</h2>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
-import defaultProfile from "../assets/default-profile.png";
 import CountrySelect from "../components/CountrySelect.jsx";
+import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { ProfileSkeleton } from "../components/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI } from "../services/api.js";
@@ -287,16 +287,13 @@ const Profile = ({ embedded = false }) => {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-2xl font-bold text-white">
-                <img
-                  src={formData.avatar || defaultProfile}
-                  alt="Avatar preview"
-                  onError={(event) => {
-                    event.currentTarget.src = defaultProfile;
-                  }}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <InitialsAvatar
+                alt="Avatar preview"
+                className="h-20 w-20"
+                src={formData.avatar}
+                textClassName="text-2xl"
+                user={formData}
+              />
               <label className="inline-flex h-10 cursor-pointer items-center rounded-lg bg-[#dc4fb2] px-5 text-sm font-semibold text-white transition hover:brightness-105">
                 Upload Avatar
                 <input

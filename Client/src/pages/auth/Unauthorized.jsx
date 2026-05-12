@@ -3,6 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const Unauthorized = () => {
   const { user } = useAuth();
+  const role = String(user?.role || "").trim();
   const dashboardPathByRole = {
     client: "/client/dashboard",
     employee: "/employee/dashboard",
@@ -18,14 +19,12 @@ const Unauthorized = () => {
         </h2>
         <p className="text-gray-600 mb-8">
           Sorry, you don't have permission to access this page.
-          {user && (
-            <span className="block mt-2">
-              Your current role: <strong>{user.role}</strong>
-            </span>
-          )}
+          <span className="block mt-2">
+            Your current role: <strong>{role || "Unknown"}</strong>
+          </span>
         </p>
         <Link
-          to={dashboardPathByRole[user?.role] || "/dashboard"}
+          to={dashboardPathByRole[role.toLowerCase()] || "/dashboard"}
           className="px-6 py-3 bg-linear-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
         >
           Go to Dashboard

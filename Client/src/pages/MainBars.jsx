@@ -4,7 +4,6 @@ import budgetIcon from "../assets/budget.png";
 import clientIcon from "../assets/client.png";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import dashboardIcon from "../assets/dashboard.png";
-import defaultProfile from "../assets/default-profile.png";
 import employeeIcon from "../assets/employee.png";
 import heartIcon from "../assets/heart.png";
 import messagesIcon from "../assets/messages.png";
@@ -16,6 +15,7 @@ import sidebarIcon from "../assets/sidebar.png";
 import taskIcon from "../assets/task.png";
 import themeIcon from "../assets/theme.png";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { NotificationSkeleton } from "../components/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
@@ -295,14 +295,7 @@ const Icon = ({ name, className = "h-6 w-6" }) => {
 
 const UserAvatar = ({ user }) => {
   return (
-    <img
-      src={user?.avatar || defaultProfile}
-      alt="User"
-      onError={(event) => {
-        event.currentTarget.src = defaultProfile;
-      }}
-      className="h-8 w-8 rounded-full object-cover"
-    />
+    <InitialsAvatar alt="User" className="h-8 w-8" textClassName="text-xs" user={user} />
   );
 };
 

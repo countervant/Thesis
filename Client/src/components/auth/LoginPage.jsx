@@ -14,6 +14,8 @@ const dashboardPathByRole = {
   admin: "/admin/dashboard",
 };
 
+const normalizeRole = (role) => String(role || "").trim().toLowerCase();
+
 const LoginPage = ({ order, order1 }) => {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -50,9 +52,10 @@ const LoginPage = ({ order, order1 }) => {
 
     try {
       const data = await authAPI.login(email, password);
-      login({ id: data.id, email: data.email, role: data.role }, data.token);
+      const role = normalizeRole(data.role);
+      login({ id: data.id, email: data.email, role }, data.token);
       resetForm();
-      navigate(dashboardPathByRole[data.role] || "/client/dashboard", {
+      navigate(dashboardPathByRole[role] || "/dashboard", {
         replace: true,
       });
     } catch (err) {

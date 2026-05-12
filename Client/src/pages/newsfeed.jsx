@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import defaultProfile from "../assets/default-profile.png";
 import emojiIcon from "../assets/emoji.png";
 import heartIcon from "../assets/heart.png";
 import insertImageIcon from "../assets/insertimage.png";
@@ -8,6 +7,7 @@ import redHeartIcon from "../assets/redheart.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { newsfeedAPI } from "../services/api.js";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { FeedSkeleton } from "../components/Skeleton.jsx";
 import { getCountryFlag } from "../utils/countries.js";
 
@@ -131,14 +131,7 @@ const canShowInOnlineTeam = (member, currentUserId) => {
 };
 
 const Avatar = ({ user, size = "h-10 w-10" }) => (
-  <img
-    src={user?.avatar || defaultProfile}
-    alt=""
-    onError={(event) => {
-      event.currentTarget.src = defaultProfile;
-    }}
-    className={`${size} shrink-0 rounded-full object-cover`}
-  />
+  <InitialsAvatar user={user} className={size} />
 );
 
 const ProfileButton = ({ children, className = "", user }) => {

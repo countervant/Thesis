@@ -41,8 +41,11 @@
 .dark .text-gray-600,
 .dark .text-gray-500,
 .dark .text-gray-400,
-.dark .text-slate-700 {
-  color: #b6b6b6 !important;
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #f5f5f5 !important;
 }
 
 .dark .border-neutral-300,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { employeeAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
-import defaultProfile from "../../../assets/default-profile.png";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
 import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
@@ -231,20 +231,14 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
   return (
     <article className="flex min-h-[300px] flex-col rounded-2xl border border-pink-100 bg-white px-8 pb-6 pt-7 shadow-[0_8px_22px_rgba(190,65,158,0.18)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
       <div className="flex items-start gap-6">
-        {employee.avatar ? (
-          <img
-            src={employee.avatar}
-            alt=""
-            onError={(event) => {
-              event.currentTarget.src = defaultProfile;
-            }}
-            className="h-16 w-16 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-2xl font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.24)]">
-            {employee.initials}
-          </div>
-        )}
+        <InitialsAvatar
+          className="h-16 w-16"
+          fallback="EM"
+          initials={employee.initials}
+          name={employee.name}
+          src={employee.avatar}
+          textClassName="text-2xl"
+        />
         <div className="min-w-0 pt-1">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="truncate text-xl font-extrabold text-neutral-950 dark:text-white">{employee.name}</h2>

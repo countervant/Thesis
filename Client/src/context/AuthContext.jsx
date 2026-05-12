@@ -3,7 +3,7 @@ import { authAPI } from "../services/api.js";
 
 const AuthContext = createContext(null);
 
-const normalizeRole = (role) => role?.toLowerCase();
+const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 const userForStorage = (userData) => {
   const storedUser = { ...(userData || {}) };
   delete storedUser.password;
@@ -109,10 +109,11 @@ export const AuthProvider = ({ children }) => {
   // Check if user has required role(s)
   const hasRole = (roles) => {
     if (!user) return false;
+    const userRole = normalizeRole(user.role);
     if (typeof roles === "string") {
-      return user.role === roles;
+      return userRole === normalizeRole(roles);
     }
-    return roles.includes(user.role);
+    return roles.map(normalizeRole).includes(userRole);
   };
 
   return (

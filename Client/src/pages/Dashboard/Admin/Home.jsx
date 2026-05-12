@@ -4,6 +4,7 @@ import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
 import { dashboardAPI } from "../../../services/api.js";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
 
 const statItems = [
@@ -308,21 +309,8 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
   );
 };
 
-const Avatar = () => (
-  <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-slate-700">
-    <svg viewBox="0 0 32 32" className="h-7 w-7" aria-hidden="true">
-      <circle cx="16" cy="13" r="6" fill="#8fa2af" />
-      <path d="M7 28c1.5-5 4.6-7.5 9-7.5s7.5 2.5 9 7.5" fill="#647887" />
-      <path
-        d="M10 12h12"
-        stroke="#1f2937"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="13" cy="14" r="1.4" fill="#111827" />
-      <circle cx="19" cy="14" r="1.4" fill="#111827" />
-    </svg>
-  </div>
+const Avatar = ({ name }) => (
+  <InitialsAvatar className="h-9 w-9" name={name} textClassName="text-xs" />
 );
 
 const StatCard = ({ item }) => {
@@ -334,8 +322,8 @@ const StatCard = ({ item }) => {
       <Icon name={item.icon} className={`h-14 w-14 ${style.text}`} />
     </span>
     <div className="leading-tight">
-      <p className="text-4xl font-extrabold text-[#10172a]">{item.value}</p>
-      <p className="mt-3 text-base font-medium text-slate-500">{item.label}</p>
+      <p className="text-4xl font-extrabold text-[#10172a] dark:text-white">{item.value}</p>
+      <p className="mt-3 text-base font-medium text-slate-500 dark:text-neutral-100">{item.label}</p>
     </div>
   </section>
   );
@@ -398,17 +386,17 @@ const MonthlyChart = ({ tasks }) => {
   return (
   <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white px-7 py-7 ${dashboardCardShadow}`}>
     <div className="mb-6 flex items-center justify-between gap-4">
-      <h2 className="text-xl font-extrabold text-[#10172a]">Monthly Overview</h2>
+      <h2 className="text-xl font-extrabold text-[#10172a] dark:text-white">Monthly Overview</h2>
     </div>
     <div className="grid grid-cols-[210px_1fr] overflow-x-auto">
       <div className="border-r border-slate-200 pr-5">
-        <p className="h-13 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+        <p className="h-13 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-white">
           Tasks
         </p>
         {visibleTasks.slice(0, 4).map((task, index) => (
           <div
             key={task.name}
-            className="grid h-13 grid-cols-[1fr_26px_34px] items-center gap-3 text-sm text-[#10172a]"
+            className="grid h-13 grid-cols-[1fr_26px_34px] items-center gap-3 text-sm text-[#10172a] dark:text-white"
           >
             <span className="flex min-w-0 items-center gap-3 font-semibold">
               <span
@@ -432,10 +420,10 @@ const MonthlyChart = ({ tasks }) => {
         >
           {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
-              <p className="text-center text-sm font-semibold text-[#10172a]">
+              <p className="text-center text-sm font-semibold text-[#10172a] dark:text-white">
                 {week}
               </p>
-              <div className="mt-3 grid grid-cols-7 text-center text-xs font-bold text-slate-500">
+              <div className="mt-3 grid grid-cols-7 text-center text-xs font-bold text-slate-500 dark:text-white">
                 {timelineDays.map((day, index) => (
                   <span key={`${week}-${day}-${index}`}>{day}</span>
                 ))}
@@ -550,13 +538,13 @@ const ExpenseChart = ({ budgetEntries }) => {
   return (
     <section className={`rounded-2xl border border-pink-100 bg-white px-8 py-7 ${dashboardCardShadow}`}>
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-extrabold text-[#10172a]">Expense Categories</h2>
+        <h2 className="text-xl font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
         <label className="relative">
           <span className="sr-only">Filter expense categories by month</span>
           <select
             value={selectedMonth}
             onChange={(event) => setSelectedMonth(event.target.value)}
-            className="h-10 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100"
+            className="h-10 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:text-white"
           >
             {monthOptions.map((month) => (
               <option key={month} value={month}>
@@ -570,7 +558,7 @@ const ExpenseChart = ({ budgetEntries }) => {
           </select>
           <svg
             viewBox="0 0 20 20"
-            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#10172a]"
+            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#10172a] dark:text-white"
             aria-hidden="true"
           >
             <path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -581,16 +569,16 @@ const ExpenseChart = ({ budgetEntries }) => {
         className="relative mx-auto grid h-60 w-60 place-items-center rounded-full"
         style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
       >
-        <div className="grid h-32 w-32 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)]">
+        <div className="grid h-32 w-32 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-neutral-950">
           <span>
-            <span className="block text-xs font-semibold text-slate-500">Total Expenses</span>
-            <span className="mt-1 block text-2xl font-extrabold text-[#10172a]">
+            <span className="block text-xs font-semibold text-slate-500 dark:text-white">Total Expenses</span>
+            <span className="mt-1 block text-2xl font-extrabold text-[#10172a] dark:text-white">
               {formatPeso(total)}
             </span>
           </span>
         </div>
       </div>
-      <div className="mt-5 space-y-3 text-sm text-[#10172a]">
+      <div className="mt-5 space-y-3 text-sm text-[#10172a] dark:text-white">
       {expenseCategories.length === 0 && (
           <span className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
@@ -607,7 +595,7 @@ const ExpenseChart = ({ budgetEntries }) => {
               <span className="truncate font-semibold">{category.label}</span>
             </span>
             <span className="font-bold">{formatPeso(category.value)}</span>
-            <span className="w-12 text-right font-bold text-slate-500">
+            <span className="w-12 text-right font-bold text-slate-500 dark:text-white">
               {total > 0 ? `${((category.value / total) * 100).toFixed(1)}%` : "0%"}
             </span>
           </span>
@@ -620,7 +608,7 @@ const ExpenseChart = ({ budgetEntries }) => {
 const EmployeeTable = ({ title, employees, tone = "violet" }) => (
   <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
     <div className="flex items-center justify-between px-7 pt-6">
-      <h2 className="flex items-center gap-2 text-xl font-extrabold text-[#10172a]">
+      <h2 className="flex items-center gap-2 text-xl font-extrabold text-[#10172a] dark:text-white">
         {title}
         <span
           className={`grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm ${
@@ -631,8 +619,8 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
         </span>
       </h2>
     </div>
-    <table className="mt-4 w-full text-left text-sm text-[#10172a]">
-      <thead className="border-b border-slate-100 text-slate-500">
+    <table className="mt-4 w-full text-left text-sm text-[#10172a] dark:text-white">
+      <thead className="border-b border-slate-100 text-slate-500 dark:text-white">
         <tr>
           <th className="px-7 py-3 font-extrabold">Employee</th>
           <th className="px-3 py-3 font-extrabold">Job</th>
@@ -643,7 +631,7 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
       <tbody>
         {employees.length === 0 && (
           <tr>
-            <td colSpan="4" className="px-5 py-6 text-center text-neutral-500">
+            <td colSpan="4" className="px-5 py-6 text-center text-neutral-500 dark:text-white">
               No employees to show.
             </td>
           </tr>
@@ -653,7 +641,7 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
           <tr key={`${title}-${index}`}>
             <td className="px-7 py-3">
               <div className="flex items-center gap-4">
-                <Avatar />
+                <Avatar name={employee.name} />
                 <span className="font-semibold">{employee.name}</span>
               </div>
             </td>
@@ -678,12 +666,12 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
 const PlaceholderPanel = ({ title, children }) => (
   <section className={`rounded-lg border border-pink-100 bg-white px-8 py-10 ${dashboardCardShadow}`}>
     <h1
-      className="text-2xl uppercase text-neutral-950"
+      className="text-2xl uppercase text-neutral-950 dark:text-white"
       style={{ fontFamily: "var(--font-bruno)" }}
     >
       {title}
     </h1>
-    <p className="mt-3 text-sm font-medium text-neutral-600">{children}</p>
+    <p className="mt-3 text-sm font-medium text-neutral-600 dark:text-white">{children}</p>
   </section>
 );
 

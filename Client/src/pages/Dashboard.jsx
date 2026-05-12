@@ -13,7 +13,7 @@ import Newsfeed from "./newsfeed.jsx";
 import Profile from "./Profile.jsx";
 import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import defaultProfile from "../assets/default-profile.png";
+import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { messageAPI } from "../services/api.js";
 
 const adminPages = new Set([
@@ -58,13 +58,11 @@ const getMessageStatus = (message) => {
 };
 
 const Avatar = ({ className = "h-12 w-12", user }) => (
-  <img
-    src={user?.avatar || defaultProfile}
+  <InitialsAvatar
     alt={user ? getDisplayName(user) : ""}
-    onError={(event) => {
-      event.currentTarget.src = defaultProfile;
-    }}
-    className={`${className} rounded-full bg-slate-200 object-cover`}
+    className={className}
+    textClassName={className.includes("h-14") ? "text-xl" : "text-sm"}
+    user={user}
   />
 );
 
