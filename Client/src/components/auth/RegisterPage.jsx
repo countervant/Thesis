@@ -51,8 +51,8 @@ const RegisterPage = ({ order, order1 }) => {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [country, setCountry] = useState(defaultCountry);
-  const [phone, setPhone] = useState(getCountryDialCode(defaultCountry));
+  const [country, setCountry] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -68,8 +68,8 @@ const RegisterPage = ({ order, order1 }) => {
     setCompanyName("");
     setEmail("");
     setEmailError("");
-    setCountry(defaultCountry);
-    setPhone(getCountryDialCode(defaultCountry));
+    setCountry("");
+    setPhone("");
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -82,7 +82,13 @@ const RegisterPage = ({ order, order1 }) => {
   };
 
   const handleCountryChange = (nextCountry) => {
-    setPhone((currentPhone) => applyCountryDialCode(currentPhone, nextCountry, country));
+    setPhone((currentPhone) =>
+      applyCountryDialCode(
+        currentPhone || getCountryDialCode(nextCountry),
+        nextCountry,
+        country || nextCountry
+      )
+    );
     setCountry(nextCountry);
   };
 
@@ -109,7 +115,8 @@ const RegisterPage = ({ order, order1 }) => {
       return;
     }
 
-    const phoneValidation = getPhoneValidationMessage(phone, country);
+    const selectedCountry = country || defaultCountry;
+    const phoneValidation = getPhoneValidationMessage(phone, selectedCountry);
     if (phoneValidation) {
       setError(phoneValidation);
       return;
@@ -136,7 +143,7 @@ const RegisterPage = ({ order, order1 }) => {
         email,
         password,
         phone.trim(),
-        country
+        selectedCountry
       );
       resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
@@ -333,7 +340,12 @@ const RegisterPage = ({ order, order1 }) => {
                 placeholder="Phone"
                 value={phone}
                 onChange={(event) =>
-                  setPhone(limitPhoneNumberLength(event.target.value, country))
+                  setPhone(
+                    limitPhoneNumberLength(
+                      event.target.value,
+                      country || defaultCountry
+                    )
+                  )
                 }
                 {...antiAutofillProps}
                 readOnly

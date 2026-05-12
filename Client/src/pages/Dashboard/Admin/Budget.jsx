@@ -5,7 +5,11 @@ import balanceIcon from "../../../assets/balance.png";
 import totalExpenseIcon from "../../../assets/totalexpense.png";
 import totalIncomeIcon from "../../../assets/totalincome.png";
 import walletIcon from "../../../assets/wallet.png";
-import { SkeletonCard, SkeletonRows } from "../../../components/Skeleton.jsx";
+import {
+  BudgetChartsSkeleton,
+  BudgetSummarySkeleton,
+  SkeletonRows,
+} from "../../../components/Skeleton.jsx";
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -459,11 +463,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
           <section className="mt-10 grid gap-4 md:grid-cols-3">
             {isLoading ? (
-              <>
-                <SkeletonCard className="h-24" />
-                <SkeletonCard className="h-24" />
-                <SkeletonCard className="h-24" />
-              </>
+              <BudgetSummarySkeleton />
             ) : (
               <>
                 <SummaryCard icon="income" label="Total Income" value={formatPeso(totals.income)} />
@@ -475,10 +475,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
           <section className="mt-6 grid gap-4 lg:grid-cols-2">
             {isLoading ? (
-              <>
-                <SkeletonCard className="min-h-[315px]" />
-                <SkeletonCard className="min-h-[315px]" />
-              </>
+              <BudgetChartsSkeleton />
             ) : (
               <>
                 <ExpenseBreakdown expenses={totals.expenses} income={totals.income} />

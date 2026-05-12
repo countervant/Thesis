@@ -8,6 +8,7 @@ import messagesIcon from "../assets/messages.png";
 import MainBars from "./MainBars.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { newsfeedAPI, taskAPI } from "../services/api.js";
+import { NotificationSkeleton } from "../components/Skeleton.jsx";
 
 const dashboardPathByRole = {
   admin: "/admin/dashboard",
@@ -228,9 +229,7 @@ const Notification = () => {
 
             <div className="mt-6 space-y-3">
               {isLoading && (
-                <div className="rounded-lg border border-pink-100 bg-pink-50 px-4 py-4 text-sm font-medium text-pink-700">
-                  Loading notifications...
-                </div>
+                <NotificationSkeleton rows={6} />
               )}
 
               {!isLoading && notifications.length === 0 && !errorMessage && (

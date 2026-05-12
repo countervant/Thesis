@@ -3,7 +3,7 @@ import { employeeAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import defaultProfile from "../../../assets/default-profile.png";
 import { getCountryFlag } from "../../../utils/countries.js";
-import { SkeletonCard } from "../../../components/Skeleton.jsx";
+import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -494,9 +494,7 @@ const AdminEmployees = ({
             )}
 
             {isLoading && (
-              Array.from({ length: 4 }).map((_, index) => (
-                <SkeletonCard key={index} className="h-56" />
-              ))
+              <PersonGridSkeleton type="employee" rows={4} />
             )}
 
             {!isLoading && visibleEmployees.length === 0 && (

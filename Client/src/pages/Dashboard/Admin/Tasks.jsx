@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
-import { SkeletonCard } from "../../../components/Skeleton.jsx";
+import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
@@ -534,9 +534,7 @@ const Tasks = ({
             )}
 
             {isLoading && (
-              Array.from({ length: 5 }).map((_, index) => (
-                <SkeletonCard key={index} className="min-h-[95px]" />
-              ))
+              <TaskListSkeleton rows={5} />
             )}
 
             {!isLoading && visibleTasks.length === 0 && (

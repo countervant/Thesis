@@ -19,7 +19,7 @@ import Profile from "../pages/Profile.jsx";
 import PublicProfile from "../pages/PublicProfile.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
-import { DashboardSkeleton } from "../components/Skeleton.jsx";
+import { AuthScreenSkeleton, DashboardSkeleton } from "../components/Skeleton.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 const dashboardPathByRole = {
@@ -46,7 +46,7 @@ const AuthPageRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return <DashboardSkeleton />;
+    return <AuthScreenSkeleton />;
   }
 
   if (isAuthenticated) {

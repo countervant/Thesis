@@ -15,6 +15,7 @@ import profileIcon from "../assets/profile.png";
 import taskIcon from "../assets/task.png";
 import themeIcon from "../assets/theme.png";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import { NotificationSkeleton } from "../components/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
 
@@ -685,9 +686,9 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
                 <div className="max-h-[520px] overflow-y-auto px-3 pb-4">
                   {isNotificationLoading && (
-                    <p className="mx-2 rounded-lg bg-pink-50 px-4 py-4 text-sm font-semibold text-[#c72fb2]">
-                      Loading notifications...
-                    </p>
+                    <div className="mx-2">
+                      <NotificationSkeleton rows={4} />
+                    </div>
                   )}
 
                   {notificationError && (
