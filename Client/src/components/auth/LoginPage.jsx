@@ -6,6 +6,7 @@ import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { getAuthErrorMessage } from "../../utils/authErrors.js";
 import { validateEmail } from "../../utils/emailValidation.js";
 
 const dashboardPathByRole = {
@@ -86,7 +87,7 @@ const LoginPage = ({ order, order1 }) => {
       if (status === 401) {
         setError("Incorrect credentials");
       } else {
-        setError(err.response?.data?.message || "Login failed. Please try again.");
+        setError(getAuthErrorMessage(err, "Login failed. Please try again."));
       }
     } finally {
       setLoading(false);

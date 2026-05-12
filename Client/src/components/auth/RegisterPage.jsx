@@ -16,6 +16,7 @@ import {
   defaultCountry,
   getCountryDialCode,
 } from "../../utils/countries.js";
+import { getAuthErrorMessage } from "../../utils/authErrors.js";
 
 const fieldNames = {
   firstName: `register_given_${Date.now()}`,
@@ -149,7 +150,7 @@ const RegisterPage = ({ order, order1 }) => {
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      setError(getAuthErrorMessage(err, "Registration failed. Please try again."));
     } finally {
       setLoading(false);
     }
