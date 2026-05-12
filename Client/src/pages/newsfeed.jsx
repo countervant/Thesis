@@ -5,7 +5,7 @@ import heartIcon from "../assets/heart.png";
 import insertImageIcon from "../assets/insertimage.png";
 import redHeartIcon from "../assets/redheart.png";
 import { useAuth } from "../context/AuthContext.jsx";
-import { newsfeedAPI } from "../services/api.js";
+import { authAPI, newsfeedAPI } from "../services/api.js";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { FeedSkeleton } from "../components/Skeleton.jsx";
@@ -124,9 +124,11 @@ const isOnlineMember = (member) =>
 const canShowInOnlineTeam = (member, currentUserId) => {
   const role = String(member?.role || "").toLowerCase();
   const memberId = getEntityId(member);
+  if (memberId && memberId === currentUserId) return true;
+
   return (
     (role === "admin" || role === "employee") &&
-    (memberId === currentUserId || isOnlineMember(member))
+    isOnlineMember(member)
   );
 };
 
@@ -183,6 +185,7 @@ const Newsfeed = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
   const [showAllTeamMembers, setShowAllTeamMembers] = useState(false);
+  const [onlineTeam, setOnlineTeam] = useState([]);
   const canPost = user?.role === "admin" || user?.role === "client";
   const userId = getEntityId(user);
 
@@ -226,6 +229,34 @@ const Newsfeed = () => {
       isMounted = false;
     };
   }, [authLoading]);
+
+  useEffect(() => {
+    if (authLoading || !userId) return undefined;
+
+    let isMounted = true;
+    const loadOnlineTeam = async () => {
+      try {
+        const members = await authAPI.getOnlineTeam();
+        if (isMounted) {
+          setOnlineTeam(members.filter((member) => canShowInOnlineTeam(member, userId)));
+        }
+      } catch {
+        if (isMounted) {
+          setOnlineTeam((currentMembers) =>
+            currentMembers.length > 0 ? currentMembers : [user].filter(Boolean)
+          );
+        }
+      }
+    };
+
+    loadOnlineTeam();
+    const intervalId = window.setInterval(loadOnlineTeam, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [authLoading, user, userId]);
 
   useEffect(() => {
     const postsMissingMedia = posts.filter(
@@ -363,28 +394,6 @@ const Newsfeed = () => {
       .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label))
       .slice(0, 5);
   }, [posts]);
-
-  const onlineTeam = useMemo(() => {
-    const teamMap = new Map();
-    const addMember = (member) => {
-      const memberId = getEntityId(member);
-      if (!memberId || teamMap.has(memberId)) return;
-      teamMap.set(memberId, member);
-    };
-
-    addMember(user);
-    posts.forEach((post) => {
-      addMember(post.author);
-      post.comments.forEach((comment) => {
-        addMember(comment.user);
-        comment.replies.forEach((reply) => addMember(reply.user));
-      });
-    });
-
-    return Array.from(teamMap.values()).filter((member) =>
-      canShowInOnlineTeam(member, userId)
-    );
-  }, [posts, user, userId]);
 
   const replacePost = (updatedPost) => {
     const normalizedPost = normalizePost(updatedPost);

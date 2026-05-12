@@ -75,6 +75,15 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+
+    lastSeen: {
+      type: Date,
+    },
+
     resetPasswordToken: {
       type: String,
     },
@@ -117,6 +126,7 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 userSchema.index({ role: 1, createdAt: -1 });
 userSchema.index({ role: 1, isActive: 1, firstName: 1, lastName: 1 });
+userSchema.index({ role: 1, isOnline: 1, lastSeen: -1 });
 
 const User = mongoose.model("User", userSchema);
 

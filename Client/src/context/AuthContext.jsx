@@ -72,6 +72,26 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  useEffect(() => {
+    if (!token || !user) return undefined;
+
+    let isActive = true;
+    const markOnline = () => {
+      authAPI.updatePresence(true).catch(() => {});
+    };
+
+    markOnline();
+    const intervalId = window.setInterval(() => {
+      if (isActive) markOnline();
+    }, 30000);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      authAPI.updatePresence(false, token).catch(() => {});
+    };
+  }, [token, user?.id]);
+
   const login = (userData, authToken) => {
     const normalizedUser = {
       ...userData,
@@ -84,6 +104,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    authAPI.updatePresence(false, token).catch(() => {});
     setUser(null);
     setToken(null);
     authAPI.clearSessionCache();

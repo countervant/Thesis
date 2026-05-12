@@ -294,6 +294,54 @@ router.post("/reset-password", async (req, res) => {
      }
     );
 
+    router.patch("/presence", protect, async (req, res) => {
+      try {
+        const isOnline = req.body?.isOnline !== false;
+        const user = await User.findByIdAndUpdate(
+          req.user._id,
+          {
+            isOnline,
+            lastSeen: new Date(),
+          },
+          {
+            new: true,
+            select: "firstName lastName email role avatar companyName isActive isOnline lastSeen",
+          }
+        ).lean();
+
+        res.status(200).json(user);
+      } catch (error) {
+        console.error("Update presence error:", error);
+        res.status(500).json({ message: "Unable to update presence" });
+      }
+    });
+
+    router.get("/online-team", protect, async (req, res) => {
+      try {
+        const onlineSince = new Date(Date.now() - 2 * 60 * 1000);
+        const users = await User.find({
+          role: { $in: ["admin", "employee"] },
+          $or: [
+            { _id: req.user._id },
+            {
+              isOnline: true,
+              lastSeen: { $gte: onlineSince },
+              isActive: { $ne: false },
+            },
+          ],
+        })
+          .select("firstName lastName email role avatar companyName isActive isOnline lastSeen")
+          .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
+          .maxTimeMS(8000)
+          .lean();
+
+        res.status(200).json(users);
+      } catch (error) {
+        console.error("Get online team error:", error);
+        res.status(500).json({ message: "Unable to fetch online team" });
+      }
+    });
+
     router.get("/users/:id", protect, async (req, res) => {
       try {
         const user = await User.findById(req.params.id).select(

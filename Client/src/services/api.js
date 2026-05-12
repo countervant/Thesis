@@ -210,6 +210,23 @@ export const authAPI = {
     return cachedGet(`/auth/users/${id}`);
   },
 
+  getOnlineTeam: async () => {
+    const response = await api.get("/auth/online-team");
+    return asArray(response.data, "online team");
+  },
+
+  updatePresence: async (isOnline = true, authToken = localStorage.getItem("token")) => {
+    if (!authToken) return null;
+
+    const response = await api.patch(
+      "/auth/presence",
+      { isOnline },
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    );
+    clearCache("/auth/me", "/auth/online-team");
+    return response.data;
+  },
+
   updateMe: async (profile) => {
     const response = await api.put("/auth/me", profile);
     clearCache("/auth/me", "/auth/employees", "/auth/assignees", "/clients");
