@@ -90,6 +90,46 @@ const toggleUserHeart = (hearts, user) => {
   return [...safeHearts, user];
 };
 
+const getPostTopic = (post) => {
+  const content = post.content.toLowerCase();
+  const hashTag = post.content.match(/#([a-z0-9][a-z0-9_-]*)/i)?.[1];
+
+  if (hashTag) {
+    return hashTag
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+  if (content.includes("client") || content.includes("feedback")) return "Client Feedback";
+  if (content.includes("feature") || content.includes("update")) return "New Features";
+  if (content.includes("team") || content.includes("employee")) return "Team Building";
+  if (content.includes("announce") || content.includes("notice")) return "Announcements";
+  return "Project Update";
+};
+
+const extractPostHashtags = (post) => {
+  const tags = post.content.match(/#[a-z0-9][a-z0-9_-]*/gi) || [];
+  return tags.map((tag) =>
+    tag
+      .slice(1)
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+  );
+};
+
+const isOnlineMember = (member) =>
+  member?.isOnline === true ||
+  member?.online === true ||
+  String(member?.presence || "").toLowerCase() === "online";
+
+const canShowInOnlineTeam = (member, currentUserId) => {
+  const role = String(member?.role || "").toLowerCase();
+  const memberId = getEntityId(member);
+  return (
+    (role === "admin" || role === "employee") &&
+    (memberId === currentUserId || isOnlineMember(member))
+  );
+};
+
 const Avatar = ({ user, size = "h-10 w-10" }) => (
   <img
     src={user?.avatar || defaultProfile}
@@ -134,6 +174,7 @@ const HeartIcon = ({ filled }) => (
 const Newsfeed = () => {
   const { user, loading: authLoading } = useAuth();
   const [posts, setPosts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [postContent, setPostContent] = useState("");
   const [postMedia, setPostMedia] = useState(null);
   const [commentDrafts, setCommentDrafts] = useState({});
@@ -148,8 +189,18 @@ const Newsfeed = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
+  const [showAllTeamMembers, setShowAllTeamMembers] = useState(false);
   const canPost = user?.role === "admin" || user?.role === "client";
   const userId = getEntityId(user);
+
+  useEffect(() => {
+    const handleNewsfeedSearch = (event) => {
+      setSearchTerm(event.detail?.value || "");
+    };
+
+    window.addEventListener("clientra:newsfeed-search", handleNewsfeedSearch);
+    return () => window.removeEventListener("clientra:newsfeed-search", handleNewsfeedSearch);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -280,6 +331,67 @@ const Newsfeed = () => {
   }, [isLoading, posts]);
 
   const hasAnyPosts = useMemo(() => posts.length > 0, [posts]);
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const visiblePosts = useMemo(() => {
+    if (!normalizedSearch) return posts;
+
+    return posts.filter((post) => {
+      const authorName = getUserName(post.author);
+      const commentText = post.comments
+        .flatMap((comment) => [
+          getUserName(comment.user),
+          comment.user?.email,
+          comment.user?.role,
+          ...comment.replies.flatMap((reply) => [
+            getUserName(reply.user),
+            reply.user?.email,
+            reply.user?.role,
+          ]),
+        ])
+        .join(" ");
+
+      return [authorName, post.author?.email, post.author?.role, commentText]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch);
+    });
+  }, [normalizedSearch, posts]);
+
+  const trendingTopics = useMemo(() => {
+    const topicCounts = posts.reduce((counts, post) => {
+      extractPostHashtags(post).forEach((topic) => {
+        counts.set(topic, (counts.get(topic) || 0) + 1);
+      });
+      return counts;
+    }, new Map());
+
+    return Array.from(topicCounts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label))
+      .slice(0, 5);
+  }, [posts]);
+
+  const onlineTeam = useMemo(() => {
+    const teamMap = new Map();
+    const addMember = (member) => {
+      const memberId = getEntityId(member);
+      if (!memberId || teamMap.has(memberId)) return;
+      teamMap.set(memberId, member);
+    };
+
+    addMember(user);
+    posts.forEach((post) => {
+      addMember(post.author);
+      post.comments.forEach((comment) => {
+        addMember(comment.user);
+        comment.replies.forEach((reply) => addMember(reply.user));
+      });
+    });
+
+    return Array.from(teamMap.values()).filter((member) =>
+      canShowInOnlineTeam(member, userId)
+    );
+  }, [posts, user, userId]);
 
   const replacePost = (updatedPost) => {
     const normalizedPost = normalizePost(updatedPost);
@@ -553,19 +665,31 @@ const Newsfeed = () => {
     }
   };
 
+  const displayedTeamMembers = showAllTeamMembers ? onlineTeam : onlineTeam.slice(0, 4);
+  const updateNewsfeedSearch = (value) => {
+    setSearchTerm(value);
+    window.dispatchEvent(
+      new CustomEvent("clientra:newsfeed-search-set", {
+        detail: { value },
+      })
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-[980px] space-y-5">
-      <header>
-        <h1
-          className="text-3xl uppercase leading-none text-neutral-950"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-          Clientra Newsfeed 
-        </h1>
-        <p className="mt-2 text-xs font-medium text-neutral-600">
-          Share updates, react to posts, and discuss with the team.
-        </p>
-      </header>
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+      <div className="mx-auto grid max-w-[1700px] gap-8 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="min-w-0 space-y-5">
+          <header className="pt-2">
+            <h1
+              className="text-3xl uppercase leading-none text-neutral-950"
+              style={{ fontFamily: "var(--font-bruno)" }}
+            >
+              <span className="text-[#dc4fb2]">Clientra</span> Newsfeed
+            </h1>
+            <p className="mt-3 text-sm font-semibold text-slate-500">
+              Share updates, react to posts, and discuss with the team.
+            </p>
+          </header>
 
       {errorMessage && (
         <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
@@ -684,8 +808,14 @@ const Newsfeed = () => {
         </p>
       )}
 
+      {!isLoading && hasAnyPosts && visiblePosts.length === 0 && (
+        <p className="rounded-lg bg-white px-5 py-8 text-center text-sm font-medium text-neutral-600 shadow-[0_2px_6px_rgba(219,39,119,0.18)] ring-1 ring-pink-50">
+          No posts match your search.
+        </p>
+      )}
+
       {!isLoading &&
-        posts.map((post) => {
+        visiblePosts.map((post) => {
           const hasHearted = post.hearts.some((heart) => getEntityId(heart) === userId);
           const areCommentsVisible = visibleComments[post.id] === true;
           const canDeletePost =
@@ -988,6 +1118,74 @@ const Newsfeed = () => {
             </article>
           );
         })}
+        </div>
+
+        <aside className="hidden space-y-6 xl:block xl:pt-[86px]">
+          <section className="rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_8px_22px_rgba(190,65,158,0.14)]">
+            <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#a33bea]">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+                <path d="m4 15 5-5 4 4 7-7M17 7h3v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Trending Topics
+            </h2>
+            {trendingTopics.length > 0 && (
+              <div className="mt-6 space-y-5">
+                {trendingTopics.map((topic) => (
+                  <button
+                    key={topic.label}
+                    type="button"
+                    onClick={() => updateNewsfeedSearch(topic.label)}
+                    className="flex w-full items-center justify-between gap-4 text-left text-sm font-bold text-[#dc4fb2] transition hover:text-[#a33bea]"
+                  >
+                    <span># {topic.label}</span>
+                    <span className="text-sm font-semibold text-slate-500">
+                      {topic.count} {topic.count === 1 ? "post" : "posts"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_8px_22px_rgba(190,65,158,0.14)]">
+            <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#a33bea]">
+              <span className="h-3 w-3 rounded-full bg-[#20bd5a]" />
+              Online Team
+            </h2>
+            {displayedTeamMembers.length > 0 && (
+              <div className="mt-6 space-y-4">
+                {displayedTeamMembers.map((member) => (
+                  <ProfileButton
+                    key={getEntityId(member)}
+                    user={member}
+                    className="flex w-full items-center gap-3 text-left"
+                  >
+                    <Avatar user={member} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-extrabold text-[#10172a]">
+                        {getUserName(member)}
+                      </span>
+                      <span className="block truncate text-xs font-semibold capitalize text-slate-500">
+                        {member?.role || "User"}
+                      </span>
+                    </span>
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#20bd5a]" />
+                  </ProfileButton>
+                ))}
+              </div>
+            )}
+            {onlineTeam.length > 4 && (
+              <button
+                type="button"
+                onClick={() => setShowAllTeamMembers((isShowing) => !isShowing)}
+                className="mt-6 h-11 w-full rounded-xl border border-[#dc4fb2] text-sm font-bold text-[#dc4fb2] transition hover:bg-pink-50"
+              >
+                {showAllTeamMembers ? "Show fewer team members" : "View all team members"}
+              </button>
+            )}
+          </section>
+        </aside>
+      </div>
       <ConfirmDialog
         confirmLabel="Yes , delete"
         icon="delete"

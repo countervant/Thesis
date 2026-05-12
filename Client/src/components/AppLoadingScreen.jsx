@@ -12,7 +12,7 @@ const AppLoadingScreen = () => (
         className="mt-4 text-xl uppercase tracking-wide"
         style={{ fontFamily: "var(--font-bruno)" }}
       >
-        CLIENTRA
+      Loading...
       </p>
     </section>
   </main>

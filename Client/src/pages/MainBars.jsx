@@ -334,6 +334,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const [isNotificationLoading, setIsNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState("");
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [newsfeedSearch, setNewsfeedSearch] = useState("");
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const userId = getEntityId(user);
@@ -357,6 +358,24 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     document.documentElement.classList.toggle("dark", isDarkMode);
     localStorage.setItem(themeStorageKey, isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const handleNewsfeedSearchSet = (event) => {
+      setNewsfeedSearch(event.detail?.value || "");
+    };
+
+    window.addEventListener("clientra:newsfeed-search-set", handleNewsfeedSearchSet);
+    return () =>
+      window.removeEventListener("clientra:newsfeed-search-set", handleNewsfeedSearchSet);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("clientra:newsfeed-search", {
+        detail: { value: activePage === "newsfeed" ? newsfeedSearch : "" },
+      })
+    );
+  }, [activePage, newsfeedSearch]);
 
   useEffect(() => {
     if (!userId) {
@@ -559,10 +578,37 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   return (
     <div className="min-h-screen bg-[#f8f9fd] text-neutral-950 dark:bg-neutral-950 dark:text-white">
       <header
-        className={`fixed right-0 top-0 z-30 flex h-[70px] items-center justify-end border-b border-neutral-300 bg-[#f8f9fd] px-5 transition-[left] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 ${
-          isSidebarExpanded ? "left-0 md:left-[240px]" : "left-0 md:left-20"
+        className={`fixed right-0 top-0 z-30 flex h-[70px] items-center justify-between gap-5 border-b border-neutral-300 bg-[#f8f9fd] px-5 transition-[left] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 ${
+          isSidebarExpanded ? "left-0 md:left-[260px]" : "left-0 md:left-20"
         }`}
       >
+        {activePage === "newsfeed" ? (
+          <label
+            className={`relative hidden w-full flex-1 md:block ${
+              isSidebarExpanded ? "ml-0 max-w-[420px]" : "ml-12 max-w-[480px]"
+            }`}
+          >
+            <span className="sr-only">Search newsfeed</span>
+            <svg
+              viewBox="0 0 24 24"
+              className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+              <path d="m15.5 15.5 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              value={newsfeedSearch}
+              onChange={(event) => setNewsfeedSearch(event.target.value)}
+              placeholder="Search users..."
+              className="h-10 w-full rounded-xl border border-pink-100 bg-white pl-12 pr-4 text-sm font-semibold text-neutral-800 shadow-[0_4px_18px_rgba(190,65,158,0.08)] outline-none transition placeholder:text-slate-400 focus:border-[#dc4fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+            />
+          </label>
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -827,13 +873,98 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             )}
           </div>
 
+          <div ref={accountMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+              className="flex h-12 min-w-[220px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-left text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              aria-label="Account menu"
+              aria-expanded={isAccountMenuOpen}
+              aria-haspopup="menu"
+            >
+              <UserAvatar user={user} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-extrabold text-[#10172a] dark:text-white">
+                  {getUserName(user)}
+                </span>
+                <span className="block text-xs font-semibold capitalize text-slate-500">
+                  {user?.role || "User"}
+                </span>
+              </span>
+              <svg
+                viewBox="0 0 20 20"
+                className={`h-4 w-4 shrink-0 transition-transform ${
+                  isAccountMenuOpen ? "rotate-180" : "rotate-0"
+                }`}
+                aria-hidden="true"
+              >
+                <path
+                  d="m6 8 4 4 4-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            {isAccountMenuOpen && (
+              <div
+                className="absolute right-0 top-16 z-40 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2.5 py-2.5 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  onClick={handleProfileClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  role="menuitem"
+                >
+                  <AccountMenuIcon src={profileIcon} />
+                  <span>Profile</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleThemeClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  role="menuitemcheckbox"
+                  aria-checked={isDarkMode}
+                >
+                  <AccountMenuIcon src={themeIcon} />
+                  <span className="flex-1">Theme</span>
+                  <span
+                    className={`flex h-5 w-10 shrink-0 items-center rounded-full p-1 transition ${
+                      isDarkMode ? "bg-[#dc4fb2]" : "bg-neutral-300"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className={`h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                        isDarkMode ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogoutClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  role="menuitem"
+                >
+                  <AccountMenuIcon src={logoutIcon} />
+                  <span>Log out</span>
+                </button>
+              </div>
+            )}
+          </div>
+
         </div>
       </header>
 
       <aside
         onClick={expandSidebar}
         className={`fixed left-0 top-0 z-40 hidden h-screen flex-col overflow-visible border-r border-neutral-300 bg-[#f8f9fd] transition-[width] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 md:flex ${
-          isSidebarExpanded ? "w-[240px]" : "w-20"
+          isSidebarExpanded ? "w-[260px]" : "w-20"
         }`}
       >
         <div className="relative flex h-[70px] items-center px-3">
@@ -841,27 +972,37 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             type="button"
             onClick={() => onNavigate?.("dashboard")}
             className={`flex min-w-0 items-center transition-all duration-300 ${
-              isSidebarExpanded ? "w-full justify-start gap-2.5 pr-12" : "w-full justify-center"
+              isSidebarExpanded ? "w-full justify-start gap-2.5 pr-10" : "w-full justify-center"
             }`}
             aria-label="Clientra dashboard"
           >
             <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 shrink-0 object-contain" />
             <span
-              className={`overflow-hidden whitespace-nowrap text-lg uppercase tracking-wide text-neutral-950 transition-all duration-300 dark:text-white ${
-                isSidebarExpanded ? "max-w-36 translate-x-0 opacity-100" : "max-w-0 translate-x-2 opacity-0"
+              className={`min-w-0 overflow-hidden whitespace-nowrap text-left text-neutral-950 transition-all duration-300 dark:text-white ${
+                isSidebarExpanded ? "max-w-[150px] translate-x-0 opacity-100" : "max-w-0 translate-x-2 opacity-0"
               }`}
-              style={{ fontFamily: "var(--font-bruno)" }}
             >
-              Clientra
+              <span
+                className="block text-lg uppercase leading-none tracking-wide"
+                style={{ fontFamily: "var(--font-bruno)" }}
+              >
+                Clientra
+              </span>
+              <span className="mt-0.5 block text-xs font-semibold leading-none text-slate-600 dark:text-slate-400">
+                Business Management
+              </span>
             </span>
           </button>
         </div>
 
-        <nav className={`flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-3 py-6 transition-[align-items] duration-300 ${
+        <nav className={`flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 py-5 transition-[align-items] duration-300 ${
           isSidebarExpanded ? "items-stretch" : "items-center"
         }`}>
           {sideNavSections.map((section, sectionIndex) => (
-            <div key={section.title} className="w-full">
+            <div
+              key={section.title}
+              className={`w-full ${isSidebarExpanded ? "mb-5" : "mb-3 last:mb-0"}`}
+            >
               <p
                 className={`mb-2 overflow-hidden whitespace-nowrap px-4 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 transition-all duration-300 ${
                   isSidebarExpanded ? "max-h-5 opacity-100" : "max-h-0 opacity-0"
@@ -869,7 +1010,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               >
                 {section.title}
               </p>
-              <div className="flex flex-col gap-2">
+              <div className={`flex flex-col ${isSidebarExpanded ? "gap-2" : "gap-3"}`}>
                 {section.items.map((item) => (
                   <button
                     key={item.id}
@@ -902,30 +1043,20 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 ))}
               </div>
               {!isSidebarExpanded && sectionIndex < sideNavSections.length - 1 && (
-                <div className="mx-auto mt-4 h-px w-10 bg-neutral-300 dark:bg-neutral-800" />
+                <div className="mx-auto mt-3 h-px w-10 bg-neutral-300 dark:bg-neutral-800" />
               )}
             </div>
           ))}
         </nav>
 
-        <div ref={accountMenuRef} className="relative px-3 pb-5">
-          <button
-            type="button"
-            onClick={() => {
-              if (!isSidebarExpanded) {
-                setIsSidebarExpanded(true);
-                return;
-              }
-              setIsAccountMenuOpen((isOpen) => !isOpen);
-            }}
-            className={`flex h-14 items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition-all duration-300 ease-in-out hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white ${
+        <div className="relative px-3 pb-5">
+          <div
+            className={`flex h-14 items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition-all duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-900 dark:text-white ${
               isSidebarExpanded
                 ? "w-full justify-start gap-3 px-3"
                 : "w-14 justify-center gap-0 px-0"
             }`}
-            aria-label="Account menu"
-            aria-expanded={isAccountMenuOpen}
-            aria-haspopup="menu"
+            aria-label="Account preview"
           >
             <UserAvatar user={user} />
             <span className={`overflow-hidden whitespace-nowrap text-left transition-all duration-300 ease-in-out ${
@@ -938,71 +1069,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 {user?.role || "User"}
               </span>
             </span>
-            <svg
-              viewBox="0 0 20 20"
-              className={`ml-auto h-4 w-4 shrink-0 transition-opacity ${
-                isSidebarExpanded ? "opacity-100" : "hidden opacity-0"
-              }`}
-              aria-hidden="true"
-            >
-              <path
-                d="m6 8 4 4 4-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-
-          {isAccountMenuOpen && (
-            <div
-              className="absolute bottom-24 left-4 z-40 w-52 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2.5 py-2.5 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
-              role="menu"
-            >
-              <button
-                type="button"
-                onClick={handleProfileClick}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                role="menuitem"
-              >
-                <AccountMenuIcon src={profileIcon} />
-                <span>Profile</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleThemeClick}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                role="menuitemcheckbox"
-                aria-checked={isDarkMode}
-              >
-                <AccountMenuIcon src={themeIcon} />
-                <span className="flex-1">Theme</span>
-                <span
-                  className={`flex h-5 w-10 shrink-0 items-center rounded-full p-1 transition ${
-                    isDarkMode ? "bg-[#dc4fb2]" : "bg-neutral-300"
-                  }`}
-                  aria-hidden="true"
-                >
-                  <span
-                    className={`h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                      isDarkMode ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={handleLogoutClick}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                role="menuitem"
-              >
-                <AccountMenuIcon src={logoutIcon} />
-                <span>Log out</span>
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       </aside>
 
@@ -1010,7 +1077,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         type="button"
         onClick={toggleSidebar}
         className={`fixed top-[35px] z-50 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-neutral-900 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800 md:grid ${
-          isSidebarExpanded ? "left-[202px]" : "left-[92px]"
+          isSidebarExpanded ? "left-[224px]" : "left-[92px]"
         }`}
         aria-label={isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
         aria-expanded={isSidebarExpanded}
@@ -1025,11 +1092,12 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
       <main
         className={`px-4 pb-8 pt-[90px] transition-[margin] duration-300 ease-in-out md:px-7 lg:px-9 ${
-          isSidebarExpanded ? "md:ml-[240px]" : "md:ml-20"
+          isSidebarExpanded ? "md:ml-[260px]" : "md:ml-20"
         }`}
-        style={{ zoom: 0.92 }}
       >
-        {children}
+        <div style={{ zoom: 0.82 }}>
+          {children}
+        </div>
       </main>
       <ConfirmDialog
         confirmLabel={notificationDeleteAction?.confirmLabel}
