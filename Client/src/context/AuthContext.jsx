@@ -86,6 +86,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setToken(null);
+    authAPI.clearSessionCache();
     localStorage.removeItem("user");
     localStorage.removeItem("token");
   };

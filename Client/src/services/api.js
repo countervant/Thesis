@@ -169,7 +169,12 @@ api.interceptors.response.use(
 
 // Auth API calls
 export const authAPI = {
+  clearSessionCache: () => {
+    clearCache("/auth/me");
+  },
+
   login: async (email, password) => {
+    clearCache("/auth/me");
     const response = await api.post("/auth/login", { email, password });
     return response.data;
   },

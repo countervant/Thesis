@@ -52,9 +52,32 @@ const LoginPage = ({ order, order1 }) => {
 
     try {
       const data = await authAPI.login(email, password);
-      const role = normalizeRole(data.role);
-      login({ id: data.id, email: data.email, role }, data.token);
+      login({ id: data.id, email: data.email, role: normalizeRole(data.role) }, data.token);
+
+      let profile = null;
+      try {
+        profile = await authAPI.getMe();
+      } catch (profileError) {
+        console.warn("[auth] Unable to refresh profile after login", profileError);
+      }
+
+      const role = normalizeRole(profile?.role || profile?.type || data.role);
+      const userData = profile
+        ? {
+            id: profile._id || profile.id || data.id,
+            ...profile,
+            role,
+          }
+        : { id: data.id, email: data.email, role };
+
+      login(userData, data.token);
       resetForm();
+
+      if (!role) {
+        setError("Login succeeded, but this account has no role. Please ask the admin to check the account role in the database.");
+        return;
+      }
+
       navigate(dashboardPathByRole[role] || "/dashboard", {
         replace: true,
       });
