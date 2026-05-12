@@ -66,6 +66,33 @@ const formatPeso = (amount, { signed = false } = {}) => {
   return `${amount < 0 ? "-" : "+"}${formattedAmount}`;
 };
 
+const getMonthKey = (value) => {
+  const inputDate = formatInputDate(value);
+  return inputDate.slice(0, 7);
+};
+
+const getCurrentMonthKey = () => getMonthKey(new Date());
+
+const getLastMonthKey = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 1);
+  return getMonthKey(date);
+};
+
+const formatMonthLabel = (monthKey) => {
+  const [year, month] = String(monthKey).split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown Month";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+};
+
 const budgetIcons = {
   balance: balanceIcon,
   expense: totalExpenseIcon,
@@ -290,65 +317,114 @@ const ExpenseBreakdown = ({ expenses, income }) => {
   );
 };
 
-const ExpenseCategories = ({ entries }) => {
-  const expenseEntries = entries.filter((entry) => entry.type === "expense");
-  const categories = expenseEntries.reduce((result, entry) => {
-    return {
-      ...result,
-      [entry.category]: (result[entry.category] || 0) + Math.abs(entry.amount),
-    };
-  }, {});
-  const categoryList = Object.entries(categories);
-  const total = categoryList.reduce((sum, [, value]) => sum + value, 0);
-  const colors = ["#8d2bc8", "#d947b3", "#6d5dfc", "#f05f9f"];
-  const segments = categoryList.slice(0, 4).reduce(
-    (result, [category, value], index) => {
+const ExpenseCategories = ({
+  entries,
+  monthOptions,
+  selectedMonth,
+  onMonthChange,
+}) => {
+  const expenseCategories = Object.entries(
+    entries
+      .filter((entry) => entry.type === "expense")
+      .reduce((result, entry) => {
+        const category = entry.category || "General";
+        return {
+          ...result,
+          [category]: (result[category] || 0) + Math.abs(Number(entry.amount) || 0),
+        };
+      }, {})
+  )
+    .slice(0, 4)
+    .map(([label, value], index) => ({
+      label,
+      value,
+      color: ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"][index % 4],
+    }));
+  const total = expenseCategories.reduce((sum, category) => sum + category.value, 0);
+  const visibleCategories =
+    expenseCategories.length > 0
+      ? expenseCategories
+      : [{ label: "No expenses", value: 1, color: "#d64ab2" }];
+  const chartStops = visibleCategories.reduce(
+    (result, category) => {
       const start = result.currentPercent;
-      const percent = total > 0 ? (value / total) * 100 : 0;
-      const end = start + percent;
+      const end = total > 0 ? start + (category.value / total) * 100 : 100;
 
       return {
         currentPercent: end,
-        items: [
-          ...result.items,
-          {
-            category,
-            value,
-            color: colors[index % colors.length],
-            end,
-            start,
-          },
-        ],
+        stops: [...result.stops, `${category.color} ${start}% ${end}%`],
       };
     },
-    { currentPercent: 0, items: [] }
-  ).items;
-  const chartBackground =
-    segments.length > 0
-      ? `conic-gradient(${segments
-          .map((segment) => `${segment.color} ${segment.start}% ${segment.end}%`)
-          .join(", ")})`
-      : "conic-gradient(#8d2bc8 0 50%, #d947b3 50% 100%)";
+    { currentPercent: 0, stops: [] }
+  ).stops;
 
   return (
-  <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
-    <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Expense Categories</h2>
-    <div className="mt-4 flex flex-col items-center">
+  <section className="rounded-2xl border border-pink-100 bg-white px-8 py-7 shadow-[0_3px_4px_rgba(190,65,158,0.35)] dark:bg-[#141414] dark:shadow-none dark:ring-1 dark:ring-neutral-800">
+    <div className="mb-5 flex items-center justify-between gap-4">
+      <h2 className="text-xl font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
+      <label className="relative">
+        <span className="sr-only">Filter expense categories by month</span>
+        <select
+          value={selectedMonth}
+          onChange={(event) => onMonthChange(event.target.value)}
+          className="h-10 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#141414] dark:text-white"
+        >
+          {monthOptions.map((month) => (
+            <option key={month} value={month}>
+              {month === getCurrentMonthKey()
+                ? "This Month"
+                : month === getLastMonthKey()
+                  ? "Last Month"
+                  : formatMonthLabel(month)}
+            </option>
+          ))}
+        </select>
+        <svg
+          viewBox="0 0 20 20"
+          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#10172a] dark:text-white"
+          aria-hidden="true"
+        >
+          <path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </label>
+    </div>
+    <div
+      className="relative mx-auto grid h-60 w-60 place-items-center rounded-full"
+      style={{ background: `conic-gradient(${chartStops.join(", ")})` }}
+    >
       <div
-        className="relative h-44 w-44 shrink-0 rounded-full sm:h-52 sm:w-52"
-        style={{ background: chartBackground }}
-      />
-      <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-2 text-xs text-neutral-600 dark:text-neutral-300 sm:grid-cols-4">
-        {segments.map((segment) => (
-          <span key={segment.category} className="flex items-center gap-2">
+        className="grid h-32 w-32 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-[#141414]"
+      >
+        <span>
+          <span className="block text-xs font-semibold text-slate-500 dark:text-neutral-400">Total Expenses</span>
+          <span className="mt-1 block text-2xl font-extrabold text-[#10172a] dark:text-white">
+            {formatPeso(total)}
+          </span>
+        </span>
+      </div>
+    </div>
+    <div className="mt-5 space-y-3 text-sm text-[#10172a] dark:text-neutral-200">
+      {expenseCategories.length === 0 && (
+        <span className="flex items-center gap-3">
+          <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
+          No expenses
+        </span>
+      )}
+      {expenseCategories.map((category) => (
+        <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
+          <span className="flex min-w-0 items-center gap-3">
             <span
               className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: segment.color }}
+              style={{ backgroundColor: category.color }}
             />
-            <span className="min-w-0 truncate">{segment.category}</span>
+            <span className="truncate font-semibold">{category.label}</span>
           </span>
-        ))}
-      </div>
+          <span className="font-bold">{formatPeso(category.value)}</span>
+          <span className="w-12 text-right font-bold text-slate-500 dark:text-neutral-400">
+            {total > 0 ? `${((category.value / total) * 100).toFixed(1)}%` : "0%"}
+          </span>
+        </span>
+      ))}
     </div>
   </section>
   );
@@ -374,6 +450,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [entryToDelete, setEntryToDelete] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
 
   useEffect(() => {
     let isMounted = true;
@@ -407,11 +484,35 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
     };
   }, [refreshKey]);
 
+  const monthOptions = useMemo(() => {
+    const months = Array.from(
+      new Set(budgetEntries.map((entry) => getMonthKey(entry.inputDate || entry.date)))
+    );
+    const defaultMonths = [getCurrentMonthKey(), getLastMonthKey()];
+    return Array.from(new Set([...defaultMonths, ...months])).sort((first, second) =>
+      second.localeCompare(first)
+    );
+  }, [budgetEntries]);
+
+  useEffect(() => {
+    if (!monthOptions.includes(selectedMonth)) {
+      setSelectedMonth(getCurrentMonthKey());
+    }
+  }, [monthOptions, selectedMonth]);
+
+  const filteredBudgetEntries = useMemo(
+    () =>
+      budgetEntries.filter(
+        (entry) => getMonthKey(entry.inputDate || entry.date) === selectedMonth
+      ),
+    [budgetEntries, selectedMonth]
+  );
+
   const totals = useMemo(() => {
-    const income = budgetEntries
+    const income = filteredBudgetEntries
       .filter((entry) => entry.type === "income")
       .reduce((sum, entry) => sum + entry.amount, 0);
-    const expenses = budgetEntries
+    const expenses = filteredBudgetEntries
       .filter((entry) => entry.type === "expense")
       .reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
 
@@ -420,7 +521,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
       expenses,
       income,
     };
-  }, [budgetEntries]);
+  }, [filteredBudgetEntries]);
 
   const deleteEntry = async (entryId) => {
     try {
@@ -479,7 +580,12 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             ) : (
               <>
                 <ExpenseBreakdown expenses={totals.expenses} income={totals.income} />
-                <ExpenseCategories entries={budgetEntries} />
+                <ExpenseCategories
+                  entries={filteredBudgetEntries}
+                  monthOptions={monthOptions}
+                  onMonthChange={setSelectedMonth}
+                  selectedMonth={selectedMonth}
+                />
               </>
             )}
           </section>
@@ -507,15 +613,15 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
                   <SkeletonRows rows={6} columns={6} />
                 )}
 
-                {!isLoading && budgetEntries.length === 0 && (
+                {!isLoading && filteredBudgetEntries.length === 0 && (
                   <tr>
                     <td colSpan="6" className="px-5 py-6 text-center font-medium text-neutral-600 dark:text-neutral-400">
-                      No budget entries found.
+                      No budget entries found for {formatMonthLabel(selectedMonth)}.
                     </td>
                   </tr>
                 )}
 
-                {!isLoading && budgetEntries.map((entry) => (
+                {!isLoading && filteredBudgetEntries.map((entry) => (
                   <tr key={entry.id}>
                     <td className="px-5 py-4">
                       <EntryType type={entry.type} />

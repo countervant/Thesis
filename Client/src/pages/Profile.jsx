@@ -98,7 +98,7 @@ const getPositionDisplay = (formData, role) => {
   return position || formatRole(role);
 };
 
-const Profile = () => {
+const Profile = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
   const hasCachedProfile = Boolean(user?.email);
@@ -270,33 +270,8 @@ const Profile = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <header className="flex h-16 items-center justify-between border-b border-neutral-300 bg-[#f5f5f5] px-5">
-        <button
-          type="button"
-          onClick={() => navigate(`/${user?.role || "client"}/dashboard`)}
-          className="flex items-center gap-2"
-        >
-          <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
-          <span
-            className="text-2xl uppercase text-neutral-950"
-            style={{ fontFamily: "var(--font-bruno)" }}
-          >
-            Clientra
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="h-10 rounded-lg border border-[#9a55ff] px-5 text-sm font-semibold text-neutral-700 transition hover:bg-purple-50"
-        >
-          Back
-        </button>
-      </header>
-
-      <main className="mx-auto max-w-[980px] px-5 py-10">
+  const content = (
+      <main className={embedded ? "mx-auto max-w-[980px]" : "mx-auto max-w-[980px] px-5 py-10"}>
         <section className="rounded-lg bg-white p-6 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50 sm:p-8">
           <div className="flex flex-col gap-6 border-b border-neutral-200 pb-7 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -532,6 +507,39 @@ const Profile = () => {
           )}
         </section>
       </main>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
+      <header className="flex h-16 items-center justify-between border-b border-neutral-300 bg-[#f5f5f5] px-5">
+        <button
+          type="button"
+          onClick={() => navigate(`/${user?.role || "client"}/dashboard`)}
+          className="flex items-center gap-2"
+        >
+          <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 object-contain" />
+          <span
+            className="text-2xl uppercase text-neutral-950"
+            style={{ fontFamily: "var(--font-bruno)" }}
+          >
+            Clientra
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="h-10 rounded-lg border border-[#9a55ff] px-5 text-sm font-semibold text-neutral-700 transition hover:bg-purple-50"
+        >
+          Back
+        </button>
+      </header>
+
+      {content}
     </div>
   );
 };

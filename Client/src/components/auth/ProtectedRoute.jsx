@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { DashboardSkeleton } from "../Skeleton.jsx";
+import AppLoadingScreen from "../AppLoadingScreen.jsx";
 
 // Protected route component that checks authentication and roles
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -8,7 +8,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const location = useLocation();
 
   if (loading) {
-    return <DashboardSkeleton />;
+    return <AppLoadingScreen />;
   }
 
   if (!isAuthenticated) {

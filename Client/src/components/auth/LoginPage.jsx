@@ -4,7 +4,6 @@ import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
-import { AuthFormSkeleton } from "../Skeleton.jsx";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { validateEmail } from "../../utils/emailValidation.js";
@@ -75,9 +74,6 @@ const LoginPage = ({ order, order1 }) => {
       <div
         className={`con order-${order} md:order-${order1} flex min-h-screen w-full items-center justify-center bg-gray-100 px-6 py-12 sm:px-10 md:w-1/2 md:px-12 md:py-0 dark:bg-[#111111]`}
       >
-        {loading ? (
-          <AuthFormSkeleton />
-        ) : (
         <form
           onSubmit={handleSubmit}
           className="w-full max-w-sm space-y-6 bg-transparent sm:max-w-md sm:space-y-8 dark:max-w-[528px] dark:rounded-2xl dark:border dark:border-pink-200/90 dark:px-10 dark:py-12 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
@@ -110,6 +106,7 @@ const LoginPage = ({ order, order1 }) => {
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
+                disabled={loading}
                 autoComplete="off"
                 className="w-full border-0 border-b border-black bg-transparent pb-2 text-gray-800 outline-none placeholder:text-gray-400 focus:ring-0 dark:border-white/40 dark:bg-[#283241] dark:text-white dark:placeholder:text-white/85"
                 required
@@ -125,6 +122,7 @@ const LoginPage = ({ order, order1 }) => {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
                 autoComplete="current-password"
                 className="min-w-0 flex-1 border-0 bg-transparent pb-2 text-gray-800 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85"
                 required
@@ -132,6 +130,7 @@ const LoginPage = ({ order, order1 }) => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
                 className="grid pb-2 pl-3 text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -149,7 +148,7 @@ const LoginPage = ({ order, order1 }) => {
             disabled={loading || isEmailInvalid}
             className="mt-6 w-full rounded-lg bg-linear-to-r from-pink-500 to-purple-600 py-3 text-base font-medium text-white shadow-lg transition-all duration-200 hover:from-pink-600 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-8 sm:text-lg dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)] dark:hover:brightness-110"
           >
-            Sign In
+            {loading ? "Signing in..." : "Sign In"}
           </button>
 
           <div>
@@ -160,7 +159,6 @@ const LoginPage = ({ order, order1 }) => {
             />
           </div>
         </form>
-        )}
       </div>
     </>
   );

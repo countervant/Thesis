@@ -6,6 +6,7 @@ import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
+const pageSizeOptions = [10, 20, 50];
 const notificationTargetKey = "clientraNotificationTarget";
 const statusToApi = {
   Pending: "pending",
@@ -42,6 +43,28 @@ const getEntityId = (entity) => {
   if (!entity) return "";
   if (typeof entity === "string") return entity;
   return entity._id || entity.id || "";
+};
+
+const formatReadableDate = (date) => {
+  const inputDate = toInputDate(date);
+  const parsedDate = new Date(`${inputDate}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date || "";
+  }
+
+  return parsedDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
+
+const getStatusTone = (status) => {
+  if (status === "Done") return "bg-pink-100 text-[#c72fb2]";
+  if (status === "Pending") return "bg-pink-100 text-[#c72fb2]";
+  if (status === "In review") return "bg-pink-50 text-[#c72fb2]";
+  return "bg-pink-100 text-[#c72fb2]";
 };
 
 const normalizeTasks = (data) => {
@@ -224,7 +247,7 @@ const FilterChip = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`h-7 rounded-md px-3 text-xs font-medium shadow-[0_2px_5px_rgba(0,0,0,0.2)] transition ${
+    className={`h-10 rounded-lg px-5 text-sm font-semibold shadow-[0_3px_8px_rgba(219,74,181,0.13)] transition ${
       active
         ? "bg-[#db4ab5] text-white"
         : "bg-white text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2] dark:bg-[#1a1a1a] dark:text-neutral-300 dark:hover:bg-[#242424] dark:hover:text-[#e347b3]"
@@ -232,6 +255,26 @@ const FilterChip = ({ active, children, onClick }) => (
   >
     {children}
   </button>
+);
+
+const FilterGroup = ({ icon, label, options, selected, onSelect }) => (
+  <div className="min-w-0 flex-1">
+    <div className="mb-4 flex items-center gap-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">
+      <Icon name={icon} className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
+      <span>{label}</span>
+    </div>
+    <div className="flex flex-wrap gap-3">
+      {options.map((status) => (
+        <FilterChip
+          key={status}
+          active={selected === status}
+          onClick={() => onSelect(status)}
+        >
+          {status}
+        </FilterChip>
+      ))}
+    </div>
+  </div>
 );
 
 const TaskCard = ({
@@ -245,8 +288,8 @@ const TaskCard = ({
 }) => (
   <article
     id={`task-card-${task.id}`}
-    className={`flex min-h-[95px] items-center gap-4 rounded-lg bg-white px-4 py-4 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 transition dark:bg-[#141414] dark:shadow-none sm:px-5 ${
-      isFocused ? "ring-2 ring-blue-300 dark:ring-[#dc4fb2]" : "ring-pink-50 dark:ring-neutral-800"
+    className={`group flex min-h-[132px] items-center gap-4 rounded-xl border border-pink-100 border-l-[#f2a8dc] border-l-2 bg-white px-6 py-5 shadow-[0_3px_4px_rgba(190,65,158,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_7px_16px_rgba(190,65,158,0.22)] dark:bg-[#141414] dark:shadow-none sm:px-7 ${
+      isFocused ? "ring-2 ring-pink-300 dark:ring-[#dc4fb2]" : "ring-pink-50 dark:ring-neutral-800"
     }`}
   >
     {canToggleDone && (
@@ -268,23 +311,24 @@ const TaskCard = ({
     )}
 
     <div className="min-w-0 flex-1">
-      <h2 className="truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+      <h2 className="truncate text-xl font-bold text-neutral-950 dark:text-neutral-100">
         {task.title}
       </h2>
-      <p className="mt-1 text-xs text-neutral-800 dark:text-neutral-400">{task.description}</p>
-      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-neutral-800 dark:text-neutral-400">
-        <Icon name="calendar" className="h-4 w-4" />
-        {task.startDate} - {task.dueDate}
+      <p className="mt-3 text-base font-medium text-neutral-700 dark:text-neutral-400">{task.description}</p>
+      <p className="mt-4 flex items-center gap-2 text-base font-medium text-neutral-600 dark:text-neutral-400">
+        <Icon name="calendar" className="h-5 w-5 text-[#c72fb2]" />
+        {formatReadableDate(task.startDate)} - {formatReadableDate(task.dueDate)}
       </p>
     </div>
 
     {showStatus && (
-      <p className="hidden min-w-[160px] text-sm font-medium text-neutral-800 dark:text-neutral-300 md:block">
-        Status: {task.status}
-      </p>
+      <span className={`hidden min-w-[135px] items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-bold md:inline-flex ${getStatusTone(task.status)}`}>
+        <span className="h-2.5 w-2.5 rounded-full bg-current" />
+        {task.status}
+      </span>
     )}
 
-    <div className="flex shrink-0 items-center gap-1">
+    <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
       <button
         type="button"
         onClick={() => onEdit(task)}
@@ -319,6 +363,8 @@ const Tasks = ({
   const [selectedDateStatus, setSelectedDateStatus] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
   const [focusedTaskId, setFocusedTaskId] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     let isMounted = true;
@@ -392,6 +438,17 @@ const Tasks = ({
       return matchesTaskStatus && matchesDateStatus;
     });
   }, [selectedDateStatus, selectedTaskStatus, tasks]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleTasks.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedTasks = visibleTasks.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDateStatus, selectedTaskStatus, pageSize]);
 
   const handleAddTask = () => {
     onNavigate?.("add-task");
@@ -474,13 +531,13 @@ const Tasks = ({
           <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
+                className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
-                Task
+                Tasks
               </h1>
-              <p className="mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
-                Assign and manage your task
+              <p className="mt-4 text-base font-medium text-neutral-600 dark:text-neutral-400">
+                Assign and manage your tasks efficiently.
               </p>
             </div>
 
@@ -488,7 +545,7 @@ const Tasks = ({
               <button
                 type="button"
                 onClick={handleAddTask}
-                className="flex h-11 items-center gap-3 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] px-5 text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+                className="flex h-14 items-center gap-3 rounded-lg bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-7 text-base font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
               >
                 <Icon className="h-5 w-5" />
                 <span>Add Task</span>
@@ -496,37 +553,27 @@ const Tasks = ({
             </div>
           </header>
 
-          <section className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Icon name="filter" className="h-5 w-5 text-neutral-900 dark:text-neutral-300" />
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Status:</span>
-              {taskStatuses.map((status) => (
-                <FilterChip
-                  key={status}
-                  active={selectedTaskStatus === status}
-                  onClick={() => setSelectedTaskStatus(status)}
-                >
-                  {status}
-                </FilterChip>
-              ))}
-            </div>
+          <section className="mt-9 grid gap-8 rounded-xl border border-pink-100 bg-white px-8 py-7 shadow-[0_3px_4px_rgba(190,65,158,0.18)] dark:border-neutral-800 dark:bg-[#141414] md:grid-cols-[1fr_1px_1fr]">
+            <FilterGroup
+              icon="filter"
+              label="Filter by status"
+              onSelect={setSelectedTaskStatus}
+              options={taskStatuses}
+              selected={selectedTaskStatus}
+            />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Icon name="calendar" className="h-5 w-5 text-neutral-900 dark:text-neutral-300" />
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Status:</span>
-              {dateStatuses.map((status) => (
-                <FilterChip
-                  key={status}
-                  active={selectedDateStatus === status}
-                  onClick={() => setSelectedDateStatus(status)}
-                >
-                  {status}
-                </FilterChip>
-              ))}
-            </div>
+            <span className="hidden h-full bg-pink-100 dark:bg-neutral-800 md:block" />
+
+            <FilterGroup
+              icon="calendar"
+              label="Filter by due date"
+              onSelect={setSelectedDateStatus}
+              options={dateStatuses}
+              selected={selectedDateStatus}
+            />
           </section>
 
-          <section className="mt-4 space-y-5">
+          <section className="mt-5 space-y-4">
             {errorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
                 {errorMessage}
@@ -543,7 +590,7 @@ const Tasks = ({
               </p>
             )}
 
-            {!isLoading && visibleTasks.map((task) => (
+            {!isLoading && paginatedTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 canToggleDone={getEntityId(task.assignedTo) === getEntityId(user)}
@@ -556,6 +603,54 @@ const Tasks = ({
               />
             ))}
           </section>
+
+          {!isLoading && visibleTasks.length > 0 && (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={safePage === 1}
+                className="grid h-11 w-11 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label="Previous page"
+              >
+                <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
+                  <path d="m12 5-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              <span className="grid h-11 min-w-11 place-items-center rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-4 text-base font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.25)]">
+                {safePage}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={safePage === totalPages}
+                className="grid h-11 w-11 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label="Next page"
+              >
+                <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
+                  <path d="m8 5 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              <label className="flex items-center gap-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <span>Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(event) => setPageSize(Number(event.target.value))}
+                  className="h-11 rounded-lg border border-pink-100 bg-white px-4 text-sm font-semibold text-neutral-900 shadow-[0_3px_4px_rgba(190,65,158,0.12)] outline-none focus:border-[#db4ab5] dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
+                >
+                  {pageSizeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <span>per page</span>
+              </label>
+            </div>
+          )}
           <ConfirmDialog
             confirmLabel={confirmAction?.confirmLabel}
             icon={confirmAction?.icon}

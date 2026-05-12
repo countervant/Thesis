@@ -48,18 +48,6 @@ const allowedOrigins = [
 
 console.log("[startup] Allowed CORS origins:", allowedOrigins.join(", "));
 
-app.use((req, res, next) => {
-  const startedAt = Date.now();
-
-  res.on("finish", () => {
-    console.log(
-      `[request] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`
-    );
-  });
-
-  next();
-});
-
 app.use(
   cors({
     credentials: true,

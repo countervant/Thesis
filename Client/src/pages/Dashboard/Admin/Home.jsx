@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
@@ -63,7 +63,15 @@ const timelineTasks = [
   },
 ];
 
-const expenseColors = ["#d64ab2", "#9228c9", "#7d5cff", "#ff7b8a"];
+const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
+const dashboardCardShadow =
+  "border-b-2 border-b-[#e347b3] shadow-[0_3px_4px_rgba(190,65,158,0.35)]";
+const statStyles = {
+  in_progress: { tile: "bg-[#f0e9ff]", text: "text-[#754de8]" },
+  pending: { tile: "bg-[#ffeaf5]", text: "text-[#e347a8]" },
+  review: { tile: "bg-[#fff0e5]", text: "text-[#ff8317]" },
+  done: { tile: "bg-[#eafbed]", text: "text-[#28b84c]" },
+};
 
 const parseCalendarDate = (value) => {
   if (!value) return null;
@@ -120,6 +128,34 @@ const formatDate = (value) => {
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "2-digit",
+    year: "numeric",
+  });
+};
+
+const getMonthKey = (value) => {
+  const date = parseCalendarDate(value);
+  const fallbackDate = date || new Date();
+  const year = fallbackDate.getFullYear();
+  const month = String(fallbackDate.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
+
+const getCurrentMonthKey = () => getMonthKey(new Date());
+
+const getLastMonthKey = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 1);
+  return getMonthKey(date);
+};
+
+const formatMonthLabel = (monthKey) => {
+  const [year, month] = String(monthKey).split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+
+  if (Number.isNaN(date.getTime())) return "Unknown Month";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
     year: "numeric",
   });
 };
@@ -289,15 +325,21 @@ const Avatar = () => (
   </div>
 );
 
-const StatCard = ({ item }) => (
-  <section className="flex h-24 items-center gap-5 rounded-lg bg-white px-5 shadow-[0_2px_6px_rgba(219,39,119,0.28)] ring-1 ring-pink-100">
-    <Icon name={item.icon} className="h-14 w-14 shrink-0 text-[#dc4bb2]" />
+const StatCard = ({ item }) => {
+  const style = statStyles[item.key] || statStyles.in_progress;
+
+  return (
+  <section className={`flex h-32 items-center gap-7 rounded-2xl border border-pink-100 bg-white px-8 ${dashboardCardShadow}`}>
+    <span className={`grid h-20 w-20 shrink-0 place-items-center rounded-3xl ${style.tile}`}>
+      <Icon name={item.icon} className={`h-14 w-14 ${style.text}`} />
+    </span>
     <div className="leading-tight">
-      <p className="text-4xl font-bold text-neutral-950">{item.value}</p>
-      <p className="text-base text-neutral-500">{item.label}</p>
+      <p className="text-4xl font-extrabold text-[#10172a]">{item.value}</p>
+      <p className="mt-3 text-base font-medium text-slate-500">{item.label}</p>
     </div>
   </section>
-);
+  );
+};
 
 const ProgressRing = ({ value }) => (
   <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#a8a2ff] text-[10px] font-semibold text-[#9b91ff]">
@@ -327,6 +369,7 @@ const MonthlyChart = ({ tasks }) => {
   const chartWeeks = Array.from({ length: visibleWeekCount }, (_, index) => index * 7).map((dayOffset) =>
     formatWeekLabel(addDays(timelineStart, dayOffset))
   );
+  const colors = ["#7c5cff", "#ff4ba2", "#ff8a1f", "#25c24d", "#35b5ff"];
 
   const chartTasks = tasksWithDates.slice(0, 5).map((task, index) => {
     const rawStart = daysBetween(timelineStart, task.calendarStartDate);
@@ -334,8 +377,6 @@ const MonthlyChart = ({ tasks }) => {
     const start = Math.min(Math.max(rawStart + 0.1, 0), visibleDayCount - 1);
     const end = Math.min(Math.max(rawEnd + 1, 0.8), visibleDayCount);
     const width = Math.max(end - start, 0.8);
-    const colors = ["#7da4e6", "#8a97ee", "#8d73dc", "#bd75e8", "#d46cdf"];
-
     return {
       name: task.title?.length > 12 ? `${task.title.slice(0, 10)}...` : task.title || "Task",
       effort: task.priority === "high" ? 3 : task.priority === "medium" ? 2 : 1,
@@ -355,24 +396,31 @@ const MonthlyChart = ({ tasks }) => {
   const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
 
   return (
-  <section className="overflow-hidden rounded-lg bg-white px-6 py-6 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-    <h2 className="mb-5 text-lg font-bold text-neutral-950">
-      Monthly Overview
-    </h2>
-    <div className="grid grid-cols-[190px_1fr] overflow-x-auto">
-      <div className="border-r border-neutral-200 pr-3">
-        <div className="h-13" />
-        {visibleTasks.map((task) => (
+  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white px-7 py-7 ${dashboardCardShadow}`}>
+    <div className="mb-6 flex items-center justify-between gap-4">
+      <h2 className="text-xl font-extrabold text-[#10172a]">Monthly Overview</h2>
+    </div>
+    <div className="grid grid-cols-[210px_1fr] overflow-x-auto">
+      <div className="border-r border-slate-200 pr-5">
+        <p className="h-13 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+          Tasks
+        </p>
+        {visibleTasks.slice(0, 4).map((task, index) => (
           <div
             key={task.name}
-            className="grid h-13 grid-cols-[1fr_26px_34px] items-center gap-3 border-t border-neutral-100 text-xs text-neutral-800"
+            className="grid h-13 grid-cols-[1fr_26px_34px] items-center gap-3 text-sm text-[#10172a]"
           >
-            <span className="flex items-center gap-3 font-medium">
-              <span className="h-2 w-2 rounded-full bg-neutral-300" />
+            <span className="flex min-w-0 items-center gap-3 font-semibold">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: colors[index % colors.length] }}
+              />
+              <span className="truncate">
               {task.name}
+              </span>
             </span>
             <span>{task.effort}</span>
-            <ProgressRing value={task.progress} />
+            <ProgressRing value={task.progress || 50} />
           </div>
         ))}
       </div>
@@ -384,10 +432,10 @@ const MonthlyChart = ({ tasks }) => {
         >
           {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
-              <p className="text-center text-xs font-semibold text-neutral-600">
+              <p className="text-center text-sm font-semibold text-[#10172a]">
                 {week}
               </p>
-              <div className="mt-2 grid grid-cols-7 text-center text-[10px] font-medium text-neutral-500">
+              <div className="mt-3 grid grid-cols-7 text-center text-xs font-bold text-slate-500">
                 {timelineDays.map((day, index) => (
                   <span key={`${week}-${day}-${index}`}>{day}</span>
                 ))}
@@ -400,11 +448,11 @@ const MonthlyChart = ({ tasks }) => {
           <div
             className="absolute inset-0"
             style={{
-              background: `repeating-linear-gradient(to right, #f1f1f1 0, #f1f1f1 1px, transparent 1px, transparent calc(100% / ${visibleDayCount}))`,
+              background: `repeating-linear-gradient(to right, #e9edf5 0, #e9edf5 1px, transparent 1px, transparent calc(100% / ${visibleDayCount}))`,
             }}
           />
           <div className="relative">
-            {visibleTasks.map((task) => (
+            {visibleTasks.slice(0, 4).map((task) => (
               <div
                 key={task.name}
                 className="relative h-13 border-b border-neutral-100 last:border-b-0"
@@ -412,7 +460,7 @@ const MonthlyChart = ({ tasks }) => {
                 {task.segments.map((segment, index) => (
                   <div
                     key={`${task.name}-${index}`}
-                    className={`absolute top-1/2 h-8 -translate-y-1/2 rounded-md shadow-sm ${
+                    className={`absolute top-1/2 h-7 -translate-y-1/2 rounded-lg shadow-sm ${
                       segment.diamond ? "aspect-square rotate-45" : ""
                     }`}
                     style={{
@@ -421,7 +469,7 @@ const MonthlyChart = ({ tasks }) => {
                         ? "30px"
                         : `${(segment.width / visibleDayCount) * 100}%`,
                       background: segment.striped
-                        ? `repeating-linear-gradient(45deg, ${segment.color} 0, ${segment.color} 2px, #d8cbff 2px, #d8cbff 5px)`
+                        ? `repeating-linear-gradient(45deg, ${segment.color} 0, ${segment.color} 2px, rgba(255,255,255,0.65) 2px, rgba(255,255,255,0.65) 5px)`
                         : segment.color,
                     }}
                   />
@@ -437,8 +485,28 @@ const MonthlyChart = ({ tasks }) => {
 };
 
 const ExpenseChart = ({ budgetEntries }) => {
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
+  const monthOptions = useMemo(() => {
+    const months = Array.from(
+      new Set(budgetEntries.map((entry) => getMonthKey(entry.date || entry.createdAt)))
+    );
+    const defaultMonths = [getCurrentMonthKey(), getLastMonthKey()];
+    return Array.from(new Set([...defaultMonths, ...months])).sort((first, second) =>
+      second.localeCompare(first)
+    );
+  }, [budgetEntries]);
+
+  useEffect(() => {
+    if (!monthOptions.includes(selectedMonth)) {
+      setSelectedMonth(getCurrentMonthKey());
+    }
+  }, [monthOptions, selectedMonth]);
+
+  const filteredBudgetEntries = budgetEntries.filter(
+    (entry) => getMonthKey(entry.date || entry.createdAt) === selectedMonth
+  );
   const expenseCategories = Object.entries(
-    budgetEntries
+    filteredBudgetEntries
       .filter((entry) => entry.type === "expense")
       .reduce((result, entry) => {
         const category = entry.category || "General";
@@ -472,29 +540,76 @@ const ExpenseChart = ({ budgetEntries }) => {
     { currentPercent: 0, stops: [] }
   ).stops;
 
+  const formatPeso = (amount) =>
+    new Intl.NumberFormat("en-PH", {
+      currency: "PHP",
+      maximumFractionDigits: 0,
+      style: "currency",
+    }).format(Math.abs(Number(amount) || 0));
+
   return (
-    <section className="rounded-lg bg-white px-6 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-      <h2 className="mb-4 text-lg font-bold text-neutral-950">
-        Expense Categories
-      </h2>
+    <section className={`rounded-2xl border border-pink-100 bg-white px-8 py-7 ${dashboardCardShadow}`}>
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <h2 className="text-xl font-extrabold text-[#10172a]">Expense Categories</h2>
+        <label className="relative">
+          <span className="sr-only">Filter expense categories by month</span>
+          <select
+            value={selectedMonth}
+            onChange={(event) => setSelectedMonth(event.target.value)}
+            className="h-10 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100"
+          >
+            {monthOptions.map((month) => (
+              <option key={month} value={month}>
+                {month === getCurrentMonthKey()
+                  ? "This Month"
+                  : month === getLastMonthKey()
+                    ? "Last Month"
+                    : formatMonthLabel(month)}
+              </option>
+            ))}
+          </select>
+          <svg
+            viewBox="0 0 20 20"
+            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#10172a]"
+            aria-hidden="true"
+          >
+            <path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </label>
+      </div>
       <div
-        className="relative mx-auto h-56 w-56 rounded-full"
+        className="relative mx-auto grid h-60 w-60 place-items-center rounded-full"
         style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
-      />
-      <div className="mt-4 space-y-2 text-xs text-neutral-500">
-        {expenseCategories.length === 0 && (
-          <span className="flex items-center gap-2">
+      >
+        <div className="grid h-32 w-32 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)]">
+          <span>
+            <span className="block text-xs font-semibold text-slate-500">Total Expenses</span>
+            <span className="mt-1 block text-2xl font-extrabold text-[#10172a]">
+              {formatPeso(total)}
+            </span>
+          </span>
+        </div>
+      </div>
+      <div className="mt-5 space-y-3 text-sm text-[#10172a]">
+      {expenseCategories.length === 0 && (
+          <span className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
             No expenses
           </span>
         )}
         {expenseCategories.map((category) => (
-          <span key={category.label} className="flex items-center gap-2">
+          <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
+            <span className="flex min-w-0 items-center gap-3">
             <span
-              className="h-2 w-2 rounded-full"
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
               style={{ backgroundColor: category.color }}
             />
-            {category.label}
+              <span className="truncate font-semibold">{category.label}</span>
+            </span>
+            <span className="font-bold">{formatPeso(category.value)}</span>
+            <span className="w-12 text-right font-bold text-slate-500">
+              {total > 0 ? `${((category.value / total) * 100).toFixed(1)}%` : "0%"}
+            </span>
           </span>
         ))}
       </div>
@@ -502,18 +617,27 @@ const ExpenseChart = ({ budgetEntries }) => {
   );
 };
 
-const EmployeeTable = ({ title, employees }) => (
-  <section className="overflow-hidden rounded-lg bg-white shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-    <div className="px-7 pt-5">
-      <h2 className="text-lg font-bold text-neutral-950">{title}</h2>
+const EmployeeTable = ({ title, employees, tone = "violet" }) => (
+  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
+    <div className="flex items-center justify-between px-7 pt-6">
+      <h2 className="flex items-center gap-2 text-xl font-extrabold text-[#10172a]">
+        {title}
+        <span
+          className={`grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm ${
+            tone === "pink" ? "bg-pink-100 text-pink-500" : "bg-violet-100 text-violet-600"
+          }`}
+        >
+          {employees.length}
+        </span>
+      </h2>
     </div>
-    <table className="mt-1 w-full text-left text-xs text-neutral-900">
-      <thead className="border-b border-slate-100 text-neutral-700">
+    <table className="mt-4 w-full text-left text-sm text-[#10172a]">
+      <thead className="border-b border-slate-100 text-slate-500">
         <tr>
-          <th className="w-16 px-5 py-3 font-medium">Employee</th>
-          <th className="px-3 py-3 font-medium">Job</th>
-          <th className="px-3 py-3 font-medium">Client</th>
-          <th className="px-3 py-3 font-medium">Date</th>
+          <th className="px-7 py-3 font-extrabold">Employee</th>
+          <th className="px-3 py-3 font-extrabold">Job</th>
+          <th className="px-3 py-3 font-extrabold">Client</th>
+          <th className="px-3 py-3 font-extrabold">{tone === "pink" ? "Status" : "Date"}</th>
         </tr>
       </thead>
       <tbody>
@@ -527,15 +651,23 @@ const EmployeeTable = ({ title, employees }) => (
 
         {employees.map((employee, index) => (
           <tr key={`${title}-${index}`}>
-            <td className="px-5 py-2">
+            <td className="px-7 py-3">
               <div className="flex items-center gap-4">
                 <Avatar />
-                <span>{employee.name}</span>
+                <span className="font-semibold">{employee.name}</span>
               </div>
             </td>
-            <td className="px-3 py-2">{employee.job}</td>
-            <td className="px-3 py-2">{employee.client}</td>
-            <td className="px-3 py-2">{employee.date}</td>
+            <td className="px-3 py-3 font-medium">{employee.job}</td>
+            <td className="px-3 py-3 font-medium">{employee.client}</td>
+            <td className="px-3 py-3 font-medium">
+              {employee.date === "Available" ? (
+                <span className="rounded-full bg-green-100 px-4 py-1 font-bold text-green-600">
+                  Available
+                </span>
+              ) : (
+                employee.date
+              )}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -544,7 +676,7 @@ const EmployeeTable = ({ title, employees }) => (
 );
 
 const PlaceholderPanel = ({ title, children }) => (
-  <section className="rounded-lg bg-white px-8 py-10 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
+  <section className={`rounded-lg border border-pink-100 bg-white px-8 py-10 ${dashboardCardShadow}`}>
     <h1
       className="text-2xl uppercase text-neutral-950"
       style={{ fontFamily: "var(--font-bruno)" }}
@@ -648,7 +780,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }
 
   return (
-        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}
@@ -657,20 +789,20 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
           {activeTopTab === "dashboard" && (
             <>
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {stats.map((item) => (
                   <StatCard key={item.label} item={item} />
                 ))}
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[1.65fr_0.95fr]">
+              <div className="grid gap-6 xl:grid-cols-[1.85fr_0.98fr]">
                 <MonthlyChart tasks={tasks} />
                 <ExpenseChart budgetEntries={budgetEntries} />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid gap-6 xl:grid-cols-2">
                 <EmployeeTable title="Working" employees={workingEmployees} />
-                <EmployeeTable title="Not Working" employees={notWorkingEmployees} />
+                <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
               </div>
             </>
           )}

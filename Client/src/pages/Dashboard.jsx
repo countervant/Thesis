@@ -10,6 +10,7 @@ import AdminAddTask from "./Dashboard/Admin/Addtask.jsx";
 import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
 import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
 import Newsfeed from "./newsfeed.jsx";
+import Profile from "./Profile.jsx";
 import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import defaultProfile from "../assets/default-profile.png";
@@ -19,6 +20,7 @@ const adminPages = new Set([
   "dashboard",
   "newsfeed",
   "messages",
+  "profile",
   "tasks",
   "add-task",
   "edit-task",
@@ -1001,7 +1003,7 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const initialLocalPage = ["dashboard", "newsfeed", "messages", "tasks"].includes(
+  const initialLocalPage = ["dashboard", "newsfeed", "messages", "profile", "tasks"].includes(
     location.state?.page
   )
     ? location.state.page
@@ -1139,6 +1141,8 @@ const Dashboard = () => {
       adminContent = <Newsfeed />;
     } else if (adminPage === "messages") {
       adminContent = <MessagesPanel />;
+    } else if (adminPage === "profile") {
+      adminContent = <Profile embedded />;
     } else if (adminPage === "client") {
       adminContent = <AdminClients />;
     } else if (
@@ -1193,6 +1197,8 @@ const Dashboard = () => {
       <AdminTasks />
     ) : localPage === "messages" ? (
       <MessagesPanel />
+    ) : localPage === "profile" ? (
+      <Profile embedded />
     ) : (
       <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
