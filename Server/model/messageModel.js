@@ -22,6 +22,10 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
     editedAt: {
       type: Date,
       default: null,
@@ -34,6 +38,9 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ sender: 1, recipient: 1, createdAt: -1 });
 messageSchema.index({ recipient: 1, sender: 1, readAt: 1 });
+messageSchema.index({ recipient: 1, deliveredAt: 1 });
+messageSchema.index({ sender: 1, createdAt: -1 });
+messageSchema.index({ recipient: 1, createdAt: -1 });
 
 const Message = mongoose.model("Message", messageSchema);
 

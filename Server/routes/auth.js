@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 
 const router = express.Router();
@@ -448,12 +449,38 @@ router.post("/reset-password", async (req, res) => {
 
     router.get("/employees", protect, authorize("admin"), async (req, res) => {
       try {
-        const employees = await User.find({ role: "employee" })
+        const { page, limit, skip } = getPagination(req.query);
+        const search = String(req.query.search || "").trim();
+        const query = {
+          role: "employee",
+          ...(req.query.isActive === "true"
+            ? { isActive: true }
+            : req.query.isActive === "false"
+              ? { isActive: false }
+              : {}),
+          ...(search
+            ? {
+                $or: [
+                  { firstName: { $regex: search, $options: "i" } },
+                  { lastName: { $regex: search, $options: "i" } },
+                  { email: { $regex: search, $options: "i" } },
+                  { position: { $regex: search, $options: "i" } },
+                ],
+              }
+            : {}),
+        };
+        const [employees, total] = await Promise.all([
+          User.find(query)
           .select("firstName lastName email phone country position role avatar isActive")
           .sort({ createdAt: -1 })
-          .lean();
+            .skip(skip)
+            .limit(limit)
+            .maxTimeMS(8000)
+          .lean(),
+          User.countDocuments(query).maxTimeMS(8000),
+        ]);
 
-        res.status(200).json(employees);
+        res.status(200).json(pagedResponse({ data: employees, page, limit, total, key: "employees" }));
       } catch (error) {
         console.error("Get employees error:", error);
         res.status(500).json({ message: "Unable to fetch employees" });

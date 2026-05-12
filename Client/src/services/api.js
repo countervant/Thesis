@@ -227,8 +227,9 @@ export const authAPI = {
 };
 
 export const taskAPI = {
-  getAll: async () => {
-    return asArray(await cachedGet("/tasks"), "tasks");
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/tasks${query ? `?${query}` : ""}`), "tasks");
   },
 
   create: async (task) => {
@@ -251,8 +252,9 @@ export const taskAPI = {
 };
 
 export const newsfeedAPI = {
-  getAll: async () => {
-    return asArray(await cachedGet("/newsfeed"), "newsfeed posts");
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/newsfeed${query ? `?${query}` : ""}`), "newsfeed posts");
   },
 
   updateCachedPost,
@@ -318,12 +320,14 @@ export const newsfeedAPI = {
 };
 
 export const messageAPI = {
-  getUsers: async () => {
-    return asArray(await cachedGet("/messages/users"), "message users");
+  getUsers: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/messages/users${query ? `?${query}` : ""}`), "message users");
   },
 
-  getThreads: async () => {
-    return asArray(await cachedGet("/messages/threads"), "message threads");
+  getThreads: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/messages/threads${query ? `?${query}` : ""}`), "message threads");
   },
 
   getUnreadCount: async () => {
@@ -338,7 +342,10 @@ export const messageAPI = {
   },
 
   send: async (recipientId, text) => {
-    const response = await api.post("/messages", { recipientId, text });
+    const payload = Array.isArray(recipientId)
+      ? { recipientIds: recipientId, text }
+      : { recipientId, text };
+    const response = await api.post("/messages", payload);
     clearCache("/messages/threads");
     return response.data;
   },
@@ -383,8 +390,9 @@ export const messageAPI = {
 };
 
 export const employeeAPI = {
-  getAll: async () => {
-    return asArray(await cachedGet("/auth/employees"), "employees");
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/auth/employees${query ? `?${query}` : ""}`), "employees");
   },
 
   create: async (employee) => {
@@ -407,8 +415,9 @@ export const employeeAPI = {
 };
 
 export const clientAPI = {
-  getAll: async () => {
-    return asArray(await cachedGet("/clients"), "clients");
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/clients${query ? `?${query}` : ""}`), "clients");
   },
 
   create: async (client) => {
@@ -431,8 +440,9 @@ export const clientAPI = {
 };
 
 export const budgetAPI = {
-  getAll: async () => {
-    return asArray(await cachedGet("/budgets"), "budget entries");
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/budgets${query ? `?${query}` : ""}`), "budget entries");
   },
 
   create: async (budget) => {
@@ -451,6 +461,12 @@ export const budgetAPI = {
     const response = await api.delete(`/budgets/${id}`);
     clearCache("/budgets");
     return response.data;
+  },
+};
+
+export const dashboardAPI = {
+  getSummary: async () => {
+    return cachedGet("/dashboard");
   },
 };
 

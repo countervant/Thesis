@@ -19,6 +19,7 @@ import Profile from "../pages/Profile.jsx";
 import PublicProfile from "../pages/PublicProfile.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
+import { DashboardSkeleton } from "../components/Skeleton.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 const dashboardPathByRole = {
@@ -45,11 +46,7 @@ const AuthPageRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-purple-500" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (isAuthenticated) {

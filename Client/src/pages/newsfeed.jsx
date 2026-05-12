@@ -8,6 +8,7 @@ import redHeartIcon from "../assets/redheart.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { newsfeedAPI } from "../services/api.js";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import { FeedSkeleton } from "../components/Skeleton.jsx";
 import { getCountryFlag } from "../utils/countries.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
@@ -674,9 +675,7 @@ const Newsfeed = () => {
       )}
 
       {isLoading && (
-        <p className="rounded-lg bg-white px-5 py-4 text-sm font-medium text-neutral-700 shadow-[0_2px_6px_rgba(219,39,119,0.18)]">
-          Loading newsfeed...
-        </p>
+        <FeedSkeleton />
       )}
 
       {!isLoading && !hasAnyPosts && (

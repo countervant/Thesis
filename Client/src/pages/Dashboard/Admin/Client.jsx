@@ -3,6 +3,7 @@ import { clientAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import defaultProfile from "../../../assets/default-profile.png";
 import { getCountryFlag } from "../../../utils/countries.js";
+import { SkeletonCard } from "../../../components/Skeleton.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -485,9 +486,9 @@ const AdminClients = () => {
             )}
 
             {isLoading && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
-                Loading clients...
-              </p>
+              Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonCard key={index} className="h-56" />
+              ))
             )}
 
             {!isLoading && visibleClients.length === 0 && (

@@ -1,27 +1,52 @@
 import express from "express";
 import NewsfeedPost from "../model/newsfeesModel.js";
 import { protect } from "../middleware/protectedjwt.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 const postAllowedRoles = ["admin", "client"];
-const userPublicFields = "firstName lastName companyName email phone country role";
+const userPublicFields = "firstName lastName companyName email country role avatar";
 
 const populatePost = (query) =>
   query
     .populate("author", userPublicFields)
-    .populate("hearts", userPublicFields)
     .populate("comments.user", userPublicFields)
-    .populate("comments.hearts", userPublicFields)
     .populate("comments.replies.user", userPublicFields)
     .lean();
 
+const withCounts = (post) => ({
+  ...post,
+  heartCount: post.hearts?.length || 0,
+  commentCount: post.comments?.length || 0,
+  comments: (post.comments || []).map((comment) => ({
+    ...comment,
+    heartCount: comment.hearts?.length || 0,
+    replyCount: comment.replies?.length || 0,
+  })),
+});
+
 router.get("/", protect, async (req, res) => {
   try {
-    const posts = await populatePost(
-      NewsfeedPost.find().select("-media.url").sort({ createdAt: -1 }).limit(10)
-    );
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
+    const [posts, total] = await Promise.all([
+      populatePost(
+        NewsfeedPost.find()
+          .select("-media.url")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .maxTimeMS(8000)
+      ),
+      NewsfeedPost.countDocuments().maxTimeMS(8000),
+    ]);
 
-    res.status(200).json(posts);
+    res.status(200).json(pagedResponse({
+      data: posts.map(withCounts),
+      page,
+      limit,
+      total,
+      key: "posts",
+    }));
   } catch (error) {
     console.error("Get newsfeed error:", error);
     res.status(500).json({ message: "Unable to fetch newsfeed posts" });
@@ -30,14 +55,26 @@ router.get("/", protect, async (req, res) => {
 
 router.get("/activity", protect, async (req, res) => {
   try {
-    const posts = await populatePost(
-      NewsfeedPost.find()
-        .select("author content hearts comments createdAt updatedAt")
-        .sort({ updatedAt: -1, createdAt: -1 })
-        .limit(50)
-    );
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 20 });
+    const [posts, total] = await Promise.all([
+      populatePost(
+        NewsfeedPost.find()
+          .select("author content hearts comments createdAt updatedAt")
+          .sort({ updatedAt: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .maxTimeMS(8000)
+      ),
+      NewsfeedPost.countDocuments().maxTimeMS(8000),
+    ]);
 
-    res.status(200).json(posts);
+    res.status(200).json(pagedResponse({
+      data: posts.map(withCounts),
+      page,
+      limit,
+      total,
+      key: "posts",
+    }));
   } catch (error) {
     console.error("Get newsfeed activity error:", error);
     res.status(500).json({ message: "Unable to fetch newsfeed activity" });
@@ -58,6 +95,41 @@ router.get("/:id/media", protect, async (req, res) => {
   } catch (error) {
     console.error("Get newsfeed media error:", error);
     res.status(500).json({ message: "Unable to fetch post media" });
+  }
+});
+
+router.get("/:id/comments", protect, async (req, res) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
+    const post = await NewsfeedPost.findById(req.params.id)
+      .select("comments")
+      .populate("comments.user", userPublicFields)
+      .populate("comments.replies.user", userPublicFields)
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const comments = (post.comments || [])
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(skip, skip + limit)
+      .map((comment) => ({
+        ...comment,
+        heartCount: comment.hearts?.length || 0,
+        replyCount: comment.replies?.length || 0,
+      }));
+
+    res.status(200).json(pagedResponse({
+      data: comments,
+      page,
+      limit,
+      total: post.comments?.length || 0,
+      key: "comments",
+    }));
+  } catch (error) {
+    console.error("Get newsfeed comments error:", error);
+    res.status(500).json({ message: "Unable to fetch comments" });
   }
 });
 

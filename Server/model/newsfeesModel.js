@@ -87,6 +87,7 @@ const newsfeedPostSchema = new mongoose.Schema(
 );
 
 newsfeedPostSchema.index({ createdAt: -1 });
+newsfeedPostSchema.index({ updatedAt: -1, createdAt: -1 });
 newsfeedPostSchema.index({ author: 1, createdAt: -1 });
 
 const NewsfeedPost = mongoose.model("NewsfeedPost", newsfeedPostSchema);

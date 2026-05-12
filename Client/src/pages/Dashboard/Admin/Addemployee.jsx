@@ -5,9 +5,9 @@ import {
   getPhoneValidationMessage,
   limitPhoneNumberLength,
 } from "../../../utils/phoneValidation.js";
+import CountrySelect from "../../../components/CountrySelect.jsx";
 import {
   applyCountryDialCode,
-  countryOptions,
   defaultCountry,
   getCountryDialCode,
 } from "../../../utils/countries.js";
@@ -250,17 +250,11 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="space-y-1">
               <FieldLabel>Country</FieldLabel>
-              <select
+              <CountrySelect
                 value={formData.country}
-                onChange={(event) => handleCountryChange(event.target.value)}
+                onChange={handleCountryChange}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
-              >
-                {countryOptions.map((option) => (
-                  <option key={option.name} value={option.name}>
-                    {option.name} ({option.dialCode})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="space-y-1">

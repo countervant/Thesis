@@ -1,6 +1,7 @@
 import express from "express";
 import Task from "../model/Admin/taskmodel.js";
 import { protect } from "../middleware/protectedjwt.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 
@@ -44,13 +45,45 @@ const normalizeTaskPayload = (body, userId) => {
 
 router.get("/", protect, async (req, res) => {
   try {
-    const tasks = await Task.find(taskQueryForUser(req.user))
+    const { page, limit, skip } = getPagination(req.query);
+    const query = { ...taskQueryForUser(req.user) };
+    const search = String(req.query.search || "").trim();
+
+    if (search) {
+      query.$and = [
+        ...(query.$and || []),
+        {
+          $or: [
+            { title: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
+          ],
+        },
+      ];
+    }
+
+    if (allowedStatuses.includes(req.query.status)) query.status = req.query.status;
+    if (allowedPriorities.includes(req.query.priority)) query.priority = req.query.priority;
+    if (req.query.assignedTo) query.assignedTo = req.query.assignedTo;
+    if (req.query.dueFrom || req.query.dueTo) {
+      query.dueDate = {};
+      if (req.query.dueFrom) query.dueDate.$gte = new Date(req.query.dueFrom);
+      if (req.query.dueTo) query.dueDate.$lte = new Date(req.query.dueTo);
+    }
+
+    const [tasks, total] = await Promise.all([
+      Task.find(query)
+      .select("-comments -attachments")
       .populate("assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .sort({ createdAt: -1 })
-      .lean();
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+      .lean(),
+      Task.countDocuments(query).maxTimeMS(8000),
+    ]);
 
-    res.status(200).json(tasks);
+    res.status(200).json(pagedResponse({ data: tasks, page, limit, total, key: "tasks" }));
   } catch (error) {
     console.error("Get tasks error:", error);
     res.status(500).json({ message: "Unable to fetch tasks" });

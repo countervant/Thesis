@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import defaultProfile from "../assets/default-profile.png";
+import CountrySelect from "../components/CountrySelect.jsx";
+import { ProfileSkeleton } from "../components/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI } from "../services/api.js";
 import { isValidEmail } from "../utils/emailValidation.js";
@@ -11,7 +13,6 @@ import {
 } from "../utils/phoneValidation.js";
 import {
   applyCountryDialCode,
-  countryOptions,
   defaultCountry,
   ensureCountryDialCode,
   getCountryDialCode,
@@ -334,9 +335,7 @@ const Profile = () => {
           </div>
 
           {isLoading && !formData.email ? (
-            <p className="mt-6 rounded-md bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-700">
-              Loading profile...
-            </p>
+            <ProfileSkeleton />
           ) : (
             <form
               onSubmit={handleSubmit}
@@ -362,9 +361,7 @@ const Profile = () => {
               />
 
               {isLoading && (
-                <p className="mb-5 rounded-md bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-700">
-                  Refreshing profile from database...
-                </p>
+                <ProfileSkeleton />
               )}
 
               {errorMessage && (
@@ -442,17 +439,11 @@ const Profile = () => {
 
                 <div className="space-y-1">
                   <FieldLabel>Country</FieldLabel>
-                  <select
+                  <CountrySelect
                     value={formData.country}
-                    onChange={(event) => handleCountryChange(event.target.value)}
+                    onChange={handleCountryChange}
                     className="h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
-                  >
-                    {countryOptions.map((option) => (
-                      <option key={option.name} value={option.name}>
-                        {option.name} ({option.dialCode})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
 

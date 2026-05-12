@@ -49,6 +49,12 @@ const formatMessageTime = (value) => {
   });
 };
 
+const getMessageStatus = (message) => {
+  if (message?.readAt) return "Seen";
+  if (message?.deliveredAt) return "Delivered";
+  return "Sent";
+};
+
 const Avatar = ({ className = "h-12 w-12", user }) => (
   <img
     src={user?.avatar || defaultProfile}
@@ -135,6 +141,11 @@ const MessagesPanel = () => {
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
+  const [bulkDraft, setBulkDraft] = useState("");
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState([]);
+  const [openMenuMessageId, setOpenMenuMessageId] = useState("");
+  const [newMessageSearch, setNewMessageSearch] = useState("");
   const threadEndRef = useRef(null);
   const activeUserIdRef = useRef("");
 
@@ -160,8 +171,11 @@ const MessagesPanel = () => {
       }));
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return [...threadItems, ...newConversationItems].filter((item) => {
-      if (!normalizedSearch) return true;
+    return [
+      ...threadItems,
+      ...(normalizedSearch ? newConversationItems : []),
+    ].filter((item) => {
+      if (!normalizedSearch) return item.hasThread;
 
       const participant = item.participant;
       return [getDisplayName(participant), participant?.email, participant?.role]
@@ -181,18 +195,31 @@ const MessagesPanel = () => {
       try {
         setIsLoadingInbox(true);
         setErrorMessage("");
-        const [nextThreads, nextUsers] = await Promise.all([
+        const [threadResult, userResult] = await Promise.allSettled([
           messageAPI.getThreads(),
-          messageAPI.getUsers(),
+          messageAPI.getUsers({ limit: 100 }),
         ]);
+        const nextThreads =
+          threadResult.status === "fulfilled" && Array.isArray(threadResult.value)
+            ? threadResult.value
+            : [];
+        const nextUsers =
+          userResult.status === "fulfilled" && Array.isArray(userResult.value)
+            ? userResult.value
+            : [];
 
         if (!isMounted) return;
 
-        setThreads(Array.isArray(nextThreads) ? nextThreads : []);
-        setUsers(Array.isArray(nextUsers) ? nextUsers : []);
+        setThreads(nextThreads);
+        setUsers(nextUsers);
 
-        const firstParticipant =
-          nextThreads?.[0]?.participant || nextUsers?.[0] || null;
+        if (threadResult.status === "rejected" && userResult.status === "rejected") {
+          setErrorMessage(
+            threadResult.reason?.response?.data?.message || "Unable to load messages."
+          );
+        }
+
+        const firstParticipant = nextThreads?.[0]?.participant || null;
         if (!activeUserId && firstParticipant) {
           setActiveUserId(getEntityId(firstParticipant));
         }
@@ -244,9 +271,19 @@ const MessagesPanel = () => {
         );
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load conversation."
+          const searchedParticipant = users.find(
+            (item) => getEntityId(item) === activeUserId
           );
+
+          if (searchedParticipant) {
+            setActiveParticipant(searchedParticipant);
+            setMessages([]);
+            setErrorMessage("");
+          } else {
+            setErrorMessage(
+              error.response?.data?.message || "Unable to load conversation."
+            );
+          }
         }
       } finally {
         if (isMounted) {
@@ -260,7 +297,7 @@ const MessagesPanel = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeUserId]);
+  }, [activeUserId, users]);
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -309,10 +346,7 @@ const MessagesPanel = () => {
   };
 
   const handleStartNewMessage = () => {
-    const firstUser = users[0];
-    if (firstUser) {
-      handleSelectConversation(firstUser);
-    }
+    setIsNewMessageOpen(true);
   };
 
   const refreshThreads = useCallback(async () => {
@@ -356,6 +390,12 @@ const MessagesPanel = () => {
               );
             }
 
+            if (action === "delivered") {
+              return currentMessages.map((item) =>
+                getEntityId(item) === getEntityId(message) ? { ...item, ...message } : item
+              );
+            }
+
             if (
               currentMessages.some(
                 (item) => getEntityId(item) === getEntityId(message)
@@ -366,6 +406,17 @@ const MessagesPanel = () => {
 
             return [...currentMessages, message];
           });
+        }
+
+        if (action === "read") {
+          setMessages((currentMessages) =>
+            currentMessages.map((item) =>
+              getEntityId(item.sender) === currentUserId &&
+              getEntityId(item.recipient) === event.readerId
+                ? { ...item, readAt: event.readAt, deliveredAt: item.deliveredAt || event.readAt }
+                : item
+            )
+          );
         }
 
         refreshThreads();
@@ -474,7 +525,66 @@ const MessagesPanel = () => {
     }
   };
 
+  const toggleSelectedRecipient = (recipientId) => {
+    setSelectedRecipientIds((currentIds) =>
+      currentIds.includes(recipientId)
+        ? currentIds.filter((id) => id !== recipientId)
+        : [...currentIds, recipientId]
+    );
+  };
+
+  const selectRecipientsByRole = (role) => {
+    setSelectedRecipientIds(
+      users
+        .filter((item) => item.role === role)
+        .map((item) => getEntityId(item))
+    );
+  };
+
+  const handleSendBulkMessage = async (event) => {
+    event.preventDefault();
+    const text = bulkDraft.trim();
+    if (!text || selectedRecipientIds.length === 0 || isSending) return;
+
+    try {
+      setIsSending(true);
+      setErrorMessage("");
+      const result = await messageAPI.send(selectedRecipientIds, text);
+      const createdMessages = Array.isArray(result?.messages) ? result.messages : [];
+      setBulkDraft("");
+      setSelectedRecipientIds([]);
+      setIsNewMessageOpen(false);
+      if (createdMessages[0]) {
+        const firstRecipientId = getEntityId(createdMessages[0].recipient);
+        const participant = users.find((item) => getEntityId(item) === firstRecipientId);
+        if (participant) handleSelectConversation(participant);
+      }
+      await refreshThreads();
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to send message.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const activeName = activeParticipant ? getDisplayName(activeParticipant) : "";
+  const latestOutgoingId = [...messages]
+    .reverse()
+    .map((message) => (getEntityId(message.sender) === currentUserId ? getEntityId(message) : ""))
+    .find(Boolean);
+  const modalUsers = users.filter((participant) => {
+    const term = newMessageSearch.trim().toLowerCase();
+    if (!term) return true;
+
+    return [
+      getDisplayName(participant),
+      participant.email,
+      participant.role,
+      participant.companyName,
+    ]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(term));
+  });
 
   return (
   <section className="-mx-4 -mb-10 -mt-8 flex h-[calc(100vh-4rem)] overflow-hidden border-y border-neutral-300 bg-[#f1f1f1] text-neutral-950 dark:border-neutral-800 dark:bg-neutral-950 md:-mx-6 lg:-mx-8">
@@ -652,10 +762,55 @@ const MessagesPanel = () => {
             return (
               <div
                 key={message._id || `${message.createdAt}-${message.text}`}
-                className={`flex items-end gap-3 ${isMine ? "justify-end" : ""}`}
+                className={`group/message flex items-center gap-2 ${isMine ? "justify-end" : ""}`}
               >
                 {!isMine && (
                   <Avatar className="h-11 w-11 shrink-0" user={activeParticipant} />
+                )}
+                {isMine && !isEditing && (
+                  <div className="relative flex h-full min-h-10 items-center opacity-0 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenMenuMessageId((currentId) =>
+                          currentId === messageId ? "" : messageId
+                        )
+                      }
+                      disabled={Boolean(busyMessageId)}
+                      className="grid h-10 w-10 place-items-center rounded-full bg-white text-black shadow-sm transition hover:bg-neutral-200 disabled:opacity-50"
+                      aria-label="Message options"
+                    >
+                      <span className="flex flex-col items-center gap-0.5" aria-hidden="true">
+                        <span className="h-1 w-1 rounded-full bg-current" />
+                        <span className="h-1 w-1 rounded-full bg-current" />
+                        <span className="h-1 w-1 rounded-full bg-current" />
+                      </span>
+                    </button>
+                    {openMenuMessageId === messageId && (
+                      <div className="absolute right-11 top-1/2 z-10 w-28 -translate-y-1/2 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 text-left text-xs font-bold shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuMessageId("");
+                            handleStartEditMessage(message);
+                          }}
+                          className="block w-full px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuMessageId("");
+                            handleDeleteMessage(message);
+                          }}
+                          className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-neutral-800"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <div className={`flex max-w-[76%] flex-col ${isMine ? "items-end" : "items-start"} sm:max-w-[560px]`}>
                   <div
@@ -707,23 +862,10 @@ const MessagesPanel = () => {
                     )}
                   </div>
                   {isMine && !isEditing && (
-                    <div className="mt-1 flex gap-2 pr-2 text-[11px] font-bold text-neutral-500 dark:text-neutral-400">
-                      <button
-                        type="button"
-                        onClick={() => handleStartEditMessage(message)}
-                        disabled={Boolean(busyMessageId)}
-                        className="transition hover:text-[#c72fb2] disabled:opacity-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMessage(message)}
-                        disabled={Boolean(busyMessageId)}
-                        className="transition hover:text-red-600 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
+                    <div className="mt-1 flex items-center gap-2 pr-2 text-[11px] font-bold text-neutral-500 dark:text-neutral-400">
+                      {messageId === latestOutgoingId && (
+                        <span>{getMessageStatus(message)}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -769,6 +911,81 @@ const MessagesPanel = () => {
         </button>
       </form>
     </div>
+    {isNewMessageOpen && (
+      <div className="fixed inset-0 z-40 grid place-items-center bg-black/45 px-4">
+        <form
+          onSubmit={handleSendBulkMessage}
+          className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-2xl dark:bg-neutral-950"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-extrabold">New Message</h2>
+            <button
+              type="button"
+              onClick={() => setIsNewMessageOpen(false)}
+              className="grid h-9 w-9 place-items-center rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900"
+              aria-label="Close new message"
+            >
+              x
+            </button>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+            <button type="button" onClick={() => setSelectedRecipientIds(users.map((item) => getEntityId(item)))} className="rounded-full bg-neutral-100 px-3 py-2 dark:bg-neutral-900">Select All</button>
+            <button type="button" onClick={() => selectRecipientsByRole("client")} className="rounded-full bg-neutral-100 px-3 py-2 dark:bg-neutral-900">Select All Clients</button>
+            <button type="button" onClick={() => selectRecipientsByRole("employee")} className="rounded-full bg-neutral-100 px-3 py-2 dark:bg-neutral-900">Select All Employees</button>
+            <button type="button" onClick={() => setSelectedRecipientIds([])} className="rounded-full bg-neutral-100 px-3 py-2 dark:bg-neutral-900">Clear</button>
+          </div>
+          <input
+            type="search"
+            value={newMessageSearch}
+            onChange={(event) => setNewMessageSearch(event.target.value)}
+            placeholder="Search users"
+            className="mt-4 h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
+          />
+          <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {modalUsers.map((participant) => {
+              const participantId = getEntityId(participant);
+              const selected = selectedRecipientIds.includes(participantId);
+              return (
+                <label key={participantId} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-900">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => toggleSelectedRecipient(participantId)}
+                    className="h-4 w-4"
+                  />
+                  <Avatar className="h-10 w-10" user={participant} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold">{getDisplayName(participant)}</span>
+                    <span className="block truncate text-xs text-neutral-500">
+                      {[participant.email, participant.role, participant.companyName].filter(Boolean).join(" - ")}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <textarea
+            value={bulkDraft}
+            onChange={(event) => setBulkDraft(event.target.value)}
+            maxLength={1000}
+            placeholder="Type a message"
+            className="mt-4 h-28 w-full resize-none rounded-lg border border-neutral-300 bg-transparent p-3 text-sm outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
+          />
+          <div className="mt-4 flex justify-end gap-3">
+            <button type="button" onClick={() => setIsNewMessageOpen(false)} className="h-10 rounded-lg border border-neutral-300 px-5 text-sm font-bold">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!bulkDraft.trim() || selectedRecipientIds.length === 0 || isSending}
+              className="h-10 rounded-lg bg-[#dc4fb2] px-5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              Send
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
   </section>
   );
 };

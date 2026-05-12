@@ -4,6 +4,7 @@ import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 const emailRegex =
@@ -58,19 +59,61 @@ const clientUserToClient = (user) => ({
 
 router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
-    const clients = await Client.find()
+    const { page, limit, skip } = getPagination(req.query);
+    const search = String(req.query.search || "").trim();
+    const activeFilter =
+      req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
+    const searchQuery = search
+      ? {
+          $or: [
+            { companyName: { $regex: search, $options: "i" } },
+            { contactPerson: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+    const clientQuery = {
+      ...searchQuery,
+      ...(activeFilter === undefined ? {} : { isActive: activeFilter }),
+    };
+    const userQuery = {
+      role: "client",
+      ...searchQuery,
+      ...(activeFilter === undefined ? {} : { isActive: activeFilter }),
+    };
+
+    const [clients, clientUsers, clientTotal, userTotal] = await Promise.all([
+      Client.find(clientQuery)
+      .select("companyName contactPerson email phone country service isActive address notes assignedEmployee createdAt updatedAt")
       .populate("assignedEmployee", "firstName lastName email role")
       .sort({ createdAt: -1 })
-      .lean();
-    const clientUsers = await User.find({ role: "client" })
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+      .lean(),
+      User.find(userQuery)
       .select("firstName lastName companyName email phone country position role isActive createdAt updatedAt")
       .sort({ createdAt: -1 })
-      .lean();
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+      .lean(),
+      Client.countDocuments(clientQuery).maxTimeMS(8000),
+      User.countDocuments(userQuery).maxTimeMS(8000),
+    ]);
 
-    res.status(200).json([
+    const data = [
       ...clientUsers.map(clientUserToClient),
       ...clients.map((client) => ({ ...client, source: "client" })),
-    ]);
+    ].slice(0, limit);
+
+    res.status(200).json(pagedResponse({
+      data,
+      page,
+      limit,
+      total: clientTotal + userTotal,
+      key: "clients",
+    }));
   } catch (error) {
     console.error("Get clients error:", error);
     res.status(500).json({ message: "Unable to fetch clients" });

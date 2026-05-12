@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { protect } from "../middleware/protectedjwt.js";
 import Message from "../model/messageModel.js";
 import User from "../model/userModel.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 const messageClients = new Map();
@@ -57,6 +58,11 @@ const removeMessageClient = (userId, res) => {
   }
 };
 
+const isUserOnline = (userId) => {
+  const clients = messageClients.get(String(userId));
+  return Boolean(clients?.size);
+};
+
 const emitMessageEvent = (userId, payload) => {
   const clients = messageClients.get(String(userId));
   if (!clients) return;
@@ -82,6 +88,7 @@ const toMessagePayload = (message) => ({
   sender: getUserId(message.sender),
   recipient: getUserId(message.recipient),
   text: message.text,
+  deliveredAt: message.deliveredAt,
   readAt: message.readAt,
   editedAt: message.editedAt,
   createdAt: message.createdAt,
@@ -111,6 +118,27 @@ router.get("/events", async (req, res) => {
 
     addMessageClient(userId, res);
 
+    const deliveredMessages = await Message.find({
+      recipient: userId,
+      deliveredAt: null,
+    })
+      .select("_id sender recipient text deliveredAt readAt editedAt createdAt updatedAt")
+      .limit(100)
+      .maxTimeMS(8000);
+
+    if (deliveredMessages.length > 0) {
+      const deliveredAt = new Date();
+      await Message.updateMany(
+        { _id: { $in: deliveredMessages.map((message) => message._id) } },
+        { $set: { deliveredAt } }
+      ).maxTimeMS(8000);
+
+      deliveredMessages.forEach((message) => {
+        message.deliveredAt = deliveredAt;
+        emitMessageChange(message, "delivered");
+      });
+    }
+
     const heartbeat = setInterval(() => {
       res.write(`event: ping\n`);
       res.write(`data: {}\n\n`);
@@ -130,16 +158,42 @@ router.get("/events", async (req, res) => {
 router.get("/users", protect, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
-    const users = await User.find({
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 50 });
+    const search = String(req.query.search || "").trim();
+    const searchQuery = search
+      ? {
+          $or: [
+            { firstName: { $regex: search, $options: "i" } },
+            { lastName: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { companyName: { $regex: search, $options: "i" } },
+            { role: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+    const query = {
       _id: { $ne: currentUserId },
       isActive: true,
-    })
+      ...searchQuery,
+    };
+    const [users, total] = await Promise.all([
+      User.find(query)
       .select(userFields)
       .sort({ firstName: 1, lastName: 1 })
+        .skip(skip)
+        .limit(limit)
       .maxTimeMS(8000)
-      .lean();
+        .lean(),
+      User.countDocuments(query).maxTimeMS(8000),
+    ]);
 
-    res.status(200).json(users.map(toParticipant));
+    res.status(200).json(pagedResponse({
+      data: users.map(toParticipant),
+      page,
+      limit,
+      total,
+      key: "users",
+    }));
   } catch (error) {
     console.error("Get message users error:", error);
     res.status(500).json({ message: "Unable to fetch message users" });
@@ -164,55 +218,60 @@ router.get("/unread-count", protect, async (req, res) => {
 router.get("/threads", protect, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
-    const messages = await Message.find({
-      $or: [{ sender: currentUserId }, { recipient: currentUserId }],
-    })
-      .populate("sender", userFields)
-      .populate("recipient", userFields)
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .maxTimeMS(8000)
-      .lean();
-
-    const threadMap = new Map();
-
-    messages.forEach((message) => {
-      const participantId = getParticipantId(message, currentUserId);
-      if (!participantId || threadMap.has(participantId)) return;
-
-      const participant =
-        getUserId(message.sender) === currentUserId
-          ? message.recipient
-          : message.sender;
-
-      threadMap.set(participantId, {
-        participant: toParticipant(participant),
-        lastMessage: {
-          _id: message._id,
-          text: message.text,
-          sender: getUserId(message.sender),
-          recipient: getUserId(message.recipient),
-          createdAt: message.createdAt,
-          readAt: message.readAt,
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 20 });
+    const currentObjectId = new mongoose.Types.ObjectId(currentUserId);
+    const pipeline = [
+      { $match: { $or: [{ sender: currentObjectId }, { recipient: currentObjectId }] } },
+      { $sort: { createdAt: -1 } },
+      {
+        $addFields: {
+          participantId: {
+            $cond: [{ $eq: ["$sender", currentObjectId] }, "$recipient", "$sender"],
+          },
+          isUnreadForCurrentUser: {
+            $and: [{ $eq: ["$recipient", currentObjectId] }, { $eq: ["$readAt", null] }],
+          },
         },
-        unreadCount: 0,
-      });
-    });
+      },
+      {
+        $group: {
+          _id: "$participantId",
+          lastMessage: { $first: "$$ROOT" },
+          unreadCount: { $sum: { $cond: ["$isUnreadForCurrentUser", 1, 0] } },
+        },
+      },
+      { $sort: { "lastMessage.createdAt": -1 } },
+      {
+        $facet: {
+          rows: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $lookup: {
+                from: "users",
+                localField: "_id",
+                foreignField: "_id",
+                as: "participant",
+                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, avatar: 1, companyName: 1, isActive: 1 } }],
+              },
+            },
+            { $unwind: "$participant" },
+          ],
+          total: [{ $count: "count" }],
+        },
+      },
+    ];
 
-    messages.forEach((message) => {
-      const participantId = getParticipantId(message, currentUserId);
-      const thread = threadMap.get(participantId);
+    const [result] = await Message.aggregate(pipeline).option({ maxTimeMS: 8000 });
+    const rows = result?.rows || [];
+    const total = result?.total?.[0]?.count || 0;
+    const threads = rows.map((thread) => ({
+      participant: toParticipant(thread.participant),
+      lastMessage: toMessagePayload(thread.lastMessage),
+      unreadCount: thread.unreadCount || 0,
+    }));
 
-      if (
-        thread &&
-        getUserId(message.recipient) === currentUserId &&
-        !message.readAt
-      ) {
-        thread.unreadCount += 1;
-      }
-    });
-
-    res.status(200).json(Array.from(threadMap.values()));
+    res.status(200).json(pagedResponse({ data: threads, page, limit, total, key: "threads" }));
   } catch (error) {
     console.error("Get message threads error:", error);
     res.status(500).json({ message: "Unable to fetch message threads" });
@@ -223,6 +282,7 @@ router.get("/threads/:userId", protect, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
     const otherUserId = req.params.userId;
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 50 });
 
     if (!mongoose.Types.ObjectId.isValid(otherUserId)) {
       return res.status(400).json({ message: "Invalid user" });
@@ -236,29 +296,53 @@ router.get("/threads/:userId", protect, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const messages = await Message.find({
+    const messageQuery = {
       $or: [
         { sender: currentUserId, recipient: otherUserId },
         { sender: otherUserId, recipient: currentUserId },
       ],
-    })
-      .sort({ createdAt: 1 })
-      .limit(500)
+    };
+    const total = await Message.countDocuments(messageQuery).maxTimeMS(8000);
+    const messages = await Message.find(messageQuery)
+      .select("sender recipient text deliveredAt readAt editedAt createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .maxTimeMS(8000)
       .lean();
 
-    await Message.updateMany(
+    const readAt = new Date();
+    const readResult = await Message.updateMany(
       {
         sender: otherUserId,
         recipient: currentUserId,
         readAt: null,
       },
-      { $set: { readAt: new Date() } }
+      { $set: { readAt, deliveredAt: readAt } }
     ).maxTimeMS(8000);
+
+    if (readResult.modifiedCount > 0) {
+      emitMessageEvent(otherUserId, {
+        action: "read",
+        readerId: currentUserId,
+        participantId: otherUserId,
+        readAt,
+      });
+      emitMessageEvent(currentUserId, {
+        action: "read",
+        readerId: currentUserId,
+        participantId: otherUserId,
+        readAt,
+      });
+    }
 
     res.status(200).json({
       participant: toParticipant(participant),
-      messages,
+      messages: messages.reverse(),
+      page,
+      limit,
+      total,
+      totalPages: Math.max(Math.ceil(total / limit), 1),
     });
   } catch (error) {
     console.error("Get message thread error:", error);
@@ -269,14 +353,18 @@ router.get("/threads/:userId", protect, async (req, res) => {
 router.post("/", protect, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
-    const recipientId = req.body.recipientId;
+    const requestedRecipientIds = [
+      req.body.recipientId,
+      ...(Array.isArray(req.body.recipientIds) ? req.body.recipientIds : []),
+    ].filter(Boolean);
+    const recipientIds = [...new Set(requestedRecipientIds.map(String))];
     const text = String(req.body.text || "").trim();
 
-    if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+    if (recipientIds.length === 0 || recipientIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
       return res.status(400).json({ message: "Invalid recipient" });
     }
 
-    if (recipientId === currentUserId) {
+    if (recipientIds.includes(currentUserId)) {
       return res.status(400).json({ message: "You cannot message yourself" });
     }
 
@@ -288,24 +376,29 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Message must be 1000 characters or fewer" });
     }
 
-    const recipient = await User.findOne({
-      _id: recipientId,
+    const recipients = await User.find({
+      _id: { $in: recipientIds },
       isActive: true,
-    }).select("_id");
+    }).select("_id").lean();
 
-    if (!recipient) {
+    if (recipients.length === 0) {
       return res.status(404).json({ message: "Recipient not found" });
     }
 
-    const message = await Message.create({
-      sender: currentUserId,
-      recipient: recipientId,
-      text,
-    });
+    const validRecipientIds = recipients.map((recipient) => getUserId(recipient));
+    const now = new Date();
+    const messages = await Message.insertMany(
+      validRecipientIds.map((recipientId) => ({
+        sender: currentUserId,
+        recipient: recipientId,
+        text,
+        deliveredAt: isUserOnline(recipientId) ? now : null,
+      }))
+    );
 
-    emitMessageChange(message, "created");
+    messages.forEach((message) => emitMessageChange(message, "created"));
 
-    res.status(201).json(message);
+    res.status(201).json(req.body.recipientIds ? { messages } : messages[0]);
   } catch (error) {
     console.error("Send message error:", error);
     res.status(500).json({ message: "Unable to send message" });

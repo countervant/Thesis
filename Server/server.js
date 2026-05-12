@@ -11,6 +11,7 @@ import clients from "./routes/clients.js";
 import tasks from "./routes/tasks.js";
 import newsfeed from "./routes/newsfeed.js";
 import messages from "./routes/messages.js";
+import dashboard from "./routes/dashboard.js";
 
 // Resolve .env relative to this file so it works regardless of cwd
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -99,6 +100,7 @@ app.use("/api/clients", clients);
 app.use("/api/tasks", tasks);
 app.use("/api/newsfeed", newsfeed);
 app.use("/api/messages", messages);
+app.use("/api/dashboard", dashboard);
 
 app.use("/api", (req, res) => {
   console.warn(`[route] No API route matched: ${req.method} ${req.originalUrl}`);

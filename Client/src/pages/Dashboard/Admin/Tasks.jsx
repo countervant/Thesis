@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import { SkeletonCard } from "../../../components/Skeleton.jsx";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const dateStatuses = ["All", "Today", "Week", "Overdue"];
@@ -533,9 +534,9 @@ const Tasks = ({
             )}
 
             {isLoading && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] dark:bg-[#141414] dark:text-neutral-300 dark:shadow-none dark:ring-1 dark:ring-neutral-800">
-                Loading tasks...
-              </p>
+              Array.from({ length: 5 }).map((_, index) => (
+                <SkeletonCard key={index} className="min-h-[95px]" />
+              ))
             )}
 
             {!isLoading && visibleTasks.length === 0 && (

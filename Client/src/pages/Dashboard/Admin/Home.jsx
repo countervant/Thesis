@@ -3,7 +3,8 @@ import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
-import { budgetAPI, clientAPI, employeeAPI, taskAPI } from "../../../services/api.js";
+import { dashboardAPI } from "../../../services/api.js";
+import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
 
 const statItems = [
   { key: "in_progress", label: "In Progress", icon: "progress" },
@@ -130,15 +131,6 @@ const getUserName = (value) => {
   const lastName = value?.lastName || "";
   const name = `${firstName} ${lastName}`.trim();
   return name || value?.email || "Unassigned";
-};
-
-const getLoadErrorMessage = (label, error) => {
-  const message =
-    error?.response?.data?.message ||
-    error?.message ||
-    "Unable to load this data.";
-
-  return `${label}: ${message}`;
 };
 
 const Icon = ({ name, className = "h-8 w-8" }) => {
@@ -305,17 +297,6 @@ const StatCard = ({ item }) => (
       <p className="text-base text-neutral-500">{item.label}</p>
     </div>
   </section>
-);
-
-const DashboardLoading = () => (
-  <div className="-mx-4 -mb-10 -mt-8 grid min-h-[calc(100vh-4rem)] place-items-center bg-[#f1f1f1] px-4 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-    <section className="grid place-items-center rounded-lg bg-white px-10 py-12 text-center shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-pink-100 border-t-[#dc4bb2]" />
-      <p className="mt-4 text-sm font-semibold text-neutral-700">
-        Loading dashboard data...
-      </p>
-    </section>
-  </div>
 );
 
 const ProgressRing = ({ value }) => (
@@ -579,6 +560,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [budgetEntries, setBudgetEntries] = useState([]);
+  const [taskStatusCounts, setTaskStatusCounts] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const activeTopTab = ["dashboard", "newsfeed", "messages"].includes(activePage)
@@ -587,7 +569,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
   const stats = statItems.map((item) => ({
     ...item,
-    value: tasks.filter((task) => task.status === item.key).length,
+    value: taskStatusCounts[item.key] ?? tasks.filter((task) => task.status === item.key).length,
   }));
 
   const activeTaskAssigneeIds = new Set(
@@ -627,51 +609,18 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
       try {
         setIsLoading(true);
         setLoadError("");
-        const [taskResult, employeeResult, clientResult, budgetResult] =
-          await Promise.allSettled([
-            taskAPI.getAll(),
-            employeeAPI.getAll(),
-            clientAPI.getAll(),
-            budgetAPI.getAll(),
-          ]);
+        const summary = await dashboardAPI.getSummary();
 
         if (!isMounted) {
           return;
         }
 
-        setTasks(
-          taskResult.status === "fulfilled" && Array.isArray(taskResult.value)
-            ? taskResult.value
-            : []
-        );
-        setEmployees(
-          employeeResult.status === "fulfilled" && Array.isArray(employeeResult.value)
-            ? employeeResult.value
-            : []
-        );
-        setClients(
-          clientResult.status === "fulfilled" && Array.isArray(clientResult.value)
-            ? clientResult.value
-            : []
-        );
-        setBudgetEntries(
-          budgetResult.status === "fulfilled" && Array.isArray(budgetResult.value)
-            ? budgetResult.value
-            : []
-        );
-
-        const failedRequests = [
-          ["Tasks", taskResult],
-          ["Employees", employeeResult],
-          ["Clients", clientResult],
-          ["Budgets", budgetResult],
-        ].filter(([, result]) => result.status === "rejected");
-
-        setLoadError(
-          failedRequests
-            .map(([label, result]) => getLoadErrorMessage(label, result.reason))
-            .join(" ")
-        );
+        setTasks(Array.isArray(summary.recentTasks) ? summary.recentTasks : []);
+        setEmployees(Array.isArray(summary.recentEmployees) ? summary.recentEmployees : []);
+        setClients(Array.isArray(summary.recentClients) ? summary.recentClients : []);
+        setBudgetEntries(Array.isArray(summary.recentBudgetEntries) ? summary.recentBudgetEntries : []);
+        setTaskStatusCounts(summary.taskStatusCounts || {});
+        setLoadError("");
       } catch (error) {
         if (!isMounted) {
           return;
@@ -695,7 +644,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }, []);
 
   if (activeTopTab === "dashboard" && isLoading) {
-    return <DashboardLoading />;
+    return <DashboardSkeleton />;
   }
 
   return (

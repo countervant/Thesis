@@ -4,6 +4,7 @@ import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
+import CountrySelect from "../CountrySelect.jsx";
 import { authAPI } from "../../services/api.js";
 import { validateEmail } from "../../utils/emailValidation.js";
 import {
@@ -12,7 +13,6 @@ import {
 } from "../../utils/phoneValidation.js";
 import {
   applyCountryDialCode,
-  countryOptions,
   defaultCountry,
   getCountryDialCode,
 } from "../../utils/countries.js";
@@ -317,19 +317,13 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6">
             <div className="border-b border-black mb-2 dark:border-white/40">
-              <select
+              <CountrySelect
                 value={country}
-                onChange={(event) => handleCountryChange(event.target.value)}
+                onChange={handleCountryChange}
                 autoComplete="country-name"
                 className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 dark:text-white"
                 required
-              >
-                {countryOptions.map((option) => (
-                  <option key={option.name} value={option.name}>
-                    {option.name} ({option.dialCode})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="border-b border-black mb-2 dark:border-white/40">
