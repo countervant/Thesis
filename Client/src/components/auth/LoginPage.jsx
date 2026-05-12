@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";

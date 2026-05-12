@@ -1,14 +1,16 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+console.info(`[api] Base URL: ${API_URL}`);
 
 const cache = new Map();
 const CACHE_TIME = 2 * 60 * 1000;
@@ -18,16 +20,22 @@ const cachedGet = async (url) => {
   const now = Date.now();
 
   if (cached?.promise) {
+    console.debug(`[api] GET ${url} using in-flight request`);
     return cached.promise;
   }
 
   if (cached?.data !== undefined && now - cached.time < CACHE_TIME) {
+    console.debug(`[api] GET ${url} served from cache`);
     return cached.data;
   }
 
   const promise = api
     .get(url)
     .then((response) => {
+      const dataShape = Array.isArray(response.data)
+        ? `array(${response.data.length})`
+        : typeof response.data;
+      console.debug(`[api] GET ${url} cached ${dataShape}`);
       cache.set(url, {
         data: response.data,
         time: Date.now(),
@@ -45,6 +53,19 @@ const cachedGet = async (url) => {
 
 const clearCache = (...urls) => {
   urls.forEach((url) => cache.delete(url));
+};
+
+const asArray = (data, label) => {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  console.warn(`[api] Expected ${label} to be an array, received:`, data);
+  return [];
 };
 
 const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
@@ -104,6 +125,9 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.debug(
+      `[api] -> ${config.method?.toUpperCase() || "GET"} ${config.baseURL || ""}${config.url || ""}`
+    );
     return config;
   },
   (error) => {
@@ -113,11 +137,25 @@ api.interceptors.request.use(
 
 // Handle response errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const dataShape = Array.isArray(response.data)
+      ? `array(${response.data.length})`
+      : typeof response.data;
+    console.debug(
+      `[api] <- ${response.status} ${response.config?.url || ""} (${dataShape})`
+    );
+    return response;
+  },
   (error) => {
     const status = error.response?.status;
     const requestUrl = error.config?.url || "";
     const isLoginRequest = requestUrl.includes("/login");
+    console.error("[api] Request failed", {
+      method: error.config?.method?.toUpperCase(),
+      url: requestUrl,
+      status,
+      message: error.response?.data?.message || error.message,
+    });
     if (status === 401 && !isLoginRequest) {
       // Token expired or invalid - clear storage
       cache.clear();
@@ -184,13 +222,13 @@ export const authAPI = {
   },
 
   getAssignees: async () => {
-    return cachedGet("/auth/assignees");
+    return asArray(await cachedGet("/auth/assignees"), "assignees");
   },
 };
 
 export const taskAPI = {
   getAll: async () => {
-    return cachedGet("/tasks");
+    return asArray(await cachedGet("/tasks"), "tasks");
   },
 
   create: async (task) => {
@@ -214,7 +252,7 @@ export const taskAPI = {
 
 export const newsfeedAPI = {
   getAll: async () => {
-    return cachedGet("/newsfeed");
+    return asArray(await cachedGet("/newsfeed"), "newsfeed posts");
   },
 
   updateCachedPost,
@@ -224,7 +262,7 @@ export const newsfeedAPI = {
   },
 
   getActivity: async () => {
-    return cachedGet("/newsfeed/activity");
+    return asArray(await cachedGet("/newsfeed/activity"), "newsfeed activity");
   },
 
   getMedia: async (id) => {
@@ -281,20 +319,16 @@ export const newsfeedAPI = {
 
 export const messageAPI = {
   getUsers: async () => {
-    return cachedGet("/messages/users");
+    return asArray(await cachedGet("/messages/users"), "message users");
   },
 
   getThreads: async () => {
-    return cachedGet("/messages/threads");
+    return asArray(await cachedGet("/messages/threads"), "message threads");
   },
 
   getUnreadCount: async () => {
-    const response = await api.get("/messages/threads");
-    const threads = Array.isArray(response.data) ? response.data : [];
-    return threads.reduce(
-      (total, thread) => total + (Number(thread.unreadCount) || 0),
-      0
-    );
+    const response = await api.get("/messages/unread-count");
+    return Number(response.data?.unreadCount) || 0;
   },
 
   getThread: async (userId) => {
@@ -350,7 +384,7 @@ export const messageAPI = {
 
 export const employeeAPI = {
   getAll: async () => {
-    return cachedGet("/auth/employees");
+    return asArray(await cachedGet("/auth/employees"), "employees");
   },
 
   create: async (employee) => {
@@ -374,7 +408,7 @@ export const employeeAPI = {
 
 export const clientAPI = {
   getAll: async () => {
-    return cachedGet("/clients");
+    return asArray(await cachedGet("/clients"), "clients");
   },
 
   create: async (client) => {
@@ -398,7 +432,7 @@ export const clientAPI = {
 
 export const budgetAPI = {
   getAll: async () => {
-    return cachedGet("/budgets");
+    return asArray(await cachedGet("/budgets"), "budget entries");
   },
 
   create: async (budget) => {

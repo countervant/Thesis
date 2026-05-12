@@ -20,20 +20,58 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // CORS – accept origins from env or fall back to common dev ports
-const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
-  : [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://127.0.0.1:5174",
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3001",
-      "http://127.0.0.1:3001",
-    ];
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
+];
 
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+const parseOrigins = (...values) =>
+  values
+    .filter(Boolean)
+    .flatMap((value) => value.split(","))
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const allowedOrigins = [
+  ...new Set([
+    ...parseOrigins(process.env.CORS_ORIGINS, process.env.FRONTEND_URL),
+    ...defaultOrigins,
+  ]),
+];
+
+console.log("[startup] Allowed CORS origins:", allowedOrigins.join(", "));
+
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+
+  res.on("finish", () => {
+    console.log(
+      `[request] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`
+    );
+  });
+
+  next();
+});
+
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.warn(`[cors] Blocked origin: ${origin}`);
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -46,6 +84,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api", (req, res, next) => {
   if (!isDbConnected()) {
+    console.error(`[database] Request blocked while disconnected: ${req.method} ${req.originalUrl}`);
     return res.status(503).json({ message: "Database unavailable" });
   }
 
@@ -61,12 +100,30 @@ app.use("/api/tasks", tasks);
 app.use("/api/newsfeed", newsfeed);
 app.use("/api/messages", messages);
 
+app.use("/api", (req, res) => {
+  console.warn(`[route] No API route matched: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ message: "API route not found" });
+});
+
+app.use((error, req, res, next) => {
+  console.error(`[server] Unhandled error for ${req.method} ${req.originalUrl}:`, error);
+
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  res.status(error.status || 500).json({
+    message: error.message || "Server error",
+  });
+});
+
 try {
   await dbConnect();
 
   app.listen(port, () => {
     console.log(`Server running on port ${port}`);
   });
-} catch {
+} catch (error) {
+  console.error("[startup] Server failed to start:", error);
   process.exit(1);
 }

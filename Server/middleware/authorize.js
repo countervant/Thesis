@@ -6,6 +6,9 @@ export const authorize = (...roles) => {
     }
 
     if (!roles.includes(req.user.role)) {
+      console.warn(
+        `[auth] Role denied for ${req.method} ${req.originalUrl}: '${req.user.role}' not in [${roles.join(", ")}]`
+      );
       return res.status(403).json({
         message: `User role '${req.user.role}' is not authorized to access this route`,
       });

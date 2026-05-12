@@ -8,17 +8,31 @@ export const dbConnect = async () => {
   }
 
   try {
+    console.log("[database] Connecting to MongoDB...");
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      readPreference: "secondaryPreferred",
-      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 8000,
+      socketTimeoutMS: 20000,
     });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log(`[database] MongoDB connected: ${conn.connection.host}/${conn.connection.name}`);
 
     return conn;
   } catch (error) {
-    console.error("Database connection error:", error);
+    console.error("[database] Connection error:", error);
     throw error;
   }
 };
 
 export const isDbConnected = () => mongoose.connection.readyState === 1;
+
+mongoose.connection.on("disconnected", () => {
+  console.warn("[database] MongoDB disconnected");
+});
+
+mongoose.connection.on("reconnected", () => {
+  console.log("[database] MongoDB reconnected");
+});
+
+mongoose.connection.on("error", (error) => {
+  console.error("[database] MongoDB runtime error:", error);
+});

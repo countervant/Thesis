@@ -136,12 +136,28 @@ router.get("/users", protect, async (req, res) => {
     })
       .select(userFields)
       .sort({ firstName: 1, lastName: 1 })
+      .maxTimeMS(8000)
       .lean();
 
     res.status(200).json(users.map(toParticipant));
   } catch (error) {
     console.error("Get message users error:", error);
     res.status(500).json({ message: "Unable to fetch message users" });
+  }
+});
+
+router.get("/unread-count", protect, async (req, res) => {
+  try {
+    const currentUserId = getUserId(req.user);
+    const unreadCount = await Message.countDocuments({
+      recipient: currentUserId,
+      readAt: null,
+    }).maxTimeMS(8000);
+
+    res.status(200).json({ unreadCount });
+  } catch (error) {
+    console.error("Get unread message count error:", error);
+    res.status(500).json({ message: "Unable to fetch unread message count" });
   }
 });
 
@@ -154,6 +170,8 @@ router.get("/threads", protect, async (req, res) => {
       .populate("sender", userFields)
       .populate("recipient", userFields)
       .sort({ createdAt: -1 })
+      .limit(500)
+      .maxTimeMS(8000)
       .lean();
 
     const threadMap = new Map();
@@ -210,7 +228,10 @@ router.get("/threads/:userId", protect, async (req, res) => {
       return res.status(400).json({ message: "Invalid user" });
     }
 
-    const participant = await User.findById(otherUserId).select(userFields).lean();
+    const participant = await User.findById(otherUserId)
+      .select(userFields)
+      .maxTimeMS(8000)
+      .lean();
     if (!participant) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -222,6 +243,8 @@ router.get("/threads/:userId", protect, async (req, res) => {
       ],
     })
       .sort({ createdAt: 1 })
+      .limit(500)
+      .maxTimeMS(8000)
       .lean();
 
     await Message.updateMany(
@@ -231,7 +254,7 @@ router.get("/threads/:userId", protect, async (req, res) => {
         readAt: null,
       },
       { $set: { readAt: new Date() } }
-    );
+    ).maxTimeMS(8000);
 
     res.status(200).json({
       participant: toParticipant(participant),

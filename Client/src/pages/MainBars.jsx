@@ -371,7 +371,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       onMessage: loadUnreadMessages,
       onError: () => {},
     });
-    const intervalId = setInterval(loadUnreadMessages, 5000);
+    const intervalId = setInterval(loadUnreadMessages, 30000);
 
     return () => {
       isMounted = false;
