@@ -2,6 +2,58 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../model/userModel.js';
 
+const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
+const authUserCache = new Map();
+const authUserFields =
+  "firstName middleInitial lastName companyName email phone country role position isActive isOnline lastSeen createdAt updatedAt";
+
+const isDatabaseTimeout = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.name === "MongoNetworkTimeoutError" ||
+    error?.name === "MongoServerSelectionError" ||
+    error?.name === "MongooseError" ||
+    message.includes("timed out") ||
+    message.includes("server selection") ||
+    message.includes("connection")
+  );
+};
+
+const getCachedUser = async (userId) => {
+  const cached = authUserCache.get(userId);
+  const now = Date.now();
+
+  if (cached && cached.expiresAt > now) {
+    return cached.promise || cached.user;
+  }
+
+  const promise = User.findById(userId)
+    .select(authUserFields)
+    .maxTimeMS(8000)
+    .lean()
+    .then((user) => {
+      if (user) {
+        authUserCache.set(userId, {
+          user,
+          expiresAt: Date.now() + AUTH_USER_CACHE_MS,
+        });
+      } else {
+        authUserCache.delete(userId);
+      }
+      return user;
+    })
+    .catch((error) => {
+      authUserCache.delete(userId);
+      throw error;
+    });
+
+  authUserCache.set(userId, {
+    promise,
+    expiresAt: now + AUTH_USER_CACHE_MS,
+  });
+
+  return promise;
+};
 
 export const protect = async (req, res, next) => {
   let token;
@@ -16,10 +68,7 @@ export const protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    req.user = await User.findById(decoded.id)
-      .select('-password')
-      .maxTimeMS(8000)
-      .lean();
+    req.user = await getCachedUser(decoded.id);
 
     if (!req.user) {
       console.warn(`[auth] Token user not found for ${req.method} ${req.originalUrl}`);
@@ -28,6 +77,11 @@ export const protect = async (req, res, next) => {
 
     return next();
     } catch (error){
+      if (isDatabaseTimeout(error)) {
+        console.error(`[database] Auth lookup failed for ${req.method} ${req.originalUrl}:`, error.message);
+        return res.status(503).json({ message: 'Database unavailable' });
+      }
+
       console.error(`[auth] Token failed for ${req.method} ${req.originalUrl}:`, error.message);
       return res.status(401).json({message: 'Not authorized, token failed'});
     }

@@ -1,14 +1,23 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import AppLoadingScreen from "../../components/AppLoadingScreen.jsx";
 
 const Unauthorized = () => {
-  const { user } = useAuth();
+  const { loading, token, user } = useAuth();
   const role = String(user?.role || "").trim();
   const dashboardPathByRole = {
     client: "/client/dashboard",
     employee: "/employee/dashboard",
     admin: "/admin/dashboard",
   };
+
+  if (loading || (token && !user)) {
+    return <AppLoadingScreen />;
+  }
+
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">

@@ -18,7 +18,7 @@ import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { NotificationSkeleton } from "../components/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
+import { getApiErrorMessage, messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const notificationReadKeyPrefix = "clientraReadNotifications";
@@ -309,6 +309,7 @@ const AccountMenuIcon = ({ src }) => (
 );
 
 const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
+  const isMessagesPage = activePage === "messages";
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -448,7 +449,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       } catch (error) {
         if (isMounted) {
           setNotificationError(
-            error.response?.data?.message || "Unable to load notifications."
+            getApiErrorMessage(error, "Unable to load notifications.")
           );
         }
       } finally {
@@ -1084,11 +1085,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       </button>
 
       <main
-        className={`px-4 pb-8 pt-[90px] transition-[margin] duration-300 ease-in-out md:px-7 lg:px-9 ${
+        className={`px-4 pt-[90px] transition-[margin] duration-300 ease-in-out md:px-7 lg:px-9 ${
+          isMessagesPage ? "pb-0" : "pb-8"
+        } ${
           isSidebarExpanded ? "md:ml-[260px]" : "md:ml-20"
         }`}
       >
-        <div style={{ zoom: 0.82 }}>
+        <div style={{ zoom: isMessagesPage ? 1 : 0.82 }}>
           {children}
         </div>
       </main>

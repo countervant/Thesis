@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { budgetAPI } from "../../../services/api.js";
+import { budgetAPI, getApiErrorMessage } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import balanceIcon from "../../../assets/balance.png";
 import totalExpenseIcon from "../../../assets/totalexpense.png";
@@ -466,9 +466,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load budget entries."
-          );
+          setErrorMessage(getApiErrorMessage(error, "Unable to load budget entries."));
         }
       } finally {
         if (isMounted) {

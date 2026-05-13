@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
@@ -12,6 +13,11 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 const router = express.Router();
 const emailRegex =
   /^[A-Za-z0-9]+(?:[._%+-][A-Za-z0-9]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
+const isMongoTimeoutError = (error) =>
+  error?.name === "MongoNetworkTimeoutError" ||
+  error?.name === "MongoNetworkError" ||
+  String(error?.message || "").toLowerCase().includes("timed out");
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const isValidEmail = (email) => {
   const trimmedEmail = email.trim();
@@ -134,14 +140,39 @@ router.post("/login", async (req, res) => {
    if (!isValidEmail(normalizedEmail)) {
     return res.status(400).json({ message: "Enter a valid email" });
    }
-   const user = await User.findOne({ email: normalizedEmail }).select("password role email");
+   const loadUser = () =>
+    User.findOne({ email: normalizedEmail })
+      .select("password role email")
+      .maxTimeMS(20000);
+
+   let user;
+   try {
+    user = await loadUser();
+   } catch (error) {
+    if (!isMongoTimeoutError(error)) throw error;
+    await wait(750);
+    user = await loadUser();
+   }
 
     if(!user || !(await user.matchPassword(password))){
         return res.status(401).json({message: "Invalid email or password"});
     }
+    User.findByIdAndUpdate(user._id, {
+      isOnline: true,
+      lastSeen: new Date(),
+    }).maxTimeMS(8000).catch((error) => {
+      if (!isMongoTimeoutError(error)) {
+        console.error("Login presence update error:", error);
+      }
+    });
+
     const token = generateToken(user._id);
     res.status(200).json({id: user._id, email: user.email, role: user.role, token});
   } catch (error) {
+    if (isMongoTimeoutError(error)) {
+      return res.status(503).json({ message: "Login is temporarily unavailable. Please try again." });
+    }
+
     res.status(500).json({ message: "Server error" });
   }
 }
@@ -305,7 +336,7 @@ router.post("/reset-password", async (req, res) => {
           },
           {
             new: true,
-            select: "firstName lastName email role avatar companyName isActive isOnline lastSeen",
+            select: "firstName lastName email role companyName isActive isOnline lastSeen",
           }
         ).lean();
 
@@ -321,16 +352,11 @@ router.post("/reset-password", async (req, res) => {
         const onlineSince = new Date(Date.now() - 2 * 60 * 1000);
         const users = await User.find({
           role: { $in: ["admin", "employee"] },
-          $or: [
-            { _id: req.user._id },
-            {
-              isOnline: true,
-              lastSeen: { $gte: onlineSince },
-              isActive: { $ne: false },
-            },
-          ],
+          isOnline: true,
+          lastSeen: { $gte: onlineSince },
+          isActive: { $ne: false },
         })
-          .select("firstName lastName email role avatar companyName isActive isOnline lastSeen")
+          .select("firstName lastName email role companyName isActive isOnline lastSeen")
           .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
           .maxTimeMS(8000)
           .lean();
@@ -344,9 +370,24 @@ router.post("/reset-password", async (req, res) => {
 
     router.get("/users/:id", protect, async (req, res) => {
       try {
-        const user = await User.findById(req.params.id).select(
-          "firstName middleInitial lastName companyName email phone country role avatar position isActive"
-        ).lean();
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+          return res.status(400).json({ message: "Invalid user" });
+        }
+
+        const loadUser = () =>
+          User.findById(req.params.id)
+            .select("firstName middleInitial lastName companyName email phone country role avatar position isActive")
+            .maxTimeMS(30000)
+            .lean();
+
+        let user;
+        try {
+          user = await loadUser();
+        } catch (error) {
+          if (!isMongoTimeoutError(error)) throw error;
+          await wait(750);
+          user = await loadUser();
+        }
 
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -354,6 +395,10 @@ router.post("/reset-password", async (req, res) => {
 
         res.status(200).json(user);
       } catch (error) {
+        if (isMongoTimeoutError(error)) {
+          return res.status(503).json({ message: "Profile is temporarily unavailable" });
+        }
+
         console.error("Get public profile error:", error);
         res.status(500).json({ message: "Unable to load profile" });
       }
@@ -519,7 +564,7 @@ router.post("/reset-password", async (req, res) => {
         };
         const [employees, total] = await Promise.all([
           User.find(query)
-          .select("firstName lastName email phone country position role avatar isActive")
+          .select("firstName lastName email phone country position role isActive")
           .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)

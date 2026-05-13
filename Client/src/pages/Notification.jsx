@@ -7,7 +7,7 @@ import heartIcon from "../assets/heart.png";
 import messagesIcon from "../assets/messages.png";
 import MainBars from "./MainBars.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { newsfeedAPI, taskAPI } from "../services/api.js";
+import { getApiErrorMessage, newsfeedAPI, taskAPI } from "../services/api.js";
 import { NotificationSkeleton } from "../components/Skeleton.jsx";
 
 const dashboardPathByRole = {
@@ -160,7 +160,7 @@ const Notification = () => {
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load notifications.");
+          setErrorMessage(getApiErrorMessage(error, "Unable to load notifications."));
         }
       } finally {
         if (isMounted) {

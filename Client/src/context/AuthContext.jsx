@@ -10,6 +10,18 @@ const userForStorage = (userData) => {
   return storedUser;
 };
 
+const normalizeUser = (userData, fallbackUser = null) => {
+  const source = userData || {};
+  const fallback = fallbackUser || {};
+
+  return {
+    ...fallback,
+    ...source,
+    id: source.id || source._id || fallback.id || fallback._id,
+    role: normalizeRole(source.role || source.type || fallback.role || fallback.type),
+  };
+};
+
 const persistUser = (userData) => {
   try {
     localStorage.setItem("user", JSON.stringify(userForStorage(userData)));
@@ -22,6 +34,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(true);
+
+  const markOffline = useCallback(async (authToken = token) => {
+    if (!authToken) return;
+
+    try {
+      await authAPI.updatePresence(false, authToken);
+    } catch {
+      // Logging out should continue even if the presence request fails.
+    }
+  }, [token]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -36,10 +58,7 @@ export const AuthProvider = ({ children }) => {
         if (storedUser) {
           try {
             const parsedUser = JSON.parse(storedUser);
-            const normalizedUser = {
-              ...parsedUser,
-              role: normalizeRole(parsedUser.role || parsedUser.type),
-            };
+            const normalizedUser = normalizeUser(parsedUser);
             setUser(normalizedUser);
             persistUser(normalizedUser);
           } catch {
@@ -50,11 +69,7 @@ export const AuthProvider = ({ children }) => {
         if (storedToken) {
           try {
             const profile = await authAPI.getMe();
-            const normalizedProfile = {
-              id: profile._id || profile.id,
-              ...profile,
-              role: normalizeRole(profile.role || profile.type),
-            };
+            const normalizedProfile = normalizeUser(profile);
             setUser(normalizedProfile);
             persistUser(normalizedProfile);
           } catch {
@@ -72,39 +87,49 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  const userId = user?.id || user?._id;
+
   useEffect(() => {
-    if (!token || !user) return undefined;
+    if (!token || !userId) return undefined;
 
     let isActive = true;
     const markOnline = () => {
+      if (document.visibilityState === "hidden") return;
       authAPI.updatePresence(true).catch(() => {});
     };
 
     markOnline();
     const intervalId = window.setInterval(() => {
       if (isActive) markOnline();
-    }, 30000);
+    }, 120000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        markOnline();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isActive = false;
       window.clearInterval(intervalId);
-      authAPI.updatePresence(false, token).catch(() => {});
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      markOffline(token);
     };
-  }, [token, user?.id]);
+  }, [markOffline, token, userId]);
 
   const login = (userData, authToken) => {
-    const normalizedUser = {
-      ...userData,
-      role: normalizeRole(userData.role || userData.type),
-    };
+    const normalizedUser = normalizeUser(userData);
     setUser(normalizedUser);
     setToken(authToken);
     persistUser(normalizedUser);
     localStorage.setItem("token", authToken);
   };
 
-  const logout = () => {
-    authAPI.updatePresence(false, token).catch(() => {});
+  const logout = async () => {
+    const currentToken = token;
+    await markOffline(currentToken);
     setUser(null);
     setToken(null);
     authAPI.clearSessionCache();
@@ -114,12 +139,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = useCallback((userData) => {
     setUser((currentUser) => {
-      const normalizedUser = {
-        ...currentUser,
-        ...userData,
-        id: userData.id || userData._id || currentUser?.id,
-        role: normalizeRole(userData.role || userData.type || currentUser?.role),
-      };
+      const normalizedUser = normalizeUser(userData, currentUser);
 
       persistUser(normalizedUser);
       return normalizedUser;

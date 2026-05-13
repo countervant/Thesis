@@ -68,6 +68,24 @@ const asArray = (data, label) => {
   return [];
 };
 
+export const getApiErrorMessage = (error, fallback = "Unable to load data.") => {
+  const status = error.response?.status;
+  const method = error.config?.method?.toUpperCase?.() || "GET";
+  const url = `${error.config?.baseURL || API_URL}${error.config?.url || ""}`;
+  const serverMessage = error.response?.data?.message;
+  const networkMessage = error.message;
+
+  if (serverMessage) {
+    return `${serverMessage} (${method} ${url}${status ? `, HTTP ${status}` : ""})`;
+  }
+
+  if (status) {
+    return `${fallback} (${method} ${url}, HTTP ${status})`;
+  }
+
+  return `${fallback} (${method} ${url}, ${networkMessage || "network error"})`;
+};
+
 const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
 
 const mergeCachedPost = (currentPost, nextPost) => ({
@@ -175,7 +193,7 @@ export const authAPI = {
 
   login: async (email, password) => {
     clearCache("/auth/me");
-    const response = await api.post("/auth/login", { email, password });
+    const response = await api.post("/auth/login", { email, password }, { timeout: 45000 });
     return response.data;
   },
 

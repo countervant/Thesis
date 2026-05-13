@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { clientAPI } from "../../../services/api.js";
+import { clientAPI, getApiErrorMessage } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
@@ -323,7 +323,7 @@ const AdminClients = () => {
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load clients.");
+          setErrorMessage(getApiErrorMessage(error, "Unable to load clients."));
         }
       } finally {
         if (isMounted) {

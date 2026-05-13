@@ -14,7 +14,7 @@ import Profile from "./Profile.jsx";
 import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
-import { messageAPI } from "../services/api.js";
+import { getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const adminPages = new Set([
   "dashboard",
@@ -215,7 +215,7 @@ const MessagesPanel = () => {
 
         if (threadResult.status === "rejected" && userResult.status === "rejected") {
           setErrorMessage(
-            threadResult.reason?.response?.data?.message || "Unable to load messages."
+            getApiErrorMessage(threadResult.reason, "Unable to load messages.")
           );
         }
 
@@ -226,7 +226,7 @@ const MessagesPanel = () => {
       } catch (error) {
         if (isMounted) {
           setErrorMessage(
-            error.response?.data?.message || "Unable to load messages."
+            getApiErrorMessage(error, "Unable to load messages.")
           );
         }
       } finally {
@@ -281,7 +281,7 @@ const MessagesPanel = () => {
             setErrorMessage("");
           } else {
             setErrorMessage(
-              error.response?.data?.message || "Unable to load conversation."
+              getApiErrorMessage(error, "Unable to load conversation.")
             );
           }
         }
@@ -587,8 +587,8 @@ const MessagesPanel = () => {
   });
 
   return (
-  <section className="-mx-4 -mb-10 -mt-8 flex h-[calc(100vh-4rem)] overflow-hidden border-y border-neutral-300 bg-[#f1f1f1] text-neutral-950 dark:border-neutral-800 dark:bg-neutral-950 md:-mx-6 lg:-mx-8">
-    <aside className="hidden w-[310px] shrink-0 border-r border-neutral-300 bg-[#f5f5f5] px-4 py-8 dark:border-neutral-800 dark:bg-neutral-950 sm:block lg:w-[330px]">
+  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-neutral-300 bg-[#f1f1f1] text-neutral-950 dark:border-neutral-800 dark:bg-neutral-950 md:-mx-7 lg:-mx-9">
+    <aside className="hidden w-[310px] shrink-0 border-r border-neutral-300 bg-[#f5f5f5] px-4 py-7 dark:border-neutral-800 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[330px]">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold leading-none">Messages</h1>
         <button
@@ -613,7 +613,7 @@ const MessagesPanel = () => {
         />
       </label>
 
-      <div className="mt-7 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-7 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {isLoadingInbox && (
           <p className="rounded-lg bg-white px-4 py-4 text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
             Loading messages...
@@ -734,7 +734,7 @@ const MessagesPanel = () => {
         </p>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-7">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-7">
         <div className="space-y-5">
           {isLoadingThread && (
             <p className="rounded-lg bg-white px-4 py-4 text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
@@ -877,7 +877,7 @@ const MessagesPanel = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSendMessage} className="flex items-center gap-3 px-4 pb-5 sm:px-9">
+      <form onSubmit={handleSendMessage} className="flex shrink-0 items-center gap-3 border-t border-neutral-300 px-4 py-4 dark:border-neutral-800 sm:px-9">
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">Message</span>
           <input

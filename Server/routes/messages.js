@@ -9,7 +9,7 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 const router = express.Router();
 const messageClients = new Map();
 
-const userFields = "firstName lastName email role avatar companyName isActive";
+const userFields = "firstName lastName email role companyName isActive isOnline lastSeen";
 
 const getUserId = (user) => {
   if (!user) return "";
@@ -20,8 +20,16 @@ const getUserId = (user) => {
   return "";
 };
 
+const isPresenceOnline = (user) => {
+  if (!user?.isOnline || !user?.lastSeen) return false;
+
+  const lastSeenTime = new Date(user.lastSeen).getTime();
+  return Number.isFinite(lastSeenTime) && Date.now() - lastSeenTime <= 2 * 60 * 1000;
+};
+
 const toParticipant = (user) => {
   if (!user) return null;
+  const online = isPresenceOnline(user);
 
   return {
     _id: user._id,
@@ -29,9 +37,11 @@ const toParticipant = (user) => {
     lastName: user.lastName,
     email: user.email,
     role: user.role,
-    avatar: user.avatar || "",
+    avatar: "",
     companyName: user.companyName || "",
     isActive: user.isActive,
+    isOnline: online,
+    lastSeen: user.lastSeen,
   };
 };
 
@@ -58,7 +68,7 @@ const removeMessageClient = (userId, res) => {
   }
 };
 
-const isUserOnline = (userId) => {
+const hasMessageConnection = (userId) => {
   const clients = messageClients.get(String(userId));
   return Boolean(clients?.size);
 };
@@ -252,7 +262,7 @@ router.get("/threads", protect, async (req, res) => {
                 localField: "_id",
                 foreignField: "_id",
                 as: "participant",
-                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, avatar: 1, companyName: 1, isActive: 1 } }],
+                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, companyName: 1, isActive: 1, isOnline: 1, lastSeen: 1 } }],
               },
             },
             { $unwind: "$participant" },
@@ -379,12 +389,15 @@ router.post("/", protect, async (req, res) => {
     const recipients = await User.find({
       _id: { $in: recipientIds },
       isActive: true,
-    }).select("_id").lean();
+    }).select("_id isOnline lastSeen").lean();
 
     if (recipients.length === 0) {
       return res.status(404).json({ message: "Recipient not found" });
     }
 
+    const recipientById = new Map(
+      recipients.map((recipient) => [getUserId(recipient), recipient])
+    );
     const validRecipientIds = recipients.map((recipient) => getUserId(recipient));
     const now = new Date();
     const messages = await Message.insertMany(
@@ -392,7 +405,11 @@ router.post("/", protect, async (req, res) => {
         sender: currentUserId,
         recipient: recipientId,
         text,
-        deliveredAt: isUserOnline(recipientId) ? now : null,
+        deliveredAt:
+          hasMessageConnection(recipientId) ||
+          isPresenceOnline(recipientById.get(recipientId))
+            ? now
+            : null,
       }))
     );
 

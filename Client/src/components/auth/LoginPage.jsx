@@ -53,7 +53,7 @@ const LoginPage = ({ order, order1 }) => {
 
     try {
       const data = await authAPI.login(email, password);
-      login({ id: data.id, email: data.email, role: normalizeRole(data.role) }, data.token);
+      localStorage.setItem("token", data.token);
 
       let profile = null;
       try {
@@ -71,14 +71,14 @@ const LoginPage = ({ order, order1 }) => {
           }
         : { id: data.id, email: data.email, role };
 
-      login(userData, data.token);
-      resetForm();
-
       if (!role) {
+        localStorage.removeItem("token");
         setError("Login succeeded, but this account has no role. Please ask the admin to check the account role in the database.");
         return;
       }
 
+      login(userData, data.token);
+      resetForm();
       navigate(dashboardPathByRole[role] || "/dashboard", {
         replace: true,
       });

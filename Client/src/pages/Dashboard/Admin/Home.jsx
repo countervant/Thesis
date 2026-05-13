@@ -3,7 +3,7 @@ import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
-import { dashboardAPI } from "../../../services/api.js";
+import { dashboardAPI, getApiErrorMessage } from "../../../services/api.js";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
 
@@ -746,9 +746,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
           return;
         }
 
-        setLoadError(
-          error.response?.data?.message || "Unable to load dashboard data."
-        );
+        setLoadError(getApiErrorMessage(error, "Unable to load dashboard data."));
       } finally {
         if (isMounted) {
           setIsLoading(false);

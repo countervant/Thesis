@@ -267,38 +267,42 @@ const Newsfeed = () => {
 
     let isMounted = true;
 
-    postsMissingMedia.forEach(async (post) => {
-      try {
-        const media = await newsfeedAPI.getMedia(post.id);
+    const loadMissingMedia = async () => {
+      for (const post of postsMissingMedia) {
+        try {
+          const media = await newsfeedAPI.getMedia(post.id);
 
-        if (!isMounted) return;
+          if (!isMounted) return;
 
-        setPosts((currentPosts) =>
-          currentPosts.map((currentPost) =>
-            currentPost.id === post.id
-              ? {
-                  ...currentPost,
-                  media: {
-                    type: media?.type || "",
-                    url: media?.url || "",
-                    name: media?.name || "",
-                  },
-                }
-              : currentPost
-          )
-        );
-      } catch {
-        if (!isMounted) return;
+          setPosts((currentPosts) =>
+            currentPosts.map((currentPost) =>
+              currentPost.id === post.id
+                ? {
+                    ...currentPost,
+                    media: {
+                      type: media?.type || "",
+                      url: media?.url || "",
+                      name: media?.name || "",
+                    },
+                  }
+                : currentPost
+            )
+          );
+        } catch {
+          if (!isMounted) return;
 
-        setPosts((currentPosts) =>
-          currentPosts.map((currentPost) =>
-            currentPost.id === post.id
-              ? { ...currentPost, media: { type: "", url: "", name: "" } }
-              : currentPost
-          )
-        );
+          setPosts((currentPosts) =>
+            currentPosts.map((currentPost) =>
+              currentPost.id === post.id
+                ? { ...currentPost, media: { type: "", url: "", name: "" } }
+                : currentPost
+            )
+          );
+        }
       }
-    });
+    };
+
+    loadMissingMedia();
 
     return () => {
       isMounted = false;

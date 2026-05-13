@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { employeeAPI } from "../../../services/api.js";
+import { employeeAPI, getApiErrorMessage } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
@@ -328,9 +328,7 @@ const AdminEmployees = ({
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load employees."
-          );
+          setErrorMessage(getApiErrorMessage(error, "Unable to load employees."));
         }
       } finally {
         if (isMounted) {

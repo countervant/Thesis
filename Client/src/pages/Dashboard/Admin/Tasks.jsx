@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { taskAPI } from "../../../services/api.js";
+import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 
@@ -379,7 +379,7 @@ const Tasks = ({
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load tasks.");
+          setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));
         }
       } finally {
         if (isMounted) {

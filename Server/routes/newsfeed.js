@@ -1,11 +1,37 @@
 import express from "express";
+import mongoose from "mongoose";
 import NewsfeedPost from "../model/newsfeesModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 const postAllowedRoles = ["admin", "client"];
-const userPublicFields = "firstName lastName companyName email country role avatar";
+const userPublicFields = "firstName lastName companyName email country role";
+const isMongoTimeoutError = (error) =>
+  error?.name === "MongoNetworkTimeoutError" ||
+  error?.name === "MongoNetworkError" ||
+  String(error?.message || "").toLowerCase().includes("timed out");
+const emptyMedia = { type: "", url: "", name: "" };
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const findPostMedia = (postId) =>
+  NewsfeedPost.findById(postId)
+    .select("media")
+    .maxTimeMS(30000)
+    .lean();
+
+const findPostMediaWithRetry = async (postId) => {
+  try {
+    return await findPostMedia(postId);
+  } catch (error) {
+    if (!isMongoTimeoutError(error)) {
+      throw error;
+    }
+
+    await wait(750);
+    return findPostMedia(postId);
+  }
+};
 
 const populatePost = (query) =>
   query
@@ -83,16 +109,22 @@ router.get("/activity", protect, async (req, res) => {
 
 router.get("/:id/media", protect, async (req, res) => {
   try {
-    const post = await NewsfeedPost.findById(req.params.id)
-      .select("media")
-      .lean();
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid post" });
+    }
+
+    const post = await findPostMediaWithRetry(req.params.id);
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    res.status(200).json(post.media || { type: "", url: "", name: "" });
+    res.status(200).json(post.media || emptyMedia);
   } catch (error) {
+    if (isMongoTimeoutError(error)) {
+      return res.status(200).json(emptyMedia);
+    }
+
     console.error("Get newsfeed media error:", error);
     res.status(500).json({ message: "Unable to fetch post media" });
   }

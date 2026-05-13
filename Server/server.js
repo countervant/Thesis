@@ -12,6 +12,8 @@ import tasks from "./routes/tasks.js";
 import newsfeed from "./routes/newsfeed.js";
 import messages from "./routes/messages.js";
 import dashboard from "./routes/dashboard.js";
+import users from "./routes/users.js";
+import databaseDiagnostics from "./routes/databaseDiagnostics.js";
 
 // Resolve .env relative to this file so it works regardless of cwd
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +73,8 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.use("/api/database", databaseDiagnostics);
+
 app.use("/api", (req, res, next) => {
   if (!isDbConnected()) {
     console.error(`[database] Request blocked while disconnected: ${req.method} ${req.originalUrl}`);
@@ -89,6 +93,7 @@ app.use("/api/tasks", tasks);
 app.use("/api/newsfeed", newsfeed);
 app.use("/api/messages", messages);
 app.use("/api/dashboard", dashboard);
+app.use("/api/users", users);
 
 app.use("/api", (req, res) => {
   console.warn(`[route] No API route matched: ${req.method} ${req.originalUrl}`);

@@ -4,10 +4,10 @@ import AppLoadingScreen from "../AppLoadingScreen.jsx";
 
 // Protected route component that checks authentication and roles
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, hasRole, loading } = useAuth();
+  const { isAuthenticated, hasRole, loading, token, user } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || (token && !user)) {
     return <AppLoadingScreen />;
   }
 
