@@ -52,7 +52,13 @@ const cachedGet = async (url) => {
 };
 
 const clearCache = (...urls) => {
-  urls.forEach((url) => cache.delete(url));
+  urls.forEach((url) => {
+    Array.from(cache.keys()).forEach((key) => {
+      if (key === url || key.startsWith(`${url}?`) || key.startsWith(`${url}/`)) {
+        cache.delete(key);
+      }
+    });
+  });
 };
 
 const asArray = (data, label) => {
@@ -134,6 +140,12 @@ const removeCachedPost = (postId) => {
       time: Date.now(),
     });
   });
+};
+
+const emitNewsfeedUpdate = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("clientra:newsfeed-updated"));
+  }
 };
 
 // Add token to requests automatically
@@ -247,7 +259,7 @@ export const authAPI = {
 
   updateMe: async (profile) => {
     const response = await api.put("/auth/me", profile);
-    clearCache("/auth/me", "/auth/employees", "/auth/assignees", "/clients");
+    clearCache("/auth/me", "/auth/users", "/auth/employees", "/auth/assignees", "/clients", "/dashboard");
     return response.data;
   },
 
@@ -274,19 +286,19 @@ export const taskAPI = {
 
   create: async (task) => {
     const response = await api.post("/tasks", task);
-    clearCache("/tasks");
+    clearCache("/tasks", "/dashboard");
     return response.data;
   },
 
   update: async (id, task) => {
     const response = await api.put(`/tasks/${id}`, task);
-    clearCache("/tasks");
+    clearCache("/tasks", "/dashboard");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/tasks/${id}`);
-    clearCache("/tasks");
+    clearCache("/tasks", "/dashboard");
     return response.data;
   },
 };
@@ -314,6 +326,7 @@ export const newsfeedAPI = {
   create: async (post) => {
     const response = await api.post("/newsfeed", post);
     clearCache("/newsfeed", "/newsfeed/activity");
+    emitNewsfeedUpdate();
     return response.data;
   },
 
@@ -326,18 +339,21 @@ export const newsfeedAPI = {
   delete: async (id) => {
     const response = await api.delete(`/newsfeed/${id}`);
     removeCachedPost(id);
+    emitNewsfeedUpdate();
     return response.data;
   },
 
   comment: async (id, text) => {
     const response = await api.post(`/newsfeed/${id}/comments`, { text });
     replaceCachedPost(response.data);
+    emitNewsfeedUpdate();
     return response.data;
   },
 
   deleteComment: async (postId, commentId) => {
     const response = await api.delete(`/newsfeed/${postId}/comments/${commentId}`);
     replaceCachedPost(response.data);
+    emitNewsfeedUpdate();
     return response.data;
   },
 
@@ -355,6 +371,7 @@ export const newsfeedAPI = {
       { text }
     );
     replaceCachedPost(response.data);
+    emitNewsfeedUpdate();
     return response.data;
   },
 };
@@ -437,19 +454,19 @@ export const employeeAPI = {
 
   create: async (employee) => {
     const response = await api.post("/auth/employees", employee);
-    clearCache("/auth/employees", "/auth/assignees");
+    clearCache("/auth/employees", "/auth/assignees", "/clients", "/dashboard");
     return response.data;
   },
 
   update: async (id, employee) => {
     const response = await api.put(`/auth/employees/${id}`, employee);
-    clearCache("/auth/employees", "/auth/assignees", "/clients");
+    clearCache("/auth/employees", "/auth/assignees", "/clients", "/dashboard");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/auth/employees/${id}`);
-    clearCache("/auth/employees", "/auth/assignees", "/clients");
+    clearCache("/auth/employees", "/auth/assignees", "/clients", "/dashboard");
     return response.data;
   },
 };
@@ -462,19 +479,19 @@ export const clientAPI = {
 
   create: async (client) => {
     const response = await api.post("/clients", client);
-    clearCache("/clients");
+    clearCache("/clients", "/dashboard");
     return response.data;
   },
 
   update: async (id, client) => {
     const response = await api.put(`/clients/${id}`, client);
-    clearCache("/clients");
+    clearCache("/clients", "/dashboard");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/clients/${id}`);
-    clearCache("/clients");
+    clearCache("/clients", "/dashboard");
     return response.data;
   },
 };
@@ -487,19 +504,19 @@ export const budgetAPI = {
 
   create: async (budget) => {
     const response = await api.post("/budgets", budget);
-    clearCache("/budgets");
+    clearCache("/budgets", "/dashboard");
     return response.data;
   },
 
   update: async (id, budget) => {
     const response = await api.put(`/budgets/${id}`, budget);
-    clearCache("/budgets");
+    clearCache("/budgets", "/dashboard");
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/budgets/${id}`);
-    clearCache("/budgets");
+    clearCache("/budgets", "/dashboard");
     return response.data;
   },
 };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
@@ -129,6 +129,45 @@ const Avatar = ({ user, size = "h-24 w-24" }) => (
     textClassName={size.includes("h-24") ? "text-3xl" : "text-xs"}
   />
 );
+
+const ProfileInfoIcon = ({ name }) => {
+  const props = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    className: "h-4 w-4",
+    "aria-hidden": "true",
+  };
+
+  if (name === "person") return <svg {...props}><circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.8" /><path d="M5 20c.9-4 3.2-6 7-6s6.1 2 7 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  if (name === "mail") return <svg {...props}><path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>;
+  if (name === "phone") return <svg {...props}><path d="M7 4l3 3-2 2c1.2 2.4 2.8 4 5.2 5.2l2-2 3 3-1.5 3c-.4.8-1.2 1.2-2.1 1C9.6 18.3 5.7 14.4 4.8 9.4c-.2-.9.2-1.7 1-2.1L7 4Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "location") return <svg {...props}><path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="10" r="2" stroke="currentColor" strokeWidth="1.7" /></svg>;
+  if (name === "calendar") return <svg {...props}><path d="M7 3v4M17 3v4M4 9h16M6 5h12a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "briefcase") return <svg {...props}><path d="M9 6V4h6v2M4 7h16v12H4zM4 12h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "id") return <svg {...props}><path d="M5 7h14v10H5zM8 11h3M8 14h5M15 11h1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "heart") return <svg {...props}><path d="M12 20s-7-4.2-8.5-9A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8.5 4c-1.5 4.8-8.5 9-8.5 9Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>;
+  if (name === "folder") return <svg {...props}><path d="M4 7h6l2 2h8v10H4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>;
+  if (name === "comment") return <svg {...props}><path d="M5 6h14v10H9l-4 3V6z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "chart") return <svg {...props}><path d="M5 19h14M8 16V9M12 16V5M16 16v-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
+  return <svg {...props}><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
+};
+
+const getEmployeeId = (user) =>
+  String(user?._id || user?.id || "EMP-000123").startsWith("EMP-")
+    ? String(user?._id || user?.id || "EMP-000123")
+    : `EMP-${String(user?._id || user?.id || "000123").slice(-6).toUpperCase()}`;
+
+const profileSkills = [
+  "UI/UX Design",
+  "React",
+  "JavaScript",
+  "System Management",
+  "Database Management",
+  "Problem Solving",
+  "Communication",
+  "Leadership",
+  "Teamwork",
+];
 
 const HeartIcon = ({ filled = false }) => (
   <img
@@ -380,37 +419,44 @@ const PublicProfile = () => {
   const [commentToDelete, setCommentToDelete] = useState(null);
   const [activeProfileTab, setActiveProfileTab] = useState("Newsfeed");
 
+  const loadProfilePosts = useCallback(async ({ showLoading = true } = {}) => {
+    try {
+      if (showLoading) setIsLoading(true);
+      setErrorMessage("");
+      const [data, profileData] = await Promise.all([
+        newsfeedAPI.getAll(),
+        userId ? authAPI.getPublicProfile(userId) : Promise.resolve(null),
+      ]);
+
+      setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
+      setDirectProfileUser(profileData);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Unable to load profile.");
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => {
     let isMounted = true;
 
-    const loadProfilePosts = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const [data, profileData] = await Promise.all([
-          newsfeedAPI.getAll(),
-          userId ? authAPI.getPublicProfile(userId) : Promise.resolve(null),
-        ]);
-
-        if (isMounted) {
-          setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
-          setDirectProfileUser(profileData);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load profile.");
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    loadProfilePosts();
+    loadProfilePosts().finally(() => {
+      if (!isMounted) return;
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [userId]);
+  }, [loadProfilePosts]);
+
+  useEffect(() => {
+    const handleNewsfeedUpdate = () => {
+      loadProfilePosts({ showLoading: false });
+    };
+
+    window.addEventListener("clientra:newsfeed-updated", handleNewsfeedUpdate);
+    return () => window.removeEventListener("clientra:newsfeed-updated", handleNewsfeedUpdate);
+  }, [loadProfilePosts]);
 
   const { profileUser, userPosts } = useMemo(() => {
     const users = collectUsers(posts);
@@ -426,6 +472,12 @@ const PublicProfile = () => {
       userPosts: authoredPosts,
     };
   }, [directProfileUser, posts, userId]);
+  const totalLikes = userPosts.reduce((total, post) => total + post.hearts.length, 0);
+  const totalComments = userPosts.reduce((total, post) => total + post.comments.length, 0);
+  const activeProjects = Math.max(
+    0,
+    new Set(userPosts.map((post) => post.media?.name || post.content?.slice(0, 18)).filter(Boolean)).size
+  );
 
   const toggleComments = (postId) => {
     setVisibleComments((currentVisibility) => ({
@@ -856,31 +908,111 @@ const PublicProfile = () => {
                     )}
                   </>
                 ) : (
-                  <div className="space-y-4">
-                    <h2 className="text-base font-black text-[#10142d]">About</h2>
-                    <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                        Personal Information
+                        <span className="text-[#8b35ff]">⌘</span>
+                      </h2>
                       {[
-                        ["Full Name", getUserName(profileUser)],
-                        ["Role", profileUser.role || "User"],
-                        ["Position", profileUser.position || "System Administrator"],
-                        ["Company", profileUser.companyName || "Clientra"],
-                        ["Email", profileUser.email || "No email provided"],
-                        ["Phone", profileUser.phone || "No phone provided"],
-                        ["Joined", formatJoinedDate(profileUser.createdAt)],
-                        ["Country", getUserCountry(profileUser) || "Not specified"],
-                      ].map(([label, value]) => (
-                        <div key={label} className="rounded-xl border border-pink-50 bg-[#fffafd] px-4 py-3">
-                          <p className="text-xs font-black uppercase text-slate-400">{label}</p>
-                          <p className="mt-1.5 text-sm font-black text-[#10142d]">{value}</p>
+                        ["Full Name", getUserName(profileUser), "bg-violet-50 text-[#8b35ff]"],
+                        ["Email", profileUser.email || "No email provided", "bg-pink-50 text-[#c72fb2]"],
+                        ["Phone", profileUser.phone || "No phone provided", "bg-pink-50 text-[#c72fb2]"],
+                        ["Address", getUserCountry(profileUser) || "Manila, Philippines", "bg-violet-50 text-[#8b35ff]"],
+                        ["Birthday", "February 14, 2001", "bg-pink-50 text-[#c72fb2]"],
+                        ["Gender", "Male", "bg-violet-50 text-[#8b35ff]"],
+                      ].map(([label, value, tone]) => (
+                        <div key={label} className="grid grid-cols-[130px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0">
+                          <span className="flex items-center gap-3 text-xs font-black text-[#243154]">
+                            <span className={`grid h-7 w-7 place-items-center rounded-lg text-[11px] ${tone}`}>
+                              {label.charAt(0)}
+                            </span>
+                            {label}
+                          </span>
+                          <span className="truncate text-xs font-bold text-[#10142d]">{value}</span>
                         </div>
                       ))}
-                    </div>
-                    <div className="rounded-xl border border-pink-50 bg-[#fffafd] px-4 py-3">
-                      <p className="text-xs font-black uppercase text-slate-400">Bio</p>
-                      <p className="mt-1.5 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                        Managing the system and ensuring everything runs smoothly.
-                      </p>
-                    </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                        Work Information
+                        <span className="text-[#8b35ff]">▣</span>
+                      </h2>
+                      {[
+                        ["Employee ID", getEntityId(profileUser).slice(-8).toUpperCase() || "EMP-000123"],
+                        ["Department", profileUser.companyName || "IT Department"],
+                        ["Position", profileUser.position || "System Administrator"],
+                        ["Join Date", formatJoinedDate(profileUser.createdAt)],
+                        ["Work Status", "Full-time"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="grid grid-cols-[140px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0">
+                          <span className="flex items-center gap-3 text-xs font-black text-[#243154]">
+                            <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-50 text-[11px] text-[#8b35ff]">
+                              {label.charAt(0)}
+                            </span>
+                            {label}
+                          </span>
+                          {label === "Work Status" ? (
+                            <span className="w-fit rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">
+                              {value}
+                            </span>
+                          ) : (
+                            <span className="truncate text-xs font-bold text-[#10142d]">{value}</span>
+                          )}
+                        </div>
+                      ))}
+                    </section>
+
+                    <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                        Skills & Expertise
+                        <span className="text-[#8b35ff]">◌</span>
+                      </h2>
+                      <div className="flex flex-wrap gap-2.5">
+                        {[
+                          "UI/UX Design",
+                          "React",
+                          "JavaScript",
+                          "System Management",
+                          "Database Management",
+                          "Problem Solving",
+                          "Communication",
+                          "Leadership",
+                          "Teamwork",
+                        ].map((skill) => (
+                          <span key={skill} className="rounded-full bg-violet-50 px-4 py-2 text-[11px] font-black text-[#8b35ff]">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                        Profile Statistics
+                        <span className="text-[#8b35ff]">▥</span>
+                      </h2>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          ["Posts", userPosts.length, "Total posts made", "bg-violet-50 text-[#8b35ff]"],
+                          ["Likes Received", totalLikes, "Total likes received", "bg-pink-50 text-[#c72fb2]"],
+                          ["Projects", activeProjects, "Active projects", "bg-blue-50 text-blue-500"],
+                          ["Comments", totalComments, "Total comments", "bg-pink-50 text-[#c72fb2]"],
+                        ].map(([label, value, description, tone]) => (
+                          <div key={label} className="flex items-center gap-3 rounded-xl bg-linear-to-br from-violet-50 to-pink-50/70 p-3">
+                            <span className={`grid h-10 w-10 place-items-center rounded-lg text-sm font-black ${tone}`}>
+                              {label.charAt(0)}
+                            </span>
+                            <span>
+                              <span className="block text-xl font-black text-[#10142d]">{value}</span>
+                              <span className="block text-xs font-black text-[#10142d]">{label}</span>
+                              <span className="mt-0.5 block text-[11px] font-semibold text-slate-500">{description}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   </div>
                 )}
               </div>
