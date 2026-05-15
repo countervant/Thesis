@@ -5,7 +5,7 @@ import User from '../model/userModel.js';
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
 const authUserCache = new Map();
 const authUserFields =
-  "firstName middleInitial lastName companyName email phone country role position isActive isOnline lastSeen createdAt updatedAt";
+  "firstName middleInitial lastName companyName email phone country role position avatar coverPhoto isActive isOnline lastSeen createdAt updatedAt";
 
 const isDatabaseTimeout = (error) => {
   const message = String(error?.message || "").toLowerCase();

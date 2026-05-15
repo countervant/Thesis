@@ -376,7 +376,7 @@ router.post("/reset-password", async (req, res) => {
 
         const loadUser = () =>
           User.findById(req.params.id)
-            .select("firstName middleInitial lastName companyName email phone country role avatar position isActive")
+            .select("firstName middleInitial lastName companyName email phone country role avatar coverPhoto position isActive")
             .maxTimeMS(30000)
             .lean();
 
@@ -422,6 +422,7 @@ router.post("/reset-password", async (req, res) => {
           country,
           position,
           avatar,
+          coverPhoto,
           password,
         } = req.body;
 
@@ -472,6 +473,7 @@ router.post("/reset-password", async (req, res) => {
         if (country !== undefined) user.country = country.trim() || "Philippines";
         if (position !== undefined) user.position = position.trim();
         if (avatar !== undefined) user.avatar = avatar;
+        if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
 
         if (password) {
           if (password.length < 8) {
@@ -501,6 +503,7 @@ router.post("/reset-password", async (req, res) => {
           email: user.email,
           role: user.role,
           avatar: user.avatar,
+          coverPhoto: user.coverPhoto,
           phone: user.phone,
           country: user.country,
           position: user.position,

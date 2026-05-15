@@ -552,7 +552,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
               <button
                 type="button"
                 onClick={onAddEntry}
-                className="flex h-11 items-center gap-3 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] px-5 text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+                className="flex h-11 items-center gap-3 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-6 text-base font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105"
               >
                 <Icon className="h-5 w-5" />
                 <span>Add Entry</span>

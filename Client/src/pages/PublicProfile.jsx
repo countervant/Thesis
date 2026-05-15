@@ -672,11 +672,11 @@ const PublicProfile = () => {
 
         {!isLoading && profileUser && (
           <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-            <aside className="space-y-5">
+            <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
               <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
                 <div className="h-32 bg-pink-50">
                   <img
-                    src={defaultCoverPhoto}
+                    src={profileUser.coverPhoto || defaultCoverPhoto}
                     alt=""
                     className="h-full w-full object-cover"
                     aria-hidden="true"

@@ -9,8 +9,10 @@ import AdminEmployees from "./Dashboard/Admin/Employee.jsx";
 import AdminAddTask from "./Dashboard/Admin/Addtask.jsx";
 import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
 import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
+import AdminCalendar from "./Dashboard/Admin/Calendar.jsx";
 import LeaveRequest from "./Leaverequest.jsx";
 import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
+import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
 import EmpTask from "./Dashboard/Employee/EmpTask.jsx";
 import Newsfeed from "./newsfeed.jsx";
@@ -36,6 +38,7 @@ const adminPages = new Set([
   "add-employee",
   "edit-employee",
   "leave-request",
+  "calendar",
 ]);
 
 const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
@@ -1150,6 +1153,8 @@ const Dashboard = () => {
       adminContent = <AdminClients />;
     } else if (adminPage === "leave-request") {
       adminContent = <LeaveRequest />;
+    } else if (adminPage === "calendar") {
+      adminContent = <AdminCalendar />;
     } else if (
       adminPage === "employee" ||
       adminPage === "add-employee" ||
@@ -1200,6 +1205,8 @@ const Dashboard = () => {
       <EmpDashboard />
     ) : role === "employee" && localPage === "tasks" ? (
       <EmpTask />
+    ) : role === "employee" && localPage === "calendar" ? (
+      <EmpCalendar />
     ) : role === "employee" && localPage === "leave-request" ? (
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (

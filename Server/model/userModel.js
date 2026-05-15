@@ -53,6 +53,11 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    coverPhoto: {
+      type: String,
+      default: "",
+    },
+
     phone: {
       type: String,
       default: "",

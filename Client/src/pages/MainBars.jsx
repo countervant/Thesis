@@ -39,6 +39,7 @@ const sideNavSections = [
     title: "Management",
     items: [
       { id: "tasks", label: "Tasks", icon: "tasks" },
+      { id: "calendar", label: "Calendar", icon: "calendar" },
       { id: "budget", label: "Budget", icon: "budget" },
       { id: "client", label: "Client", icon: "client" },
       { id: "employee", label: "Employee", icon: "employee" },
@@ -282,6 +283,15 @@ const Icon = ({ name, className = "h-6 w-6" }) => {
     );
   }
 
+  if (name === "calendar") {
+    return (
+      <svg {...props}>
+        <rect x="5" y="5" width="14" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 3v4M16 3v4M5 10h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
   if (name === "leave-request") {
     return (
       <svg {...props}>
@@ -338,7 +348,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               ? {
                   ...section,
                   items: section.items.filter((item) =>
-                    ["tasks", "leave-request"].includes(item.id)
+                    ["tasks", "calendar", "leave-request"].includes(item.id)
                   ),
                 }
               : section
