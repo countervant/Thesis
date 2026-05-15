@@ -14,6 +14,7 @@ import notificationIcon from "../assets/notification.png";
 import logoutIcon from "../assets/logout.png";
 import profileIcon from "../assets/profile.png";
 import sidebarIcon from "../assets/sidebar.png";
+import settingsIcon from "../assets/settings.png";
 import taskIcon from "../assets/task.png";
 import themeIcon from "../assets/theme.png";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -47,6 +48,10 @@ const sideNavSections = [
       { id: "leave-request", label: "Leave Requests", icon: "leave-request" },
     ],
   },
+  {
+    title: "System",
+    items: [{ id: "settings", label: "Settings", icon: "settings" }],
+  },
 ];
 
 const navIcons = {
@@ -58,6 +63,7 @@ const navIcons = {
   "leave-request": leaveRequestIcon,
   messages: messagesIcon,
   newsfeed: newsfeedIcon,
+  settings: settingsIcon,
   tasks: taskIcon,
 };
 
@@ -589,6 +595,15 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     navigate("/profile");
   };
 
+  const handleSettingsClick = () => {
+    setIsAccountMenuOpen(false);
+    if (onNavigate) {
+      onNavigate("settings");
+      return;
+    }
+    navigate(`/${user?.role || "client"}/dashboard`, { state: { page: "settings" } });
+  };
+
   const handleThemeClick = () => {
     setIsDarkMode((currentMode) => !currentMode);
   };
@@ -983,6 +998,15 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                       }`}
                     />
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSettingsClick}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  role="menuitem"
+                >
+                  <AccountMenuIcon src={settingsIcon} />
+                  <span>Settings</span>
                 </button>
                 <button
                   type="button"
