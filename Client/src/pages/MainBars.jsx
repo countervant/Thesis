@@ -6,6 +6,7 @@ import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import dashboardIcon from "../assets/dashboard.png";
 import employeeIcon from "../assets/employee.png";
 import heartIcon from "../assets/heart.png";
+import leaveRequestIcon from "../assets/leaverequest.png";
 import messagesIcon from "../assets/messages.png";
 import newsfeedIcon from "../assets/newsfeed.png";
 import notificationIcon from "../assets/notification.png";
@@ -41,6 +42,7 @@ const sideNavSections = [
       { id: "budget", label: "Budget", icon: "budget" },
       { id: "client", label: "Client", icon: "client" },
       { id: "employee", label: "Employee", icon: "employee" },
+      { id: "leave-request", label: "Leave Requests", icon: "leave-request" },
     ],
   },
 ];
@@ -50,6 +52,7 @@ const navIcons = {
   client: clientIcon,
   dashboard: dashboardIcon,
   employee: employeeIcon,
+  "leave-request": leaveRequestIcon,
   messages: messagesIcon,
   newsfeed: newsfeedIcon,
   tasks: taskIcon,
@@ -279,6 +282,21 @@ const Icon = ({ name, className = "h-6 w-6" }) => {
     );
   }
 
+  if (name === "leave-request") {
+    return (
+      <svg {...props}>
+        <rect x="5" y="4" width="14" height="16" rx="3" stroke="currentColor" strokeWidth="1.7" />
+        <path
+          d="M8 8h8M8 12h5M8 16h3M16 14l1.5 1.5L21 12"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg {...props}>
       <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
@@ -312,6 +330,21 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const isMessagesPage = activePage === "messages";
   const navigate = useNavigate();
   const { user } = useAuth();
+  const visibleSideNavSections =
+    user?.role === "employee"
+      ? sideNavSections
+          .map((section) =>
+            section.title === "Management"
+              ? {
+                  ...section,
+                  items: section.items.filter((item) =>
+                    ["tasks", "leave-request"].includes(item.id)
+                  ),
+                }
+              : section
+          )
+          .filter((section) => section.items.length > 0)
+      : sideNavSections;
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem(themeStorageKey) === "dark"
@@ -992,7 +1025,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         <nav className={`flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 py-5 transition-[align-items] duration-300 ${
           isSidebarExpanded ? "items-stretch" : "items-center"
         }`}>
-          {sideNavSections.map((section, sectionIndex) => (
+          {visibleSideNavSections.map((section, sectionIndex) => (
             <div
               key={section.title}
               className={`w-full ${isSidebarExpanded ? "mb-5" : "mb-3 last:mb-0"}`}
@@ -1036,7 +1069,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                   </button>
                 ))}
               </div>
-              {!isSidebarExpanded && sectionIndex < sideNavSections.length - 1 && (
+              {!isSidebarExpanded && sectionIndex < visibleSideNavSections.length - 1 && (
                 <div className="mx-auto mt-3 h-px w-10 bg-neutral-300 dark:bg-neutral-800" />
               )}
             </div>

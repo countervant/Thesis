@@ -4,6 +4,7 @@ import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton.jsx";
 import companyIcon from "../assets/company.png";
+import defaultCoverPhoto from "../assets/defaultcoverphoto.png";
 import emailIcon from "../assets/email.png";
 import heartIcon from "../assets/heart.png";
 import phoneIcon from "../assets/phonenumber.png";
@@ -57,6 +58,18 @@ const formatDateTime = (value) => {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  });
+};
+
+const formatJoinedDate = (value) => {
+  if (!value) return "May 8, 2026";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "May 8, 2026";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
 };
 
@@ -365,6 +378,7 @@ const PublicProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState(null);
+  const [activeProfileTab, setActiveProfileTab] = useState("Newsfeed");
 
   useEffect(() => {
     let isMounted = true;
@@ -633,7 +647,7 @@ const PublicProfile = () => {
         onLogout={() => setIsLogoutDialogOpen(true)}
         onNavigate={handleNavigate}
       >
-        <div className="mx-auto max-w-[980px] space-y-5">
+        <div className="w-full space-y-5">
 
         {errorMessage && (
           <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
@@ -657,112 +671,221 @@ const PublicProfile = () => {
         )}
 
         {!isLoading && profileUser && (
-          <>
-            <section className="rounded-lg bg-white p-6 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <Avatar user={profileUser} />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h1
-                      className="text-3xl uppercase leading-none text-neutral-950"
-                      style={{ fontFamily: "var(--font-bruno)" }}
-                    >
+          <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+            <aside className="space-y-5">
+              <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
+                <div className="h-32 bg-pink-50">
+                  <img
+                    src={defaultCoverPhoto}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div className="px-6 pb-6 text-center">
+                  <div className="relative -mt-14 inline-block">
+                    <Avatar user={profileUser} size="h-28 w-28" />
+                    <span className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-white bg-emerald-500" />
+                  </div>
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <h1 className="text-2xl font-black leading-tight text-[#10142d]">
                       {getUserName(profileUser)}
                     </h1>
                     <CountryBadge user={profileUser} />
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-[#c72fb2]">
+                  <span className="mt-3 inline-flex rounded-full bg-pink-50 px-4 py-1 text-xs font-black uppercase text-[#c72fb2]">
                     {profileUser.role || "user"}
+                  </span>
+                  <p className="mt-5 text-sm font-black text-[#10142d]">
+                    {profileUser.position || profileUser.companyName || "System Administrator"}
                   </p>
-                  {profileUser.companyName && (
-                    <p className="mt-3 flex w-fit items-center gap-2 text-sm font-semibold text-neutral-800">
+                  <p className="mx-auto mt-2 max-w-[210px] text-sm font-medium leading-6 text-slate-500">
+                    Managing the system and ensuring everything runs smoothly.
+                  </p>
+
+                  <div className="mt-6 space-y-4 border-y border-pink-50 py-5 text-left text-sm font-semibold text-slate-600">
+                    <p className="flex items-center gap-3">
                       <img src={companyIcon} alt="" className="h-5 w-5 object-contain" />
-                      {profileUser.companyName}
+                      {profileUser.companyName || "Clientra"}
                     </p>
-                  )}
-                  {profileUser.email && (
-                    <a
-                      href={getEmailComposeUrl(profileUser.email)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group mt-3 inline-flex w-fit items-center gap-2 text-sm font-medium text-neutral-600 transition duration-200 hover:-translate-y-0.5 hover:text-[#c72fb2] active:translate-y-0 active:scale-95"
-                    >
-                      <img
-                        src={emailIcon}
-                        alt=""
-                        className="h-5 w-5 object-contain transition duration-200 group-hover:scale-110 group-hover:rotate-[-6deg] group-active:scale-90"
-                      />
-                      <span className="transition duration-200 group-hover:translate-x-0.5">
+                    {profileUser.email && (
+                      <a
+                        href={getEmailComposeUrl(profileUser.email)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-3 transition hover:text-[#c72fb2]"
+                      >
+                        <img src={emailIcon} alt="" className="h-5 w-5 object-contain" />
                         {profileUser.email}
-                      </span>
-                    </a>
-                  )}
-                  {profileUser.phone && (
-                    <a
-                      href={`tel:${profileUser.phone}`}
-                      className="group mt-2 flex w-fit items-center gap-2 text-sm font-medium text-neutral-600 transition duration-200 hover:-translate-y-0.5 hover:text-[#c72fb2] active:translate-y-0 active:scale-95"
-                    >
-                      <img
-                        src={phoneIcon}
-                        alt=""
-                        className="h-5 w-5 object-contain transition duration-200 group-hover:scale-110 group-hover:rotate-[-6deg] group-active:scale-90"
-                      />
-                      <span className="transition duration-200 group-hover:translate-x-0.5">
+                      </a>
+                    )}
+                    {profileUser.phone && (
+                      <a
+                        href={`tel:${profileUser.phone}`}
+                        className="flex items-center gap-3 transition hover:text-[#c72fb2]"
+                      >
+                        <img src={phoneIcon} alt="" className="h-5 w-5 object-contain" />
                         {profileUser.phone}
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="mt-5 border-b border-pink-50 pb-5 text-left text-sm font-semibold text-slate-600">
+                    <p className="flex items-start gap-3">
+                      <span className="mt-0.5 grid h-5 w-5 place-items-center rounded-md border border-slate-200 text-xs text-slate-500">
+                        +
                       </span>
-                    </a>
+                      <span>
+                        <span className="block text-slate-500">Joined</span>
+                        <span className="font-black text-[#10142d]">
+                          {formatJoinedDate(profileUser.createdAt)}
+                        </span>
+                      </span>
+                    </p>
+                  </div>
+
+                  {getEntityId(profileUser) === getEntityId(user) && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavigate("profile")}
+                      className="mt-5 h-11 w-full rounded-lg border border-[#c72fb2] text-sm font-black text-[#c72fb2] transition hover:bg-pink-50"
+                    >
+                      Edit Profile
+                    </button>
                   )}
                 </div>
+              </section>
+
+              <section className="rounded-2xl bg-white p-5 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
+                <h2 className="mb-5 text-sm font-black text-[#10142d]">
+                  Profile Overview
+                </h2>
+                {[
+                  ["Posts", userPosts.length, "bg-pink-50 text-[#c72fb2]"],
+                  [
+                    "Likes Received",
+                    userPosts.reduce((total, post) => total + post.hearts.length, 0),
+                    "bg-rose-50 text-rose-500",
+                  ],
+                  [
+                    "Comments",
+                    userPosts.reduce((total, post) => total + post.comments.length, 0),
+                    "bg-emerald-50 text-emerald-500",
+                  ],
+                ].map(([label, value, tone]) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between border-b border-pink-50 py-3 last:border-b-0"
+                  >
+                    <span className="flex items-center gap-3 text-sm font-semibold text-slate-600">
+                      <span className={`grid h-9 w-9 place-items-center rounded-lg text-xs font-black ${tone}`}>
+                        {label === "Posts" ? "P" : label === "Likes Received" ? "L" : "C"}
+                      </span>
+                      {label}
+                    </span>
+                    <span className="text-sm font-black text-[#10142d]">{value}</span>
+                  </div>
+                ))}
+              </section>
+            </aside>
+
+            <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
+              <div className="flex border-b border-pink-50 px-7">
+                {["Newsfeed", "About"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveProfileTab(tab)}
+                    className={`h-16 px-7 text-sm font-black ${
+                      activeProfileTab === tab
+                        ? "border-b-4 border-[#7427ff] text-[#7427ff]"
+                        : "text-slate-500 hover:text-[#c72fb2]"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-6">
+                {activeProfileTab === "Newsfeed" ? (
+                  <>
+                    <h2 className="mb-5 text-lg font-black text-[#10142d]">
+                      Newsfeed Posts
+                    </h2>
+                    {userPosts.length === 0 ? (
+                      <p className="rounded-lg bg-white px-5 py-8 text-center text-sm font-medium text-neutral-600 shadow-[0_2px_6px_rgba(219,39,119,0.18)] ring-1 ring-pink-50">
+                        No newsfeed posts yet.
+                      </p>
+                    ) : (
+                      <div className="space-y-5">
+                        {userPosts.map((post) => {
+                          const hasHearted = post.hearts.some(
+                            (heart) => getEntityId(heart) === getEntityId(user)
+                          );
+
+                          return (
+                            <PostPreview
+                              key={post.id}
+                              commentDraft={commentDrafts[post.id] || ""}
+                              currentUser={user}
+                              hasHearted={hasHearted}
+                              isCommentsVisible={visibleComments[post.id] === true}
+                              onCommentChange={(value) => handleCommentChange(post.id, value)}
+                              onDeleteComment={(commentId) =>
+                                setCommentToDelete({ postId: post.id, commentId })
+                              }
+                              onReplyChange={handleReplyChange}
+                              onSubmitComment={(event) => handleAddComment(event, post.id)}
+                              onSubmitReply={(event, commentId) =>
+                                handleAddReply(event, post.id, commentId)
+                              }
+                              onToggleCommentHeart={(commentId) =>
+                                handleToggleCommentHeart(post.id, commentId)
+                              }
+                              onToggleComments={() => toggleComments(post.id)}
+                              onToggleHeart={() => handleToggleHeart(post.id)}
+                              onToggleReplies={toggleReplies}
+                              post={post}
+                              replyDrafts={replyDrafts}
+                              visibleReplies={visibleReplies}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-6">
+                    <h2 className="text-lg font-black text-[#10142d]">About</h2>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {[
+                        ["Full Name", getUserName(profileUser)],
+                        ["Role", profileUser.role || "User"],
+                        ["Position", profileUser.position || "System Administrator"],
+                        ["Company", profileUser.companyName || "Clientra"],
+                        ["Email", profileUser.email || "No email provided"],
+                        ["Phone", profileUser.phone || "No phone provided"],
+                        ["Joined", formatJoinedDate(profileUser.createdAt)],
+                        ["Country", getUserCountry(profileUser) || "Not specified"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-xl border border-pink-50 bg-[#fffafd] px-5 py-4">
+                          <p className="text-xs font-black uppercase text-slate-400">{label}</p>
+                          <p className="mt-2 text-sm font-black text-[#10142d]">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-xl border border-pink-50 bg-[#fffafd] px-5 py-4">
+                      <p className="text-xs font-black uppercase text-slate-400">Bio</p>
+                      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                        Managing the system and ensuring everything runs smoothly.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
-
-            <section>
-              <h2 className="mb-3 text-lg font-bold text-neutral-950">
-                Newsfeed Posts
-              </h2>
-              {userPosts.length === 0 ? (
-                <p className="rounded-lg bg-white px-5 py-8 text-center text-sm font-medium text-neutral-600 shadow-[0_2px_6px_rgba(219,39,119,0.18)] ring-1 ring-pink-50">
-                  No newsfeed posts yet.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {userPosts.map((post) => {
-                    const hasHearted = post.hearts.some(
-                      (heart) => getEntityId(heart) === getEntityId(user)
-                    );
-
-                    return (
-                      <PostPreview
-                        key={post.id}
-                        commentDraft={commentDrafts[post.id] || ""}
-                        currentUser={user}
-                        hasHearted={hasHearted}
-                        isCommentsVisible={visibleComments[post.id] === true}
-                        onCommentChange={(value) => handleCommentChange(post.id, value)}
-                        onDeleteComment={(commentId) =>
-                          setCommentToDelete({ postId: post.id, commentId })
-                        }
-                        onReplyChange={handleReplyChange}
-                        onSubmitComment={(event) => handleAddComment(event, post.id)}
-                        onSubmitReply={(event, commentId) =>
-                          handleAddReply(event, post.id, commentId)
-                        }
-                        onToggleCommentHeart={(commentId) =>
-                          handleToggleCommentHeart(post.id, commentId)
-                        }
-                        onToggleComments={() => toggleComments(post.id)}
-                        onToggleHeart={() => handleToggleHeart(post.id)}
-                        onToggleReplies={toggleReplies}
-                        post={post}
-                        replyDrafts={replyDrafts}
-                        visibleReplies={visibleReplies}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          </>
+          </div>
         )}
         </div>
       </MainBars>
