@@ -333,7 +333,7 @@ const AccountMenuIcon = ({ src }) => (
   <img
     src={src}
     alt=""
-    className="h-7 w-7 shrink-0 object-contain dark:brightness-0 dark:invert"
+    className="h-5 w-5 shrink-0 object-contain dark:brightness-0 dark:invert"
     aria-hidden="true"
   />
 );
@@ -617,14 +617,14 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   return (
     <div className="min-h-screen bg-[#f8f9fd] text-neutral-950 dark:bg-neutral-950 dark:text-white">
       <header
-        className={`fixed right-0 top-0 z-30 flex h-[70px] items-center justify-between gap-5 border-b border-neutral-300 bg-[#f8f9fd] px-5 transition-[left] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 ${
-          isSidebarExpanded ? "left-0 md:left-[260px]" : "left-0 md:left-20"
+        className={`fixed right-0 top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-neutral-200 bg-[#f8f9fd] px-4 transition-[left] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 ${
+          isSidebarExpanded ? "left-0 md:left-[220px]" : "left-0 md:left-[68px]"
         }`}
       >
         {activePage === "newsfeed" ? (
           <label
             className={`relative hidden w-full flex-1 md:block ${
-              isSidebarExpanded ? "ml-0 max-w-[420px]" : "ml-12 max-w-[480px]"
+              isSidebarExpanded ? "ml-0 max-w-[380px]" : "ml-10 max-w-[440px]"
             }`}
           >
             <span className="sr-only">Search newsfeed</span>
@@ -642,17 +642,17 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               value={newsfeedSearch}
               onChange={(event) => setNewsfeedSearch(event.target.value)}
               placeholder="Search users..."
-              className="h-10 w-full rounded-xl border border-pink-100 bg-white pl-12 pr-4 text-sm font-semibold text-neutral-800 shadow-[0_4px_18px_rgba(190,65,158,0.08)] outline-none transition placeholder:text-slate-400 focus:border-[#dc4fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="h-9 w-full rounded-xl border border-pink-100 bg-white pl-11 pr-4 text-sm font-semibold text-neutral-800 shadow-[0_4px_18px_rgba(190,65,158,0.08)] outline-none transition placeholder:text-slate-400 focus:border-[#dc4fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             />
           </label>
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => onNavigate?.("messages")}
-            className={`relative grid h-12 w-12 place-items-center rounded-xl border transition hover:border-pink-200 hover:text-[#c72fb2] ${
+            className={`relative grid h-10 w-10 place-items-center rounded-xl border transition hover:border-pink-200 hover:text-[#c72fb2] ${
               activePage === "messages"
                 ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-pink-500/40 dark:bg-neutral-900 dark:text-[#f472d0]"
                 : "border-slate-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
@@ -663,8 +663,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <img
               src={messagesIcon}
               alt=""
-              className={`h-6 w-6 object-contain ${
-              activePage === "messages" ? "top-nav-icon-active" : ""
+              className={`h-5 w-5 object-contain ${
+                activePage === "messages" ? "top-nav-icon-active" : ""
               }`}
               aria-hidden="true"
             />
@@ -679,7 +679,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsNotificationOpen((isOpen) => !isOpen)}
-              className="relative grid h-12 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               aria-label="Notifications"
               aria-expanded={isNotificationOpen}
               aria-haspopup="dialog"
@@ -688,7 +688,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               <img
                 src={notificationIcon}
                 alt=""
-                className="h-6 w-6 object-contain"
+                className="h-5 w-5 object-contain"
                 aria-hidden="true"
               />
               {unreadCount > 0 && (
@@ -916,7 +916,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
-              className="flex h-12 min-w-[220px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-left text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="flex h-10 min-w-[190px] items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-2.5 text-left text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               aria-label="Account menu"
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
@@ -950,13 +950,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
             {isAccountMenuOpen && (
               <div
-                className="absolute right-0 top-16 z-40 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2.5 py-2.5 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
+                className="absolute right-0 top-12 z-40 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2 py-2 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
                 role="menu"
               >
                 <button
                   type="button"
                   onClick={handleProfileClick}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   role="menuitem"
                 >
                   <AccountMenuIcon src={profileIcon} />
@@ -965,7 +965,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 <button
                   type="button"
                   onClick={handleThemeClick}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   role="menuitemcheckbox"
                   aria-checked={isDarkMode}
                 >
@@ -987,7 +987,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 <button
                   type="button"
                   onClick={handleLogoutClick}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-lg leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-none transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   role="menuitem"
                 >
                   <AccountMenuIcon src={logoutIcon} />
@@ -1003,62 +1003,62 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       <aside
         onClick={expandSidebar}
         className={`fixed left-0 top-0 z-40 hidden h-screen flex-col overflow-visible border-r border-neutral-300 bg-[#f8f9fd] transition-[width] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 md:flex ${
-          isSidebarExpanded ? "w-[260px]" : "w-20"
+          isSidebarExpanded ? "w-[220px]" : "w-[68px]"
         }`}
       >
-        <div className="relative flex h-[70px] items-center px-3">
+        <div className="relative flex h-14 items-center px-2.5">
           <button
             type="button"
             onClick={() => onNavigate?.("dashboard")}
             className={`flex min-w-0 items-center transition-all duration-300 ${
-              isSidebarExpanded ? "w-full justify-start gap-2.5 pr-10" : "w-full justify-center"
+              isSidebarExpanded ? "w-full justify-start gap-2 pr-8" : "w-full justify-center"
             }`}
             aria-label="Clientra dashboard"
           >
-            <img src={CLIENTRA2} alt="Clientra" className="h-10 w-10 shrink-0 object-contain" />
+            <img src={CLIENTRA2} alt="Clientra" className="h-9 w-9 shrink-0 object-contain" />
             <span
               className={`min-w-0 overflow-hidden whitespace-nowrap text-left text-neutral-950 transition-all duration-300 dark:text-white ${
-                isSidebarExpanded ? "max-w-[150px] translate-x-0 opacity-100" : "max-w-0 translate-x-2 opacity-0"
+                isSidebarExpanded ? "max-w-[140px] translate-x-0 opacity-100" : "max-w-0 translate-x-2 opacity-0"
               }`}
             >
               <span
-                className="block text-lg uppercase leading-none tracking-wide"
+                className="block text-base uppercase leading-none tracking-wide"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Clientra
               </span>
-              <span className="mt-0.5 block text-xs font-semibold leading-none text-slate-600 dark:text-slate-400">
+              <span className="mt-0.5 block text-[10px] font-semibold leading-none text-slate-600 dark:text-slate-400">
                 Business Management
               </span>
             </span>
           </button>
         </div>
 
-        <nav className={`flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 py-5 transition-[align-items] duration-300 ${
+        <nav className={`flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-2.5 py-4 transition-[align-items] duration-300 ${
           isSidebarExpanded ? "items-stretch" : "items-center"
         }`}>
           {visibleSideNavSections.map((section, sectionIndex) => (
             <div
               key={section.title}
-              className={`w-full ${isSidebarExpanded ? "mb-5" : "mb-3 last:mb-0"}`}
+              className={`w-full ${isSidebarExpanded ? "mb-4" : "mb-2.5 last:mb-0"}`}
             >
               <p
-                className={`mb-2 overflow-hidden whitespace-nowrap px-4 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 transition-all duration-300 ${
+                className={`mb-1.5 overflow-hidden whitespace-nowrap px-3 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 transition-all duration-300 ${
                   isSidebarExpanded ? "max-h-5 opacity-100" : "max-h-0 opacity-0"
                 }`}
               >
                 {section.title}
               </p>
-              <div className={`flex flex-col ${isSidebarExpanded ? "gap-2" : "gap-3"}`}>
+              <div className={`flex flex-col ${isSidebarExpanded ? "gap-1.5" : "gap-2"}`}>
                 {section.items.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => onNavigate?.(item.id)}
-                    className={`flex h-14 items-center rounded-xl text-sm font-bold transition-all duration-300 ease-in-out active:scale-95 ${
+                    className={`flex h-11 items-center rounded-xl text-[13px] font-bold transition-all duration-300 ease-in-out active:scale-95 ${
                       isSidebarExpanded
-                        ? "w-full justify-start gap-3 px-4"
-                        : "mx-auto w-14 justify-center gap-0 px-0"
+                        ? "w-full justify-start gap-2.5 px-3"
+                        : "mx-auto w-11 justify-center gap-0 px-0"
                     } ${
                       activePage === item.id
                         ? "bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]"
@@ -1069,7 +1069,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                   >
                     <Icon
                       name={item.icon}
-                      className={`h-6 w-6 shrink-0 ${
+                      className={`h-5 w-5 shrink-0 ${
                         activePage === item.id ? "brightness-0 invert" : "dark:brightness-0 dark:invert"
                       }`}
                     />
@@ -1082,18 +1082,18 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 ))}
               </div>
               {!isSidebarExpanded && sectionIndex < visibleSideNavSections.length - 1 && (
-                <div className="mx-auto mt-3 h-px w-10 bg-neutral-300 dark:bg-neutral-800" />
+                <div className="mx-auto mt-2.5 h-px w-9 bg-neutral-300 dark:bg-neutral-800" />
               )}
             </div>
           ))}
         </nav>
 
-        <div className="relative px-3 pb-5">
+        <div className="relative px-2.5 pb-4">
           <div
-            className={`flex h-14 items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition-all duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-900 dark:text-white ${
+            className={`flex h-11 items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition-all duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-900 dark:text-white ${
               isSidebarExpanded
-                ? "w-full justify-start gap-3 px-3"
-                : "w-14 justify-center gap-0 px-0"
+                ? "w-full justify-start gap-2.5 px-2.5"
+                : "w-11 justify-center gap-0 px-0"
             }`}
             aria-label="Account preview"
           >
@@ -1115,8 +1115,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       <button
         type="button"
         onClick={toggleSidebar}
-        className={`fixed top-[35px] z-50 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-neutral-900 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800 md:grid ${
-          isSidebarExpanded ? "left-[224px]" : "left-[92px]"
+        className={`fixed top-7 z-50 hidden h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-neutral-900 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800 md:grid ${
+          isSidebarExpanded ? "left-[186px]" : "left-[78px]"
         }`}
         aria-label={isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
         aria-expanded={isSidebarExpanded}
@@ -1130,13 +1130,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       </button>
 
       <main
-        className={`px-4 pt-[90px] transition-[margin] duration-300 ease-in-out md:px-7 lg:px-9 ${
+        className={`px-4 pt-[70px] transition-[margin] duration-300 ease-in-out md:px-5 lg:px-6 ${
           isMessagesPage ? "pb-0" : "pb-8"
         } ${
-          isSidebarExpanded ? "md:ml-[260px]" : "md:ml-20"
+          isSidebarExpanded ? "md:ml-[220px]" : "md:ml-[68px]"
         }`}
       >
-        <div style={{ zoom: isMessagesPage ? 1 : 0.82 }}>
+        <div style={{ zoom: isMessagesPage ? 1 : 0.9 }}>
           {children}
         </div>
       </main>

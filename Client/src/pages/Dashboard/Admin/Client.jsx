@@ -211,7 +211,7 @@ const FilterButton = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`h-12 min-w-[128px] rounded-xl border px-6 text-sm font-bold shadow-[0_2px_6px_rgba(190,65,158,0.12)] transition ${
+    className={`h-9 min-w-[108px] rounded-xl border px-4 text-xs font-bold shadow-[0_2px_6px_rgba(190,65,158,0.12)] transition ${
       active
         ? "border-transparent bg-linear-to-r from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)]"
         : "border-pink-100 bg-white text-neutral-800 hover:bg-pink-50 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-[#141414] dark:text-neutral-200"
@@ -226,7 +226,7 @@ const ClientCard = ({ client, onDelete }) => {
   const countryFlag = getCountryFlag(client.country);
 
   return (
-    <article className="flex min-h-[300px] flex-col rounded-2xl border border-pink-100 bg-white px-8 pb-6 pt-7 shadow-[0_8px_22px_rgba(190,65,158,0.18)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <article className="flex min-h-[230px] flex-col rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white px-5 pb-4 pt-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
       {client.id === 1 && (
         <Icon
           name="bell"
@@ -234,18 +234,18 @@ const ClientCard = ({ client, onDelete }) => {
         />
       )}
 
-      <div className="flex items-start gap-6">
+      <div className="flex items-start gap-4">
         <InitialsAvatar
-          className="h-16 w-16"
+          className="h-12 w-12"
           fallback="CL"
           initials={client.initials}
           name={client.name}
           src={client.avatar}
-          textClassName="text-2xl"
+          textClassName="text-base"
         />
         <div className="min-w-0 pt-1">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="truncate text-xl font-extrabold text-neutral-950 dark:text-white">{client.name}</h2>
+            <h2 className="truncate text-base font-extrabold text-neutral-950 dark:text-white">{client.name}</h2>
             {countryFlag && (
               <img
                 src={countryFlag}
@@ -257,7 +257,7 @@ const ClientCard = ({ client, onDelete }) => {
             )}
           </div>
           <span
-            className={`mt-3 inline-flex h-7 items-center gap-2 rounded-full px-4 text-xs font-bold ${
+            className={`mt-2 inline-flex h-6 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${
               isActive
                 ? "bg-[#d8ffe3] text-[#1d9a4f]"
                 : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
@@ -269,7 +269,7 @@ const ClientCard = ({ client, onDelete }) => {
         </div>
       </div>
 
-      <div className="mt-8 space-y-4 text-sm font-semibold text-slate-600 dark:text-neutral-300">
+      <div className="mt-5 space-y-3 text-xs font-semibold text-slate-600 dark:text-neutral-300">
         <p className="flex items-center gap-2">
           <Icon name="building" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {client.company}
@@ -284,7 +284,7 @@ const ClientCard = ({ client, onDelete }) => {
         </p>
       </div>
 
-      <div className="mt-auto flex items-center justify-between border-t border-slate-200 pt-5 text-sm font-semibold text-slate-500 dark:border-neutral-800 dark:text-neutral-400">
+      <div className="mt-auto flex items-center justify-between border-t border-slate-200 pt-4 text-xs font-semibold text-slate-500 dark:border-neutral-800 dark:text-neutral-400">
         <span className="truncate">{client.service}</span>
         <div className="flex items-center gap-2">
           <button
@@ -420,25 +420,25 @@ const AdminClients = () => {
   };
 
   return (
-        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-8 dark:bg-neutral-950 md:-mx-8 md:px-10 lg:-mx-10 lg:px-12">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
         <div className="mx-auto max-w-[1500px]">
-          <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-4xl leading-none text-neutral-950 dark:text-white"
+                className="text-3xl leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Clients
               </h1>
-              <p className="mt-3 text-base font-semibold text-slate-500 dark:text-neutral-400">
+              <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-neutral-400">
                 Manage and organize your client relationships
               </p>
             </div>
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={exportClients}
-                className="inline-flex h-14 items-center gap-3 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-9 text-base font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.32)] transition hover:brightness-105"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.32)] transition hover:brightness-105"
               >
                 <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
                   <path d="M10 3v9m0 0 4-4m-4 4-4-4M4 16h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -448,7 +448,7 @@ const AdminClients = () => {
             </div>
           </header>
 
-          <section className="mt-9 flex flex-col gap-5 xl:flex-row xl:items-center">
+          <section className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-center">
             <label className="relative flex-1">
               <span className="sr-only">Search clients</span>
               <input
@@ -456,15 +456,15 @@ const AdminClients = () => {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search clients by name, email, company..."
-                className="h-14 w-full rounded-xl border border-slate-200 bg-white px-14 text-base font-medium text-neutral-800 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-12 text-sm font-medium text-neutral-800 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
               />
               <Icon
                 name="search"
-                className="absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-500"
+                className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {filters.map((filter) => (
                 <FilterButton
                   key={filter}
@@ -477,7 +477,7 @@ const AdminClients = () => {
             </div>
           </section>
 
-          <section className="mt-8 grid gap-8 xl:grid-cols-2">
+          <section className="mt-5 grid gap-4 xl:grid-cols-2">
             {errorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100 lg:col-span-2">
                 {errorMessage}

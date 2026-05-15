@@ -263,11 +263,11 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const SummaryCard = ({ icon, label, value }) => (
-  <section className="flex h-24 items-center justify-center gap-8 rounded-lg border-b-2 border-[#e347b3] bg-white px-6 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
-    <Icon name={icon} className="h-16 w-16" />
+  <section className="flex h-20 items-center justify-center gap-5 rounded-2xl border-b-2 border-[#f7b7e6] bg-white px-5 shadow-[0_3px_4px_rgba(219,39,119,0.12),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <Icon name={icon} className="h-11 w-11" />
     <div className="min-w-[110px] text-center leading-tight">
-      <p className="text-3xl font-bold text-neutral-950 dark:text-white">{value}</p>
-      <p className="text-base text-neutral-500 dark:text-neutral-400">{label}</p>
+      <p className="text-2xl font-bold text-neutral-950 dark:text-white">{value}</p>
+      <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">{label}</p>
     </div>
   </section>
 );
@@ -281,29 +281,29 @@ const ExpenseBreakdown = ({ expenses, income }) => {
   );
 
   return (
-  <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
-    <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Expense Breakdown</h2>
-    <div className="mt-6 flex flex-1 items-end gap-4">
-      <div className="flex h-52 w-12 flex-col justify-between text-right text-xs text-neutral-500 dark:text-neutral-500">
+  <section className="flex min-h-[250px] flex-col rounded-2xl border-b-2 border-[#f7b7e6] bg-white px-5 py-4 shadow-[0_3px_4px_rgba(219,39,119,0.12),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <h2 className="text-base font-bold text-neutral-900 dark:text-white">Expense Breakdown</h2>
+    <div className="mt-4 flex flex-1 items-end gap-3">
+      <div className="flex h-40 w-12 flex-col justify-between text-right text-[11px] text-neutral-500 dark:text-neutral-500">
         {axisLabels.map((label, index) => (
           <span key={`${label}-${index}`}>{label}</span>
         ))}
       </div>
-      <div className="relative flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_52px)] px-8 dark:border-neutral-700 dark:bg-[repeating-linear-gradient(to_bottom,#474747_0,#474747_1px,transparent_1px,transparent_52px)]">
+      <div className="relative flex h-40 flex-1 items-end justify-center gap-6 border-b border-neutral-300 bg-[repeating-linear-gradient(to_bottom,#d9d9d9_0,#d9d9d9_1px,transparent_1px,transparent_40px)] px-6 dark:border-neutral-700 dark:bg-[repeating-linear-gradient(to_bottom,#474747_0,#474747_1px,transparent_1px,transparent_40px)]">
         <div
-          className="w-24 max-w-[34%] rounded-t-sm bg-[#ff1f14]"
+          className="w-18 max-w-[34%] rounded-t-sm bg-[#ff1f14]"
           style={{ height: expenseHeight }}
           title={`Expenses: ${formatPeso(expenses)}`}
         />
         <div
-          className="w-24 max-w-[34%] rounded-t-sm bg-[#18a64f]"
+          className="w-18 max-w-[34%] rounded-t-sm bg-[#18a64f]"
           style={{ height: incomeHeight }}
           title={`Income: ${formatPeso(income)}`}
         />
         <span className="absolute -bottom-5 text-xs text-neutral-400">Dec 25</span>
       </div>
     </div>
-    <div className="mt-9 flex justify-center gap-16 text-xs text-neutral-700 dark:text-neutral-300">
+    <div className="mt-7 flex justify-center gap-10 text-xs text-neutral-700 dark:text-neutral-300">
       <span className="flex items-center gap-2">
         <Icon name="expense" className="h-5 w-5" />
         Expenses
@@ -359,15 +359,15 @@ const ExpenseCategories = ({
   ).stops;
 
   return (
-  <section className="rounded-2xl border border-pink-100 bg-white px-8 py-7 shadow-[0_3px_4px_rgba(190,65,158,0.35)] dark:bg-[#141414] dark:shadow-none dark:ring-1 dark:ring-neutral-800">
-    <div className="mb-5 flex items-center justify-between gap-4">
-      <h2 className="text-xl font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
+  <section className="rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white px-5 py-5 shadow-[0_3px_4px_rgba(190,65,158,0.16),0_8px_24px_rgba(190,65,158,0.05)] dark:bg-[#141414] dark:shadow-none dark:ring-1 dark:ring-neutral-800">
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
       <label className="relative">
         <span className="sr-only">Filter expense categories by month</span>
         <select
           value={selectedMonth}
           onChange={(event) => onMonthChange(event.target.value)}
-          className="h-10 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#141414] dark:text-white"
+          className="h-9 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-9 text-xs font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#141414] dark:text-white"
         >
           {monthOptions.map((month) => (
             <option key={month} value={month}>
@@ -389,21 +389,21 @@ const ExpenseCategories = ({
       </label>
     </div>
     <div
-      className="relative mx-auto grid h-60 w-60 place-items-center rounded-full"
+      className="relative mx-auto grid h-44 w-44 place-items-center rounded-full"
       style={{ background: `conic-gradient(${chartStops.join(", ")})` }}
     >
       <div
-        className="grid h-32 w-32 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-[#141414]"
+        className="grid h-24 w-24 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-[#141414]"
       >
         <span>
-          <span className="block text-xs font-semibold text-slate-500 dark:text-neutral-400">Total Expenses</span>
-          <span className="mt-1 block text-2xl font-extrabold text-[#10172a] dark:text-white">
+          <span className="block text-[10px] font-semibold text-slate-500 dark:text-neutral-400">Total Expenses</span>
+          <span className="mt-1 block text-lg font-extrabold text-[#10172a] dark:text-white">
             {formatPeso(total)}
           </span>
         </span>
       </div>
     </div>
-    <div className="mt-5 space-y-3 text-sm text-[#10172a] dark:text-neutral-200">
+    <div className="mt-4 space-y-2 text-xs text-[#10172a] dark:text-neutral-200">
       {expenseCategories.length === 0 && (
         <span className="flex items-center gap-3">
           <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
@@ -411,10 +411,10 @@ const ExpenseCategories = ({
         </span>
       )}
       {expenseCategories.map((category) => (
-        <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
-          <span className="flex min-w-0 items-center gap-3">
+        <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-3">
+          <span className="flex min-w-0 items-center gap-2">
             <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: category.color }}
             />
             <span className="truncate font-semibold">{category.label}</span>
@@ -534,8 +534,8 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   };
 
   return (
-        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-          <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
                 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
@@ -552,7 +552,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
               <button
                 type="button"
                 onClick={onAddEntry}
-                className="flex h-11 items-center gap-3 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-6 text-base font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105"
+                className="flex h-10 items-center gap-2 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105"
               >
                 <Icon className="h-5 w-5" />
                 <span>Add Entry</span>
@@ -560,7 +560,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             </div>
           </header>
 
-          <section className="mt-10 grid gap-4 md:grid-cols-3">
+          <section className="mt-5 grid gap-4 md:grid-cols-3">
             {isLoading ? (
               <BudgetSummarySkeleton />
             ) : (
@@ -572,7 +572,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             )}
           </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+          <section className="mt-4 grid gap-4 lg:grid-cols-2">
             {isLoading ? (
               <BudgetChartsSkeleton />
             ) : (
@@ -594,16 +594,16 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
             </p>
           )}
 
-          <section className="mt-4 overflow-hidden rounded-lg bg-white shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+          <section className="mt-4 overflow-hidden rounded-2xl border-b-2 border-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(219,39,119,0.12),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
             <table className="w-full min-w-[780px] text-left text-xs text-neutral-800 dark:text-neutral-200">
               <thead className="border-b border-neutral-300 dark:border-neutral-700">
                 <tr>
-                  <th className="px-5 py-4 font-medium">Type</th>
-                  <th className="px-5 py-4 font-medium">Description</th>
-                  <th className="px-5 py-4 font-medium">Category</th>
-                  <th className="px-5 py-4 font-medium">Date</th>
-                  <th className="px-5 py-4 font-medium">Amount</th>
-                  <th className="px-5 py-4 text-right font-medium">Actions</th>
+                  <th className="px-5 py-3 font-medium">Type</th>
+                  <th className="px-5 py-3 font-medium">Description</th>
+                  <th className="px-5 py-3 font-medium">Category</th>
+                  <th className="px-5 py-3 font-medium">Date</th>
+                  <th className="px-5 py-3 font-medium">Amount</th>
+                  <th className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -621,20 +621,20 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
 
                 {!isLoading && filteredBudgetEntries.map((entry) => (
                   <tr key={entry.id}>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-3">
                       <EntryType type={entry.type} />
                     </td>
-                    <td className="px-5 py-4 font-medium">{entry.description}</td>
-                    <td className="px-5 py-4">{entry.category}</td>
-                    <td className="px-5 py-4 text-neutral-500 dark:text-neutral-400">{entry.date}</td>
+                    <td className="px-5 py-3 font-medium">{entry.description}</td>
+                    <td className="px-5 py-3">{entry.category}</td>
+                    <td className="px-5 py-3 text-neutral-500 dark:text-neutral-400">{entry.date}</td>
                     <td
-                      className={`px-5 py-4 font-bold ${
+                      className={`px-5 py-3 font-bold ${
                         entry.amount < 0 ? "text-red-600" : "text-green-600"
                       }`}
                     >
                       {formatCurrency(entry.amount)}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-3">
                       <div className="flex justify-end gap-4">
                         <button
                           type="button"

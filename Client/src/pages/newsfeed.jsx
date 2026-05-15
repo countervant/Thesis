@@ -683,17 +683,17 @@ const Newsfeed = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-      <div className="mx-auto grid max-w-[1700px] gap-8 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="min-w-0 space-y-5">
-          <header className="pt-2">
+    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+      <div className="mx-auto grid max-w-[1600px] gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
+        <div className="min-w-0 space-y-4">
+          <header>
             <h1
               className="text-3xl uppercase leading-none text-neutral-950"
               style={{ fontFamily: "var(--font-bruno)" }}
             >
               <span className="text-[#dc4fb2]">Clientra</span> Newsfeed
             </h1>
-            <p className="mt-3 text-sm font-semibold text-slate-500">
+            <p className="mt-2 text-sm font-semibold text-slate-500">
               Share updates, react to posts, and discuss with the team.
             </p>
           </header>
@@ -707,22 +707,22 @@ const Newsfeed = () => {
       {canPost && (
         <form
           onSubmit={handleCreatePost}
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+          className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
         >
-          <div className="flex items-center gap-4 px-6 py-5">
-            <Avatar user={user} size="h-11 w-11" />
+          <div className="flex items-center gap-3 px-5 py-4">
+            <Avatar user={user} size="h-9 w-9" />
             <textarea
               value={postContent}
               onChange={(event) => setPostContent(event.target.value)}
               placeholder={`What's on your mind, ${user?.firstName || "there"}?`}
               maxLength={1200}
               rows={1}
-              className="min-h-11 flex-1 resize-none border-0 bg-transparent px-1 py-3 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+              className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
-          <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
-            <div className="flex flex-wrap items-center gap-8">
-              <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600">
+          <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-2.5">
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600">
                 <img
                   src={insertImageIcon}
                   alt=""
@@ -736,7 +736,7 @@ const Newsfeed = () => {
                   className="sr-only"
                 />
               </label>
-              <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600">
+              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                   <path d="M7 3h7l4 4v14H7zM14 3v5h5M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -747,7 +747,7 @@ const Newsfeed = () => {
                 <button
                   type="button"
                   onClick={() => setIsEmojiPickerOpen((isOpen) => !isOpen)}
-                  className="flex h-10 items-center gap-2 rounded-lg px-2 text-sm font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
+                  className="flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
                   aria-label="Add emoji"
                   aria-expanded={isEmojiPickerOpen}
                 >
@@ -775,7 +775,7 @@ const Newsfeed = () => {
                 <button
                   type="button"
                   onClick={() => setPostMedia(null)}
-                  className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
                 >
                   Remove Media
                 </button>
@@ -783,7 +783,7 @@ const Newsfeed = () => {
               <button
                 type="submit"
                 disabled={isPosting}
-                className="h-10 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-8 text-sm font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                className="h-9 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-6 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isPosting ? "Posting..." : "Post"}
               </button>
@@ -836,7 +836,7 @@ const Newsfeed = () => {
             <article
               key={post.id}
               id={`newsfeed-post-${post.id}`}
-              className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition ${
+              className={`rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition ${
                 focusedTarget?.postId === post.id
                   ? "ring-2 ring-pink-200"
                   : ""
@@ -879,7 +879,7 @@ const Newsfeed = () => {
                     )}
                   </div>
                 )}
-                <div className="flex items-center gap-4 pr-10">
+                <div className="flex items-center gap-3 pr-10">
                   <ProfileButton
                     user={post.author}
                     className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
@@ -903,7 +903,7 @@ const Newsfeed = () => {
                   </div>
                 </div>
 
-                <div className="mt-3 pl-14">
+                  <div className="mt-3 pl-12">
                   <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-800">
                     {post.content}
                   </p>
@@ -927,15 +927,15 @@ const Newsfeed = () => {
                 </div>
               </div>
 
-              <div className="mt-4 border-t border-slate-200">
-                <div className="flex items-center justify-between gap-4 py-3 text-sm font-semibold text-slate-500">
+              <div className="mt-3 border-t border-slate-200">
+                <div className="flex items-center justify-between gap-4 py-2.5 text-xs font-semibold text-slate-500">
                   <div className="flex min-w-0 items-center gap-2">
                     <HeartIcon filled={post.hearts.length > 0} />
                     <span className="truncate">
                       {post.hearts.length > 0
                         ? hasHearted
                           ? `You${post.hearts.length > 1 ? ` and ${post.hearts.length - 1} others` : ""}`
-                          : `${post.hearts.length} appreciation${post.hearts.length === 1 ? "" : "s"}`
+                          : `${post.hearts.length} Like${post.hearts.length === 1 ? "" : "s"}`
                         : "0"}
                     </span>
                   </div>
@@ -956,7 +956,7 @@ const Newsfeed = () => {
                   <button
                     type="button"
                     onClick={() => handleToggleHeart(post.id)}
-                    className={`flex h-11 items-center justify-center gap-2 border-r border-slate-200 text-sm font-black transition hover:bg-pink-50 ${hasHearted ? "text-pink-600" : "text-slate-600"}`}
+                    className={`flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black transition hover:bg-pink-50 ${hasHearted ? "text-pink-600" : "text-slate-600"}`}
                     aria-label={hasHearted ? "Remove heart" : "Heart post"}
                   >
                     <HeartIcon filled={hasHearted} />
@@ -965,7 +965,7 @@ const Newsfeed = () => {
                   <button
                     type="button"
                     onClick={() => toggleComments(post.id)}
-                    className="flex h-11 items-center justify-center gap-2 border-r border-slate-200 text-sm font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
+                    className="flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                       <path d="M5 6h14v10H9l-4 3V6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -974,7 +974,7 @@ const Newsfeed = () => {
                   </button>
                   <button
                     type="button"
-                    className="flex h-11 items-center justify-center gap-2 text-sm font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
+                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                       <path d="M20 12 4 5l3 7-3 7 16-7zM7 12h13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -1151,7 +1151,7 @@ const Newsfeed = () => {
                     onChange={(event) => handleCommentChange(post.id, event.target.value)}
                     placeholder="Write a comment..."
                     maxLength={500}
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 pr-28 text-sm font-semibold text-neutral-800 outline-none transition placeholder:text-slate-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pr-24 text-sm font-semibold text-neutral-800 outline-none transition placeholder:text-slate-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
                   />
                   <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-3 text-slate-500">
                     <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600" aria-label="Add emoji">
@@ -1171,16 +1171,16 @@ const Newsfeed = () => {
         })}
         </div>
 
-        <aside className="hidden space-y-6 xl:sticky xl:top-24 xl:block xl:self-start xl:pt-[86px]">
-          <section className="rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_8px_22px_rgba(190,65,158,0.14)]">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#a33bea]">
+        <aside className="hidden space-y-4 xl:sticky xl:top-20 xl:block xl:self-start xl:pt-[68px]">
+          <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+            <h2 className="flex items-center gap-2 text-base font-extrabold text-[#a33bea]">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                 <path d="m4 15 5-5 4 4 7-7M17 7h3v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Trending Topics
             </h2>
             {trendingTopics.length > 0 && (
-              <div className="mt-6 space-y-5">
+              <div className="mt-4 space-y-3">
                 {trendingTopics.map((topic) => (
                   <button
                     key={topic.label}
@@ -1198,20 +1198,20 @@ const Newsfeed = () => {
             )}
           </section>
 
-          <section className="rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_8px_22px_rgba(190,65,158,0.14)]">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold text-[#a33bea]">
+          <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+            <h2 className="flex items-center gap-2 text-base font-extrabold text-[#a33bea]">
               <span className="h-3 w-3 rounded-full bg-[#20bd5a]" />
               Online Team
             </h2>
             {displayedTeamMembers.length > 0 && (
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3">
                 {displayedTeamMembers.map((member) => (
                   <ProfileButton
                     key={getEntityId(member)}
                     user={member}
                     className="flex w-full items-center gap-3 text-left"
                   >
-                    <Avatar user={member} />
+                    <Avatar user={member} size="h-8 w-8" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-extrabold text-[#10172a]">
                         {getUserName(member)}
@@ -1229,7 +1229,7 @@ const Newsfeed = () => {
               <button
                 type="button"
                 onClick={() => setShowAllTeamMembers((isShowing) => !isShowing)}
-                className="mt-6 h-11 w-full rounded-xl border border-[#dc4fb2] text-sm font-bold text-[#dc4fb2] transition hover:bg-pink-50"
+                className="mt-4 h-9 w-full rounded-xl border border-[#dc4fb2] text-xs font-bold text-[#dc4fb2] transition hover:bg-pink-50"
               >
                 {showAllTeamMembers ? "Show fewer team members" : "View all team members"}
               </button>

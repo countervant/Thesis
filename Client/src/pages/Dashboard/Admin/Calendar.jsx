@@ -72,7 +72,7 @@ const toneStyles = {
 };
 
 const Card = ({ children, className = "" }) => (
-  <section className={`rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.045)] ${className}`}>
+  <section className={`rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.12),0_8px_24px_rgba(190,65,158,0.04)] ${className}`}>
     {children}
   </section>
 );
@@ -97,53 +97,53 @@ const AdminCalendar = () => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-      <section className="mx-auto max-w-[1840px] rounded-3xl border border-slate-200/70 bg-white px-7 py-7 shadow-[0_12px_38px_rgba(15,23,42,0.04)]">
+    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+      <section className="mx-auto max-w-[1840px] rounded-2xl border border-pink-100 bg-white px-5 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)]">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1
-              className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+              className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
               style={{ fontFamily: "var(--font-bruno)" }}
             >
               Calendar
             </h1>
-            <p className="mt-2 text-base font-semibold text-slate-500">
+            <p className="mt-2 text-sm font-semibold text-slate-500">
               Manage company schedules, events, meetings, and deadlines.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-[#10142d] shadow-sm">Today</button>
+            <button type="button" className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm">Today</button>
             <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <button type="button" className="grid h-11 w-12 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
-              <button type="button" className="grid h-11 w-12 place-items-center border-l border-slate-200 text-slate-700" aria-label="Next month"><Icon className="h-4 w-4" /></button>
+              <button type="button" className="grid h-9 w-10 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
+              <button type="button" className="grid h-9 w-10 place-items-center border-l border-slate-200 text-slate-700" aria-label="Next month"><Icon className="h-4 w-4" /></button>
             </div>
-            <select className="h-11 rounded-xl border border-transparent bg-white px-3 text-base font-black text-[#26314f] outline-none"><option>May 2026</option></select>
-            <button type="button" className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Filter</button>
-            <select className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-[#10142d] shadow-sm outline-none"><option>Team / Department</option></select>
-            <button type="button" className="flex h-11 items-center gap-2 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-6 text-sm font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-5 w-5" />Add Event</button>
+            <select className="h-9 rounded-xl border border-transparent bg-white px-3 text-sm font-black text-[#26314f] outline-none"><option>May 2026</option></select>
+            <button type="button" className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Filter</button>
+            <select className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm outline-none"><option>Team / Department</option></select>
+            <button type="button" className="flex h-9 items-center gap-2 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
           </div>
         </header>
 
-        <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {stats.map((item) => (
-            <Card key={item.label} className="min-h-40 px-6 py-6">
-              <div className="flex items-center gap-6">
-                <span className={`grid h-20 w-20 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
-                  <Icon name={item.icon} className="h-10 w-10" />
+            <Card key={item.label} className="min-h-28 px-5 py-4">
+              <div className="flex items-center gap-4">
+                <span className={`grid h-14 w-14 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
+                  <Icon name={item.icon} className="h-7 w-7" />
                 </span>
                 <div>
-                  <p className="text-5xl font-black leading-none text-[#10142d]">{item.value}</p>
-                  <p className="mt-2 text-base font-black leading-tight text-[#10142d]">{item.label}</p>
-                  <p className="text-sm font-semibold text-slate-500">{item.sublabel}</p>
+                  <p className="text-2xl font-black leading-none text-[#10142d]">{item.value}</p>
+                  <p className="mt-1 text-xs font-black leading-tight text-[#10142d]">{item.label}</p>
+                  <p className="text-xs font-semibold text-slate-500">{item.sublabel}</p>
                 </div>
               </div>
             </Card>
           ))}
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[300px_minmax(760px,1fr)_390px]">
-          <div className="space-y-5">
-            <Card className="p-6">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[260px_minmax(680px,1fr)_330px]">
+          <div className="space-y-4">
+            <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendar View</h2>
               {["Company Calendar", "Team Calendar", "Employee Calendar", "Project Calendar"].map((item, index) => (
                 <button key={item} type="button" className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${index === 0 ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
@@ -152,7 +152,7 @@ const AdminCalendar = () => {
               ))}
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Teams / Departments</h2>
               {departments.map(([item, color], index) => (
                 <button key={item} type="button" className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${index === 0 ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
@@ -163,7 +163,7 @@ const AdminCalendar = () => {
               <button type="button" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"><Icon name="plus" className="h-4 w-4" />Add Department</button>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendars</h2>
               {calendarChecks.map(([item, accent]) => (
                 <label key={item} className="mb-3 flex items-center gap-3 text-sm font-bold text-slate-600">
@@ -177,7 +177,7 @@ const AdminCalendar = () => {
 
           <Card className="overflow-hidden">
             <div className="grid grid-cols-7 border-b border-slate-200 text-center text-base font-black text-[#10142d]">
-              {weekDays.map((day) => <span key={day} className="py-5">{day}</span>)}
+              {weekDays.map((day) => <span key={day} className="py-3">{day}</span>)}
             </div>
             <div className="grid grid-cols-7">
               {days.map((day, index) => {
@@ -186,8 +186,8 @@ const AdminCalendar = () => {
                 const events = calendarEvents.filter((event) => event.day === day);
 
                 return (
-                  <div key={`${day}-${index}`} className="min-h-34 border-b border-r border-slate-200 p-3 last:border-r-0">
-                    <div className={`mb-3 text-base font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{label}</div>
+                  <div key={`${day}-${index}`} className="min-h-28 border-b border-r border-slate-200 p-2.5 last:border-r-0">
+                    <div className={`mb-2 text-sm font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{label}</div>
                     <div className="space-y-1.5">
                       {events.map((event) => (
                         <div key={`${day}-${event.label}`} className={`relative truncate rounded-lg px-2.5 py-1.5 text-xs font-black ${event.color}`}>
@@ -204,14 +204,14 @@ const AdminCalendar = () => {
             </div>
           </Card>
 
-          <div className="space-y-5">
-            <Card className="p-6">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-lg font-black">Upcoming Events</h2>
-                <button type="button" className="text-sm font-black text-violet-700">View all</button>
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base font-black">Upcoming Events</h2>
+                <button type="button" className="text-xs font-black text-violet-700">View all</button>
               </div>
               {upcomingEvents.map((event) => (
-                <div key={event.title} className="grid grid-cols-[16px_1fr_auto] items-center gap-4 border-b border-slate-100 py-4 last:border-b-0">
+                <div key={event.title} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
                   <span className={`h-3 w-3 rounded-full ${event.dot}`} />
                   <span>
                     <span className="block text-sm font-black">{event.title}</span>
@@ -222,8 +222,8 @@ const AdminCalendar = () => {
               ))}
             </Card>
 
-            <Card className="p-6">
-              <h2 className="mb-7 text-lg font-black">Calendar Analytics</h2>
+            <Card className="p-4">
+              <h2 className="mb-4 text-base font-black">Calendar Analytics</h2>
               <div className="grid gap-7 sm:grid-cols-[140px_1fr] sm:items-center">
                 <div className="grid h-36 w-36 place-items-center rounded-full" style={{ background: "conic-gradient(#f97316 0 39%, #3b82f6 39% 61%, #ec4899 61% 82%, #22c55e 82% 100%)" }}>
                   <div className="grid h-22 w-22 place-items-center rounded-full bg-white text-center shadow-sm">
@@ -248,14 +248,14 @@ const AdminCalendar = () => {
           </div>
         </div>
 
-        <Card className="mt-5 overflow-hidden">
-          <div className="px-6 pt-5">
-            <h2 className="text-lg font-black">Event List <span className="text-sm font-bold text-slate-500">(May 2026)</span></h2>
+        <Card className="mt-4 overflow-hidden">
+          <div className="px-5 pt-4">
+            <h2 className="text-base font-black">Event List <span className="text-xs font-bold text-slate-500">(May 2026)</span></h2>
           </div>
-          <div className="overflow-x-auto px-6 pb-5">
-            <table className="w-full min-w-[1180px] text-left text-sm">
+          <div className="overflow-x-auto px-5 pb-4">
+            <table className="w-full min-w-[1180px] text-left text-xs">
               <thead className="text-xs font-black text-slate-500">
-                <tr>{["Event", "Type", "Date & Time", "Participants / Assignees", "Calendar", "Actions"].map((heading) => <th key={heading} className="px-3 py-4">{heading}</th>)}</tr>
+                <tr>{["Event", "Type", "Date & Time", "Participants / Assignees", "Calendar", "Actions"].map((heading) => <th key={heading} className="px-3 py-3">{heading}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {eventList.map((event) => (

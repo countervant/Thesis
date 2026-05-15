@@ -309,20 +309,20 @@ const Profile = ({ embedded = false }) => {
 
   const content = (
     <main className={embedded ? "w-full" : "w-full px-5 py-10"}>
-      <div className="mb-7">
+      <div className="mb-4">
         <h1
-          className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+          className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
           style={{ fontFamily: "var(--font-bruno)" }}
         >
-          Edit Profile
+        Profile
         </h1>
-        <p className="mt-3 text-base font-semibold text-slate-500">
+        <p className="mt-2 text-sm font-semibold text-slate-500">
           Manage your personal information and account settings.
         </p>
       </div>
 
       {isLoading && !formData.email ? (
-        <section className="rounded-2xl bg-white p-6 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
+        <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
           <ProfileSkeleton />
         </section>
       ) : (
@@ -330,14 +330,14 @@ const Profile = ({ embedded = false }) => {
           onSubmit={handleSubmit}
           autoComplete="off"
           data-form-type="other"
-          className="grid gap-6 xl:grid-cols-[360px_1fr]"
+          className="grid gap-4 xl:grid-cols-[300px_1fr]"
         >
           <input type="text" name="username" autoComplete="username" tabIndex={-1} aria-hidden="true" className="hidden" />
           <input type="password" name="password" autoComplete="current-password" tabIndex={-1} aria-hidden="true" className="hidden" />
 
-          <aside className="space-y-5">
-            <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-              <div className="group relative h-32 bg-pink-50">
+          <aside className="space-y-4">
+            <section className="overflow-hidden rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
+              <div className="group relative h-24 bg-pink-50">
                 <img
                   src={formData.coverPhoto || defaultCoverPhoto}
                   alt=""
@@ -350,38 +350,38 @@ const Profile = ({ embedded = false }) => {
                   <input type="file" accept="image/*" onChange={handleCoverPhotoChange} className="sr-only" />
                 </label>
               </div>
-              <div className="px-6 pb-6 text-center">
-                <div className="relative -mt-14 inline-block">
+              <div className="px-5 pb-5 text-center">
+                <div className="relative -mt-10 inline-block">
                   <InitialsAvatar
                     alt="Avatar preview"
-                    className="h-28 w-28"
+                    className="h-20 w-20"
                     src={formData.avatar}
-                    textClassName="text-3xl"
+                    textClassName="text-xl"
                     user={formData}
                   />
                   <span className="absolute bottom-2 right-2 h-5 w-5 rounded-full border-2 border-white bg-emerald-500" />
                 </div>
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <h2 className="text-2xl font-black text-[#10142d]">{fullName || "Your Name"}</h2>
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <h2 className="text-lg font-black text-[#10142d]">{fullName || "Your Name"}</h2>
                 </div>
-                <span className="mt-3 inline-flex rounded-full bg-pink-50 px-4 py-1 text-sm font-black uppercase text-[#c72fb2]">
+                <span className="mt-2 inline-flex rounded-full bg-pink-50 px-3 py-1 text-xs font-black uppercase text-[#c72fb2]">
                   {formatRole(user?.role) || "User"}
                 </span>
-                <p className="mt-5 text-base font-black text-[#10142d]">
+                <p className="mt-4 text-sm font-black text-[#10142d]">
                   {formData.position || "System Administrator"}
                 </p>
-                <p className="mx-auto mt-2 max-w-[240px] text-sm font-semibold leading-6 text-slate-500">
+                <p className="mx-auto mt-2 max-w-[240px] text-xs font-semibold leading-5 text-slate-500">
                   Managing the system and ensuring everything runs smoothly.
                 </p>
 
-                <div className="mt-6 space-y-4 border-y border-pink-50 py-5 text-left text-sm font-bold text-slate-600">
+                <div className="mt-4 space-y-3 border-y border-pink-50 py-4 text-left text-xs font-bold text-slate-600">
                   <p className="flex items-center gap-3"><FormIcon name="mail" />{formData.email || "email@example.com"}</p>
                   <p className="flex items-center gap-3"><FormIcon name="phone" />{formData.phone || "Phone number"}</p>
                   <p className="flex items-center gap-3"><FormIcon name="location" />{formData.companyName || formData.country || "Manila, Philippines"}</p>
                   <p className="flex items-center gap-3"><FormIcon name="calendar" />Joined {joinedDate}</p>
                 </div>
 
-                <label className="mt-5 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c72fb2] text-sm font-black text-[#c72fb2] transition hover:bg-pink-50">
+                <label className="mt-4 flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c72fb2] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
                   <FormIcon name="upload" className="h-4 w-4" />
                   Change Photo
                   <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
@@ -390,7 +390,7 @@ const Profile = ({ embedded = false }) => {
                   <button
                     type="button"
                     onClick={() => updateField("avatar", "")}
-                    className="mt-3 flex h-11 w-full items-center justify-center rounded-lg border border-red-300 text-sm font-black text-red-500 transition hover:bg-red-50"
+                    className="mt-3 flex h-9 w-full items-center justify-center rounded-lg border border-red-300 text-xs font-black text-red-500 transition hover:bg-red-50"
                   >
                     Remove Photo
                   </button>
@@ -399,7 +399,7 @@ const Profile = ({ embedded = false }) => {
                   <button
                     type="button"
                     onClick={() => updateField("coverPhoto", "")}
-                    className="mt-3 flex h-11 w-full items-center justify-center rounded-lg border border-red-300 text-sm font-black text-red-500 transition hover:bg-red-50"
+                    className="mt-3 flex h-9 w-full items-center justify-center rounded-lg border border-red-300 text-xs font-black text-red-500 transition hover:bg-red-50"
                   >
                     Remove Cover Photo
                   </button>
@@ -407,28 +407,28 @@ const Profile = ({ embedded = false }) => {
               </div>
             </section>
 
-            <section className="rounded-2xl bg-white p-5 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-              <h2 className="mb-4 text-lg font-black text-[#10142d]">Account Activity</h2>
+            <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-4 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
+              <h2 className="mb-3 text-base font-black text-[#10142d]">Account Activity</h2>
               {[
                 ["Last profile update", "May 12, 2026 - 7:52 PM"],
                 ["Last login", "May 12, 2026 - 7:50 PM"],
                 ["Account created", `${joinedDate} - 10:44 AM`],
               ].map(([label, value]) => (
-                <div key={label} className="flex gap-4 border-b border-pink-50 py-4 last:border-b-0">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-pink-50 text-[#c72fb2]">
+                <div key={label} className="flex gap-3 border-b border-pink-50 py-3 last:border-b-0">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-pink-50 text-[#c72fb2]">
                     <FormIcon name="calendar" className="h-5 w-5" />
                   </span>
                   <span>
-                    <span className="block text-sm font-black text-[#10142d]">{label}</span>
-                    <span className="text-sm font-semibold text-slate-500">{value}</span>
+                    <span className="block text-xs font-black text-[#10142d]">{label}</span>
+                    <span className="text-xs font-semibold text-slate-500">{value}</span>
                   </span>
                 </div>
               ))}
             </section>
           </aside>
 
-          <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-            <div className="space-y-7 p-7">
+          <section className="overflow-hidden rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
+            <div className="space-y-5 p-5">
               {errorMessage && (
                 <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">{errorMessage}</p>
               )}
@@ -437,10 +437,10 @@ const Profile = ({ embedded = false }) => {
               )}
 
               <section>
-                <h2 className="mb-6 flex items-center gap-3 text-xl font-black">
+                <h2 className="mb-4 flex items-center gap-3 text-base font-black">
                   <FormIcon name="person" /> Personal Information
                 </h2>
-                <div className="grid gap-5 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <Field label="Full Name" icon="person" required>
                     <input
                       type="text"
@@ -502,11 +502,11 @@ const Profile = ({ embedded = false }) => {
                 </div>
               </section>
 
-              <section className="border-t border-pink-50 pt-7">
-                <h2 className="mb-6 flex items-center gap-3 text-xl font-black">
+              <section className="border-t border-pink-50 pt-5">
+                <h2 className="mb-4 flex items-center gap-3 text-base font-black">
                   <FormIcon name="briefcase" /> Work Information
                 </h2>
-                <div className="grid gap-5 lg:grid-cols-3">
+                <div className="grid gap-4 lg:grid-cols-3">
                   <Field label="Employee ID" icon="id">
                     <input type="text" value={getEmployeeId(user)} readOnly className={`${readOnlyInputClass} pl-12`} />
                   </Field>
@@ -533,10 +533,10 @@ const Profile = ({ embedded = false }) => {
                 </div>
               </section>
 
-              <section className="border-t border-pink-50 pt-7">
-                <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+              <section className="border-t border-pink-50 pt-5">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="flex items-center gap-3 text-xl font-black">
+                    <h2 className="flex items-center gap-3 text-base font-black">
                       <FormIcon name="person" /> Skills & Expertise
                     </h2>
                     <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -545,7 +545,7 @@ const Profile = ({ embedded = false }) => {
                   </div>
                   <button
                     type="button"
-                    className="flex h-10 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-5 text-sm font-black text-[#c72fb2] transition hover:bg-pink-50"
+                    className="flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
                   >
                     <span className="text-lg leading-none">+</span>
                     Add Skill
@@ -559,11 +559,11 @@ const Profile = ({ embedded = false }) => {
                 ].map(([group, skills]) => (
                   <div key={group} className="mb-5 last:mb-0">
                     <h3 className="mb-3 text-sm font-black text-[#10142d]">{group}</h3>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2">
                       {skills.map((skill) => (
                         <span
                           key={skill}
-                          className="inline-flex items-center gap-2 rounded-full border border-pink-100 bg-pink-50 px-4 py-2 text-sm font-black text-[#c72fb2]"
+                          className="inline-flex items-center gap-2 rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
                         >
                           {skill}
                           <button
@@ -580,23 +580,23 @@ const Profile = ({ embedded = false }) => {
                 ))}
               </section>
 
-              <section className="border-t border-pink-50 pt-7">
-                <h2 className="mb-6 flex items-center gap-3 text-xl font-black">
+              <section className="border-t border-pink-50 pt-5">
+                <h2 className="mb-4 flex items-center gap-3 text-base font-black">
                   <FormIcon name="lock" /> Account Settings
                 </h2>
                 <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
                   <button
                     type="button"
-                    className="flex h-20 w-full self-start items-center gap-5 rounded-lg border border-pink-200 bg-pink-50/30 px-5 py-3 text-left transition hover:bg-pink-50"
+                    className="flex h-16 w-full self-start items-center gap-4 rounded-lg border border-pink-200 bg-pink-50/30 px-4 py-3 text-left transition hover:bg-pink-50"
                   >
-                    <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-100 text-[#c72fb2]">
-                      <FormIcon name="lock" className="h-6 w-6" />
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-pink-100 text-[#c72fb2]">
+                      <FormIcon name="lock" className="h-5 w-5" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-base font-black text-[#10142d]">
+                      <span className="block text-sm font-black text-[#10142d]">
                         Change Password
                       </span>
-                      <span className="mt-1 block text-sm font-semibold text-slate-500">
+                      <span className="mt-1 block text-xs font-semibold text-slate-500">
                         Update your password regularly for better security.
                       </span>
                     </span>
@@ -623,18 +623,18 @@ const Profile = ({ embedded = false }) => {
               </section>
             </div>
 
-            <div className="flex justify-end gap-4 border-t border-pink-50 px-7 py-5">
+            <div className="flex justify-end gap-3 border-t border-pink-50 px-5 py-4">
               <button
                 type="button"
                 onClick={() => navigate(`/${user?.role || "client"}/dashboard`)}
-                className="h-12 rounded-xl border border-slate-200 bg-white px-12 text-sm font-black text-slate-600"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-8 text-xs font-black text-slate-600"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="h-12 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-12 text-sm font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                className="h-10 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-8 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
               </button>
@@ -726,11 +726,11 @@ const Field = ({ children, icon, label, required = false }) => (
 );
 
 const inputClass =
-  "h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#dc4fb2] focus:ring-2 focus:ring-pink-100";
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#dc4fb2] focus:ring-2 focus:ring-pink-100";
 
 const iconInputClass = `${inputClass} pl-12`;
 
 const readOnlyInputClass =
-  "h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-600 outline-none";
+  "h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-600 outline-none";
 
 export default Profile;

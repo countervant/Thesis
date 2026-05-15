@@ -120,7 +120,7 @@ const ImageIcon = ({ src, alt = "", className = "h-5 w-5" }) => (
 );
 
 const Card = ({ children, className = "" }) => (
-  <section className={`rounded-2xl border border-pink-100 bg-white shadow-[0_3px_4px_rgba(190,65,158,0.35)] ${className}`}>
+  <section className={`rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.16),0_8px_24px_rgba(190,65,158,0.05)] ${className}`}>
     {children}
   </section>
 );
@@ -143,31 +143,31 @@ const LeaveRequest = () => {
   const selectedRequest = leaveRequests[0];
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-      <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
+    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1
-            className="text-4xl font-black tracking-tight text-[#10142d]"
+            className="text-3xl font-black tracking-tight text-[#10142d]"
             style={{ fontFamily: "var(--font-bruno)" }}
           >
             Leave Requests
           </h1>
-          <p className="mt-2 text-base font-semibold text-slate-500">
+          <p className="mt-2 text-sm font-semibold text-slate-500">
             Manage and review employee leave requests.
           </p>
         </div>
       </header>
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <Card key={card.label} className="p-5">
-            <div className="flex items-center gap-4">
-              <span className={`grid h-16 w-16 place-items-center rounded-2xl ring-1 ${toneStyles[card.tone]}`}>
-                <ImageIcon src={card.icon} className="h-9 w-9" />
+          <Card key={card.label} className="p-4">
+            <div className="flex items-center gap-3">
+              <span className={`grid h-12 w-12 place-items-center rounded-2xl ring-1 ${toneStyles[card.tone]}`}>
+                <ImageIcon src={card.icon} className="h-7 w-7" />
               </span>
               <div>
-                <p className="text-sm font-extrabold text-slate-600">{card.label}</p>
-                <p className="mt-1 text-4xl font-black text-[#10142d]">{card.value}</p>
+                <p className="text-xs font-extrabold text-slate-600">{card.label}</p>
+                <p className="mt-1 text-2xl font-black text-[#10142d]">{card.value}</p>
                 <p className={`mt-1 text-xs font-extrabold ${card.tone === "green" ? "text-emerald-600" : card.tone === "rose" ? "text-rose-500" : "text-orange-500"}`}>
                   {card.note}
                 </p>
@@ -177,10 +177,10 @@ const LeaveRequest = () => {
         ))}
       </div>
 
-      <div className="mt-5 grid gap-5 2xl:grid-cols-[1.7fr_1fr]">
+      <div className="mt-4 grid gap-4 2xl:grid-cols-[1.7fr_1fr]">
         <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-pink-50 px-5 py-5">
-            <h2 className="text-xl font-black">Leave Requests</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-pink-50 px-5 py-4">
+            <h2 className="text-base font-black">Leave Requests</h2>
             <div className="flex flex-wrap gap-3">
               <select className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none">
                 <option>All Departments</option>
@@ -199,14 +199,14 @@ const LeaveRequest = () => {
               <button
                 key={tab}
                 type="button"
-                className={`rounded-full px-5 py-2 text-sm font-extrabold transition ${index === 0 ? "bg-pink-100 text-pink-700 shadow-sm" : "border border-pink-100 bg-white text-slate-600 hover:bg-pink-50"}`}
+                className={`rounded-full px-4 py-1.5 text-xs font-extrabold transition ${index === 0 ? "bg-pink-100 text-pink-700 shadow-sm" : "border border-pink-100 bg-white text-slate-600 hover:bg-pink-50"}`}
               >
                 {tab}
               </button>
             ))}
           </div>
-          <div className="overflow-x-auto px-5 py-5">
-            <table className="w-full min-w-[980px] text-left text-sm">
+          <div className="overflow-x-auto px-5 py-4">
+            <table className="w-full min-w-[980px] text-left text-xs">
               <thead className="text-xs font-black uppercase text-slate-400">
                 <tr>
                   {["Request ID", "Employee", "Leave Type", "Dates", "Duration", "Department", "Status", "Actions"].map((heading) => (
@@ -217,8 +217,8 @@ const LeaveRequest = () => {
               <tbody className="divide-y divide-pink-50">
                 {leaveRequests.map((request) => (
                   <tr key={request.id} className="hover:bg-pink-50/40">
-                    <td className="px-3 py-4 font-black text-pink-700">{request.id}</td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-3 font-black text-pink-700">{request.id}</td>
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar initials={request.initials} name={request.employee} />
                         <span>
@@ -227,12 +227,12 @@ const LeaveRequest = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-4 font-bold text-slate-700">{request.type}</td>
-                    <td className="px-3 py-4 font-bold text-slate-600">{request.dates}</td>
-                    <td className="px-3 py-4 font-bold text-slate-600">{request.duration}</td>
-                    <td className="px-3 py-4 font-bold text-slate-600">{request.department}</td>
-                    <td className="px-3 py-4"><StatusPill status={request.status} /></td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-3 font-bold text-slate-700">{request.type}</td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{request.dates}</td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{request.duration}</td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{request.department}</td>
+                    <td className="px-3 py-3"><StatusPill status={request.status} /></td>
+                    <td className="px-3 py-3">
                       <div className="flex gap-2">
                         <button type="button" className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-100 bg-emerald-50" aria-label="Approve">
                           <ImageIcon src={check} className="h-5 w-5" />
@@ -252,10 +252,10 @@ const LeaveRequest = () => {
           </div>
         </Card>
 
-        <div className="grid gap-5">
-          <Card className="p-5">
+        <div className="grid gap-4">
+          <Card className="p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black">Team Leave Calendar</h2>
+              <h2 className="text-base font-black">Team Leave Calendar</h2>
               <span className="text-sm font-black text-pink-600">May 2026</span>
             </div>
             <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
@@ -283,14 +283,14 @@ const LeaveRequest = () => {
             </div>
           </Card>
 
-          <Card className="p-5">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-black">Request Details</h2>
+          <Card className="p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-black">Request Details</h2>
               <StatusPill status="Pending" />
             </div>
             <div className="grid gap-5 sm:grid-cols-[0.8fr_1.2fr]">
               <div className="text-center">
-                <Avatar initials={selectedRequest.initials} name={selectedRequest.employee} size="mx-auto h-20 w-20" />
+                <Avatar initials={selectedRequest.initials} name={selectedRequest.employee} size="mx-auto h-14 w-14" />
                 <p className="mt-3 text-base font-black">{selectedRequest.employee}</p>
                 <p className="text-sm font-bold text-slate-500">{selectedRequest.role}</p>
                 <p className="text-sm font-bold text-slate-500">{selectedRequest.department}</p>
@@ -302,16 +302,16 @@ const LeaveRequest = () => {
                 <p><span className="text-slate-400">Reason:</span> Family vacation trip.</p>
               </div>
             </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <button type="button" className="h-12 rounded-xl bg-emerald-500 text-sm font-black text-white shadow-lg shadow-emerald-100">Approve</button>
-              <button type="button" className="h-12 rounded-xl bg-rose-500 text-sm font-black text-white shadow-lg shadow-rose-100">Reject</button>
-              <button type="button" className="h-12 rounded-xl border border-pink-300 bg-white text-sm font-black text-pink-700">View Details</button>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <button type="button" className="h-10 rounded-xl bg-emerald-500 text-xs font-black text-white shadow-lg shadow-emerald-100">Approve</button>
+              <button type="button" className="h-10 rounded-xl bg-rose-500 text-xs font-black text-white shadow-lg shadow-rose-100">Reject</button>
+              <button type="button" className="h-10 rounded-xl border border-pink-300 bg-white text-xs font-black text-pink-700">View Details</button>
             </div>
           </Card>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 2xl:grid-cols-[1.45fr_1fr]">
+      <div className="mt-4 grid gap-4 2xl:grid-cols-[1.45fr_1fr]">
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between border-b border-pink-50 px-5 py-4">
             <h2 className="text-lg font-black">Leave Analytics</h2>
@@ -386,7 +386,7 @@ const LeaveRequest = () => {
 
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between px-5 py-5">
-            <h2 className="text-xl font-black">Recent Leave History</h2>
+            <h2 className="text-base font-black">Recent Leave History</h2>
             <span className="text-sm font-black text-pink-600">View all</span>
           </div>
           <div className="overflow-x-auto px-5 pb-5">

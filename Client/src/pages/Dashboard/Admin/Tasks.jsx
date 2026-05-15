@@ -61,10 +61,10 @@ const formatReadableDate = (date) => {
 };
 
 const getStatusTone = (status) => {
-  if (status === "Done") return "bg-pink-100 text-[#c72fb2]";
-  if (status === "Pending") return "bg-pink-100 text-[#c72fb2]";
-  if (status === "In review") return "bg-pink-50 text-[#c72fb2]";
-  return "bg-pink-100 text-[#c72fb2]";
+  if (status === "Done") return "bg-[#eafbed] text-[#28b84c]";
+  if (status === "Pending") return "bg-[#ffeaf5] text-[#e347a8]";
+  if (status === "In review") return "bg-[#fff0e5] text-[#ff8317]";
+  return "bg-[#f0e9ff] text-[#754de8]";
 };
 
 const normalizeTasks = (data) => {
@@ -247,7 +247,7 @@ const FilterChip = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`h-10 rounded-lg px-5 text-sm font-semibold shadow-[0_3px_8px_rgba(219,74,181,0.13)] transition ${
+    className={`h-8 rounded-lg px-4 text-xs font-semibold shadow-[0_3px_8px_rgba(219,74,181,0.13)] transition ${
       active
         ? "bg-[#db4ab5] text-white"
         : "bg-white text-neutral-700 hover:bg-pink-50 hover:text-[#c72fb2] dark:bg-[#1a1a1a] dark:text-neutral-300 dark:hover:bg-[#242424] dark:hover:text-[#e347b3]"
@@ -259,11 +259,11 @@ const FilterChip = ({ active, children, onClick }) => (
 
 const FilterGroup = ({ icon, label, options, selected, onSelect }) => (
   <div className="min-w-0 flex-1">
-    <div className="mb-4 flex items-center gap-2 text-sm font-bold text-neutral-800 dark:text-neutral-200">
+    <div className="mb-3 flex items-center gap-2 text-xs font-bold text-neutral-800 dark:text-neutral-200">
       <Icon name={icon} className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
       <span>{label}</span>
     </div>
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-2">
       {options.map((status) => (
         <FilterChip
           key={status}
@@ -288,7 +288,7 @@ const TaskCard = ({
 }) => (
   <article
     id={`task-card-${task.id}`}
-    className={`group flex min-h-[132px] items-center gap-4 rounded-xl border border-pink-100 border-l-[#f2a8dc] border-l-2 bg-white px-6 py-5 shadow-[0_3px_4px_rgba(190,65,158,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_7px_16px_rgba(190,65,158,0.22)] dark:bg-[#141414] dark:shadow-none sm:px-7 ${
+    className={`group flex min-h-[104px] items-center gap-3 rounded-2xl border border-pink-100 border-l-[#f2a8dc] border-l-2 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.09)] dark:bg-[#141414] dark:shadow-none sm:px-5 ${
       isFocused ? "ring-2 ring-pink-300 dark:ring-[#dc4fb2]" : "ring-pink-50 dark:ring-neutral-800"
     }`}
   >
@@ -311,19 +311,19 @@ const TaskCard = ({
     )}
 
     <div className="min-w-0 flex-1">
-      <h2 className="truncate text-xl font-bold text-neutral-950 dark:text-neutral-100">
+      <h2 className="truncate text-base font-bold text-neutral-950 dark:text-neutral-100">
         {task.title}
       </h2>
-      <p className="mt-3 text-base font-medium text-neutral-700 dark:text-neutral-400">{task.description}</p>
-      <p className="mt-4 flex items-center gap-2 text-base font-medium text-neutral-600 dark:text-neutral-400">
-        <Icon name="calendar" className="h-5 w-5 text-[#c72fb2]" />
+      <p className="mt-2 text-sm font-medium text-neutral-700 dark:text-neutral-400">{task.description}</p>
+      <p className="mt-3 flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+        <Icon name="calendar" className="h-4 w-4 text-[#c72fb2]" />
         {formatReadableDate(task.startDate)} - {formatReadableDate(task.dueDate)}
       </p>
     </div>
 
     {showStatus && (
-      <span className={`hidden min-w-[135px] items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-bold md:inline-flex ${getStatusTone(task.status)}`}>
-        <span className="h-2.5 w-2.5 rounded-full bg-current" />
+      <span className={`hidden min-w-[112px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold md:inline-flex ${getStatusTone(task.status)}`}>
+        <span className="h-2 w-2 rounded-full bg-current" />
         {task.status}
       </span>
     )}
@@ -528,15 +528,15 @@ const Tasks = ({
 
   return (
         <div className="mx-auto max-w-[1500px]">
-          <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+                className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Tasks
               </h1>
-              <p className="mt-4 text-base font-medium text-neutral-600 dark:text-neutral-400">
+              <p className="mt-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">
                 Assign and manage your tasks efficiently.
               </p>
             </div>
@@ -545,7 +545,7 @@ const Tasks = ({
               <button
                 type="button"
                 onClick={handleAddTask}
-                className="flex h-14 items-center gap-3 rounded-lg bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-7 text-base font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
+                className="flex h-10 items-center gap-2 rounded-lg bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
               >
                 <Icon className="h-5 w-5" />
                 <span>Add Task</span>
@@ -553,7 +553,7 @@ const Tasks = ({
             </div>
           </header>
 
-          <section className="mt-9 grid gap-8 rounded-xl border border-pink-100 bg-white px-8 py-7 shadow-[0_3px_4px_rgba(190,65,158,0.18)] dark:border-neutral-800 dark:bg-[#141414] md:grid-cols-[1fr_1px_1fr]">
+          <section className="mt-5 grid gap-5 rounded-2xl border border-pink-100 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] dark:border-neutral-800 dark:bg-[#141414] md:grid-cols-[1fr_1px_1fr]">
             <FilterGroup
               icon="filter"
               label="Filter by status"
@@ -573,7 +573,7 @@ const Tasks = ({
             />
           </section>
 
-          <section className="mt-5 space-y-4">
+          <section className="mt-4 space-y-3">
             {errorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
                 {errorMessage}
@@ -605,12 +605,12 @@ const Tasks = ({
           </section>
 
           {!isLoading && visibleTasks.length > 0 && (
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-5">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
               <button
                 type="button"
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                 disabled={safePage === 1}
-                className="grid h-11 w-11 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
                 aria-label="Previous page"
               >
                 <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
@@ -618,7 +618,7 @@ const Tasks = ({
                 </svg>
               </button>
 
-              <span className="grid h-11 min-w-11 place-items-center rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-4 text-base font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.25)]">
+              <span className="grid h-9 min-w-9 place-items-center rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.25)]">
                 {safePage}
               </span>
 
@@ -626,7 +626,7 @@ const Tasks = ({
                 type="button"
                 onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                 disabled={safePage === totalPages}
-                className="grid h-11 w-11 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
                 aria-label="Next page"
               >
                 <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
@@ -639,7 +639,7 @@ const Tasks = ({
                 <select
                   value={pageSize}
                   onChange={(event) => setPageSize(Number(event.target.value))}
-                  className="h-11 rounded-lg border border-pink-100 bg-white px-4 text-sm font-semibold text-neutral-900 shadow-[0_3px_4px_rgba(190,65,158,0.12)] outline-none focus:border-[#db4ab5] dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
+                  className="h-9 rounded-lg border border-pink-100 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-[0_3px_4px_rgba(190,65,158,0.12)] outline-none focus:border-[#db4ab5] dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
                 >
                   {pageSizeOptions.map((option) => (
                     <option key={option} value={option}>

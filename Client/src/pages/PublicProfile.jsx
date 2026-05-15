@@ -160,9 +160,9 @@ const PostPreview = ({
   replyDrafts,
   visibleReplies,
 }) => (
-  <article className="rounded-lg bg-white p-5 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-    <div className="flex items-center gap-4">
-      <Avatar user={post.author} size="h-10 w-10" />
+  <article className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
+    <div className="flex items-center gap-3">
+      <Avatar user={post.author} size="h-9 w-9" />
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <h3 className="text-sm font-bold text-neutral-950">
           {getUserName(post.author)}
@@ -177,7 +177,7 @@ const PostPreview = ({
       </div>
     </div>
 
-    <div className="mt-3 pl-14">
+    <div className="mt-3 pl-12">
       {post.content && (
         <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-800">
           {post.content}
@@ -185,25 +185,25 @@ const PostPreview = ({
       )}
 
       {post.media?.url && (
-        <div className="mt-4 overflow-hidden rounded-lg border border-neutral-200">
+        <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200">
           {post.media.type === "image" ? (
             <img
               src={post.media.url}
               alt={post.media.name || "Post media"}
-              className="max-h-[520px] w-full bg-neutral-50 object-contain"
+              className="max-h-[440px] w-full bg-neutral-50 object-contain"
             />
           ) : (
             <video
               src={post.media.url}
               controls
-              className="max-h-[520px] w-full bg-black"
+              className="max-h-[440px] w-full bg-black"
             />
           )}
         </div>
       )}
     </div>
 
-    <div className="mt-4 flex items-center gap-3 border-y border-neutral-100 py-3">
+    <div className="mt-3 flex items-center gap-3 border-y border-neutral-100 py-2.5">
       <button
         type="button"
         onClick={onToggleHeart}
@@ -228,7 +228,7 @@ const PostPreview = ({
     </div>
 
     {isCommentsVisible && (
-      <div className="mt-4 space-y-4">
+      <div className="mt-3 space-y-3">
         {post.comments.map((comment) => {
           const commentId = comment._id || comment.id;
           const canDeleteComment =
@@ -240,10 +240,10 @@ const PostPreview = ({
           const areRepliesVisible = visibleReplies[commentId] === true;
 
           return (
-            <div key={commentId} className="space-y-3">
+            <div key={commentId} className="space-y-2.5">
               <div className="flex gap-3">
                 <Avatar user={comment.user} size="h-8 w-8" />
-                <div className="flex-1 rounded-lg bg-neutral-50 px-4 py-3">
+                <div className="flex-1 rounded-lg bg-neutral-50 px-3.5 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-xs font-bold text-neutral-900">
                       {getUserName(comment.user)}
@@ -295,11 +295,11 @@ const PostPreview = ({
               {areRepliesVisible && (
                 <>
                   {comment.replies.length > 0 && (
-                    <div className="ml-11 space-y-3">
+                    <div className="ml-11 space-y-2.5">
                       {comment.replies.map((reply) => (
                         <div key={reply._id || reply.id} className="flex gap-3">
                           <Avatar user={reply.user} size="h-7 w-7" />
-                          <div className="flex-1 rounded-lg bg-white px-4 py-3 ring-1 ring-neutral-100">
+                          <div className="flex-1 rounded-lg bg-white px-3.5 py-2.5 ring-1 ring-neutral-100">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-xs font-bold text-neutral-900">
                                 {getUserName(reply.user)}
@@ -344,7 +344,7 @@ const PostPreview = ({
       </div>
     )}
 
-    <form onSubmit={onSubmitComment} className="mt-4 flex gap-3">
+    <form onSubmit={onSubmitComment} className="mt-3 flex gap-3">
       <Avatar user={currentUser} size="h-8 w-8" />
       <input
         type="text"
@@ -352,11 +352,11 @@ const PostPreview = ({
         onChange={(event) => onCommentChange(event.target.value)}
         placeholder="Write a comment..."
         maxLength={500}
-        className="h-10 flex-1 rounded-lg border border-neutral-300 bg-transparent px-4 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+        className="h-9 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
       />
       <button
         type="submit"
-        className="h-10 rounded-lg bg-[#dc4fb2] px-4 text-sm font-semibold text-white transition hover:brightness-105"
+        className="h-9 rounded-lg bg-[#dc4fb2] px-3 text-xs font-semibold text-white transition hover:brightness-105"
       >
         Comment
       </button>
@@ -647,7 +647,7 @@ const PublicProfile = () => {
         onLogout={() => setIsLogoutDialogOpen(true)}
         onNavigate={handleNavigate}
       >
-        <div className="w-full space-y-5">
+        <div className="w-full space-y-4">
 
         {errorMessage && (
           <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
@@ -657,7 +657,7 @@ const PublicProfile = () => {
 
         {isLoading && (
           <>
-            <section className="rounded-lg bg-white p-6 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
+            <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
               <ProfileSkeleton />
             </section>
             <FeedSkeleton />
@@ -665,16 +665,16 @@ const PublicProfile = () => {
         )}
 
         {!isLoading && !profileUser && (
-          <p className="rounded-lg bg-white px-5 py-8 text-center text-sm font-medium text-neutral-600 shadow-[0_2px_6px_rgba(219,39,119,0.18)] ring-1 ring-pink-50">
+          <p className="rounded-2xl border border-pink-100 bg-white px-4 py-6 text-center text-sm font-medium text-neutral-600 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
             Profile not found.
           </p>
         )}
 
         {!isLoading && profileUser && (
-          <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-            <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-              <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-                <div className="h-32 bg-pink-50">
+          <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+            <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+              <section className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
+                <div className="h-28 bg-pink-50">
                   <img
                     src={profileUser.coverPhoto || defaultCoverPhoto}
                     alt=""
@@ -682,30 +682,30 @@ const PublicProfile = () => {
                     aria-hidden="true"
                   />
                 </div>
-                <div className="px-6 pb-6 text-center">
-                  <div className="relative -mt-14 inline-block">
-                    <Avatar user={profileUser} size="h-28 w-28" />
-                    <span className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-white bg-emerald-500" />
+                <div className="px-4 pb-4 text-center">
+                  <div className="relative -mt-11 inline-block">
+                    <Avatar user={profileUser} size="h-20 w-20" />
+                    <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
                   </div>
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <h1 className="text-2xl font-black leading-tight text-[#10142d]">
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <h1 className="text-xl font-black leading-tight text-[#10142d]">
                       {getUserName(profileUser)}
                     </h1>
                     <CountryBadge user={profileUser} />
                   </div>
-                  <span className="mt-3 inline-flex rounded-full bg-pink-50 px-4 py-1 text-xs font-black uppercase text-[#c72fb2]">
+                  <span className="mt-2 inline-flex rounded-full bg-pink-50 px-3 py-1 text-[11px] font-black uppercase text-[#c72fb2]">
                     {profileUser.role || "user"}
                   </span>
-                  <p className="mt-5 text-sm font-black text-[#10142d]">
+                  <p className="mt-4 text-sm font-black text-[#10142d]">
                     {profileUser.position || profileUser.companyName || "System Administrator"}
                   </p>
-                  <p className="mx-auto mt-2 max-w-[210px] text-sm font-medium leading-6 text-slate-500">
+                  <p className="mx-auto mt-1.5 max-w-[210px] text-xs font-medium leading-5 text-slate-500">
                     Managing the system and ensuring everything runs smoothly.
                   </p>
 
-                  <div className="mt-6 space-y-4 border-y border-pink-50 py-5 text-left text-sm font-semibold text-slate-600">
+                  <div className="mt-4 space-y-3 border-y border-pink-50 py-4 text-left text-xs font-semibold text-slate-600">
                     <p className="flex items-center gap-3">
-                      <img src={companyIcon} alt="" className="h-5 w-5 object-contain" />
+                      <img src={companyIcon} alt="" className="h-4 w-4 object-contain" />
                       {profileUser.companyName || "Clientra"}
                     </p>
                     {profileUser.email && (
@@ -715,7 +715,7 @@ const PublicProfile = () => {
                         rel="noreferrer"
                         className="flex items-center gap-3 transition hover:text-[#c72fb2]"
                       >
-                        <img src={emailIcon} alt="" className="h-5 w-5 object-contain" />
+                        <img src={emailIcon} alt="" className="h-4 w-4 object-contain" />
                         {profileUser.email}
                       </a>
                     )}
@@ -724,13 +724,13 @@ const PublicProfile = () => {
                         href={`tel:${profileUser.phone}`}
                         className="flex items-center gap-3 transition hover:text-[#c72fb2]"
                       >
-                        <img src={phoneIcon} alt="" className="h-5 w-5 object-contain" />
+                        <img src={phoneIcon} alt="" className="h-4 w-4 object-contain" />
                         {profileUser.phone}
                       </a>
                     )}
                   </div>
 
-                  <div className="mt-5 border-b border-pink-50 pb-5 text-left text-sm font-semibold text-slate-600">
+                  <div className="mt-4 border-b border-pink-50 pb-4 text-left text-xs font-semibold text-slate-600">
                     <p className="flex items-start gap-3">
                       <span className="mt-0.5 grid h-5 w-5 place-items-center rounded-md border border-slate-200 text-xs text-slate-500">
                         +
@@ -748,7 +748,7 @@ const PublicProfile = () => {
                     <button
                       type="button"
                       onClick={() => handleNavigate("profile")}
-                      className="mt-5 h-11 w-full rounded-lg border border-[#c72fb2] text-sm font-black text-[#c72fb2] transition hover:bg-pink-50"
+                      className="mt-4 h-9 w-full rounded-lg border border-[#c72fb2] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
                     >
                       Edit Profile
                     </button>
@@ -756,8 +756,8 @@ const PublicProfile = () => {
                 </div>
               </section>
 
-              <section className="rounded-2xl bg-white p-5 shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-                <h2 className="mb-5 text-sm font-black text-[#10142d]">
+              <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
+                <h2 className="mb-3 text-sm font-black text-[#10142d]">
                   Profile Overview
                 </h2>
                 {[
@@ -775,10 +775,10 @@ const PublicProfile = () => {
                 ].map(([label, value, tone]) => (
                   <div
                     key={label}
-                    className="flex items-center justify-between border-b border-pink-50 py-3 last:border-b-0"
+                    className="flex items-center justify-between border-b border-pink-50 py-2.5 last:border-b-0"
                   >
                     <span className="flex items-center gap-3 text-sm font-semibold text-slate-600">
-                      <span className={`grid h-9 w-9 place-items-center rounded-lg text-xs font-black ${tone}`}>
+                      <span className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-black ${tone}`}>
                         {label === "Posts" ? "P" : label === "Likes Received" ? "L" : "C"}
                       </span>
                       {label}
@@ -789,16 +789,16 @@ const PublicProfile = () => {
               </section>
             </aside>
 
-            <section className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_8px_rgba(190,65,158,0.25)] ring-1 ring-pink-50">
-              <div className="flex border-b border-pink-50 px-7">
+            <section className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
+              <div className="flex border-b border-pink-50 px-5">
                 {["Newsfeed", "About"].map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setActiveProfileTab(tab)}
-                    className={`h-16 px-7 text-sm font-black ${
+                    className={`h-12 px-5 text-sm font-black ${
                       activeProfileTab === tab
-                        ? "border-b-4 border-[#7427ff] text-[#7427ff]"
+                        ? "border-b-2 border-[#7427ff] text-[#7427ff]"
                         : "text-slate-500 hover:text-[#c72fb2]"
                     }`}
                   >
@@ -807,18 +807,18 @@ const PublicProfile = () => {
                 ))}
               </div>
 
-              <div className="p-6">
+              <div className="p-5">
                 {activeProfileTab === "Newsfeed" ? (
                   <>
-                    <h2 className="mb-5 text-lg font-black text-[#10142d]">
+                    <h2 className="mb-4 text-base font-black text-[#10142d]">
                       Newsfeed Posts
                     </h2>
                     {userPosts.length === 0 ? (
-                      <p className="rounded-lg bg-white px-5 py-8 text-center text-sm font-medium text-neutral-600 shadow-[0_2px_6px_rgba(219,39,119,0.18)] ring-1 ring-pink-50">
+                      <p className="rounded-2xl border border-pink-100 bg-white px-4 py-6 text-center text-sm font-medium text-neutral-600 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-100/70">
                         No newsfeed posts yet.
                       </p>
                     ) : (
-                      <div className="space-y-5">
+                      <div className="space-y-4">
                         {userPosts.map((post) => {
                           const hasHearted = post.hearts.some(
                             (heart) => getEntityId(heart) === getEntityId(user)
@@ -856,8 +856,8 @@ const PublicProfile = () => {
                     )}
                   </>
                 ) : (
-                  <div className="space-y-6">
-                    <h2 className="text-lg font-black text-[#10142d]">About</h2>
+                  <div className="space-y-4">
+                    <h2 className="text-base font-black text-[#10142d]">About</h2>
                     <div className="grid gap-4 md:grid-cols-2">
                       {[
                         ["Full Name", getUserName(profileUser)],
@@ -869,15 +869,15 @@ const PublicProfile = () => {
                         ["Joined", formatJoinedDate(profileUser.createdAt)],
                         ["Country", getUserCountry(profileUser) || "Not specified"],
                       ].map(([label, value]) => (
-                        <div key={label} className="rounded-xl border border-pink-50 bg-[#fffafd] px-5 py-4">
+                        <div key={label} className="rounded-xl border border-pink-50 bg-[#fffafd] px-4 py-3">
                           <p className="text-xs font-black uppercase text-slate-400">{label}</p>
-                          <p className="mt-2 text-sm font-black text-[#10142d]">{value}</p>
+                          <p className="mt-1.5 text-sm font-black text-[#10142d]">{value}</p>
                         </div>
                       ))}
                     </div>
-                    <div className="rounded-xl border border-pink-50 bg-[#fffafd] px-5 py-4">
+                    <div className="rounded-xl border border-pink-50 bg-[#fffafd] px-4 py-3">
                       <p className="text-xs font-black uppercase text-slate-400">Bio</p>
-                      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                      <p className="mt-1.5 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
                         Managing the system and ensuring everything runs smoothly.
                       </p>
                     </div>

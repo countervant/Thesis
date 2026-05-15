@@ -67,7 +67,7 @@ const timelineTasks = [
 
 const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
 const dashboardCardShadow =
-  "border-b-2 border-b-[#e347b3] shadow-[0_3px_4px_rgba(190,65,158,0.35)]";
+  "border-b-2 border-b-[#f7b7e6] shadow-[0_3px_4px_rgba(190,65,158,0.16),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-100/70";
 const statStyles = {
   in_progress: { tile: "bg-[#f0e9ff]", text: "text-[#754de8]" },
   pending: { tile: "bg-[#ffeaf5]", text: "text-[#e347a8]" },
@@ -311,27 +311,27 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
 };
 
 const Avatar = ({ name }) => (
-  <InitialsAvatar className="h-9 w-9" name={name} textClassName="text-xs" />
+  <InitialsAvatar className="h-8 w-8" name={name} textClassName="text-xs" />
 );
 
 const StatCard = ({ item }) => {
   const style = statStyles[item.key] || statStyles.in_progress;
 
   return (
-  <section className={`flex h-32 items-center gap-7 rounded-2xl border border-pink-100 bg-white px-8 ${dashboardCardShadow}`}>
-    <span className={`grid h-20 w-20 shrink-0 place-items-center rounded-3xl ${style.tile}`}>
-      <Icon name={item.icon} className={`h-14 w-14 ${style.text}`} />
+  <section className={`flex h-24 items-center gap-4 rounded-2xl border border-pink-100 bg-white px-5 ${dashboardCardShadow}`}>
+    <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${style.tile}`}>
+      <Icon name={item.icon} className={`h-9 w-9 ${style.text}`} />
     </span>
     <div className="leading-tight">
-      <p className="text-4xl font-extrabold text-[#10172a] dark:text-white">{item.value}</p>
-      <p className="mt-3 text-base font-medium text-slate-500 dark:text-neutral-100">{item.label}</p>
+      <p className="text-2xl font-extrabold text-[#10172a] dark:text-white">{item.value}</p>
+      <p className="mt-1.5 text-xs font-semibold text-slate-500 dark:text-neutral-100">{item.label}</p>
     </div>
   </section>
   );
 };
 
 const ProgressRing = ({ value }) => (
-  <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#a8a2ff] text-[10px] font-semibold text-[#9b91ff]">
+  <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-[#a8a2ff] text-[9px] font-semibold text-[#9b91ff]">
     {value}
   </span>
 );
@@ -354,7 +354,7 @@ const MonthlyChart = ({ tasks }) => {
   );
   const visibleWeekCount = Math.max(3, Math.ceil((latestDueDayOffset + 1) / 7));
   const visibleDayCount = visibleWeekCount * 7;
-  const chartMinWidth = Math.max(720, visibleDayCount * 34);
+  const chartMinWidth = Math.max(660, visibleDayCount * 30);
   const chartWeeks = Array.from({ length: visibleWeekCount }, (_, index) => index * 7).map((dayOffset) =>
     formatWeekLabel(addDays(timelineStart, dayOffset))
   );
@@ -385,23 +385,23 @@ const MonthlyChart = ({ tasks }) => {
   const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
 
   return (
-  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white px-7 py-7 ${dashboardCardShadow}`}>
-    <div className="mb-6 flex items-center justify-between gap-4">
-      <h2 className="text-xl font-extrabold text-[#10172a] dark:text-white">Monthly Overview</h2>
+  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white px-5 py-5 ${dashboardCardShadow}`}>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Monthly Overview</h2>
     </div>
-    <div className="grid grid-cols-[210px_1fr] overflow-x-auto">
-      <div className="border-r border-slate-200 pr-5">
-        <p className="h-13 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-white">
+    <div className="grid grid-cols-[178px_1fr] overflow-x-auto">
+      <div className="border-r border-slate-200 pr-4">
+        <p className="h-10 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-white">
           Tasks
         </p>
         {visibleTasks.slice(0, 4).map((task, index) => (
           <div
             key={task.name}
-            className="grid h-13 grid-cols-[1fr_26px_34px] items-center gap-3 text-sm text-[#10172a] dark:text-white"
+            className="grid h-10 grid-cols-[1fr_22px_30px] items-center gap-2 text-xs text-[#10172a] dark:text-white"
           >
-            <span className="flex min-w-0 items-center gap-3 font-semibold">
+            <span className="flex min-w-0 items-center gap-2 font-semibold">
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                className="h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: colors[index % colors.length] }}
               />
               <span className="truncate">
@@ -416,15 +416,15 @@ const MonthlyChart = ({ tasks }) => {
 
       <div style={{ minWidth: `${chartMinWidth}px` }}>
         <div
-          className="grid h-13 border-b border-neutral-100"
+          className="grid h-10 border-b border-neutral-100"
           style={{ gridTemplateColumns: `repeat(${visibleWeekCount}, minmax(0, 1fr))` }}
         >
           {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
-              <p className="text-center text-sm font-semibold text-[#10172a] dark:text-white">
+              <p className="text-center text-xs font-semibold text-[#10172a] dark:text-white">
                 {week}
               </p>
-              <div className="mt-3 grid grid-cols-7 text-center text-xs font-bold text-slate-500 dark:text-white">
+              <div className="mt-2 grid grid-cols-7 text-center text-[10px] font-bold text-slate-500 dark:text-white">
                 {timelineDays.map((day, index) => (
                   <span key={`${week}-${day}-${index}`}>{day}</span>
                 ))}
@@ -444,18 +444,18 @@ const MonthlyChart = ({ tasks }) => {
             {visibleTasks.slice(0, 4).map((task) => (
               <div
                 key={task.name}
-                className="relative h-13 border-b border-neutral-100 last:border-b-0"
+                className="relative h-10 border-b border-neutral-100 last:border-b-0"
               >
                 {task.segments.map((segment, index) => (
                   <div
                     key={`${task.name}-${index}`}
-                    className={`absolute top-1/2 h-7 -translate-y-1/2 rounded-lg shadow-sm ${
+                    className={`absolute top-1/2 h-5 -translate-y-1/2 rounded-md shadow-sm ${
                       segment.diamond ? "aspect-square rotate-45" : ""
                     }`}
                     style={{
                       left: `${(segment.start / visibleDayCount) * 100}%`,
                       width: segment.diamond
-                        ? "30px"
+                        ? "22px"
                         : `${(segment.width / visibleDayCount) * 100}%`,
                       background: segment.striped
                         ? `repeating-linear-gradient(45deg, ${segment.color} 0, ${segment.color} 2px, rgba(255,255,255,0.65) 2px, rgba(255,255,255,0.65) 5px)`
@@ -537,15 +537,15 @@ const ExpenseChart = ({ budgetEntries }) => {
     }).format(Math.abs(Number(amount) || 0));
 
   return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-8 py-7 ${dashboardCardShadow}`}>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-5 ${dashboardCardShadow}`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
         <label className="relative">
           <span className="sr-only">Filter expense categories by month</span>
           <select
             value={selectedMonth}
             onChange={(event) => setSelectedMonth(event.target.value)}
-            className="h-10 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:text-white"
+            className="h-9 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-9 text-xs font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:text-white"
           >
             {monthOptions.map((month) => (
               <option key={month} value={month}>
@@ -567,19 +567,19 @@ const ExpenseChart = ({ budgetEntries }) => {
         </label>
       </div>
       <div
-        className="relative mx-auto grid h-60 w-60 place-items-center rounded-full"
+        className="relative mx-auto grid h-44 w-44 place-items-center rounded-full"
         style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
       >
-        <div className="grid h-32 w-32 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-neutral-950">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-neutral-950">
           <span>
-            <span className="block text-xs font-semibold text-slate-500 dark:text-white">Total Expenses</span>
-            <span className="mt-1 block text-2xl font-extrabold text-[#10172a] dark:text-white">
+            <span className="block text-[10px] font-semibold text-slate-500 dark:text-white">Total Expenses</span>
+            <span className="mt-1 block text-lg font-extrabold text-[#10172a] dark:text-white">
               {formatPeso(total)}
             </span>
           </span>
         </div>
       </div>
-      <div className="mt-5 space-y-3 text-sm text-[#10172a] dark:text-white">
+      <div className="mt-4 space-y-2 text-xs text-[#10172a] dark:text-white">
       {expenseCategories.length === 0 && (
           <span className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
@@ -587,10 +587,10 @@ const ExpenseChart = ({ budgetEntries }) => {
           </span>
         )}
         {expenseCategories.map((category) => (
-          <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
-            <span className="flex min-w-0 items-center gap-3">
+          <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-3">
+            <span className="flex min-w-0 items-center gap-2">
             <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: category.color }}
             />
               <span className="truncate font-semibold">{category.label}</span>
@@ -608,11 +608,11 @@ const ExpenseChart = ({ budgetEntries }) => {
 
 const EmployeeTable = ({ title, employees, tone = "violet" }) => (
   <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
-    <div className="flex items-center justify-between px-7 pt-6">
-      <h2 className="flex items-center gap-2 text-xl font-extrabold text-[#10172a] dark:text-white">
+    <div className="flex items-center justify-between px-5 pt-4">
+      <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
         {title}
         <span
-          className={`grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm ${
+          className={`grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs ${
             tone === "pink" ? "bg-pink-100 text-pink-500" : "bg-violet-100 text-violet-600"
           }`}
         >
@@ -620,19 +620,19 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
         </span>
       </h2>
     </div>
-    <table className="mt-4 w-full text-left text-sm text-[#10172a] dark:text-white">
+    <table className="mt-3 w-full text-left text-xs text-[#10172a] dark:text-white">
       <thead className="border-b border-slate-100 text-slate-500 dark:text-white">
         <tr>
-          <th className="px-7 py-3 font-extrabold">Employee</th>
-          <th className="px-3 py-3 font-extrabold">Job</th>
-          <th className="px-3 py-3 font-extrabold">Client</th>
-          <th className="px-3 py-3 font-extrabold">{tone === "pink" ? "Status" : "Date"}</th>
+          <th className="px-5 py-2.5 font-extrabold">Employee</th>
+          <th className="px-3 py-2.5 font-extrabold">Job</th>
+          <th className="px-3 py-2.5 font-extrabold">Client</th>
+          <th className="px-3 py-2.5 font-extrabold">{tone === "pink" ? "Status" : "Date"}</th>
         </tr>
       </thead>
       <tbody>
         {employees.length === 0 && (
           <tr>
-            <td colSpan="4" className="px-5 py-6 text-center text-neutral-500 dark:text-white">
+            <td colSpan="4" className="px-5 py-5 text-center text-neutral-500 dark:text-white">
               No employees to show.
             </td>
           </tr>
@@ -640,17 +640,17 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
 
         {employees.map((employee, index) => (
           <tr key={`${title}-${index}`}>
-            <td className="px-7 py-3">
-              <div className="flex items-center gap-4">
+            <td className="px-5 py-2.5">
+              <div className="flex items-center gap-3">
                 <Avatar name={employee.name} />
                 <span className="font-semibold">{employee.name}</span>
               </div>
             </td>
-            <td className="px-3 py-3 font-medium">{employee.job}</td>
-            <td className="px-3 py-3 font-medium">{employee.client}</td>
-            <td className="px-3 py-3 font-medium">
+            <td className="px-3 py-2.5 font-medium">{employee.job}</td>
+            <td className="px-3 py-2.5 font-medium">{employee.client}</td>
+            <td className="px-3 py-2.5 font-medium">
               {employee.date === "Available" ? (
-                <span className="rounded-full bg-green-100 px-4 py-1 font-bold text-green-600">
+                <span className="rounded-full bg-green-100 px-3 py-1 text-[11px] font-bold text-green-600">
                   Available
                 </span>
               ) : (
@@ -699,29 +699,29 @@ const RecentActivities = ({ tasks, employees }) => {
   const visibleActivities = activities.length > 0 ? activities : fallbackActivities;
 
   return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-7 py-6 ${dashboardCardShadow}`}>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="flex items-center gap-3 text-xl font-extrabold text-[#10172a] dark:text-white">
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
           <span className="text-[#c72fb2]">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
               <path d="M4 13h4l2-7 4 14 2-7h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
           Recent Activities
         </h2>
-        <button type="button" className="text-sm font-black text-pink-600 transition hover:text-pink-700">
+        <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
           View all
         </button>
       </div>
       <div className="divide-y divide-slate-100">
         {visibleActivities.map((activity, index) => (
-          <div key={`${activity.name}-${index}`} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+          <div key={`${activity.name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
             <Avatar name={activity.name} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-black text-[#10172a] dark:text-white">
+              <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
                 {activity.name} <span className="font-semibold">{activity.text}</span>
               </span>
-              <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-white">
+              <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-white">
                 {typeof activity.time === "string" && activity.time.includes(" at ")
                   ? activity.time
                   : formatDate(activity.time)}
@@ -741,16 +741,16 @@ const OnlineTeam = ({ employees }) => {
   const visibleEmployees = onlineEmployees;
 
   return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-7 py-6 ${dashboardCardShadow}`}>
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="flex items-center gap-3 text-xl font-extrabold text-[#10172a] dark:text-white">
-          <span className="h-3 w-3 rounded-full bg-emerald-500" />
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
           Online Team
-          <span className="grid h-7 min-w-7 place-items-center rounded-full bg-violet-100 px-2 text-sm font-black text-violet-600">
+          <span className="grid h-6 min-w-6 place-items-center rounded-full bg-violet-100 px-2 text-xs font-black text-violet-600">
             {visibleEmployees.length}
           </span>
         </h2>
-        <button type="button" className="text-sm font-black text-pink-600 transition hover:text-pink-700">
+        <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
           View all
         </button>
       </div>
@@ -764,17 +764,17 @@ const OnlineTeam = ({ employees }) => {
           const name = getUserName(employee);
 
           return (
-            <div key={`${name}-${index}`} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+            <div key={`${name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
               <Avatar name={name} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-black text-[#10172a] dark:text-white">
+                <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
                   {name}
                 </span>
-                <span className="block truncate text-xs font-semibold text-slate-500 dark:text-white">
+                <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
                   {employee.position || "Team Member"}
                 </span>
               </span>
-              <span className="h-3 w-3 rounded-full bg-emerald-500" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
             </div>
           );
         })}
@@ -875,7 +875,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }
 
   return (
-        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}
@@ -884,36 +884,36 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
           {activeTopTab === "dashboard" && (
             <>
-              <header>
-                <p className="text-base font-black text-[#10172a] dark:text-white">
+              <header className="pb-1">
+                <p className="text-sm font-black text-[#10172a] dark:text-white">
            
                   Welcome back, {getUserName(user)}!
                 </p>
                 <h1
-                  className="mt-1 text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+                  className="mt-1 text-3xl uppercase leading-none text-neutral-950 dark:text-white"
                   style={{ fontFamily: "var(--font-bruno)" }}
                 >
                   Dashboard
                 </h1>
               </header>
 
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {stats.map((item) => (
                   <StatCard key={item.label} item={item} />
                 ))}
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-[1.85fr_0.98fr]">
+              <div className="grid gap-4 xl:grid-cols-[1.85fr_0.82fr]">
                 <MonthlyChart tasks={tasks} />
                 <ExpenseChart budgetEntries={budgetEntries} />
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-2">
+              <div className="grid gap-4 xl:grid-cols-2">
                 <EmployeeTable title="Working" employees={workingEmployees} />
                 <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-[1.6fr_0.85fr]">
+              <div className="grid gap-4 xl:grid-cols-[1.6fr_0.85fr]">
                 <RecentActivities tasks={tasks} employees={employees} />
                 <OnlineTeam employees={employees} />
               </div>
