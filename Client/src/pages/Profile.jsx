@@ -310,7 +310,12 @@ const Profile = ({ embedded = false }) => {
   const content = (
     <main className={embedded ? "w-full" : "w-full px-5 py-10"}>
       <div className="mb-7">
-        <h1 className="text-4xl font-black tracking-tight text-[#10142d]">Edit Profile</h1>
+        <h1
+          className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+          style={{ fontFamily: "var(--font-bruno)" }}
+        >
+          Edit Profile
+        </h1>
         <p className="mt-3 text-base font-semibold text-slate-500">
           Manage your personal information and account settings.
         </p>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import budgetIcon from "../assets/budget.png";
+import calendarIcon from "../assets/calendar.png";
 import clientIcon from "../assets/client.png";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import dashboardIcon from "../assets/dashboard.png";
@@ -50,6 +51,7 @@ const sideNavSections = [
 
 const navIcons = {
   budget: budgetIcon,
+  calendar: calendarIcon,
   client: clientIcon,
   dashboard: dashboardIcon,
   employee: employeeIcon,

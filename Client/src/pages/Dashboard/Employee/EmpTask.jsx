@@ -131,7 +131,12 @@ const EmpTask = () => {
     <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-[#10142d]">My Tasks</h1>
+          <h1
+            className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+            style={{ fontFamily: "var(--font-bruno)" }}
+          >
+            My Tasks
+          </h1>
           <p className="mt-2 text-sm font-semibold text-slate-500">
             Manage your tasks and stay on top of your work.
           </p>

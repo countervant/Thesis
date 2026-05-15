@@ -4,6 +4,7 @@ import emojiIcon from "../assets/emoji.png";
 import heartIcon from "../assets/heart.png";
 import insertImageIcon from "../assets/insertimage.png";
 import redHeartIcon from "../assets/redheart.png";
+import sendIcon from "../assets/send.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI, newsfeedAPI } from "../services/api.js";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -826,7 +827,7 @@ const Newsfeed = () => {
         visiblePosts.map((post) => {
           const hasHearted = post.hearts.some((heart) => getEntityId(heart) === userId);
           const areCommentsVisible = visibleComments[post.id] === true;
-          const shouldShowComments = areCommentsVisible || post.comments.length > 0;
+          const shouldShowComments = areCommentsVisible;
           const canDeletePost =
             user?.role === "admin" || getEntityId(post.author) === userId;
           const isPostMenuOpen = openPostMenuId === post.id;
@@ -1150,7 +1151,7 @@ const Newsfeed = () => {
                     onChange={(event) => handleCommentChange(post.id, event.target.value)}
                     placeholder="Write a comment..."
                     maxLength={500}
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 pr-20 text-sm font-semibold text-neutral-800 outline-none transition placeholder:text-slate-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                    className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 pr-28 text-sm font-semibold text-neutral-800 outline-none transition placeholder:text-slate-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
                   />
                   <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-3 text-slate-500">
                     <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600" aria-label="Add emoji">
@@ -1158,6 +1159,9 @@ const Newsfeed = () => {
                     </button>
                     <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600" aria-label="Add image">
                       <img src={insertImageIcon} alt="" className="h-4 w-4 object-contain" />
+                    </button>
+                    <button type="submit" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50" aria-label="Send comment">
+                      <img src={sendIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
                   </span>
                 </label>

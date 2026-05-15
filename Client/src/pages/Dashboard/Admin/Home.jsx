@@ -6,6 +6,7 @@ import done from "../../../assets/done.png";
 import { dashboardAPI, getApiErrorMessage } from "../../../services/api.js";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
+import { useAuth } from "../../../context/AuthContext.jsx";
 
 const statItems = [
   { key: "in_progress", label: "In Progress", icon: "progress" },
@@ -675,7 +676,115 @@ const PlaceholderPanel = ({ title, children }) => (
   </section>
 );
 
+const RecentActivities = ({ tasks, employees }) => {
+  const activities = [
+    ...employees.slice(0, 2).map((employee, index) => ({
+      name: getUserName(employee),
+      text: index === 0 ? "logged in" : "updated their profile",
+      time: employee.updatedAt || employee.createdAt,
+    })),
+    ...tasks.slice(0, 3).map((task) => ({
+      name: getUserName(task.assignedTo || task.createdBy),
+      text: `updated task "${task.title || "Untitled Task"}"`,
+      time: task.updatedAt || task.createdAt || task.dueDate,
+    })),
+  ].slice(0, 4);
+
+  const fallbackActivities = [
+    { name: "Luis Emmanuel Reyes", text: "logged in", time: "May 09, 2026 at 10:15 AM" },
+    { name: "Kate Valdez", text: 'updated task "SEO Audit"', time: "May 09, 2026 at 9:00 AM" },
+    { name: "Maria Santos", text: 'posted announcement "New Company Policy"', time: "May 09, 2026 at 8:45 AM" },
+    { name: "John Carlo", text: 'completed task "Oplan Launch 2"', time: "May 09, 2026 at 8:30 AM" },
+  ];
+  const visibleActivities = activities.length > 0 ? activities : fallbackActivities;
+
+  return (
+    <section className={`rounded-2xl border border-pink-100 bg-white px-7 py-6 ${dashboardCardShadow}`}>
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-3 text-xl font-extrabold text-[#10172a] dark:text-white">
+          <span className="text-[#c72fb2]">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
+              <path d="M4 13h4l2-7 4 14 2-7h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          Recent Activities
+        </h2>
+        <button type="button" className="text-sm font-black text-pink-600 transition hover:text-pink-700">
+          View all
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {visibleActivities.map((activity, index) => (
+          <div key={`${activity.name}-${index}`} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+            <Avatar name={activity.name} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-black text-[#10172a] dark:text-white">
+                {activity.name} <span className="font-semibold">{activity.text}</span>
+              </span>
+              <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-white">
+                {typeof activity.time === "string" && activity.time.includes(" at ")
+                  ? activity.time
+                  : formatDate(activity.time)}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const OnlineTeam = ({ employees }) => {
+  const onlineEmployees = employees
+    .filter((employee) => employee.isOnline === true)
+    .slice(0, 6);
+  const visibleEmployees = onlineEmployees;
+
+  return (
+    <section className={`rounded-2xl border border-pink-100 bg-white px-7 py-6 ${dashboardCardShadow}`}>
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-3 text-xl font-extrabold text-[#10172a] dark:text-white">
+          <span className="h-3 w-3 rounded-full bg-emerald-500" />
+          Online Team
+          <span className="grid h-7 min-w-7 place-items-center rounded-full bg-violet-100 px-2 text-sm font-black text-violet-600">
+            {visibleEmployees.length}
+          </span>
+        </h2>
+        <button type="button" className="text-sm font-black text-pink-600 transition hover:text-pink-700">
+          View all
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {visibleEmployees.length === 0 && (
+          <p className="py-6 text-center text-sm font-semibold text-slate-500 dark:text-white">
+            No online team members.
+          </p>
+        )}
+        {visibleEmployees.map((employee, index) => {
+          const name = getUserName(employee);
+
+          return (
+            <div key={`${name}-${index}`} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+              <Avatar name={name} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-black text-[#10172a] dark:text-white">
+                  {name}
+                </span>
+                <span className="block truncate text-xs font-semibold text-slate-500 dark:text-white">
+                  {employee.position || "Team Member"}
+                </span>
+              </span>
+              <span className="h-3 w-3 rounded-full bg-emerald-500" />
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
 const AdminDashboard = ({ activePage = "dashboard" }) => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
@@ -775,6 +884,19 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
           {activeTopTab === "dashboard" && (
             <>
+              <header>
+                <p className="text-base font-black text-[#10172a] dark:text-white">
+           
+                  Welcome back, {getUserName(user)}!
+                </p>
+                <h1
+                  className="mt-1 text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+                  style={{ fontFamily: "var(--font-bruno)" }}
+                >
+                  Dashboard
+                </h1>
+              </header>
+
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {stats.map((item) => (
                   <StatCard key={item.label} item={item} />
@@ -789,6 +911,11 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
               <div className="grid gap-6 xl:grid-cols-2">
                 <EmployeeTable title="Working" employees={workingEmployees} />
                 <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
+              </div>
+
+              <div className="grid gap-6 xl:grid-cols-[1.6fr_0.85fr]">
+                <RecentActivities tasks={tasks} employees={employees} />
+                <OnlineTeam employees={employees} />
               </div>
             </>
           )}

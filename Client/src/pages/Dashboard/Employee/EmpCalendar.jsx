@@ -80,7 +80,12 @@ const EmpCalendar = () => {
       <div className="mx-auto max-w-[1840px] space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black tracking-tight text-[#10142d]">Calendar</h1>
+            <h1
+              className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+              style={{ fontFamily: "var(--font-bruno)" }}
+            >
+              Calendar
+            </h1>
             <p className="mt-2 text-base font-semibold text-slate-500">
               Manage your schedule, events, and important deadlines.
             </p>
@@ -170,7 +175,6 @@ const EmpCalendar = () => {
                     <div className="space-y-1.5">
                       {events.map((event) => (
                         <div key={`${day}-${event.label}`} className={`relative truncate rounded-lg px-2.5 py-1.5 text-xs font-black ${event.color}`}>
-                          {event.badge && <span className="absolute -right-1 -top-4 grid h-8 w-8 place-items-center rounded-full bg-[#7b2cff] text-sm text-white">{event.badge}</span>}
                           <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current align-middle" />
                           {event.label}
                           {event.time && <span className="block pl-3 font-bold opacity-80">{event.time}</span>}
