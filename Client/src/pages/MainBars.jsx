@@ -347,7 +347,7 @@ const AccountMenuIcon = ({ src }) => (
 const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const isMessagesPage = activePage === "messages";
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { token, user } = useAuth();
   const visibleSideNavSections =
     user?.role === "employee"
       ? sideNavSections
@@ -423,7 +423,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   }, [activePage, newsfeedSearch]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!token || !userId) {
       setUnreadMessageCount(0);
       return undefined;
     }
@@ -456,7 +456,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       clearInterval(intervalId);
       closeMessages();
     };
-  }, [userId]);
+  }, [token, userId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
