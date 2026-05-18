@@ -71,16 +71,29 @@ const parseOrigins = (...values) =>
     .map(normalizeOrigin)
     .filter(Boolean);
 
+const parseOriginPatterns = (...values) =>
+  values
+    .filter(Boolean)
+    .flatMap((value) => value.split(","))
+    .map((pattern) => pattern.trim())
+    .filter(Boolean)
+    .map((pattern) => new RegExp(pattern));
+
 const allowedOrigins = [
   ...new Set([
     ...parseOrigins(process.env.CORS_ORIGINS, process.env.FRONTEND_URL),
     ...(isProduction ? [] : defaultOrigins),
   ]),
 ];
+const allowedOriginPatterns = parseOriginPatterns(process.env.CORS_ORIGIN_PATTERNS);
 
 console.log(
   "[startup] Allowed CORS origins:",
   allowedOrigins.length ? allowedOrigins.join(", ") : "same-origin only"
+);
+console.log(
+  "[startup] Allowed CORS origin patterns:",
+  allowedOriginPatterns.length ? allowedOriginPatterns.map((pattern) => pattern.source).join(", ") : "none"
 );
 
 app.use(
@@ -89,7 +102,11 @@ app.use(
     origin(origin, callback) {
       const normalizedOrigin = origin ? normalizeOrigin(origin) : "";
 
-      if (!origin || allowedOrigins.includes(normalizedOrigin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(normalizedOrigin) ||
+        allowedOriginPatterns.some((pattern) => pattern.test(normalizedOrigin))
+      ) {
         return callback(null, true);
       }
 
