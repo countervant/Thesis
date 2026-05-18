@@ -41,6 +41,19 @@ const getEntityId = (entity) => {
   return entity._id || entity.id || "";
 };
 
+const normalizeSubtasks = (subtasks = []) => {
+  if (!Array.isArray(subtasks)) return [{ title: "", completed: false }];
+
+  const normalizedSubtasks = subtasks.map((subtask) => ({
+    title: subtask?.title || "",
+    completed: Boolean(subtask?.completed),
+  }));
+
+  return normalizedSubtasks.length > 0
+    ? normalizedSubtasks
+    : [{ title: "", completed: false }];
+};
+
 const normalizeAssignees = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.assignees)) return data.assignees;
@@ -72,6 +85,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     dueDate: todayInputDate(),
     priority: "medium",
     assignedTo: getEntityId(user),
+    subtasks: [{ title: "", completed: false }],
   });
   const [assignees, setAssignees] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
@@ -125,6 +139,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       dueDate: toInputDate(task.dueDate),
       priority: task.priority || "medium",
       assignedTo: getEntityId(task.assignedTo) || getEntityId(user),
+      subtasks: normalizeSubtasks(task.subtasks),
     });
   }, [task, user]);
 
@@ -132,6 +147,32 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     setFormData((currentData) => ({
       ...currentData,
       [field]: value,
+    }));
+  };
+
+  const updateSubtask = (index, field, value) => {
+    setFormData((currentData) => ({
+      ...currentData,
+      subtasks: currentData.subtasks.map((subtask, currentIndex) =>
+        currentIndex === index ? { ...subtask, [field]: value } : subtask
+      ),
+    }));
+  };
+
+  const addSubtask = () => {
+    setFormData((currentData) => ({
+      ...currentData,
+      subtasks: [...currentData.subtasks, { title: "", completed: false }],
+    }));
+  };
+
+  const removeSubtask = (index) => {
+    setFormData((currentData) => ({
+      ...currentData,
+      subtasks:
+        currentData.subtasks.length > 1
+          ? currentData.subtasks.filter((_, currentIndex) => currentIndex !== index)
+          : [{ title: "", completed: false }],
     }));
   };
 
@@ -157,7 +198,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    if (isPastInputDate(formData.startDate) || isPastInputDate(formData.dueDate)) {
+    if ((!isEditing && isPastInputDate(formData.startDate)) || isPastInputDate(formData.dueDate)) {
       setErrorMessage("Past dates cannot be selected.");
       return;
     }
@@ -169,6 +210,18 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
 
     if (!formData.assignedTo) {
       setErrorMessage("Please choose who this task is assigned to.");
+      return;
+    }
+
+    const subtasks = formData.subtasks
+      .map((subtask) => ({
+        title: subtask.title.trim(),
+        completed: Boolean(subtask.completed),
+      }))
+      .filter((subtask) => subtask.title);
+
+    if (subtasks.length === 0) {
+      setErrorMessage("At least one subtask is required.");
       return;
     }
 
@@ -184,6 +237,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
         assignedTo: formData.assignedTo,
+        subtasks,
       };
 
       if (isEditing) {
@@ -249,15 +303,61 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             />
           </div>
 
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <FieldLabel>Subtasks</FieldLabel>
+              <button
+                type="button"
+                onClick={addSubtask}
+                className="h-8 rounded-lg bg-pink-50 px-3 text-xs font-black text-[#dc4fb2] transition hover:bg-pink-100"
+              >
+                Add Subtask
+              </button>
+            </div>
+            <div className="space-y-2">
+              {formData.subtasks.map((subtask, index) => (
+                <div key={index} className="grid gap-2 sm:grid-cols-[32px_minmax(0,1fr)_36px] sm:items-center">
+                  <label className="grid h-8 w-8 place-items-center">
+                    <span className="sr-only">Mark subtask complete</span>
+                    <input
+                      type="checkbox"
+                      checked={subtask.completed}
+                      onChange={(event) => updateSubtask(index, "completed", event.target.checked)}
+                      className="h-4 w-4 rounded border-neutral-300 accent-[#dc4fb2]"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    value={subtask.title}
+                    onChange={(event) => updateSubtask(index, "title", event.target.value)}
+                    placeholder={`Subtask ${index + 1}`}
+                    className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSubtask(index)}
+                    className="grid h-9 w-9 place-items-center rounded-lg text-pink-600 transition hover:bg-pink-50"
+                    aria-label={`Remove subtask ${index + 1}`}
+                  >
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                      <path d="M5 10h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="space-y-1">
               <FieldLabel>Start Date</FieldLabel>
               <input
                 type="date"
+                disabled={isEditing}
                 min={todayInputDate()}
                 value={formData.startDate}
                 onChange={(event) => updateField("startDate", event.target.value)}
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-300 dark:focus:ring-pink-950"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:border-neutral-700 dark:text-neutral-300 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-500 dark:focus:ring-pink-950"
               />
             </div>
 

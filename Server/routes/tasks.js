@@ -25,21 +25,47 @@ const taskQueryForUser = (user) => {
   };
 };
 
+const normalizeSubtasks = (subtasks = []) => {
+  if (!Array.isArray(subtasks)) return [];
+
+  return subtasks
+    .map((subtask) => ({
+      title: String(subtask?.title || "").trim(),
+      completed: Boolean(subtask?.completed),
+    }))
+    .filter((subtask) => subtask.title);
+};
+
+const getStatusFromSubtasks = (subtasks, fallbackStatus) => {
+  if (!subtasks.length) return fallbackStatus;
+
+  const completedCount = subtasks.filter((subtask) => subtask.completed).length;
+  if (completedCount === subtasks.length) return "done";
+  if (completedCount > 0) return "in_progress";
+  return "pending";
+};
+
 const normalizeTaskPayload = (body, userId) => {
   const title = body.title?.trim();
   const dueDate = body.dueDate ? new Date(body.dueDate) : null;
   const startDate = body.startDate ? new Date(body.startDate) : dueDate;
   const status = body.status || "in_progress";
   const priority = body.priority || "medium";
+  const subtasks = normalizeSubtasks(body.subtasks).map((subtask) => ({
+    ...subtask,
+    completed: status === "done" ? true : subtask.completed,
+  }));
+  const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
 
   return {
     title,
     description: body.description?.trim() || "",
     startDate,
     dueDate,
-    status: allowedStatuses.includes(status) ? status : "in_progress",
+    status: getStatusFromSubtasks(subtasks, fallbackStatus),
     priority: allowedPriorities.includes(priority) ? priority : "medium",
     assignedTo: body.assignedTo || userId,
+    subtasks,
   };
 };
 
@@ -98,6 +124,10 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Task title is required" });
     }
 
+    if (!payload.subtasks.length) {
+      return res.status(400).json({ message: "At least one subtask is required" });
+    }
+
     if (!payload.dueDate || Number.isNaN(payload.dueDate.getTime())) {
       return res.status(400).json({ message: "Valid due date is required" });
     }
@@ -152,6 +182,7 @@ router.put("/:id", protect, async (req, res) => {
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
         assignedTo: req.body.assignedTo ?? task.assignedTo,
+        subtasks: req.body.subtasks ?? task.subtasks,
       },
       req.user._id
     );
@@ -186,6 +217,7 @@ router.put("/:id", protect, async (req, res) => {
     task.status = payload.status;
     task.priority = payload.priority;
     task.assignedTo = payload.assignedTo;
+    task.subtasks = payload.subtasks;
     task.completedAt = payload.status === "done" ? task.completedAt || new Date() : undefined;
 
     await task.save();

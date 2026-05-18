@@ -1,66 +1,19 @@
-const stats = [
-  { label: "Total Events", value: "38", sublabel: "this month", tone: "violet", icon: "calendar" },
-  { label: "Meetings", value: "15", sublabel: "this month", tone: "orange", icon: "cup" },
-  { label: "Deadlines", value: "23", sublabel: "this month", tone: "green", icon: "check" },
-  { label: "On Leave", value: "12", sublabel: "today", tone: "pink", icon: "users" },
-  { label: "Holidays", value: "5", sublabel: "this month", tone: "blue", icon: "flag" },
-];
+import { useEffect, useMemo, useState } from "react";
+import { calendarAPI } from "../../../services/api.js";
 
-const calendarEvents = [
-  { day: 1, label: "Labor Day", time: "", color: "bg-emerald-50 text-emerald-700" },
-  { day: 4, label: "Team Meeting", time: "10:00 AM", color: "bg-orange-50 text-orange-700" },
-  { day: 5, label: "Project Deadline", time: "11:59 PM", color: "bg-blue-50 text-blue-700" },
-  { day: 6, label: "Client Call", time: "11:00 AM", color: "bg-orange-50 text-orange-700" },
-  { day: 7, label: "Marketing Sync", time: "02:00 PM", color: "bg-violet-50 text-violet-700" },
-  { day: 9, label: "Stand-up", time: "10:00 AM", color: "bg-pink-50 text-pink-700", badge: "9", more: 2 },
-  { day: 11, label: "Client Review", time: "01:00 PM", color: "bg-orange-50 text-orange-700" },
-  { day: 12, label: "UI/UX Review", time: "03:00 PM", color: "bg-blue-50 text-blue-700" },
-  { day: 12, label: "Leave (3)", time: "All Day", color: "bg-pink-50 text-pink-700" },
-  { day: 14, label: "Team Meeting", time: "10:00 AM", color: "bg-orange-50 text-orange-700" },
-  { day: 15, label: "Monthly Report", time: "05:00 PM", color: "bg-blue-50 text-blue-700" },
-  { day: 18, label: "Leave (3)", time: "All Day", color: "bg-pink-50 text-pink-700" },
-  { day: 19, label: "Client Call", time: "11:00 AM", color: "bg-orange-50 text-orange-700" },
-  { day: 20, label: "Website Deadline", time: "11:59 PM", color: "bg-blue-50 text-blue-700" },
-  { day: 21, label: "Sprint Planning", time: "10:00 AM", color: "bg-orange-50 text-orange-700" },
-  { day: 22, label: "Stand-up", time: "10:00 AM", color: "bg-pink-50 text-pink-700", more: 1 },
-  { day: 25, label: "Team Building", time: "All Day", color: "bg-emerald-50 text-emerald-700" },
-  { day: 26, label: "Client Meeting", time: "02:00 PM", color: "bg-orange-50 text-orange-700" },
-  { day: 28, label: "Marketing Plan", time: "11:00 AM", color: "bg-orange-50 text-orange-700" },
-  { day: 29, label: "Project Update", time: "04:00 PM", color: "bg-blue-50 text-blue-700" },
-  { day: 31, label: "Holiday", time: "", color: "bg-emerald-50 text-emerald-700" },
-];
-
-const upcomingEvents = [
-  { title: "Team Stand-up Meeting", time: "Today, 10:00 AM", tag: "Meeting", dot: "bg-violet-600", tagClass: "bg-violet-50 text-violet-700" },
-  { title: "Client Call", time: "Today, 11:00 AM", tag: "Meeting", dot: "bg-orange-500", tagClass: "bg-violet-50 text-violet-700" },
-  { title: "Project Deadline", time: "Tomorrow, 11:59 PM", tag: "Deadline", dot: "bg-blue-500", tagClass: "bg-blue-50 text-blue-700" },
-  { title: "Leave (3 employees)", time: "Tomorrow, All Day", tag: "Leave", dot: "bg-pink-500", tagClass: "bg-pink-50 text-pink-700" },
-  { title: "Marketing Sync", time: "May 07, 02:00 PM", tag: "Meeting", dot: "bg-orange-500", tagClass: "bg-violet-50 text-violet-700" },
-];
-
-const departments = [
+const baseDepartments = [
   ["All Departments", "bg-violet-600"],
-  ["Management", "bg-blue-500"],
-  ["Development", "bg-orange-500"],
-  ["Design", "bg-pink-500"],
-  ["Marketing", "bg-emerald-500"],
-  ["Sales", "bg-pink-400"],
-  ["Support", "bg-violet-600"],
 ];
+
+const departmentColors = ["bg-violet-600", "bg-blue-500", "bg-orange-500", "bg-pink-500", "bg-emerald-500", "bg-pink-400"];
 
 const calendarChecks = [
-  ["Company Events", "accent-violet-600"],
-  ["Meetings", "accent-orange-500"],
-  ["Deadlines", "accent-blue-500"],
-  ["Leaves", "accent-pink-500"],
-  ["Holidays", "accent-emerald-500"],
-  ["Birthdays", "accent-violet-500"],
-];
-
-const eventList = [
-  { title: "Team Stand-up Meeting", dot: "bg-violet-600", type: "Meeting", typeClass: "bg-orange-50 text-orange-600", date: "May 09, 2026", time: "10:00 AM - 11:00 AM", participants: ["AB", "JT", "MD", "SR"], extra: "+6", calendar: "Meetings", calendarClass: "bg-orange-50 text-orange-600" },
-  { title: "Client Call", dot: "bg-orange-500", type: "Meeting", typeClass: "bg-orange-50 text-orange-600", date: "May 09, 2026", time: "11:00 AM - 12:00 PM", participants: ["LC", "PV", "AG", "KM"], extra: "+2", calendar: "Meetings", calendarClass: "bg-orange-50 text-orange-600" },
-  { title: "Project Deadline", dot: "bg-blue-500", type: "Deadline", typeClass: "bg-violet-50 text-violet-700", date: "May 10, 2026", time: "11:59 PM", participants: ["PD"], extra: "Peejay David", calendar: "Deadlines", calendarClass: "bg-blue-50 text-blue-700" },
+  ["Company Events", "bg-violet-600"],
+  ["Meetings", "bg-orange-500"],
+  ["Deadlines", "bg-blue-500"],
+  ["Leaves", "bg-pink-500"],
+  ["Holidays", "bg-emerald-500"],
+  ["Birthdays", "bg-violet-500"],
 ];
 
 const toneStyles = {
@@ -70,6 +23,35 @@ const toneStyles = {
   pink: "bg-pink-50 text-pink-600",
   violet: "bg-violet-50 text-violet-600",
 };
+
+const typeStyles = {
+  "Company Event": "bg-violet-50 text-violet-700",
+  Meeting: "bg-orange-50 text-orange-600",
+  Deadline: "bg-violet-50 text-violet-700",
+  Leave: "bg-pink-50 text-pink-700",
+  Holiday: "bg-emerald-50 text-emerald-700",
+  Birthday: "bg-violet-50 text-violet-700",
+};
+
+const calendarStyles = {
+  "Company Events": "bg-violet-50 text-violet-700",
+  Meetings: "bg-orange-50 text-orange-600",
+  Deadlines: "bg-blue-50 text-blue-700",
+  Leaves: "bg-pink-50 text-pink-700",
+  Holidays: "bg-emerald-50 text-emerald-700",
+  Birthdays: "bg-violet-50 text-violet-700",
+};
+
+const dotStyles = {
+  blue: "bg-blue-500",
+  emerald: "bg-emerald-500",
+  orange: "bg-orange-500",
+  pink: "bg-pink-500",
+  violet: "bg-violet-600",
+};
+
+const getMonthOptions = (year) => Array.from({ length: 12 }, (_, index) => new Date(year, index, 1));
+const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const Card = ({ children, className = "" }) => (
   <section className={`rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.12),0_8px_24px_rgba(190,65,158,0.04)] ${className}`}>
@@ -92,19 +74,235 @@ const Icon = ({ name, className = "h-6 w-6" }) => {
   return <svg {...props}><path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 };
 
+const toDateKey = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const monthKey = (date) => `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}`;
+const sameMonth = (first, second) => first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth();
+const formatMonth = (date) => date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+const formatDate = (value) => new Date(value).toLocaleDateString("en-US", { month: "long", day: "2-digit", year: "numeric" });
+const addDays = (dateKey, days) => {
+  const date = new Date(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+};
+
+const getCalendarDays = (monthDate) => {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const firstCell = new Date(firstDay);
+  firstCell.setDate(firstDay.getDate() - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(firstCell);
+    date.setDate(firstCell.getDate() + index);
+    return date;
+  });
+};
+
+const normalizeEvent = (event) => ({
+  ...event,
+  id: event._id || event.id,
+  dateKey: toDateKey(event.date),
+  time: event.startTime === "All Day" ? "All Day" : [event.startTime, event.endTime].filter(Boolean).join(" - "),
+  dot: dotStyles[event.color || (event.type === "Deadline" ? "blue" : event.type === "Leave" ? "pink" : event.type === "Holiday" ? "emerald" : event.type === "Company Event" ? "emerald" : "orange")],
+  typeClass: typeStyles[event.type] || typeStyles.Meeting,
+  calendarClass: calendarStyles[event.calendar] || calendarStyles.Meetings,
+});
+
+const emptyEventForm = (date) => ({
+  id: "",
+  title: "",
+  date,
+  startTime: "09:00 AM",
+  endTime: "10:00 AM",
+  type: "Meeting",
+  calendar: "Meetings",
+  department: "All Departments",
+  participantsText: "",
+  color: "orange",
+  visibility: "all",
+});
+
+const Modal = ({ title, children, onClose }) => (
+  <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
+    <section className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-black text-[#10142d]">{title}</h2>
+        <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500">
+          x
+        </button>
+      </div>
+      {children}
+    </section>
+  </div>
+);
+
+const Field = ({ label, children }) => (
+  <label className="block">
+    <span className="mb-1.5 block text-xs font-black text-[#10142d]">{label}</span>
+    {children}
+  </label>
+);
+
 const AdminCalendar = () => {
-  const days = Array.from({ length: 42 }, (_, index) => index - 4);
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const today = new Date();
+  const todayKey = toDateKey(today);
+  const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(() => todayKey);
+  const [selectedView, setSelectedView] = useState("Company Calendar");
+  const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
+  const [enabledCalendars, setEnabledCalendars] = useState(() => Object.fromEntries(calendarChecks.map(([item]) => [item, true])));
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [eventForm, setEventForm] = useState(null);
+  const [departmentForm, setDepartmentForm] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const allDepartments = [
+    ...baseDepartments,
+    ...departments.map((department) => [department.name, department.color || "bg-violet-600"]),
+  ];
+
+  const loadEvents = async () => {
+    const data = await calendarAPI.getAll({ month: monthKey(currentMonth) });
+    setEvents(data.map(normalizeEvent));
+  };
+
+  const loadDepartments = async () => {
+    const data = await calendarAPI.getDepartments();
+    setDepartments(data);
+  };
+
+  useEffect(() => {
+    loadEvents().catch((error) => console.error("Unable to load calendar events", error));
+  }, [currentMonth]);
+
+  useEffect(() => {
+    loadDepartments().catch((error) => console.error("Unable to load calendar departments", error));
+  }, []);
+
+  const monthEvents = useMemo(() => {
+    return events.filter((event) => {
+      const departmentMatches = selectedDepartment === "All Departments" || event.department === selectedDepartment || event.department === "All Departments";
+      return enabledCalendars[event.calendar] !== false && departmentMatches;
+    });
+  }, [enabledCalendars, events, selectedDepartment]);
+
+  const stats = [
+    { label: "Total Events", value: monthEvents.length, sublabel: "this month", tone: "violet", icon: "calendar" },
+    { label: "Meetings", value: monthEvents.filter((event) => event.type === "Meeting").length, sublabel: "this month", tone: "orange", icon: "cup" },
+    { label: "Deadlines", value: monthEvents.filter((event) => event.type === "Deadline").length, sublabel: "this month", tone: "green", icon: "check" },
+    { label: "On Leave", value: monthEvents.filter((event) => event.type === "Leave" && event.dateKey === toDateKey(today)).length, sublabel: "today", tone: "pink", icon: "users" },
+    { label: "Holidays", value: monthEvents.filter((event) => event.type === "Holiday").length, sublabel: "this month", tone: "blue", icon: "flag" },
+  ];
+
+  const analyticsTotal = Math.max(monthEvents.length, 1);
+  const analytics = [
+    ["Meetings", monthEvents.filter((event) => event.type === "Meeting").length, "bg-orange-500"],
+    ["Deadlines", monthEvents.filter((event) => event.type === "Deadline").length, "bg-blue-500"],
+    ["Leaves", monthEvents.filter((event) => event.type === "Leave").length, "bg-pink-500"],
+    ["Holidays", monthEvents.filter((event) => event.type === "Holiday").length, "bg-emerald-500"],
+  ];
+
+  const upcomingEvents = [...monthEvents]
+    .filter((event) => event.dateKey >= selectedDate && (showAllUpcoming || event.dateKey <= addDays(selectedDate, 6)))
+    .sort((first, second) => first.dateKey.localeCompare(second.dateKey) || first.startTime.localeCompare(second.startTime))
+    .slice(0, 5);
+
+  const addEvent = () => {
+    setEventForm({
+      ...emptyEventForm(selectedDate < todayKey ? todayKey : selectedDate),
+      department: selectedDepartment,
+    });
+  };
+
+  const editEvent = (event) => {
+    setEventForm({
+      id: event.id,
+      title: event.title,
+      date: event.dateKey,
+      startTime: event.startTime || "",
+      endTime: event.endTime || "",
+      type: event.type || "Meeting",
+      calendar: event.calendar || "Meetings",
+      department: event.department || "All Departments",
+      participantsText: (event.participants || []).join(", "),
+      color: event.color || "orange",
+      visibility: event.visibility || "all",
+    });
+  };
+
+  const saveEvent = async (event) => {
+    event.preventDefault();
+    const payload = {
+      title: eventForm.title,
+      date: eventForm.date,
+      startTime: eventForm.startTime,
+      endTime: eventForm.endTime,
+      type: eventForm.type,
+      calendar: eventForm.calendar,
+      department: eventForm.department,
+      participants: eventForm.participantsText.split(",").map((item) => item.trim()).filter(Boolean),
+      color: eventForm.color,
+      visibility: eventForm.visibility,
+    };
+
+    if (eventForm.id) {
+      await calendarAPI.update(eventForm.id, payload);
+    } else {
+      await calendarAPI.create(payload);
+    }
+
+    setEventForm(null);
+    await loadEvents();
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!deleteTarget) return;
+    await calendarAPI.delete(deleteTarget.id);
+    setDeleteTarget(null);
+    await loadEvents();
+  };
+
+  const addDepartment = () => {
+    setDepartmentForm({ name: "", color: "bg-violet-600" });
+  };
+
+  const saveDepartment = async (event) => {
+    event.preventDefault();
+    await calendarAPI.createDepartment(departmentForm);
+    setDepartmentForm(null);
+    await loadDepartments();
+  };
+
+  const resetFilters = () => {
+    setSelectedDepartment("All Departments");
+    setEnabledCalendars(Object.fromEntries(calendarChecks.map(([item]) => [item, true])));
+  };
+
+  const setAllCalendars = (checked) => {
+    setEnabledCalendars(Object.fromEntries(calendarChecks.map(([item]) => [item, checked])));
+  };
+
+  const goToMonth = (offset) => setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() + offset, 1));
+
+  const goToday = () => {
+    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelectedDate(toDateKey(today));
+  };
 
   return (
     <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
       <section className="mx-auto max-w-[1840px] rounded-2xl border border-pink-100 bg-white px-5 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)]">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1
-              className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
-              style={{ fontFamily: "var(--font-bruno)" }}
-            >
+            <h1 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white" style={{ fontFamily: "var(--font-bruno)" }}>
               Calendar
             </h1>
             <p className="mt-2 text-sm font-semibold text-slate-500">
@@ -112,15 +310,19 @@ const AdminCalendar = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm">Today</button>
+            <button type="button" onClick={goToday} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm">Today</button>
             <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <button type="button" className="grid h-9 w-10 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
-              <button type="button" className="grid h-9 w-10 place-items-center border-l border-slate-200 text-slate-700" aria-label="Next month"><Icon className="h-4 w-4" /></button>
+              <button type="button" onClick={() => goToMonth(-1)} className="grid h-9 w-10 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
+              <button type="button" onClick={() => goToMonth(1)} className="grid h-9 w-10 place-items-center border-l border-slate-200 text-slate-700" aria-label="Next month"><Icon className="h-4 w-4" /></button>
             </div>
-            <select className="h-9 rounded-xl border border-transparent bg-white px-3 text-sm font-black text-[#26314f] outline-none"><option>May 2026</option></select>
-            <button type="button" className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Filter</button>
-            <select className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm outline-none"><option>Team / Department</option></select>
-            <button type="button" className="flex h-9 items-center gap-2 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
+            <select value={currentMonth.getMonth()} onChange={(event) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="h-9 rounded-xl border border-transparent bg-white px-3 text-sm font-black text-[#26314f] outline-none">
+              {getMonthOptions(currentMonth.getFullYear()).map((month) => <option key={month.getMonth()} value={month.getMonth()}>{formatMonth(month)}</option>)}
+            </select>
+            <button type="button" onClick={resetFilters} className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Filter</button>
+            <select value={selectedDepartment} onChange={(event) => setSelectedDepartment(event.target.value)} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm outline-none">
+              {allDepartments.map(([department]) => <option key={department}>{department}</option>)}
+            </select>
+            <button type="button" onClick={addEvent} className="flex h-9 items-center gap-2 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
           </div>
         </header>
 
@@ -141,12 +343,12 @@ const AdminCalendar = () => {
           ))}
         </div>
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[260px_minmax(680px,1fr)_330px]">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(680px,1fr)_370px]">
           <div className="space-y-4">
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendar View</h2>
-              {["Company Calendar", "Team Calendar", "Employee Calendar", "Project Calendar"].map((item, index) => (
-                <button key={item} type="button" className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${index === 0 ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
+              {["Company Calendar", "Team Calendar", "Employee Calendar", "Project Calendar"].map((item) => (
+                <button key={item} type="button" onClick={() => setSelectedView(item)} className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedView === item ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
                   <Icon name="calendar" className="h-4 w-4" /> {item}
                 </button>
               ))}
@@ -154,24 +356,36 @@ const AdminCalendar = () => {
 
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Teams / Departments</h2>
-              {departments.map(([item, color], index) => (
-                <button key={item} type="button" className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${index === 0 ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
+              {allDepartments.map(([item, color]) => (
+                <button key={item} type="button" onClick={() => setSelectedDepartment(item)} className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedDepartment === item ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
                   {item}
                 </button>
               ))}
-              <button type="button" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"><Icon name="plus" className="h-4 w-4" />Add Department</button>
+              <button type="button" onClick={addDepartment} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"><Icon name="plus" className="h-4 w-4" />Add Department</button>
             </Card>
 
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendars</h2>
-              {calendarChecks.map(([item, accent]) => (
+              {calendarChecks.map(([item, color]) => (
                 <label key={item} className="mb-3 flex items-center gap-3 text-sm font-bold text-slate-600">
-                  <input type="checkbox" defaultChecked className={`h-4 w-4 rounded ${accent}`} />
+                  <input
+                    type="checkbox"
+                    checked={enabledCalendars[item]}
+                    onChange={(event) => setEnabledCalendars((current) => ({ ...current, [item]: event.target.checked }))}
+                    className="peer sr-only"
+                  />
+                  <span className={`grid h-4 w-4 place-items-center rounded ${enabledCalendars[item] ? color : "border border-slate-300 bg-white"}`}>
+                    {enabledCalendars[item] && (
+                      <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 text-white" aria-hidden="true">
+                        <path d="m4 8 2.5 2.5L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
                   {item}
                 </label>
               ))}
-              <button type="button" className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"><Icon name="gear" className="h-4 w-4" />Manage Calendars</button>
+              <button type="button" onClick={() => setAllCalendars(!Object.values(enabledCalendars).every(Boolean))} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"> Select All</button>
             </Card>
           </div>
 
@@ -180,25 +394,27 @@ const AdminCalendar = () => {
               {weekDays.map((day) => <span key={day} className="py-3">{day}</span>)}
             </div>
             <div className="grid grid-cols-7">
-              {days.map((day, index) => {
-                const label = day < 1 ? 31 + day : day > 31 ? day - 31 : day;
-                const muted = day < 1 || day > 31;
-                const events = calendarEvents.filter((event) => event.day === day);
+              {getCalendarDays(currentMonth).map((date) => {
+                const dateKey = toDateKey(date);
+                const muted = !sameMonth(date, currentMonth);
+                const selected = selectedDate === dateKey;
+                const locked = dateKey < todayKey;
+                const dayEvents = monthEvents.filter((event) => event.dateKey === dateKey);
 
                 return (
-                  <div key={`${day}-${index}`} className="min-h-28 border-b border-r border-slate-200 p-2.5 last:border-r-0">
-                    <div className={`mb-2 text-sm font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{label}</div>
+                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-28 border-b border-r border-slate-200 p-2.5 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60" : "hover:bg-pink-50/40"} ${selected ? "bg-pink-50/70" : ""}`}>
+                    <div className={`mb-2 text-sm font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
                     <div className="space-y-1.5">
-                      {events.map((event) => (
-                        <div key={`${day}-${event.label}`} className={`relative truncate rounded-lg px-2.5 py-1.5 text-xs font-black ${event.color}`}>
+                      {dayEvents.slice(0, 2).map((event) => (
+                        <div key={event.id} className={`relative truncate rounded-lg px-2.5 py-1.5 text-xs font-black ${event.calendarClass}`}>
                           <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current align-middle" />
-                          {event.label}
+                          {event.title}
                           {event.time && <span className="block pl-3 font-bold opacity-80">{event.time}</span>}
                         </div>
                       ))}
-                      {events.find((event) => event.more) && <p className="pl-2 text-xs font-black text-slate-500">+ {events.find((event) => event.more)?.more} more</p>}
+                      {dayEvents.length > 2 && <p className="pl-2 text-xs font-black text-slate-500">+ {dayEvents.length - 2} more</p>}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -208,38 +424,36 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-black">Upcoming Events</h2>
-                <button type="button" className="text-xs font-black text-violet-700">View all</button>
+                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="text-xs font-black text-violet-700">{showAllUpcoming ? "This week" : "View all"}</button>
               </div>
               {upcomingEvents.map((event) => (
-                <div key={event.title} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
+                <div key={event.id} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
                   <span className={`h-3 w-3 rounded-full ${event.dot}`} />
                   <span>
                     <span className="block text-sm font-black">{event.title}</span>
-                    <span className="text-xs font-bold text-slate-500">{event.time}</span>
+                    <span className="text-xs font-bold text-slate-500">{formatDate(event.date)} • {event.time}</span>
                   </span>
-                  <span className={`rounded-full px-3 py-1 text-xs font-black ${event.tagClass}`}>{event.tag}</span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-black ${event.typeClass}`}>{event.type}</span>
                 </div>
               ))}
             </Card>
 
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendar Analytics</h2>
-              <div className="grid gap-7 sm:grid-cols-[140px_1fr] sm:items-center">
-                <div className="grid h-36 w-36 place-items-center rounded-full" style={{ background: "conic-gradient(#f97316 0 39%, #3b82f6 39% 61%, #ec4899 61% 82%, #22c55e 82% 100%)" }}>
-                  <div className="grid h-22 w-22 place-items-center rounded-full bg-white text-center shadow-sm">
-                    <span className="text-3xl font-black leading-none">38<span className="mt-1 block text-xs text-slate-500">Total Events</span></span>
+              <div className="grid gap-5 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center">
+                <div className="grid h-32 w-32 place-items-center rounded-full" style={{ background: "conic-gradient(#f97316 0 39%, #3b82f6 39% 61%, #ec4899 61% 82%, #22c55e 82% 100%)" }}>
+                  <div className="grid h-20 w-20 place-items-center rounded-full bg-white text-center shadow-sm">
+                    <span className="text-3xl font-black leading-none">{monthEvents.length}<span className="mt-1 block text-xs text-slate-500">Total Events</span></span>
                   </div>
                 </div>
-                <div className="space-y-4 text-sm font-bold">
-                  {[
-                    ["Meetings", "15 (39%)", "bg-orange-500"],
-                    ["Deadlines", "23 (61%)", "bg-blue-500"],
-                    ["Leaves", "8 (21%)", "bg-pink-500"],
-                    ["Holidays", "5 (13%)", "bg-emerald-500"],
-                  ].map(([label, value, color]) => (
-                    <p key={label} className="flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${color}`} />{label}</span>
-                      <span>{value}</span>
+                <div className="min-w-0 space-y-4 text-sm font-bold">
+                  {analytics.map(([label, value, color]) => (
+                    <p key={label} className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-3">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className={`h-3 w-3 shrink-0 rounded-full ${color}`} />
+                        <span>{label}</span>
+                      </span>
+                      <span className="whitespace-nowrap text-right text-xs tabular-nums">{value} ({Math.round((value / analyticsTotal) * 100)}%)</span>
                     </p>
                   ))}
                 </div>
@@ -250,7 +464,7 @@ const AdminCalendar = () => {
 
         <Card className="mt-4 overflow-hidden">
           <div className="px-5 pt-4">
-            <h2 className="text-base font-black">Event List <span className="text-xs font-bold text-slate-500">(May 2026)</span></h2>
+            <h2 className="text-base font-black">Event List <span className="text-xs font-bold text-slate-500">({formatMonth(currentMonth)})</span></h2>
           </div>
           <div className="overflow-x-auto px-5 pb-4">
             <table className="w-full min-w-[1180px] text-left text-xs">
@@ -258,26 +472,26 @@ const AdminCalendar = () => {
                 <tr>{["Event", "Type", "Date & Time", "Participants / Assignees", "Calendar", "Actions"].map((heading) => <th key={heading} className="px-3 py-3">{heading}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {eventList.map((event) => (
-                  <tr key={event.title}>
+                {monthEvents.map((event) => (
+                  <tr key={event.id}>
                     <td className="px-3 py-3 font-black"><span className={`mr-4 inline-block h-3 w-3 rounded-full ${event.dot}`} />{event.title}</td>
                     <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.typeClass}`}>{event.type}</span></td>
-                    <td className="px-3 py-3 font-bold text-slate-600">{event.date} <span className="ml-8">{event.time}</span></td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{formatDate(event.date)} <span className="ml-8">{event.time}</span></td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex -space-x-2">
-                          {event.participants.map((participant) => <span key={participant} className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-pink-100 text-[10px] font-black text-pink-700">{participant}</span>)}
+                          {(event.participants || []).slice(0, 4).map((participant) => <span key={participant} className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-pink-100 text-[10px] font-black text-pink-700">{participant}</span>)}
                         </div>
-                        <span className="text-xs font-black text-slate-500">{event.extra}</span>
+                        <span className="text-xs font-black text-slate-500">{event.department}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.calendarClass}`}>{event.calendar}</span></td>
                     <td className="px-3 py-3">
                       <div className="flex gap-2">
-                        <button type="button" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
+                        <button type="button" onClick={() => editEvent(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
                           <Icon name="edit" className="h-4 w-4" />
                         </button>
-                        <button type="button" className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
+                        <button type="button" onClick={() => setDeleteTarget(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
                           <Icon name="trash" className="h-4 w-4" />
                         </button>
                       </div>
@@ -287,11 +501,154 @@ const AdminCalendar = () => {
               </tbody>
             </table>
             <div className="pt-3 text-center">
-              <button type="button" className="text-base font-black text-violet-700">View all events</button>
+              <button type="button" onClick={resetFilters} className="text-base font-black text-violet-700">View all events</button>
             </div>
           </div>
         </Card>
       </section>
+
+      {eventForm && (
+        <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => setEventForm(null)}>
+          <form onSubmit={saveEvent} className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Title">
+                <input
+                  required
+                  value={eventForm.title}
+                  onChange={(event) => setEventForm((form) => ({ ...form, title: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                />
+              </Field>
+              <Field label="Date">
+                <input
+                  required
+                  type="date"
+                  min={todayKey}
+                  value={eventForm.date}
+                  onChange={(event) => setEventForm((form) => ({ ...form, date: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                />
+              </Field>
+              <Field label="Start Time">
+                <input
+                  value={eventForm.startTime}
+                  onChange={(event) => setEventForm((form) => ({ ...form, startTime: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                  placeholder="09:00 AM"
+                />
+              </Field>
+              <Field label="End Time">
+                <input
+                  value={eventForm.endTime}
+                  onChange={(event) => setEventForm((form) => ({ ...form, endTime: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                  placeholder="10:00 AM"
+                />
+              </Field>
+              <Field label="Type">
+                <select
+                  value={eventForm.type}
+                  onChange={(event) => setEventForm((form) => ({ ...form, type: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                >
+                  {["Meeting", "Deadline", "Leave", "Holiday", "Company Event", "Birthday"].map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+              <Field label="Calendar">
+                <select
+                  value={eventForm.calendar}
+                  onChange={(event) => setEventForm((form) => ({ ...form, calendar: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                >
+                  {calendarChecks.map(([item]) => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+              <Field label="Department">
+                <select
+                  value={eventForm.department}
+                  onChange={(event) => setEventForm((form) => ({ ...form, department: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                >
+                  {allDepartments.map(([item]) => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+              <Field label="Color">
+                <select
+                  value={eventForm.color}
+                  onChange={(event) => setEventForm((form) => ({ ...form, color: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                >
+                  {["orange", "blue", "pink", "emerald", "violet"].map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Participants / Assignees">
+              <input
+                value={eventForm.participantsText}
+                onChange={(event) => setEventForm((form) => ({ ...form, participantsText: event.target.value }))}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                placeholder="AB, JT, MD"
+              />
+            </Field>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
+                Cancel
+              </button>
+              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+                Save Event
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {departmentForm && (
+        <Modal title="Add Department" onClose={() => setDepartmentForm(null)}>
+          <form onSubmit={saveDepartment} className="space-y-4">
+            <Field label="Department Name">
+              <input
+                required
+                value={departmentForm.name}
+                onChange={(event) => setDepartmentForm((form) => ({ ...form, name: event.target.value }))}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+              />
+            </Field>
+            <Field label="Dot Color">
+              <select
+                value={departmentForm.color}
+                onChange={(event) => setDepartmentForm((form) => ({ ...form, color: event.target.value }))}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+              >
+                {departmentColors.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </Field>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setDepartmentForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
+                Cancel
+              </button>
+              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+                Add Department
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal title="Do you want to delete?" onClose={() => setDeleteTarget(null)}>
+          <p className="text-sm font-semibold leading-6 text-slate-500">
+            This will permanently delete "{deleteTarget.title}" from the calendar.
+          </p>
+          <div className="mt-5 flex justify-end gap-3">
+            <button type="button" onClick={() => setDeleteTarget(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
+              Cancel
+            </button>
+            <button type="button" onClick={confirmDeleteEvent} className="h-10 rounded-lg bg-pink-600 px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(219,39,119,0.25)]">
+              Delete
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

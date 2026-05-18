@@ -3,7 +3,7 @@ import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
-import { dashboardAPI, getApiErrorMessage } from "../../../services/api.js";
+import { calendarAPI, dashboardAPI, getApiErrorMessage } from "../../../services/api.js";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
@@ -144,6 +144,12 @@ const getMonthKey = (value) => {
 
 const getCurrentMonthKey = () => getMonthKey(new Date());
 
+const getNextMonthKey = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() + 1);
+  return getMonthKey(date);
+};
+
 const getLastMonthKey = () => {
   const date = new Date();
   date.setMonth(date.getMonth() - 1);
@@ -169,6 +175,15 @@ const getUserName = (value) => {
   const lastName = value?.lastName || "";
   const name = `${firstName} ${lastName}`.trim();
   return name || value?.email || "Unassigned";
+};
+
+const toDateKey = (value) => {
+  const date = parseCalendarDate(value);
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 const Icon = ({ name, className = "h-8 w-8" }) => {
@@ -734,20 +749,65 @@ const RecentActivities = ({ tasks, employees }) => {
   );
 };
 
-const OnlineTeam = ({ employees }) => {
-  const onlineEmployees = employees
-    .filter((employee) => employee.isOnline === true)
+const calendarDotStyles = {
+  blue: "bg-blue-500",
+  emerald: "bg-emerald-500",
+  orange: "bg-orange-500",
+  pink: "bg-pink-500",
+  violet: "bg-violet-600",
+};
+
+const calendarTypeStyles = {
+  "Company Event": "bg-violet-50 text-violet-700",
+  Meeting: "bg-orange-50 text-orange-600",
+  Deadline: "bg-blue-50 text-blue-700",
+  Leave: "bg-pink-50 text-pink-700",
+  Holiday: "bg-emerald-50 text-emerald-700",
+  Birthday: "bg-violet-50 text-violet-700",
+  Personal: "bg-emerald-50 text-emerald-700",
+};
+
+const normalizeCalendarEvent = (event) => {
+  const dateKey = toDateKey(event.date);
+  const tone = event.color || (
+    event.type === "Deadline" ? "blue" :
+    event.type === "Leave" ? "pink" :
+    event.type === "Holiday" || event.type === "Company Event" ? "emerald" :
+    event.type === "Birthday" ? "violet" :
+    "orange"
+  );
+
+  return {
+    ...event,
+    id: event._id || event.id,
+    dateKey,
+    time: event.startTime === "All Day" ? "All Day" : [event.startTime, event.endTime].filter(Boolean).join(" - "),
+    dot: calendarDotStyles[tone] || calendarDotStyles.orange,
+    typeClass: calendarTypeStyles[event.type] || calendarTypeStyles.Meeting,
+  };
+};
+
+const UpcomingEvents = ({ events }) => {
+  const todayKey = toDateKey(new Date());
+  const upcomingEvents = events
+    .map(normalizeCalendarEvent)
+    .filter((event) => event.dateKey >= todayKey)
+    .sort((first, second) => first.dateKey.localeCompare(second.dateKey) || String(first.startTime || "").localeCompare(String(second.startTime || "")))
     .slice(0, 6);
-  const visibleEmployees = onlineEmployees;
 
   return (
     <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          Online Team
+          <span className="text-[#c72fb2]">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <rect x="5" y="5" width="14" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M8 3v4M16 3v4M5 10h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </span>
+          Upcoming Events
           <span className="grid h-6 min-w-6 place-items-center rounded-full bg-violet-100 px-2 text-xs font-black text-violet-600">
-            {visibleEmployees.length}
+            {upcomingEvents.length}
           </span>
         </h2>
         <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
@@ -755,29 +815,27 @@ const OnlineTeam = ({ employees }) => {
         </button>
       </div>
       <div className="divide-y divide-slate-100">
-        {visibleEmployees.length === 0 && (
+        {upcomingEvents.length === 0 && (
           <p className="py-6 text-center text-sm font-semibold text-slate-500 dark:text-white">
-            No online team members.
+            No upcoming events.
           </p>
         )}
-        {visibleEmployees.map((employee, index) => {
-          const name = getUserName(employee);
-
-          return (
-            <div key={`${name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-              <Avatar name={name} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
-                  {name}
-                </span>
-                <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
-                  {employee.position || "Team Member"}
-                </span>
+        {upcomingEvents.map((event) => (
+          <div key={event.id || `${event.title}-${event.dateKey}`} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+            <span className={`h-3 w-3 rounded-full ${event.dot}`} />
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+                {event.title}
               </span>
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            </div>
-          );
-        })}
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
+                {formatDate(event.date)} {event.time ? `• ${event.time}` : ""}
+              </span>
+            </span>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${event.typeClass}`}>
+              {event.type || "Event"}
+            </span>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -789,6 +847,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [budgetEntries, setBudgetEntries] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [taskStatusCounts, setTaskStatusCounts] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -838,7 +897,11 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
       try {
         setIsLoading(true);
         setLoadError("");
-        const summary = await dashboardAPI.getSummary();
+        const [summary, currentMonthEvents, nextMonthEvents] = await Promise.all([
+          dashboardAPI.getSummary(),
+          calendarAPI.getAll({ month: getCurrentMonthKey() }),
+          calendarAPI.getAll({ month: getNextMonthKey() }),
+        ]);
 
         if (!isMounted) {
           return;
@@ -848,6 +911,10 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
         setEmployees(Array.isArray(summary.recentEmployees) ? summary.recentEmployees : []);
         setClients(Array.isArray(summary.recentClients) ? summary.recentClients : []);
         setBudgetEntries(Array.isArray(summary.recentBudgetEntries) ? summary.recentBudgetEntries : []);
+        setCalendarEvents([
+          ...(Array.isArray(currentMonthEvents) ? currentMonthEvents : []),
+          ...(Array.isArray(nextMonthEvents) ? nextMonthEvents : []),
+        ]);
         setTaskStatusCounts(summary.taskStatusCounts || {});
         setLoadError("");
       } catch (error) {
@@ -915,7 +982,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
               <div className="grid gap-4 xl:grid-cols-[1.6fr_0.85fr]">
                 <RecentActivities tasks={tasks} employees={employees} />
-                <OnlineTeam employees={employees} />
+                <UpcomingEvents events={calendarEvents} />
               </div>
             </>
           )}

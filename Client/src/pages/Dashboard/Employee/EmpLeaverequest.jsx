@@ -1,20 +1,9 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
-
-const stats = [
-  { label: "Pending Requests", value: "2", icon: pendingrequest, tone: "orange" },
-  { label: "Approved", value: "5", icon: check, tone: "green" },
-  { label: "Rejected", value: "1", icon: reject, tone: "rose" },
-];
-
-const history = [
-  { id: "LR-2026-0052", type: "Vacation Leave", dates: "May 15, 2026 - May 18, 2026", duration: "4 days", status: "Pending", submitted: "May 09, 2026 09:30 AM", approvedBy: "-" },
-  { id: "LR-2026-0048", type: "Sick Leave", dates: "Apr 28, 2026 - Apr 29, 2026", duration: "2 days", status: "Approved", submitted: "Apr 26, 2026 02:15 PM", approvedBy: "Jane Smith (HR)" },
-  { id: "LR-2026-0042", type: "Vacation Leave", dates: "Apr 10, 2026 - Apr 12, 2026", duration: "3 days", status: "Approved", submitted: "Apr 02, 2026 11:10 AM", approvedBy: "Jane Smith (HR)" },
-  { id: "LR-2026-0035", type: "Emergency Leave", dates: "Mar 18, 2026 - Mar 18, 2026", duration: "1 day", status: "Rejected", submitted: "Mar 17, 2026 05:20 PM", approvedBy: "John Miller (Manager)" },
-  { id: "LR-2026-0029", type: "Vacation Leave", dates: "Feb 20, 2026 - Feb 24, 2026", duration: "5 days", status: "Approved", submitted: "Feb 10, 2026 09:45 AM", approvedBy: "Jane Smith (HR)" },
-];
+import { useAuth } from "../../../context/AuthContext";
+import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
 
 const toneStyles = {
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
@@ -32,6 +21,15 @@ const leaveTypeColors = {
   "Emergency Leave": "bg-rose-50 text-rose-600",
   "Sick Leave": "bg-emerald-50 text-emerald-600",
   "Vacation Leave": "bg-emerald-50 text-emerald-600",
+  Others: "bg-pink-50 text-pink-600",
+};
+
+const defaultForm = {
+  leaveType: "Vacation Leave",
+  startDate: "",
+  endDate: "",
+  reason: "",
+  emergencyContact: "",
 };
 
 const Card = ({ children, className = "" }) => (
@@ -54,7 +52,7 @@ const SmallIcon = ({ name, className = "h-4 w-4" }) => {
 };
 
 const StatusPill = ({ status }) => (
-  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${statusStyles[status]}`}>
+  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${statusStyles[status] || statusStyles.Pending}`}>
     {status}
   </span>
 );
@@ -68,28 +66,109 @@ const LeaveType = ({ type }) => (
   </span>
 );
 
-const Calendar = () => {
+const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
+
+const getUserName = (profile) =>
+  [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
+  profile?.companyName ||
+  profile?.email ||
+  "Employee";
+
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const formatDates = (request) => {
+  const start = formatDate(request?.startDate);
+  const end = formatDate(request?.endDate);
+  return start === end ? start : `${start} - ${end}`;
+};
+
+const calculateDuration = (startDate, endDate) => {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 0;
+  return Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000) + 1);
+};
+
+const durationLabel = (days) => `${days || 0} ${Number(days) === 1 ? "day" : "days"}`;
+
+const normalizeRequest = (request) => ({
+  ...request,
+  id: request.requestCode || getEntityId(request),
+  type: request.leaveType || "Others",
+  dates: formatDates(request),
+  duration: durationLabel(request.durationDays || 1),
+  status: request.status || "Pending",
+  submitted: formatDateTime(request.createdAt),
+  approvedBy: request.reviewedBy ? `${getUserName(request.reviewedBy)} (${request.reviewedBy.role || "Reviewer"})` : "-",
+});
+
+const monthName = (date) =>
+  date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+const statusCalendarClass = {
+  Approved: "bg-emerald-500 text-white",
+  Pending: "bg-orange-50 text-orange-600",
+  Rejected: "bg-pink-50 text-pink-600",
+};
+
+const Calendar = ({ currentMonth, onNextMonth, onPreviousMonth, requests }) => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const days = Array.from({ length: 35 }, (_, index) => index - 4);
-  const markedDays = {
-    15: "bg-emerald-500 text-white",
-    16: "bg-emerald-50 text-emerald-700",
-    17: "bg-emerald-50 text-emerald-700",
-    18: "bg-emerald-50 text-emerald-700",
-    19: "bg-orange-50 text-orange-600",
-    25: "bg-[#7427ff] text-white",
-  };
+  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+  const firstDayOffset = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+  const cells = Math.ceil((daysInMonth + firstDayOffset) / 7) * 7;
+  const days = Array.from({ length: cells }, (_, index) => index - firstDayOffset + 1);
+  const markedDays = requests.reduce((map, request) => {
+    const start = new Date(request.startDate);
+    const end = new Date(request.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return map;
+
+    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    if (start > monthEnd || end < monthStart) return map;
+
+    const first = start < monthStart ? 1 : start.getDate();
+    const last = end > monthEnd ? daysInMonth : end.getDate();
+    for (let day = first; day <= last; day += 1) {
+      map[day] = statusCalendarClass[request.status] || "bg-orange-50 text-orange-600";
+    }
+    return map;
+  }, {});
 
   return (
     <Card className="p-5">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-xl font-black">Leave Calendar</h2>
         <div className="flex items-center gap-4 text-sm font-black text-[#10142d]">
-          <button type="button" className="grid h-8 w-8 place-items-center rounded-lg hover:bg-pink-50" aria-label="Previous month">
+          <button type="button" onClick={onPreviousMonth} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-pink-50" aria-label="Previous month">
             <SmallIcon name="chevron" className="h-4 w-4 rotate-180" />
           </button>
-          May 2026
-          <button type="button" className="grid h-8 w-8 place-items-center rounded-lg hover:bg-pink-50" aria-label="Next month">
+          {monthName(currentMonth)}
+          <button type="button" onClick={onNextMonth} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-pink-50" aria-label="Next month">
             <SmallIcon name="chevron" className="h-4 w-4" />
           </button>
         </div>
@@ -99,12 +178,11 @@ const Calendar = () => {
       </div>
       <div className="grid grid-cols-7 gap-2">
         {days.map((day, index) => {
-          const label = day < 1 ? 30 + day : day > 31 ? day - 31 : day;
-          const isMuted = day < 1 || day > 31;
+          const isMuted = day < 1 || day > daysInMonth;
           return (
             <div key={`${day}-${index}`} className="grid h-12 place-items-center text-sm font-black">
               <span className={`grid h-9 min-w-9 place-items-center rounded-full px-2 ${markedDays[day] || ""} ${isMuted ? "text-slate-300" : "text-[#10142d]"}`}>
-                {label}
+                {isMuted ? "" : day}
               </span>
             </div>
           );
@@ -115,7 +193,6 @@ const Calendar = () => {
           ["Approved", "bg-emerald-500"],
           ["Pending", "bg-orange-500"],
           ["Rejected", "bg-pink-500"],
-          ["Holiday", "bg-[#7427ff]"],
         ].map(([label, color]) => (
           <span key={label} className="flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
@@ -128,6 +205,126 @@ const Calendar = () => {
 };
 
 const EmpLeaverequest = () => {
+  const { user } = useAuth();
+  const [requests, setRequests] = useState([]);
+  const [summary, setSummary] = useState({});
+  const [statusFilter, setStatusFilter] = useState("");
+  const [currentMonth, setCurrentMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [form, setForm] = useState(() => ({
+    ...defaultForm,
+    emergencyContact: user?.phone || "",
+  }));
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const loadRequests = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+      const response = await leaveRequestAPI.getAll({ limit: 100, month: "all" });
+      setRequests(response.leaveRequests.map(normalizeRequest));
+      setSummary(response.summary || {});
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
+      setRequests([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  useEffect(() => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      emergencyContact: currentForm.emergencyContact || user?.phone || "",
+    }));
+  }, [user?.phone]);
+
+  const formDuration = calculateDuration(form.startDate, form.endDate);
+
+  const stats = useMemo(
+    () => [
+      { label: "Pending Requests", value: summary.pending || 0, icon: pendingrequest, tone: "orange" },
+      { label: "Approved", value: summary.approved || 0, icon: check, tone: "green" },
+      { label: "Rejected", value: summary.rejected || 0, icon: reject, tone: "rose" },
+    ],
+    [summary]
+  );
+
+  const filteredHistory = useMemo(
+    () => requests.filter((request) => !statusFilter || request.status === statusFilter),
+    [requests, statusFilter]
+  );
+
+  const updateField = (field, value) => {
+    setForm((currentForm) => {
+      const nextForm = { ...currentForm, [field]: value };
+      if (field === "startDate" && nextForm.endDate && value > nextForm.endDate) {
+        nextForm.endDate = value;
+      }
+      return nextForm;
+    });
+  };
+
+  const resetForm = () => {
+    setForm({
+      ...defaultForm,
+      emergencyContact: user?.phone || "",
+    });
+    setMessage("");
+    setErrorMessage("");
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setMessage("");
+    setErrorMessage("");
+
+    if (!form.startDate || !form.endDate || !form.reason.trim() || !form.emergencyContact.trim()) {
+      setErrorMessage("Please complete all required leave request fields.");
+      return;
+    }
+
+    if (formDuration <= 0) {
+      setErrorMessage("End date must be the same as or later than the start date.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await leaveRequestAPI.create({
+        leaveType: form.leaveType,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason,
+        emergencyContact: form.emergencyContact,
+      });
+      setMessage("Leave request submitted.");
+      setForm({
+        ...defaultForm,
+        emergencyContact: user?.phone || "",
+      });
+      await loadRequests();
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to submit leave request."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePreviousMonth = () => {
+    setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1));
+  };
+
   return (
     <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header>
@@ -141,6 +338,12 @@ const EmpLeaverequest = () => {
           Request time off and track your leave status.
         </p>
       </header>
+
+      {(errorMessage || message) && (
+        <p className={`rounded-xl border px-4 py-3 text-sm font-bold ${errorMessage ? "border-rose-100 bg-rose-50 text-rose-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}>
+          {errorMessage || message}
+        </p>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-3">
         {stats.map((item) => (
@@ -161,64 +364,104 @@ const EmpLeaverequest = () => {
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
         <Card className="p-5">
           <h2 className="mb-5 text-xl font-black">Request Leave</h2>
-          <div className="grid gap-5 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-2 block text-xs font-black text-slate-600">Leave Type <span className="text-pink-500">*</span></span>
-              <select className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100">
-                <option>Vacation Leave</option>
-                <option>Sick Leave</option>
-                <option>Emergency Leave</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-black text-slate-600">Start Date <span className="text-pink-500">*</span></span>
-              <span className="relative block">
-                <input className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100" value="May 15, 2026" readOnly />
-                <SmallIcon name="calendar" className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-              </span>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-black text-slate-600">End Date <span className="text-pink-500">*</span></span>
-              <span className="relative block">
-                <input className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100" value="May 18, 2026" readOnly />
-                <SmallIcon name="calendar" className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-              </span>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-black text-slate-600">Total Duration</span>
-              <input className="h-12 w-full rounded-xl border border-pink-100 bg-pink-50 px-4 text-sm font-black text-pink-700 outline-none" value="4 days" readOnly />
-            </label>
-            <label className="block md:col-span-2">
-              <span className="mb-2 block text-xs font-black text-slate-600">Reason <span className="text-pink-500">*</span></span>
-              <textarea className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100" defaultValue="Family vacation trip." />
-            </label>
-            <label className="block md:col-span-2">
-              <span className="mb-2 block text-xs font-black text-slate-600">Emergency Contact <span className="text-pink-500">*</span></span>
-              <span className="relative block">
-                <input className="h-12 w-full rounded-xl border border-slate-200 bg-white px-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100" value="Juan Dela Cruz (0917 123 4567)" readOnly />
-                <SmallIcon name="person" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-              </span>
-            </label>
-          </div>
-          <div className="mt-5 flex justify-end gap-3">
-            <button type="button" className="h-12 rounded-xl border border-slate-200 bg-white px-9 text-sm font-black text-slate-600">Cancel</button>
-            <button type="button" className="h-12 rounded-xl bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-9 text-sm font-black text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]">
-              Submit Request
-            </button>
-          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-xs font-black text-slate-600">Leave Type <span className="text-pink-500">*</span></span>
+                <select
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                  value={form.leaveType}
+                  onChange={(event) => updateField("leaveType", event.target.value)}
+                >
+                  <option>Vacation Leave</option>
+                  <option>Sick Leave</option>
+                  <option>Emergency Leave</option>
+                  <option>Others</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-black text-slate-600">Start Date <span className="text-pink-500">*</span></span>
+                <span className="relative block">
+                  <input
+                    type="date"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                    value={form.startDate}
+                    onChange={(event) => updateField("startDate", event.target.value)}
+                  />
+                  <SmallIcon name="calendar" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                </span>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-black text-slate-600">End Date <span className="text-pink-500">*</span></span>
+                <span className="relative block">
+                  <input
+                    type="date"
+                    min={form.startDate || undefined}
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                    value={form.endDate}
+                    onChange={(event) => updateField("endDate", event.target.value)}
+                  />
+                  <SmallIcon name="calendar" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                </span>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-black text-slate-600">Total Duration</span>
+                <input className="h-12 w-full rounded-xl border border-pink-100 bg-pink-50 px-4 text-sm font-black text-pink-700 outline-none" value={durationLabel(formDuration)} readOnly />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-xs font-black text-slate-600">Reason <span className="text-pink-500">*</span></span>
+                <textarea
+                  className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                  value={form.reason}
+                  onChange={(event) => updateField("reason", event.target.value)}
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-xs font-black text-slate-600">Emergency Contact <span className="text-pink-500">*</span></span>
+                <span className="relative block">
+                  <input
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                    value={form.emergencyContact}
+                    onChange={(event) => updateField("emergencyContact", event.target.value)}
+                    placeholder="Name and phone number"
+                  />
+                  <SmallIcon name="person" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                </span>
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" onClick={resetForm} className="h-12 rounded-xl border border-slate-200 bg-white px-9 text-sm font-black text-slate-600">Cancel</button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="h-12 rounded-xl bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-9 text-sm font-black text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Request"}
+              </button>
+            </div>
+          </form>
         </Card>
 
-        <Calendar />
+        <Calendar
+          currentMonth={currentMonth}
+          onNextMonth={handleNextMonth}
+          onPreviousMonth={handlePreviousMonth}
+          requests={requests}
+        />
       </div>
 
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between px-5 py-5">
           <h2 className="text-xl font-black">Leave History</h2>
-          <select className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none">
-            <option>All Status</option>
-            <option>Approved</option>
-            <option>Pending</option>
-            <option>Rejected</option>
+          <select
+            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="Approved">Approved</option>
+            <option value="Pending">Pending</option>
+            <option value="Rejected">Rejected</option>
           </select>
         </div>
         <div className="overflow-x-auto px-5 pb-5">
@@ -231,8 +474,18 @@ const EmpLeaverequest = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-pink-50">
-              {history.map((item) => (
-                <tr key={item.id} className="hover:bg-pink-50/40">
+              {isLoading && (
+                <tr>
+                  <td colSpan="8" className="px-3 py-8 text-center text-sm font-bold text-slate-500">Loading leave history...</td>
+                </tr>
+              )}
+              {!isLoading && filteredHistory.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="px-3 py-8 text-center text-sm font-bold text-slate-500">No leave requests found.</td>
+                </tr>
+              )}
+              {!isLoading && filteredHistory.map((item) => (
+                <tr key={getEntityId(item)} className="hover:bg-pink-50/40">
                   <td className="px-3 py-4 font-black text-pink-700">{item.id}</td>
                   <td className="px-3 py-4"><LeaveType type={item.type} /></td>
                   <td className="px-3 py-4 font-bold text-slate-600">{item.dates}</td>
@@ -241,8 +494,15 @@ const EmpLeaverequest = () => {
                   <td className="px-3 py-4 font-bold text-slate-600">{item.submitted}</td>
                   <td className="px-3 py-4 font-bold text-slate-600">{item.approvedBy}</td>
                   <td className="px-3 py-4">
-                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`More actions for ${item.id}`}>
-                      <SmallIcon name="more" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentMonth(new Date(new Date(item.startDate).getFullYear(), new Date(item.startDate).getMonth(), 1));
+                      }}
+                      className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50"
+                      aria-label={`View ${item.id} on calendar`}
+                    >
+                      <SmallIcon name="calendar" />
                     </button>
                   </td>
                 </tr>
@@ -251,11 +511,7 @@ const EmpLeaverequest = () => {
           </table>
         </div>
         <div className="flex items-center justify-center gap-3 border-t border-pink-50 px-5 py-4 text-sm font-black text-slate-500">
-          <span>1-5 of 8 requests</span>
-          <button type="button" className="grid h-9 w-9 place-items-center rounded-xl border border-pink-100 bg-white text-slate-500">‹</button>
-          <button type="button" className="grid h-9 w-9 place-items-center rounded-xl bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white">1</button>
-          <button type="button" className="grid h-9 w-9 place-items-center rounded-xl border border-pink-100 bg-white text-slate-600">2</button>
-          <button type="button" className="grid h-9 w-9 place-items-center rounded-xl border border-pink-100 bg-white text-slate-500">›</button>
+          <span>{filteredHistory.length} of {requests.length} requests</span>
         </div>
       </Card>
     </div>

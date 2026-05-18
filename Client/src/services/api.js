@@ -521,6 +521,67 @@ export const budgetAPI = {
   },
 };
 
+export const calendarAPI = {
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/calendar${query ? `?${query}` : ""}`), "calendar events");
+  },
+
+  create: async (event) => {
+    const response = await api.post("/calendar", event);
+    clearCache("/calendar");
+    return response.data;
+  },
+
+  update: async (id, event) => {
+    const response = await api.put(`/calendar/${id}`, event);
+    clearCache("/calendar");
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/calendar/${id}`);
+    clearCache("/calendar");
+    return response.data;
+  },
+
+  getDepartments: async () => {
+    return asArray(await cachedGet("/calendar/departments"), "calendar departments");
+  },
+
+  createDepartment: async (department) => {
+    const response = await api.post("/calendar/departments", department);
+    clearCache("/calendar/departments");
+    return response.data;
+  },
+};
+
+export const leaveRequestAPI = {
+  getAll: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    const response = await cachedGet(`/leave-requests${query ? `?${query}` : ""}`);
+    return {
+      ...response,
+      leaveRequests: asArray(response?.leaveRequests || response?.data, "leave requests"),
+      departments: Array.isArray(response?.departments) ? response.departments : [],
+      leaveTypes: Array.isArray(response?.leaveTypes) ? response.leaveTypes : [],
+      summary: response?.summary || {},
+    };
+  },
+
+  create: async (leaveRequest) => {
+    const response = await api.post("/leave-requests", leaveRequest);
+    clearCache("/leave-requests", "/dashboard");
+    return response.data;
+  },
+
+  updateStatus: async (id, status) => {
+    const response = await api.patch(`/leave-requests/${id}/status`, { status });
+    clearCache("/leave-requests", "/dashboard");
+    return response.data;
+  },
+};
+
 export const dashboardAPI = {
   getSummary: async () => {
     return cachedGet("/dashboard");

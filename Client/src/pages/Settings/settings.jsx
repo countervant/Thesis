@@ -2,17 +2,15 @@ import { useState } from "react";
 import settingsIcon from "../../assets/settings.png";
 import { useAuth } from "../../context/AuthContext.jsx";
 import NotificationSettings from "./notification.jsx";
+import PrivacySettings from "./privacy.jsx";
 import ProfileSettings from "./profile.jsx";
 import SecuritySettings from "./security.jsx";
 
 const menuItems = [
   ["Profile", "person"],
-  ["Account", "account"],
   ["Security", "shield"],
   ["Notifications", "bell"],
-  ["Appearance", "palette"],
   ["Privacy", "lock"],
-
 ];
 
 const overviewItems = [
@@ -22,7 +20,7 @@ const overviewItems = [
   ["Security Status", "Your account is secure", "shield"],
 ];
 
-const quickActions = ["Change Password", "Download My Data", "Deactivate Account"];
+const quickActions = ["Change Password", "Deactivate Account"];
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const commonProps = {
@@ -51,7 +49,8 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState("Profile");
   const isSecurityTab = activeTab === "Security";
   const isNotificationTab = activeTab === "Notifications";
-  const usesFullContent = isSecurityTab || isNotificationTab;
+  const isPrivacyTab = activeTab === "Privacy";
+  const usesFullContent = isSecurityTab || isNotificationTab || isPrivacyTab;
 
   return (
     <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
@@ -63,9 +62,9 @@ const Settings = () => {
             ? "xl:grid-cols-[210px_minmax(0,1fr)]"
             : "xl:grid-cols-[210px_minmax(0,1fr)_270px]"
         }`}>
-          <aside className="rounded-2xl border border-pink-100 bg-white p-3 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800 xl:min-h-[620px]">
+          <aside className="self-start rounded-2xl border border-pink-100 bg-white p-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
             <div className="flex h-full flex-col">
-              <nav className="space-y-1.5">
+              <nav className="space-y-3">
                 {menuItems.map(([label, icon]) => {
                   const isActive = label === activeTab;
                   return (
@@ -75,24 +74,24 @@ const Settings = () => {
                       onClick={() => setActiveTab(label)}
                       className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-xs font-black transition ${
                         isActive
-                          ? "bg-[#f4ebff] text-[#8b35ff]"
+                          ? "bg-pink-50 text-[#c72fb2]"
                           : "text-[#243154] hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300"
                       }`}
                     >
-                      <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-[#647299]" />
+                      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#c72fb2]" : "text-[#647299]"}`} />
                       <span>{label}</span>
                     </button>
                   );
                 })}
               </nav>
 
-              <section className="mt-auto rounded-xl border border-violet-200 bg-[#fbf7ff] p-3 shadow-[0_4px_14px_rgba(139,53,255,0.08)]">
+              <section className="mt-80 rounded-xl border border-pink-200 bg-pink-50/60 p-3 shadow-[0_4px_14px_rgba(199,47,178,0.08)]">
                 <div className="flex items-start gap-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#8b35ff] bg-white text-sm font-black text-[#8b35ff]">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#c72fb2] bg-white text-sm font-black text-[#c72fb2]">
                     ?
                   </span>
                   <div>
-                    <h2 className="text-xs font-black text-[#8b35ff]">Need Help?</h2>
+                    <h2 className="text-xs font-black text-[#c72fb2]">Need Help?</h2>
                     <p className="mt-1 text-[10px] font-semibold leading-4 text-[#647299]">
                       If you need assistance, our support team is here to help.
                     </p>
@@ -100,7 +99,7 @@ const Settings = () => {
                 </div>
                 <button
                   type="button"
-                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#d9c0ff] bg-white text-xs font-black text-[#8b35ff] transition hover:bg-violet-50"
+                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
                 >
                   Contact Support
                   <span className="text-sm leading-none">&gt;</span>
@@ -114,6 +113,8 @@ const Settings = () => {
               <SecuritySettings user={user} />
             ) : isNotificationTab ? (
               <NotificationSettings />
+            ) : isPrivacyTab ? (
+              <PrivacySettings />
             ) : (
               <>
                 <ProfileSettings user={user} />

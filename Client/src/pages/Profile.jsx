@@ -558,17 +558,17 @@ const Profile = ({ embedded = false }) => {
                   ["Other Expertise", ["System Administration", "Database Management", "Cybersecurity Basics", "Agile Methodology"]],
                 ].map(([group, skills]) => (
                   <div key={group} className="mb-5 last:mb-0">
-                    <h3 className="mb-3 text-sm font-black text-[#10142d]">{group}</h3>
+                    <h3 className="mb-3 text-sm font-black text-[black]">{group}</h3>
                     <div className="flex flex-wrap gap-2">
                       {skills.map((skill) => (
                         <span
                           key={skill}
-                          className="inline-flex items-center gap-2 rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
+                          className="inline-flex items-center gap-2 rounded-full border border-black-100 bg-black-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
                         >
                           {skill}
                           <button
                             type="button"
-                            className="text-sm font-black text-[#c72fb2] transition hover:text-pink-700"
+                            className="text-sm font-black text-[#c72fb2] transition hover:text-black-700"
                             aria-label={`Remove ${skill}`}
                           >
                             x
