@@ -62,11 +62,13 @@ const defaultOrigins = [
   "http://127.0.0.1:3001",
 ];
 
+const normalizeOrigin = (origin) => origin.trim().replace(/\/+$/, "");
+
 const parseOrigins = (...values) =>
   values
     .filter(Boolean)
     .flatMap((value) => value.split(","))
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 
 const allowedOrigins = [
@@ -85,12 +87,14 @@ app.use(
   cors({
     credentials: true,
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      const normalizedOrigin = origin ? normalizeOrigin(origin) : "";
+
+      if (!origin || allowedOrigins.includes(normalizedOrigin)) {
         return callback(null, true);
       }
 
-      console.warn(`[cors] Blocked origin: ${origin}`);
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      console.warn(`[cors] Blocked origin: ${normalizedOrigin}`);
+      return callback(new Error(`Origin ${normalizedOrigin} is not allowed by CORS`));
     },
   })
 );
