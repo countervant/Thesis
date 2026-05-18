@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
-import review from "../../../assets/review.png";
+import review from "../../../assets/Review.png";
 import done from "../../../assets/done.png";
 import {
   authAPI,
