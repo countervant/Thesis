@@ -35,7 +35,7 @@
     "client": "npm run dev --prefix Client",
     "server": "npm run dev --prefix Server",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "npm install --prefix Client && npm run build --prefix Client",
+    "build": "npm install --include=dev --prefix Client && npm run build --prefix Client",
     "start": "npm run start --prefix Server",
     "lint": "npm run lint --prefix Client",
     "install:all": "npm install && npm install --prefix Client && npm install --prefix Server"
