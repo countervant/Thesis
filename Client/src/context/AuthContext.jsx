@@ -1,12 +1,25 @@
 import { createContext, useCallback, useContext, useState, useEffect } from "react";
+import { authAPI } from "../services/api.js";
 
 const AuthContext = createContext(null);
 
-const normalizeRole = (role) => role?.toLowerCase();
+const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 const userForStorage = (userData) => {
   const storedUser = { ...(userData || {}) };
-  delete storedUser.avatar;
+  delete storedUser.password;
   return storedUser;
+};
+
+const normalizeUser = (userData, fallbackUser = null) => {
+  const source = userData || {};
+  const fallback = fallbackUser || {};
+
+  return {
+    ...fallback,
+    ...source,
+    id: source.id || source._id || fallback.id || fallback._id,
+    role: normalizeRole(source.role || source.type || fallback.role || fallback.type),
+  };
 };
 
 const persistUser = (userData) => {
@@ -22,51 +35,111 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is logged in on mount
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("token");
-    
-    if (storedUser && storedToken) {
-      const parsedUser = JSON.parse(storedUser);
-      const normalizedUser = {
-        ...parsedUser,
-        role: normalizeRole(parsedUser.role || parsedUser.type),
-      };
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(normalizedUser);
-      setToken(storedToken);
-      persistUser(normalizedUser);
+  const markOffline = useCallback(async (authToken = token) => {
+    if (!authToken) return;
+
+    try {
+      await authAPI.updatePresence(false, authToken);
+    } catch {
+      // Logging out should continue even if the presence request fails.
     }
-    setLoading(false);
+  }, [token]);
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        const storedToken = localStorage.getItem("token");
+
+        if (storedToken) {
+          setToken(storedToken);
+        }
+
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            const normalizedUser = normalizeUser(parsedUser);
+            setUser(normalizedUser);
+            persistUser(normalizedUser);
+          } catch {
+            localStorage.removeItem("user");
+          }
+        }
+
+        if (storedToken) {
+          try {
+            const profile = await authAPI.getMe();
+            const normalizedProfile = normalizeUser(profile);
+            setUser(normalizedProfile);
+            persistUser(normalizedProfile);
+          } catch {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            setToken(null);
+            setUser(null);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, []);
 
-  const login = (userData, authToken) => {
-    const normalizedUser = {
-      ...userData,
-      role: normalizeRole(userData.role || userData.type),
+  const userId = user?.id || user?._id;
+
+  useEffect(() => {
+    if (!token || !userId) return undefined;
+
+    let isActive = true;
+    const markOnline = () => {
+      if (document.visibilityState === "hidden") return;
+      authAPI.updatePresence(true).catch(() => {});
     };
+
+    markOnline();
+    const intervalId = window.setInterval(() => {
+      if (isActive) markOnline();
+    }, 120000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        markOnline();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      markOffline(token);
+    };
+  }, [markOffline, token, userId]);
+
+  const login = (userData, authToken) => {
+    const normalizedUser = normalizeUser(userData);
     setUser(normalizedUser);
     setToken(authToken);
     persistUser(normalizedUser);
     localStorage.setItem("token", authToken);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const currentToken = token;
+    await markOffline(currentToken);
     setUser(null);
     setToken(null);
+    authAPI.clearSessionCache();
     localStorage.removeItem("user");
     localStorage.removeItem("token");
   };
 
   const updateUser = useCallback((userData) => {
     setUser((currentUser) => {
-      const normalizedUser = {
-        ...currentUser,
-        ...userData,
-        id: userData.id || userData._id || currentUser?.id,
-        role: normalizeRole(userData.role || userData.type || currentUser?.role),
-      };
+      const normalizedUser = normalizeUser(userData, currentUser);
 
       persistUser(normalizedUser);
       return normalizedUser;
@@ -78,10 +151,11 @@ export const AuthProvider = ({ children }) => {
   // Check if user has required role(s)
   const hasRole = (roles) => {
     if (!user) return false;
+    const userRole = normalizeRole(user.role);
     if (typeof roles === "string") {
-      return user.role === roles;
+      return userRole === normalizeRole(roles);
     }
-    return roles.includes(user.role);
+    return roles.map(normalizeRole).includes(userRole);
   };
 
   return (

@@ -1,16 +1,23 @@
 import express from "express";
+import mongoose from "mongoose";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
-import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 
 const router = express.Router();
 const emailRegex =
   /^[A-Za-z0-9]+(?:[._%+-][A-Za-z0-9]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
+const isMongoTimeoutError = (error) =>
+  error?.name === "MongoNetworkTimeoutError" ||
+  error?.name === "MongoNetworkError" ||
+  String(error?.message || "").toLowerCase().includes("timed out");
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const isValidEmail = (email) => {
   const trimmedEmail = email.trim();
@@ -23,22 +30,39 @@ const isValidEmail = (email) => {
 
 // Register route
 router.post("/register", async (req, res) => {
-  const { firstName, lastName, email, password } = req.body;
+  const {
+    firstName,
+    middleInitial = "",
+    lastName,
+    companyName = "",
+    email,
+    password,
+    phone = "",
+    country = "Philippines",
+  } = req.body;
 
   try {
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !companyName || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Please provide first name, last name, email, and password" });
+        .json({
+          message: "Please provide first name, last name, company name, email, and password",
+        });
     }
 
     const trimmedFirstName = firstName.trim();
+    const trimmedMiddleInitial = middleInitial.trim();
     const trimmedLastName = lastName.trim();
+    const trimmedCompanyName = companyName.trim();
     const normalizedEmail = email.trim().toLowerCase();
     if (!trimmedFirstName || !trimmedLastName) {
       return res
         .status(400)
         .json({ message: "First name and last name are required" });
+    }
+
+    if (!trimmedCompanyName) {
+      return res.status(400).json({ message: "Company name is required" });
     }
 
     if (!isValidEmail(normalizedEmail)) {
@@ -59,24 +83,37 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const userExists = await User.findOne({ email: normalizedEmail });
+    const phoneValidation = getPhoneValidationMessage(phone, country);
+    if (phoneValidation) {
+      return res.status(400).json({ message: phoneValidation });
+    }
+
+    const userExists = await User.exists({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
 
     const user = await User.create({
       firstName: trimmedFirstName,
+      middleInitial: trimmedMiddleInitial,
       lastName: trimmedLastName,
+      companyName: trimmedCompanyName,
       email: normalizedEmail,
       password,
+      phone: phone.trim(),
+      country: country.trim() || "Philippines",
     });
     const token = generateToken(user._id);
     res.status(201).json({
       id: user._id,
       firstName: user.firstName,
+      middleInitial: user.middleInitial,
       lastName: user.lastName,
+      companyName: user.companyName,
       email: user.email,
       role: user.role,
+      phone: user.phone,
+      country: user.country,
       token,
     });
   } catch (error) {
@@ -103,14 +140,39 @@ router.post("/login", async (req, res) => {
    if (!isValidEmail(normalizedEmail)) {
     return res.status(400).json({ message: "Enter a valid email" });
    }
-   const user = await User.findOne({ email: normalizedEmail });
+   const loadUser = () =>
+    User.findOne({ email: normalizedEmail })
+      .select("password role email")
+      .maxTimeMS(20000);
+
+   let user;
+   try {
+    user = await loadUser();
+   } catch (error) {
+    if (!isMongoTimeoutError(error)) throw error;
+    await wait(750);
+    user = await loadUser();
+   }
 
     if(!user || !(await user.matchPassword(password))){
         return res.status(401).json({message: "Invalid email or password"});
     }
+    User.findByIdAndUpdate(user._id, {
+      isOnline: true,
+      lastSeen: new Date(),
+    }).maxTimeMS(8000).catch((error) => {
+      if (!isMongoTimeoutError(error)) {
+        console.error("Login presence update error:", error);
+      }
+    });
+
     const token = generateToken(user._id);
     res.status(200).json({id: user._id, email: user.email, role: user.role, token});
   } catch (error) {
+    if (isMongoTimeoutError(error)) {
+      return res.status(503).json({ message: "Login is temporarily unavailable. Please try again." });
+    }
+
     res.status(500).json({ message: "Server error" });
   }
 }
@@ -263,6 +325,85 @@ router.post("/reset-password", async (req, res) => {
      }
     );
 
+    router.patch("/presence", protect, async (req, res) => {
+      try {
+        const isOnline = req.body?.isOnline !== false;
+        const user = await User.findByIdAndUpdate(
+          req.user._id,
+          {
+            isOnline,
+            lastSeen: new Date(),
+          },
+          {
+            new: true,
+            select: "firstName lastName email role companyName isActive isOnline lastSeen",
+          }
+        ).lean();
+
+        res.status(200).json(user);
+      } catch (error) {
+        console.error("Update presence error:", error);
+        res.status(500).json({ message: "Unable to update presence" });
+      }
+    });
+
+    router.get("/online-team", protect, async (req, res) => {
+      try {
+        const onlineSince = new Date(Date.now() - 2 * 60 * 1000);
+        const users = await User.find({
+          role: { $in: ["admin", "employee"] },
+          isOnline: true,
+          lastSeen: { $gte: onlineSince },
+          isActive: { $ne: false },
+        })
+          .select("firstName lastName email role companyName isActive isOnline lastSeen")
+          .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
+          .maxTimeMS(8000)
+          .lean();
+
+        res.status(200).json(users);
+      } catch (error) {
+        console.error("Get online team error:", error);
+        res.status(500).json({ message: "Unable to fetch online team" });
+      }
+    });
+
+    router.get("/users/:id", protect, async (req, res) => {
+      try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+          return res.status(400).json({ message: "Invalid user" });
+        }
+
+        const loadUser = () =>
+          User.findById(req.params.id)
+            .select("firstName middleInitial lastName companyName email phone country role avatar coverPhoto position isActive")
+            .maxTimeMS(30000)
+            .lean();
+
+        let user;
+        try {
+          user = await loadUser();
+        } catch (error) {
+          if (!isMongoTimeoutError(error)) throw error;
+          await wait(750);
+          user = await loadUser();
+        }
+
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json(user);
+      } catch (error) {
+        if (isMongoTimeoutError(error)) {
+          return res.status(503).json({ message: "Profile is temporarily unavailable" });
+        }
+
+        console.error("Get public profile error:", error);
+        res.status(500).json({ message: "Unable to load profile" });
+      }
+    });
+
     router.put("/me", protect, async (req, res) => {
       try {
         const user = await User.findById(req.user._id);
@@ -273,11 +414,15 @@ router.post("/reset-password", async (req, res) => {
 
         const {
           firstName,
+          middleInitial,
           lastName,
+          companyName,
           email,
           phone,
+          country,
           position,
           avatar,
+          coverPhoto,
           password,
         } = req.body;
 
@@ -294,6 +439,10 @@ router.post("/reset-password", async (req, res) => {
           }
           user.lastName = lastName.trim();
         }
+
+        if (middleInitial !== undefined) user.middleInitial = middleInitial.trim();
+
+        if (companyName !== undefined) user.companyName = companyName.trim();
 
         if (email !== undefined) {
           const normalizedEmail = email.trim().toLowerCase();
@@ -315,13 +464,16 @@ router.post("/reset-password", async (req, res) => {
         }
 
         if (phone !== undefined) {
-          if (!isValidPhoneNumber(phone)) {
-            return res.status(400).json({ message: "Enter a valid phone number" });
+          const phoneValidation = getPhoneValidationMessage(phone, country ?? user.country);
+          if (phoneValidation) {
+            return res.status(400).json({ message: phoneValidation });
           }
           user.phone = phone.trim();
         }
+        if (country !== undefined) user.country = country.trim() || "Philippines";
         if (position !== undefined) user.position = position.trim();
         if (avatar !== undefined) user.avatar = avatar;
+        if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
 
         if (password) {
           if (password.length < 8) {
@@ -345,11 +497,15 @@ router.post("/reset-password", async (req, res) => {
           id: user._id,
           _id: user._id,
           firstName: user.firstName,
+          middleInitial: user.middleInitial,
           lastName: user.lastName,
+          companyName: user.companyName,
           email: user.email,
           role: user.role,
           avatar: user.avatar,
+          coverPhoto: user.coverPhoto,
           phone: user.phone,
+          country: user.country,
           position: user.position,
           isActive: user.isActive,
         });
@@ -367,7 +523,8 @@ router.post("/reset-password", async (req, res) => {
           _id: { $ne: req.user._id },
         })
           .select("firstName lastName email role")
-          .sort({ firstName: 1, lastName: 1 });
+          .sort({ firstName: 1, lastName: 1 })
+          .lean();
 
         res.status(200).json([
           {
@@ -388,11 +545,38 @@ router.post("/reset-password", async (req, res) => {
 
     router.get("/employees", protect, authorize("admin"), async (req, res) => {
       try {
-        const employees = await User.find({ role: "employee" })
-          .select("firstName lastName email phone position role isActive")
-          .sort({ createdAt: -1 });
+        const { page, limit, skip } = getPagination(req.query);
+        const search = String(req.query.search || "").trim();
+        const query = {
+          role: "employee",
+          ...(req.query.isActive === "true"
+            ? { isActive: true }
+            : req.query.isActive === "false"
+              ? { isActive: false }
+              : {}),
+          ...(search
+            ? {
+                $or: [
+                  { firstName: { $regex: search, $options: "i" } },
+                  { lastName: { $regex: search, $options: "i" } },
+                  { email: { $regex: search, $options: "i" } },
+                  { position: { $regex: search, $options: "i" } },
+                ],
+              }
+            : {}),
+        };
+        const [employees, total] = await Promise.all([
+          User.find(query)
+          .select("firstName lastName email phone country position role isActive")
+          .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .maxTimeMS(8000)
+          .lean(),
+          User.countDocuments(query).maxTimeMS(8000),
+        ]);
 
-        res.status(200).json(employees);
+        res.status(200).json(pagedResponse({ data: employees, page, limit, total, key: "employees" }));
       } catch (error) {
         console.error("Get employees error:", error);
         res.status(500).json({ message: "Unable to fetch employees" });
@@ -407,6 +591,7 @@ router.post("/reset-password", async (req, res) => {
           email,
           password,
           phone = "",
+          country = "Philippines",
           position = "",
           isActive = true,
         } = req.body;
@@ -429,11 +614,12 @@ router.post("/reset-password", async (req, res) => {
           return res.status(400).json({ message: "Enter a valid email" });
         }
 
-        if (!isValidPhoneNumber(phone)) {
-          return res.status(400).json({ message: "Enter a valid phone number" });
+        const phoneValidation = getPhoneValidationMessage(phone, country);
+        if (phoneValidation) {
+          return res.status(400).json({ message: phoneValidation });
         }
 
-        const userExists = await User.findOne({ email: normalizedEmail });
+        const userExists = await User.exists({ email: normalizedEmail });
 
         if (userExists) {
           return res.status(400).json({ message: "User already exists" });
@@ -445,6 +631,7 @@ router.post("/reset-password", async (req, res) => {
           email: normalizedEmail,
           password,
           phone: phone.trim(),
+          country: country.trim() || "Philippines",
           position: position.trim(),
           role: "employee",
           isActive: true,
@@ -456,8 +643,10 @@ router.post("/reset-password", async (req, res) => {
           lastName: employee.lastName,
           email: employee.email,
           phone: employee.phone,
+          country: employee.country,
           position: employee.position,
           role: employee.role,
+          avatar: employee.avatar,
           isActive: employee.isActive,
         });
       } catch (error) {
@@ -482,6 +671,7 @@ router.post("/reset-password", async (req, res) => {
           lastName,
           email,
           phone,
+          country,
           position,
           isActive,
           password,
@@ -497,11 +687,13 @@ router.post("/reset-password", async (req, res) => {
           employee.email = normalizedEmail;
         }
         if (phone !== undefined) {
-          if (!isValidPhoneNumber(phone)) {
-            return res.status(400).json({ message: "Enter a valid phone number" });
+          const phoneValidation = getPhoneValidationMessage(phone, country ?? employee.country);
+          if (phoneValidation) {
+            return res.status(400).json({ message: phoneValidation });
           }
           employee.phone = phone.trim();
         }
+        if (country !== undefined) employee.country = country.trim() || "Philippines";
         if (position !== undefined) employee.position = position.trim();
         if (isActive !== undefined) employee.isActive = isActive;
         if (password) {
@@ -521,8 +713,10 @@ router.post("/reset-password", async (req, res) => {
           lastName: employee.lastName,
           email: employee.email,
           phone: employee.phone,
+          country: employee.country,
           position: employee.position,
           role: employee.role,
+          avatar: employee.avatar,
           isActive: employee.isActive,
         });
       } catch (error) {

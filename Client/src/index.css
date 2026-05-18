@@ -1,8 +1,146 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --font-bruno: 'Bruno Ace SC', sans-serif;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark .bg-white,
+.dark .bg-neutral-50,
+.dark .bg-neutral-100,
+.dark .bg-gray-100,
+.dark [class~="bg-[#f1f1f1]"],
+.dark [class~="bg-[#f5f5f5]"] {
+  background-color: #101010 !important;
+}
+
+.dark .bg-blue-50,
+.dark .bg-green-50,
+.dark .bg-pink-50 {
+  background-color: #1a1a1a !important;
+}
+
+.dark .text-neutral-950,
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-neutral-700,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-black {
+  color: #f5f5f5 !important;
+}
+
+.dark .text-neutral-600,
+.dark .text-neutral-500,
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #f5f5f5 !important;
+}
+
+.dark .border-neutral-300,
+.dark .border-neutral-200,
+.dark .border-gray-400,
+.dark .border-black,
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: #292929 !important;
+}
+
+.dark .ring-pink-50,
+.dark .ring-pink-100,
+.dark .ring-neutral-100,
+.dark .ring-black\/10 {
+  --tw-ring-color: #292929 !important;
+}
+
+.dark .shadow-sm,
+.dark .shadow-lg,
+.dark .shadow-2xl,
+.dark [class*="shadow-["] {
+  box-shadow:
+    0 0 0 1px rgba(236, 92, 199, 0.24),
+    0 10px 30px rgba(236, 92, 199, 0.24),
+    0 8px 24px rgba(0, 0, 0, 0.34) !important;
+}
+
+.dark article,
+.dark [role="dialog"],
+.dark [role="menu"] {
+  box-shadow:
+    0 0 0 1px rgba(236, 92, 199, 0.22),
+    0 10px 28px rgba(236, 92, 199, 0.2),
+    0 8px 22px rgba(0, 0, 0, 0.32);
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  border-color: #3a3a3a !important;
+  background-color: transparent !important;
+  color: #f5f5f5 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #707070 !important;
+}
+
+.dark option {
+  background-color: #080808;
+  color: #f5f5f5;
+}
+
+.dark table,
+.dark article {
+  border-color: #292929;
+}
+
+.dark img[src*="assets/dashboard"],
+.dark img[src*="assets/task"],
+.dark img[src*="assets/budget"],
+.dark img[src*="assets/client-"],
+.dark img[src*="assets/employee"],
+.dark img[src*="assets/messages"],
+.dark img[src*="assets/newsfeed"],
+.dark img[src*="assets/notification"],
+.dark img[src*="assets/profile-"],
+.dark img[src*="assets/theme"],
+.dark img[src*="assets/logout"],
+.dark img[src*="assets/delete"] {
+  filter: brightness(0) invert(1);
+}
+
+.dark img[src*="assets/client-"],
+.dark img[src*="assets/profile-"] {
+  filter: brightness(0) invert(1) drop-shadow(0 0 5px rgba(255, 255, 255, 0.55));
+}
+
+.dark .top-nav-icon-active,
+.dark .group:hover .top-nav-icon,
+.dark [class*="brightness-0"][class*="invert"] {
+  filter: brightness(0) invert(1);
+}
+
+.top-nav-icon,
+.top-nav-icon-active {
+  transition: filter 180ms ease, transform 180ms ease;
+}
+
+.top-nav-icon-active,
+.group:hover .top-nav-icon {
+  filter: brightness(0) saturate(100%) invert(47%) sepia(62%) saturate(1827%)
+    hue-rotate(285deg) brightness(93%) contrast(91%);
 }
 
 .auth-screen {

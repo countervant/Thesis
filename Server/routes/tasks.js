@@ -1,11 +1,19 @@
 import express from "express";
 import Task from "../model/Admin/taskmodel.js";
 import { protect } from "../middleware/protectedjwt.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
+
+const startOfToday = () => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
+const isPastDate = (date) => date < startOfToday();
 
 const taskQueryForUser = (user) => {
   if (user.role === "admin") {
@@ -17,30 +25,91 @@ const taskQueryForUser = (user) => {
   };
 };
 
+const normalizeSubtasks = (subtasks = []) => {
+  if (!Array.isArray(subtasks)) return [];
+
+  return subtasks
+    .map((subtask) => ({
+      title: String(subtask?.title || "").trim(),
+      completed: Boolean(subtask?.completed),
+    }))
+    .filter((subtask) => subtask.title);
+};
+
+const getStatusFromSubtasks = (subtasks, fallbackStatus) => {
+  if (!subtasks.length) return fallbackStatus;
+
+  const completedCount = subtasks.filter((subtask) => subtask.completed).length;
+  if (completedCount === subtasks.length) return "done";
+  if (completedCount > 0) return "in_progress";
+  return "pending";
+};
+
 const normalizeTaskPayload = (body, userId) => {
   const title = body.title?.trim();
   const dueDate = body.dueDate ? new Date(body.dueDate) : null;
+  const startDate = body.startDate ? new Date(body.startDate) : dueDate;
   const status = body.status || "in_progress";
   const priority = body.priority || "medium";
+  const subtasks = normalizeSubtasks(body.subtasks).map((subtask) => ({
+    ...subtask,
+    completed: status === "done" ? true : subtask.completed,
+  }));
+  const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
 
   return {
     title,
     description: body.description?.trim() || "",
+    startDate,
     dueDate,
-    status: allowedStatuses.includes(status) ? status : "in_progress",
+    status: getStatusFromSubtasks(subtasks, fallbackStatus),
     priority: allowedPriorities.includes(priority) ? priority : "medium",
     assignedTo: body.assignedTo || userId,
+    subtasks,
   };
 };
 
 router.get("/", protect, async (req, res) => {
   try {
-    const tasks = await Task.find(taskQueryForUser(req.user))
+    const { page, limit, skip } = getPagination(req.query);
+    const query = { ...taskQueryForUser(req.user) };
+    const search = String(req.query.search || "").trim();
+
+    if (search) {
+      query.$and = [
+        ...(query.$and || []),
+        {
+          $or: [
+            { title: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
+          ],
+        },
+      ];
+    }
+
+    if (allowedStatuses.includes(req.query.status)) query.status = req.query.status;
+    if (allowedPriorities.includes(req.query.priority)) query.priority = req.query.priority;
+    if (req.query.assignedTo) query.assignedTo = req.query.assignedTo;
+    if (req.query.dueFrom || req.query.dueTo) {
+      query.dueDate = {};
+      if (req.query.dueFrom) query.dueDate.$gte = new Date(req.query.dueFrom);
+      if (req.query.dueTo) query.dueDate.$lte = new Date(req.query.dueTo);
+    }
+
+    const [tasks, total] = await Promise.all([
+      Task.find(query)
+      .select("-comments -attachments")
       .populate("assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+      .lean(),
+      Task.countDocuments(query).maxTimeMS(8000),
+    ]);
 
-    res.status(200).json(tasks);
+    res.status(200).json(pagedResponse({ data: tasks, page, limit, total, key: "tasks" }));
   } catch (error) {
     console.error("Get tasks error:", error);
     res.status(500).json({ message: "Unable to fetch tasks" });
@@ -55,8 +124,24 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Task title is required" });
     }
 
+    if (!payload.subtasks.length) {
+      return res.status(400).json({ message: "At least one subtask is required" });
+    }
+
     if (!payload.dueDate || Number.isNaN(payload.dueDate.getTime())) {
       return res.status(400).json({ message: "Valid due date is required" });
+    }
+
+    if (!payload.startDate || Number.isNaN(payload.startDate.getTime())) {
+      return res.status(400).json({ message: "Valid start date is required" });
+    }
+
+    if (payload.startDate > payload.dueDate) {
+      return res.status(400).json({ message: "Start date cannot be after due date" });
+    }
+
+    if (isPastDate(payload.startDate) || isPastDate(payload.dueDate)) {
+      return res.status(400).json({ message: "Past dates cannot be selected" });
     }
 
     const task = await Task.create({
@@ -67,7 +152,8 @@ router.post("/", protect, async (req, res) => {
 
     const createdTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role");
+      .populate("createdBy", "firstName lastName email role")
+      .lean();
 
     res.status(201).json(createdTask);
   } catch (error) {
@@ -91,10 +177,12 @@ router.put("/:id", protect, async (req, res) => {
       {
         title: req.body.title ?? task.title,
         description: req.body.description ?? task.description,
+        startDate: req.body.startDate ?? task.startDate ?? task.createdAt ?? task.dueDate,
         dueDate: req.body.dueDate ?? task.dueDate,
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
         assignedTo: req.body.assignedTo ?? task.assignedTo,
+        subtasks: req.body.subtasks ?? task.subtasks,
       },
       req.user._id
     );
@@ -107,19 +195,37 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(400).json({ message: "Valid due date is required" });
     }
 
+    if (!payload.startDate || Number.isNaN(payload.startDate.getTime())) {
+      return res.status(400).json({ message: "Valid start date is required" });
+    }
+
+    if (payload.startDate > payload.dueDate) {
+      return res.status(400).json({ message: "Start date cannot be after due date" });
+    }
+
+    if (
+      (req.body.startDate !== undefined && isPastDate(payload.startDate)) ||
+      (req.body.dueDate !== undefined && isPastDate(payload.dueDate))
+    ) {
+      return res.status(400).json({ message: "Past dates cannot be selected" });
+    }
+
     task.title = payload.title;
     task.description = payload.description;
+    task.startDate = payload.startDate;
     task.dueDate = payload.dueDate;
     task.status = payload.status;
     task.priority = payload.priority;
     task.assignedTo = payload.assignedTo;
+    task.subtasks = payload.subtasks;
     task.completedAt = payload.status === "done" ? task.completedAt || new Date() : undefined;
 
     await task.save();
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role");
+      .populate("createdBy", "firstName lastName email role")
+      .lean();
 
     res.status(200).json(updatedTask);
   } catch (error) {

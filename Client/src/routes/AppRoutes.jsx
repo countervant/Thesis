@@ -16,8 +16,10 @@ import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
 import ResetPassword from "../pages/auth/ResetPassword.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import Profile from "../pages/Profile.jsx";
+import PublicProfile from "../pages/PublicProfile.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
+import AppLoadingScreen from "../components/AppLoadingScreen.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 const dashboardPathByRole = {
@@ -38,6 +40,20 @@ const AuthLayout = () => {
 const RoleDashboardRedirect = () => {
   const { user } = useAuth();
   return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
+};
+
+const AuthPageRoute = ({ children }) => {
+  const { isAuthenticated, loading, token, user } = useAuth();
+
+  if (loading || (token && !user)) {
+    return <AppLoadingScreen />;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
+  }
+
+  return children;
 };
 
 const RouteErrorBoundary = () => {
@@ -79,9 +95,30 @@ const AppRoutes = () => {
   const router = createBrowserRouter(
     createRoutesFromElements(
       <Route element={<AuthLayout />} errorElement={<RouteErrorBoundary />}>
-        <Route index element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/ForgotPassword" element={<ForgotPassword />} />
+        <Route
+          index
+          element={
+            <AuthPageRoute>
+              <Login />
+            </AuthPageRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <AuthPageRoute>
+              <Register />
+            </AuthPageRoute>
+          }
+        />
+        <Route
+          path="/ForgotPassword"
+          element={
+            <AuthPageRoute>
+              <ForgotPassword />
+            </AuthPageRoute>
+          }
+        />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
         
@@ -100,6 +137,15 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile/:userId"
+          element={
+            <ProtectedRoute>
+              <PublicProfile />
             </ProtectedRoute>
           }
         />

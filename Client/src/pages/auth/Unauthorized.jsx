@@ -1,13 +1,23 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import AppLoadingScreen from "../../components/AppLoadingScreen.jsx";
 
 const Unauthorized = () => {
-  const { user } = useAuth();
+  const { loading, token, user } = useAuth();
+  const role = String(user?.role || "").trim();
   const dashboardPathByRole = {
     client: "/client/dashboard",
     employee: "/employee/dashboard",
     admin: "/admin/dashboard",
   };
+
+  if (loading || (token && !user)) {
+    return <AppLoadingScreen />;
+  }
+
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
@@ -18,14 +28,12 @@ const Unauthorized = () => {
         </h2>
         <p className="text-gray-600 mb-8">
           Sorry, you don't have permission to access this page.
-          {user && (
-            <span className="block mt-2">
-              Your current role: <strong>{user.role}</strong>
-            </span>
-          )}
+          <span className="block mt-2">
+            Your current role: <strong>{role || "Unknown"}</strong>
+          </span>
         </p>
         <Link
-          to={dashboardPathByRole[user?.role] || "/dashboard"}
+          to={dashboardPathByRole[role.toLowerCase()] || "/dashboard"}
           className="px-6 py-3 bg-linear-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-200"
         >
           Go to Dashboard

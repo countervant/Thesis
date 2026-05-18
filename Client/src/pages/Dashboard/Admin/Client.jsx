@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { clientAPI } from "../../../services/api.js";
+import { clientAPI, getApiErrorMessage } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
+import { getCountryFlag } from "../../../utils/countries.js";
+import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -13,9 +17,11 @@ const normalizeClient = (client) => ({
   id: client._id || client.id,
   initials: getInitials(client.contactPerson),
   name: client.contactPerson || "",
+  avatar: client.avatar || "",
   status: client.isActive ? "Active" : "Inactive",
   company: client.companyName || "",
   email: client.email || "",
+  country: client.country || "",
   phone: client.phone || "",
   service: client.service || "",
   address: client.address || "",
@@ -205,10 +211,10 @@ const FilterButton = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`h-9 rounded-lg px-5 text-sm font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.2)] transition ${
+    className={`h-9 min-w-[108px] rounded-xl border px-4 text-xs font-bold shadow-[0_2px_6px_rgba(190,65,158,0.12)] transition ${
       active
-        ? "bg-linear-to-r from-[#8424d2] to-[#e347b3] text-white"
-        : "bg-white text-neutral-800 hover:bg-pink-50 hover:text-[#c72fb2]"
+        ? "border-transparent bg-linear-to-r from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)]"
+        : "border-pink-100 bg-white text-neutral-800 hover:bg-pink-50 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-[#141414] dark:text-neutral-200"
     }`}
   >
     {children}
@@ -217,9 +223,10 @@ const FilterButton = ({ active, children, onClick }) => (
 
 const ClientCard = ({ client, onDelete }) => {
   const isActive = client.status === "Active";
+  const countryFlag = getCountryFlag(client.country);
 
   return (
-    <article className="relative rounded-lg bg-white px-6 pb-4 pt-5 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50">
+    <article className="flex min-h-[230px] flex-col rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white px-5 pb-4 pt-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
       {client.id === 1 && (
         <Icon
           name="bell"
@@ -227,49 +234,66 @@ const ClientCard = ({ client, onDelete }) => {
         />
       )}
 
-      <div className="flex items-center gap-4">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-lg font-bold text-white">
-          {client.initials}
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-neutral-900">{client.name}</h2>
+      <div className="flex items-start gap-4">
+        <InitialsAvatar
+          className="h-12 w-12"
+          fallback="CL"
+          initials={client.initials}
+          name={client.name}
+          src={client.avatar}
+          textClassName="text-base"
+        />
+        <div className="min-w-0 pt-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="truncate text-base font-extrabold text-neutral-950 dark:text-white">{client.name}</h2>
+            {countryFlag && (
+              <img
+                src={countryFlag}
+                alt=""
+                aria-label={client.country}
+                className="h-4 w-7 shrink-0 rounded-[2px] object-contain"
+                title={client.country}
+              />
+            )}
+          </div>
           <span
-            className={`mt-1 inline-flex h-5 items-center rounded-full px-4 text-xs font-medium shadow-[0_2px_5px_rgba(0,0,0,0.18)] ${
+            className={`mt-2 inline-flex h-6 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${
               isActive
-                ? "bg-[#d8ffe3] text-[#1d7f3f]"
-                : "bg-neutral-100 text-neutral-600"
+                ? "bg-[#d8ffe3] text-[#1d9a4f]"
+                : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             }`}
           >
+            <span className={`h-2 w-2 rounded-full ${isActive ? "bg-[#20bd5a]" : "bg-neutral-400"}`} />
             {client.status}
           </span>
         </div>
       </div>
 
-      <div className="mt-5 space-y-1 text-xs font-medium text-neutral-700">
+      <div className="mt-5 space-y-3 text-xs font-semibold text-slate-600 dark:text-neutral-300">
         <p className="flex items-center gap-2">
-          <Icon name="building" className="h-4 w-4 text-neutral-600" />
+          <Icon name="building" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {client.company}
         </p>
         <p className="flex items-center gap-2">
-          <Icon name="mail" className="h-4 w-4 text-neutral-600" />
+          <Icon name="mail" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {client.email}
         </p>
         <p className="flex items-center gap-2">
-          <Icon name="phone" className="h-4 w-4 text-neutral-600" />
+          <Icon name="phone" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {client.phone}
         </p>
       </div>
 
-      <div className="mt-6 flex items-center justify-between border-t border-neutral-300 pt-3 text-xs font-medium text-neutral-700">
-        <span>{client.service}</span>
+      <div className="mt-auto flex items-center justify-between border-t border-slate-200 pt-4 text-xs font-semibold text-slate-500 dark:border-neutral-800 dark:text-neutral-400">
+        <span className="truncate">{client.service}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => onDelete(client)}
-            className="grid h-8 w-8 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+            className="grid h-12 w-12 place-items-center rounded-xl bg-red-50 text-red-600 transition hover:bg-red-100"
             aria-label={`Delete ${client.name}`}
           >
-            <Icon name="delete" className="h-5 w-5" />
+            <Icon name="delete" className="h-6 w-6" />
           </button>
         </div>
       </div>
@@ -283,6 +307,7 @@ const AdminClients = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [clientToDelete, setClientToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -298,7 +323,7 @@ const AdminClients = () => {
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load clients.");
+          setErrorMessage(getApiErrorMessage(error, "Unable to load clients."));
         }
       } finally {
         if (isMounted) {
@@ -324,6 +349,7 @@ const AdminClients = () => {
         client.name,
         client.company,
         client.email,
+        client.country,
         client.phone,
         client.service,
       ]
@@ -344,9 +370,6 @@ const AdminClients = () => {
   };
 
   const deleteClient = async (client) => {
-    const shouldDelete = window.confirm(`Delete client "${client.name}"?`);
-    if (!shouldDelete) return;
-
     try {
       setErrorMessage("");
       await clientAPI.delete(client.id);
@@ -358,39 +381,90 @@ const AdminClients = () => {
     }
   };
 
+  const exportClients = () => {
+    const header = [
+      "Client",
+      "Status",
+      "Company",
+      "Email",
+      "Country",
+      "Phone",
+      "Service",
+      "Address",
+      "Notes",
+    ];
+    const rows = visibleClients.map((client) => [
+      client.name,
+      client.status,
+      client.company,
+      client.email,
+      client.country,
+      client.phone,
+      client.service,
+      client.address,
+      client.notes,
+    ]);
+    const csv = [header, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "clients.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
         <div className="mx-auto max-w-[1500px]">
-          <header className="flex items-start justify-between gap-5">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1
-                className="text-3xl uppercase leading-none text-neutral-950"
+                className="text-3xl leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Clients
               </h1>
-              <p className="mt-2 text-xs font-medium text-neutral-600">
-                Manage your client relationships
+              <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-neutral-400">
+                Manage and organize your client relationships
               </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={exportClients}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.32)] transition hover:brightness-105"
+              >
+                <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
+                  <path d="M10 3v9m0 0 4-4m-4 4-4-4M4 16h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Export
+              </button>
             </div>
           </header>
 
-          <section className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <section className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-center">
             <label className="relative flex-1">
               <span className="sr-only">Search clients</span>
               <input
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search clients..."
-                className="h-9 w-full rounded-lg border border-neutral-500 bg-white px-4 pr-10 text-sm text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100"
+                placeholder="Search clients by name, email, company..."
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-12 text-sm font-medium text-neutral-800 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
               />
               <Icon
                 name="search"
-                className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-800"
+                className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {filters.map((filter) => (
                 <FilterButton
                   key={filter}
@@ -403,7 +477,7 @@ const AdminClients = () => {
             </div>
           </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+          <section className="mt-5 grid gap-4 xl:grid-cols-2">
             {errorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100 lg:col-span-2">
                 {errorMessage}
@@ -411,9 +485,7 @@ const AdminClients = () => {
             )}
 
             {isLoading && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
-                Loading clients...
-              </p>
+              <PersonGridSkeleton type="client" rows={4} />
             )}
 
             {!isLoading && visibleClients.length === 0 && (
@@ -426,10 +498,24 @@ const AdminClients = () => {
               <ClientCard
                 key={client.id}
                 client={client}
-                onDelete={deleteClient}
+                onDelete={setClientToDelete}
               />
             ))}
           </section>
+          <ConfirmDialog
+            confirmLabel="Yes , delete"
+            icon="delete"
+            isOpen={Boolean(clientToDelete)}
+            message={`Delete client "${clientToDelete?.name || ""}"?`}
+            onCancel={() => setClientToDelete(null)}
+            onConfirm={async () => {
+              const client = clientToDelete;
+              setClientToDelete(null);
+              if (client) await deleteClient(client);
+            }}
+            title="Delete"
+          />
+        </div>
         </div>
   );
 };

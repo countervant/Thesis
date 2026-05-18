@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { employeeAPI } from "../../../services/api.js";
+import { employeeAPI, getApiErrorMessage } from "../../../services/api.js";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
+import { getCountryFlag } from "../../../utils/countries.js";
+import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
@@ -12,10 +16,12 @@ const normalizeEmployee = (employee) => ({
   id: employee._id || employee.id,
   initials: getInitials(employee.firstName, employee.lastName),
   name: [employee.firstName, employee.lastName].filter(Boolean).join(" "),
+  avatar: employee.avatar || "",
   status: employee.isActive ? "Active" : "Inactive",
   role: employee.position || "Employee",
   position: employee.position || "",
   email: employee.email || "",
+  country: employee.country || "",
   phone: employee.phone || "",
 });
 
@@ -208,10 +214,10 @@ const FilterButton = ({ active, children, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`h-9 rounded-lg px-5 text-sm font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.2)] transition ${
+    className={`h-9 min-w-[108px] rounded-xl border px-4 text-xs font-bold shadow-[0_2px_6px_rgba(190,65,158,0.12)] transition ${
       active
-        ? "bg-linear-to-r from-[#8424d2] to-[#e347b3] text-white"
-        : "bg-white text-neutral-800 hover:bg-pink-50 hover:text-[#c72fb2]"
+        ? "border-transparent bg-linear-to-r from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)]"
+        : "border-pink-100 bg-white text-neutral-800 hover:bg-pink-50 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-[#141414] dark:text-neutral-200"
     }`}
   >
     {children}
@@ -220,55 +226,73 @@ const FilterButton = ({ active, children, onClick }) => (
 
 const EmployeeCard = ({ employee, onDelete, onEdit }) => {
   const isActive = employee.status === "Active";
+  const countryFlag = getCountryFlag(employee.country);
 
   return (
-    <article className="rounded-lg bg-white px-7 pb-4 pt-6 shadow-[0_3px_4px_rgba(190,65,158,0.35)] ring-1 ring-pink-50">
-      <div className="flex items-center gap-4">
-        <div className="grid h-13 w-13 shrink-0 place-items-center rounded-full bg-linear-to-b from-[#8b2ed0] to-[#e04ab3] text-lg font-bold text-white">
-          {employee.initials}
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-neutral-900">{employee.name}</h2>
+    <article className="flex min-h-[230px] flex-col rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white px-5 pb-4 pt-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+      <div className="flex items-start gap-4">
+        <InitialsAvatar
+          className="h-12 w-12"
+          fallback="EM"
+          initials={employee.initials}
+          name={employee.name}
+          src={employee.avatar}
+          textClassName="text-base"
+        />
+        <div className="min-w-0 pt-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="truncate text-base font-extrabold text-neutral-950 dark:text-white">{employee.name}</h2>
+            {countryFlag && (
+              <img
+                src={countryFlag}
+                alt=""
+                aria-label={employee.country}
+                className="h-4 w-7 shrink-0 rounded-[2px] object-contain"
+                title={employee.country}
+              />
+            )}
+          </div>
           <span
-            className={`mt-1 inline-flex h-5 items-center rounded-full px-4 text-xs font-medium shadow-[0_2px_5px_rgba(0,0,0,0.18)] ${
+            className={`mt-2 inline-flex h-6 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${
               isActive
-                ? "bg-[#d8ffe3] text-[#1d7f3f]"
-                : "bg-neutral-100 text-neutral-600"
+                ? "bg-[#d8ffe3] text-[#1d9a4f]"
+                : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             }`}
           >
+            <span className={`h-2 w-2 rounded-full ${isActive ? "bg-[#20bd5a]" : "bg-neutral-400"}`} />
             {employee.status}
           </span>
         </div>
       </div>
 
-      <div className="mt-6 space-y-1 text-xs font-medium text-neutral-900">
+      <div className="mt-5 space-y-3 text-xs font-semibold text-slate-600 dark:text-neutral-300">
         <p className="flex items-center gap-2">
-          <Icon name="person" className="h-4 w-4" />
+          <Icon name="person" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {employee.role}
         </p>
         <p className="flex items-center gap-2">
-          <Icon name="mail" className="h-4 w-4" />
+          <Icon name="mail" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {employee.email}
         </p>
         <p className="flex items-center gap-2">
-          <Icon name="phone" className="h-4 w-4" />
+          <Icon name="phone" className="h-5 w-5 shrink-0 text-slate-500 dark:text-neutral-400" />
           {employee.phone}
         </p>
       </div>
 
-      <div className="mt-7 flex justify-end gap-2 border-t border-neutral-400 pt-3">
+      <div className="mt-auto flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-neutral-800">
         <button
           type="button"
           onClick={() => onEdit(employee)}
-          className="grid h-8 w-8 place-items-center rounded-md text-neutral-900 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+          className="grid h-9 w-9 place-items-center rounded-xl bg-pink-50 text-[#c72fb2] transition hover:bg-pink-100"
           aria-label={`Edit ${employee.name}`}
         >
-          <Icon name="edit" className="h-6 w-6" />
+          <Icon name="edit" className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={() => onDelete(employee)}
-          className="grid h-8 w-8 place-items-center rounded-md text-neutral-900 transition hover:bg-red-50 hover:text-red-600"
+          className="grid h-9 w-9 place-items-center rounded-xl bg-red-50 text-red-600 transition hover:bg-red-100"
           aria-label={`Delete ${employee.name}`}
         >
           <Icon name="delete" className="h-6 w-6" />
@@ -288,6 +312,7 @@ const AdminEmployees = ({
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -303,9 +328,7 @@ const AdminEmployees = ({
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load employees."
-          );
+          setErrorMessage(getApiErrorMessage(error, "Unable to load employees."));
         }
       } finally {
         if (isMounted) {
@@ -332,6 +355,7 @@ const AdminEmployees = ({
         employee.status,
         employee.role,
         employee.email,
+        employee.country,
         employee.phone,
       ]
         .join(" ")
@@ -355,9 +379,6 @@ const AdminEmployees = ({
   };
 
   const deleteEmployee = async (employee) => {
-    const shouldDelete = window.confirm(`Delete employee "${employee.name}"?`);
-    if (!shouldDelete) return;
-
     try {
       setErrorMessage("");
       await employeeAPI.delete(employee.id);
@@ -370,12 +391,13 @@ const AdminEmployees = ({
   };
 
   const exportEmployees = () => {
-    const header = ["Name", "Status", "Role", "Email", "Phone"];
+    const header = ["Name", "Status", "Role", "Email", "Country", "Phone"];
     const rows = visibleEmployees.map((employee) => [
       employee.name,
       employee.status,
       employee.role,
       employee.email,
+      employee.country,
       employee.phone,
     ]);
     const csv = [header, ...rows]
@@ -394,25 +416,26 @@ const AdminEmployees = ({
   };
 
   return (
-        <div className="mx-auto max-w-[1500px]">
-          <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+          <div className="mx-auto max-w-[1500px]">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1
-                className="text-3xl uppercase leading-none text-neutral-950"
+                 <h1
+                className="text-3xl leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
-                Employee
+                Employees
               </h1>
-              <p className="mt-2 text-xs font-medium text-neutral-800">
-                View your current Employee here
+              <p className="mt-2 text-sm font-semibold text-slate-500">
+                Manage and organize your employee records
               </p>
             </div>
 
-            <div className="flex items-center gap-5">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={onAddEmployee}
-                className="flex h-12 items-center gap-2 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] px-5 text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+                className="flex h-10 items-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
               >
                 <Icon name="add" className="h-5 w-5" />
                 <span>Add Employee</span>
@@ -421,30 +444,30 @@ const AdminEmployees = ({
               <button
                 type="button"
                 onClick={exportEmployees}
-                className="h-12 w-38 rounded-lg bg-linear-to-r from-[#8424d2] to-[#e347b3] text-base font-medium text-white shadow-[0_3px_8px_rgba(126,34,206,0.35)] transition hover:brightness-105"
+                className="h-10 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
               >
                 Export
               </button>
             </div>
           </header>
 
-          <section className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <label className="relative flex-1">
+          <section className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-center">
+            <label className="relative max-w-[760px] flex-1">
               <span className="sr-only">Search employees</span>
+              <Icon
+                name="search"
+                className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
+              />
               <input
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search Employee..."
-                className="h-9 w-full rounded-lg border border-neutral-600 bg-white px-4 pr-10 text-sm text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100"
-              />
-              <Icon
-                name="search"
-                className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-950"
+                placeholder="Search employees by name, email, role..."
+                className="h-10 w-full rounded-xl border border-pink-100 bg-white pl-12 pr-4 text-sm font-semibold text-neutral-800 shadow-[0_2px_6px_rgba(190,65,158,0.08)] outline-none transition placeholder:text-slate-400 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {filters.map((filter) => (
                 <FilterButton
                   key={filter}
@@ -457,7 +480,7 @@ const AdminEmployees = ({
             </div>
           </section>
 
-          <section className="mt-8 grid gap-4 lg:grid-cols-2">
+          <section className="mt-5 grid gap-4 xl:grid-cols-2">
             {errorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100 lg:col-span-2">
                 {errorMessage}
@@ -465,13 +488,11 @@ const AdminEmployees = ({
             )}
 
             {isLoading && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
-                Loading employees...
-              </p>
+              <PersonGridSkeleton type="employee" rows={4} />
             )}
 
             {!isLoading && visibleEmployees.length === 0 && (
-              <p className="rounded-md bg-white px-4 py-3 text-sm font-medium text-neutral-700 shadow-[0_3px_4px_rgba(190,65,158,0.2)] lg:col-span-2">
+              <p className="rounded-xl border border-pink-100 bg-white px-5 py-5 text-sm font-bold text-neutral-700 shadow-[0_8px_22px_rgba(190,65,158,0.12)] xl:col-span-2">
                 No employees found.
               </p>
             )}
@@ -480,11 +501,25 @@ const AdminEmployees = ({
               <EmployeeCard
                 key={employee.id}
                 employee={employee}
-                onDelete={deleteEmployee}
+                onDelete={setEmployeeToDelete}
                 onEdit={editEmployee}
               />
             ))}
           </section>
+          <ConfirmDialog
+            confirmLabel="Yes , delete"
+            icon="delete"
+            isOpen={Boolean(employeeToDelete)}
+            message={`Delete employee "${employeeToDelete?.name || ""}"?`}
+            onCancel={() => setEmployeeToDelete(null)}
+            onConfirm={async () => {
+              const employee = employeeToDelete;
+              setEmployeeToDelete(null);
+              if (employee) await deleteEmployee(employee);
+            }}
+            title="Delete"
+          />
+          </div>
         </div>
   );
 };

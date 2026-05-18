@@ -3,7 +3,8 @@ import Client from "../model/Admin/Clientmodel.js";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
-import { isValidPhoneNumber } from "../utils/phoneValidation.js";
+import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
+import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
 const emailRegex =
@@ -23,6 +24,7 @@ const normalizeClientPayload = (body) => ({
   contactPerson: body.contactPerson?.trim() || "",
   email: body.email?.trim().toLowerCase() || "",
   phone: body.phone?.trim() || "",
+  country: body.country?.trim() || "Philippines",
   service: body.service?.trim() || "",
   address: body.address?.trim() || "",
   notes: body.notes?.trim() || "",
@@ -35,8 +37,7 @@ const validateClientPayload = (payload) => {
   if (!payload.companyName) return "Company name is required";
   if (!payload.email) return "Email is required";
   if (!isValidEmail(payload.email)) return "Enter a valid email";
-  if (!isValidPhoneNumber(payload.phone)) return "Enter a valid phone number";
-  return "";
+  return getPhoneValidationMessage(payload.phone, payload.country);
 };
 
 const clientUserToClient = (user) => ({
@@ -46,6 +47,7 @@ const clientUserToClient = (user) => ({
   contactPerson: [user.firstName, user.lastName].filter(Boolean).join(" "),
   email: user.email,
   phone: user.phone || "",
+  country: user.country || "Philippines",
   service: user.position || "",
   isActive: user.isActive,
   address: "",
@@ -57,17 +59,61 @@ const clientUserToClient = (user) => ({
 
 router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
-    const clients = await Client.find()
-      .populate("assignedEmployee", "firstName lastName email role")
-      .sort({ createdAt: -1 });
-    const clientUsers = await User.find({ role: "client" })
-      .select("-password -resetPasswordToken -resetPasswordOTP")
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = getPagination(req.query);
+    const search = String(req.query.search || "").trim();
+    const activeFilter =
+      req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
+    const searchQuery = search
+      ? {
+          $or: [
+            { companyName: { $regex: search, $options: "i" } },
+            { contactPerson: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+    const clientQuery = {
+      ...searchQuery,
+      ...(activeFilter === undefined ? {} : { isActive: activeFilter }),
+    };
+    const userQuery = {
+      role: "client",
+      ...searchQuery,
+      ...(activeFilter === undefined ? {} : { isActive: activeFilter }),
+    };
 
-    res.status(200).json([
-      ...clientUsers.map(clientUserToClient),
-      ...clients.map((client) => ({ ...client.toObject(), source: "client" })),
+    const [clients, clientUsers, clientTotal, userTotal] = await Promise.all([
+      Client.find(clientQuery)
+      .select("companyName contactPerson email phone country service isActive address notes assignedEmployee createdAt updatedAt")
+      .populate("assignedEmployee", "firstName lastName email role")
+      .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+      .lean(),
+      User.find(userQuery)
+      .select("firstName lastName companyName email phone country position role isActive createdAt updatedAt")
+      .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+      .lean(),
+      Client.countDocuments(clientQuery).maxTimeMS(8000),
+      User.countDocuments(userQuery).maxTimeMS(8000),
     ]);
+
+    const data = [
+      ...clientUsers.map(clientUserToClient),
+      ...clients.map((client) => ({ ...client, source: "client" })),
+    ].slice(0, limit);
+
+    res.status(200).json(pagedResponse({
+      data,
+      page,
+      limit,
+      total: clientTotal + userTotal,
+      key: "clients",
+    }));
   } catch (error) {
     console.error("Get clients error:", error);
     res.status(500).json({ message: "Unable to fetch clients" });
@@ -117,6 +163,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
           [userClient.firstName, userClient.lastName].filter(Boolean).join(" "),
         email: req.body.email ?? userClient.email,
         phone: req.body.phone ?? userClient.phone,
+        country: req.body.country ?? userClient.country,
         service: req.body.service ?? userClient.position,
         isActive: req.body.isActive ?? userClient.isActive,
       });
@@ -140,6 +187,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       userClient.lastName = lastNameParts.join(" ") || userClient.lastName;
       userClient.email = payload.email;
       userClient.phone = payload.phone;
+      userClient.country = payload.country;
       userClient.position = payload.service;
       userClient.isActive = payload.isActive;
 
@@ -152,6 +200,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       contactPerson: req.body.contactPerson ?? client.contactPerson,
       email: req.body.email ?? client.email,
       phone: req.body.phone ?? client.phone,
+      country: req.body.country ?? client.country,
       service: req.body.service ?? client.service,
       address: req.body.address ?? client.address,
       notes: req.body.notes ?? client.notes,
@@ -177,6 +226,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
     client.contactPerson = payload.contactPerson;
     client.email = payload.email;
     client.phone = payload.phone;
+    client.country = payload.country;
     client.service = payload.service;
     client.address = payload.address;
     client.notes = payload.notes;

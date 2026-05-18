@@ -26,6 +26,12 @@ const clientSchema = new mongoose.Schema(
       default: "",
     },
 
+    country: {
+      type: String,
+      default: "Philippines",
+      trim: true,
+    },
+
     service: {
       type: String,
       default: "",
@@ -56,6 +62,11 @@ const clientSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+clientSchema.index({ createdAt: -1 });
+clientSchema.index({ email: 1 });
+clientSchema.index({ assignedEmployee: 1 });
+clientSchema.index({ isActive: 1, createdAt: -1 });
 
 const Client = mongoose.model("Client", clientSchema);
 

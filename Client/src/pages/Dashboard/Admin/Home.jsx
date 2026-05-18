@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
-import { budgetAPI, clientAPI, employeeAPI, taskAPI } from "../../../services/api.js";
+import { calendarAPI, dashboardAPI, getApiErrorMessage } from "../../../services/api.js";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
+import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
+import { useAuth } from "../../../context/AuthContext.jsx";
 
 const statItems = [
   { key: "in_progress", label: "In Progress", icon: "progress" },
@@ -62,7 +65,15 @@ const timelineTasks = [
   },
 ];
 
-const expenseColors = ["#d64ab2", "#9228c9", "#7d5cff", "#ff7b8a"];
+const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
+const dashboardCardShadow =
+  "border-b-2 border-b-[#f7b7e6] shadow-[0_3px_4px_rgba(190,65,158,0.16),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-100/70";
+const statStyles = {
+  in_progress: { tile: "bg-[#f0e9ff]", text: "text-[#754de8]" },
+  pending: { tile: "bg-[#ffeaf5]", text: "text-[#e347a8]" },
+  review: { tile: "bg-[#fff0e5]", text: "text-[#ff8317]" },
+  done: { tile: "bg-[#eafbed]", text: "text-[#28b84c]" },
+};
 
 const parseCalendarDate = (value) => {
   if (!value) return null;
@@ -123,6 +134,40 @@ const formatDate = (value) => {
   });
 };
 
+const getMonthKey = (value) => {
+  const date = parseCalendarDate(value);
+  const fallbackDate = date || new Date();
+  const year = fallbackDate.getFullYear();
+  const month = String(fallbackDate.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
+
+const getCurrentMonthKey = () => getMonthKey(new Date());
+
+const getNextMonthKey = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() + 1);
+  return getMonthKey(date);
+};
+
+const getLastMonthKey = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 1);
+  return getMonthKey(date);
+};
+
+const formatMonthLabel = (monthKey) => {
+  const [year, month] = String(monthKey).split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+
+  if (Number.isNaN(date.getTime())) return "Unknown Month";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+};
+
 const getUserId = (value) => value?._id || value?.id || value || "";
 
 const getUserName = (value) => {
@@ -130,6 +175,15 @@ const getUserName = (value) => {
   const lastName = value?.lastName || "";
   const name = `${firstName} ${lastName}`.trim();
   return name || value?.email || "Unassigned";
+};
+
+const toDateKey = (value) => {
+  const date = parseCalendarDate(value);
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 const Icon = ({ name, className = "h-8 w-8" }) => {
@@ -271,35 +325,28 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
   );
 };
 
-const Avatar = () => (
-  <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-slate-700">
-    <svg viewBox="0 0 32 32" className="h-7 w-7" aria-hidden="true">
-      <circle cx="16" cy="13" r="6" fill="#8fa2af" />
-      <path d="M7 28c1.5-5 4.6-7.5 9-7.5s7.5 2.5 9 7.5" fill="#647887" />
-      <path
-        d="M10 12h12"
-        stroke="#1f2937"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="13" cy="14" r="1.4" fill="#111827" />
-      <circle cx="19" cy="14" r="1.4" fill="#111827" />
-    </svg>
-  </div>
+const Avatar = ({ name }) => (
+  <InitialsAvatar className="h-8 w-8" name={name} textClassName="text-xs" />
 );
 
-const StatCard = ({ item }) => (
-  <section className="flex h-24 items-center gap-5 rounded-lg bg-white px-5 shadow-[0_2px_6px_rgba(219,39,119,0.28)] ring-1 ring-pink-100">
-    <Icon name={item.icon} className="h-14 w-14 shrink-0 text-[#dc4bb2]" />
+const StatCard = ({ item }) => {
+  const style = statStyles[item.key] || statStyles.in_progress;
+
+  return (
+  <section className={`flex h-24 items-center gap-4 rounded-2xl border border-pink-100 bg-white px-5 ${dashboardCardShadow}`}>
+    <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${style.tile}`}>
+      <Icon name={item.icon} className={`h-9 w-9 ${style.text}`} />
+    </span>
     <div className="leading-tight">
-      <p className="text-4xl font-bold text-neutral-950">{item.value}</p>
-      <p className="text-base text-neutral-500">{item.label}</p>
+      <p className="text-2xl font-extrabold text-[#10172a] dark:text-white">{item.value}</p>
+      <p className="mt-1.5 text-xs font-semibold text-slate-500 dark:text-neutral-100">{item.label}</p>
     </div>
   </section>
-);
+  );
+};
 
 const ProgressRing = ({ value }) => (
-  <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#a8a2ff] text-[10px] font-semibold text-[#9b91ff]">
+  <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-[#a8a2ff] text-[9px] font-semibold text-[#9b91ff]">
     {value}
   </span>
 );
@@ -308,22 +355,32 @@ const MonthlyChart = ({ tasks }) => {
   const tasksWithDates = tasks
     .map((task) => ({
       ...task,
+      calendarStartDate: parseCalendarDate(task.startDate || task.createdAt || task.dueDate),
       calendarDueDate: parseCalendarDate(task.dueDate),
     }))
-    .filter((task) => task.calendarDueDate)
-    .sort((firstTask, secondTask) => firstTask.calendarDueDate - secondTask.calendarDueDate);
+    .filter((task) => task.calendarStartDate && task.calendarDueDate)
+    .sort((firstTask, secondTask) => firstTask.calendarStartDate - secondTask.calendarStartDate);
 
-  const timelineStart = startOfWeek(tasksWithDates[0]?.calendarDueDate || new Date());
-  const chartWeeks = [0, 7, 14].map((dayOffset) =>
+  const timelineStart = startOfWeek(tasksWithDates[0]?.calendarStartDate || new Date());
+  const latestDueDayOffset = tasksWithDates.reduce(
+    (latestOffset, task) =>
+      Math.max(latestOffset, daysBetween(timelineStart, task.calendarDueDate)),
+    timelineDayCount - 1
+  );
+  const visibleWeekCount = Math.max(3, Math.ceil((latestDueDayOffset + 1) / 7));
+  const visibleDayCount = visibleWeekCount * 7;
+  const chartMinWidth = Math.max(660, visibleDayCount * 30);
+  const chartWeeks = Array.from({ length: visibleWeekCount }, (_, index) => index * 7).map((dayOffset) =>
     formatWeekLabel(addDays(timelineStart, dayOffset))
   );
+  const colors = ["#7c5cff", "#ff4ba2", "#ff8a1f", "#25c24d", "#35b5ff"];
 
   const chartTasks = tasksWithDates.slice(0, 5).map((task, index) => {
-    const dueDayOffset = daysBetween(timelineStart, task.calendarDueDate);
-    const start = Math.min(Math.max(dueDayOffset + 0.1, 0), timelineDayCount - 1);
-    const width = task.status === "done" || task.status === "review" ? 0.8 : 1;
-    const colors = ["#7da4e6", "#8a97ee", "#8d73dc", "#bd75e8", "#d46cdf"];
-
+    const rawStart = daysBetween(timelineStart, task.calendarStartDate);
+    const rawEnd = Math.max(rawStart, daysBetween(timelineStart, task.calendarDueDate));
+    const start = Math.min(Math.max(rawStart + 0.1, 0), visibleDayCount - 1);
+    const end = Math.min(Math.max(rawEnd + 1, 0.8), visibleDayCount);
+    const width = Math.max(end - start, 0.8);
     return {
       name: task.title?.length > 12 ? `${task.title.slice(0, 10)}...` : task.title || "Task",
       effort: task.priority === "high" ? 3 : task.priority === "medium" ? 2 : 1,
@@ -343,36 +400,46 @@ const MonthlyChart = ({ tasks }) => {
   const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
 
   return (
-  <section className="overflow-hidden rounded-lg bg-white px-6 py-6 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-    <h2 className="mb-5 text-lg font-bold text-neutral-950">
-      Monthly Overview
-    </h2>
-    <div className="grid grid-cols-[190px_1fr] overflow-x-auto">
-      <div className="border-r border-neutral-200 pr-3">
-        <div className="h-13" />
-        {visibleTasks.map((task) => (
+  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white px-5 py-5 ${dashboardCardShadow}`}>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Monthly Overview</h2>
+    </div>
+    <div className="grid grid-cols-[178px_1fr] overflow-x-auto">
+      <div className="border-r border-slate-200 pr-4">
+        <p className="h-10 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-white">
+          Tasks
+        </p>
+        {visibleTasks.slice(0, 4).map((task, index) => (
           <div
             key={task.name}
-            className="grid h-13 grid-cols-[1fr_26px_34px] items-center gap-3 border-t border-neutral-100 text-xs text-neutral-800"
+            className="grid h-10 grid-cols-[1fr_22px_30px] items-center gap-2 text-xs text-[#10172a] dark:text-white"
           >
-            <span className="flex items-center gap-3 font-medium">
-              <span className="h-2 w-2 rounded-full bg-neutral-300" />
+            <span className="flex min-w-0 items-center gap-2 font-semibold">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: colors[index % colors.length] }}
+              />
+              <span className="truncate">
               {task.name}
+              </span>
             </span>
             <span>{task.effort}</span>
-            <ProgressRing value={task.progress} />
+            <ProgressRing value={task.progress || 50} />
           </div>
         ))}
       </div>
 
-      <div className="min-w-[720px]">
-        <div className="grid h-13 grid-cols-3 border-b border-neutral-100">
+      <div style={{ minWidth: `${chartMinWidth}px` }}>
+        <div
+          className="grid h-10 border-b border-neutral-100"
+          style={{ gridTemplateColumns: `repeat(${visibleWeekCount}, minmax(0, 1fr))` }}
+        >
           {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
-              <p className="text-center text-xs font-semibold text-neutral-600">
+              <p className="text-center text-xs font-semibold text-[#10172a] dark:text-white">
                 {week}
               </p>
-              <div className="mt-2 grid grid-cols-7 text-center text-[10px] font-medium text-neutral-500">
+              <div className="mt-2 grid grid-cols-7 text-center text-[10px] font-bold text-slate-500 dark:text-white">
                 {timelineDays.map((day, index) => (
                   <span key={`${week}-${day}-${index}`}>{day}</span>
                 ))}
@@ -382,26 +449,31 @@ const MonthlyChart = ({ tasks }) => {
         </div>
 
         <div className="relative">
-          <div className="absolute inset-0 bg-[repeating-linear-gradient(to_right,#f1f1f1_0,#f1f1f1_1px,transparent_1px,transparent_calc(100%/21))]" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `repeating-linear-gradient(to right, #e9edf5 0, #e9edf5 1px, transparent 1px, transparent calc(100% / ${visibleDayCount}))`,
+            }}
+          />
           <div className="relative">
-            {visibleTasks.map((task) => (
+            {visibleTasks.slice(0, 4).map((task) => (
               <div
                 key={task.name}
-                className="relative h-13 border-b border-neutral-100 last:border-b-0"
+                className="relative h-10 border-b border-neutral-100 last:border-b-0"
               >
                 {task.segments.map((segment, index) => (
                   <div
                     key={`${task.name}-${index}`}
-                    className={`absolute top-1/2 h-8 -translate-y-1/2 rounded-md shadow-sm ${
+                    className={`absolute top-1/2 h-5 -translate-y-1/2 rounded-md shadow-sm ${
                       segment.diamond ? "aspect-square rotate-45" : ""
                     }`}
                     style={{
-                      left: `${(segment.start / timelineDayCount) * 100}%`,
+                      left: `${(segment.start / visibleDayCount) * 100}%`,
                       width: segment.diamond
-                        ? "30px"
-                        : `${(segment.width / timelineDayCount) * 100}%`,
+                        ? "22px"
+                        : `${(segment.width / visibleDayCount) * 100}%`,
                       background: segment.striped
-                        ? `repeating-linear-gradient(45deg, ${segment.color} 0, ${segment.color} 2px, #d8cbff 2px, #d8cbff 5px)`
+                        ? `repeating-linear-gradient(45deg, ${segment.color} 0, ${segment.color} 2px, rgba(255,255,255,0.65) 2px, rgba(255,255,255,0.65) 5px)`
                         : segment.color,
                     }}
                   />
@@ -417,8 +489,28 @@ const MonthlyChart = ({ tasks }) => {
 };
 
 const ExpenseChart = ({ budgetEntries }) => {
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
+  const monthOptions = useMemo(() => {
+    const months = Array.from(
+      new Set(budgetEntries.map((entry) => getMonthKey(entry.date || entry.createdAt)))
+    );
+    const defaultMonths = [getCurrentMonthKey(), getLastMonthKey()];
+    return Array.from(new Set([...defaultMonths, ...months])).sort((first, second) =>
+      second.localeCompare(first)
+    );
+  }, [budgetEntries]);
+
+  useEffect(() => {
+    if (!monthOptions.includes(selectedMonth)) {
+      setSelectedMonth(getCurrentMonthKey());
+    }
+  }, [monthOptions, selectedMonth]);
+
+  const filteredBudgetEntries = budgetEntries.filter(
+    (entry) => getMonthKey(entry.date || entry.createdAt) === selectedMonth
+  );
   const expenseCategories = Object.entries(
-    budgetEntries
+    filteredBudgetEntries
       .filter((entry) => entry.type === "expense")
       .reduce((result, entry) => {
         const category = entry.category || "General";
@@ -452,29 +544,76 @@ const ExpenseChart = ({ budgetEntries }) => {
     { currentPercent: 0, stops: [] }
   ).stops;
 
+  const formatPeso = (amount) =>
+    new Intl.NumberFormat("en-PH", {
+      currency: "PHP",
+      maximumFractionDigits: 0,
+      style: "currency",
+    }).format(Math.abs(Number(amount) || 0));
+
   return (
-    <section className="rounded-lg bg-white px-6 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-      <h2 className="mb-4 text-lg font-bold text-neutral-950">
-        Expense Categories
-      </h2>
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-5 ${dashboardCardShadow}`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
+        <label className="relative">
+          <span className="sr-only">Filter expense categories by month</span>
+          <select
+            value={selectedMonth}
+            onChange={(event) => setSelectedMonth(event.target.value)}
+            className="h-9 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-9 text-xs font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:text-white"
+          >
+            {monthOptions.map((month) => (
+              <option key={month} value={month}>
+                {month === getCurrentMonthKey()
+                  ? "This Month"
+                  : month === getLastMonthKey()
+                    ? "Last Month"
+                    : formatMonthLabel(month)}
+              </option>
+            ))}
+          </select>
+          <svg
+            viewBox="0 0 20 20"
+            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#10172a] dark:text-white"
+            aria-hidden="true"
+          >
+            <path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </label>
+      </div>
       <div
-        className="relative mx-auto h-56 w-56 rounded-full"
+        className="relative mx-auto grid h-44 w-44 place-items-center rounded-full"
         style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
-      />
-      <div className="mt-4 space-y-2 text-xs text-neutral-500">
-        {expenseCategories.length === 0 && (
-          <span className="flex items-center gap-2">
+      >
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-neutral-950">
+          <span>
+            <span className="block text-[10px] font-semibold text-slate-500 dark:text-white">Total Expenses</span>
+            <span className="mt-1 block text-lg font-extrabold text-[#10172a] dark:text-white">
+              {formatPeso(total)}
+            </span>
+          </span>
+        </div>
+      </div>
+      <div className="mt-4 space-y-2 text-xs text-[#10172a] dark:text-white">
+      {expenseCategories.length === 0 && (
+          <span className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
             No expenses
           </span>
         )}
         {expenseCategories.map((category) => (
-          <span key={category.label} className="flex items-center gap-2">
+          <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-3">
+            <span className="flex min-w-0 items-center gap-2">
             <span
-              className="h-2 w-2 rounded-full"
+              className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: category.color }}
             />
-            {category.label}
+              <span className="truncate font-semibold">{category.label}</span>
+            </span>
+            <span className="font-bold">{formatPeso(category.value)}</span>
+            <span className="w-12 text-right font-bold text-slate-500 dark:text-white">
+              {total > 0 ? `${((category.value / total) * 100).toFixed(1)}%` : "0%"}
+            </span>
           </span>
         ))}
       </div>
@@ -482,24 +621,33 @@ const ExpenseChart = ({ budgetEntries }) => {
   );
 };
 
-const EmployeeTable = ({ title, employees }) => (
-  <section className="overflow-hidden rounded-lg bg-white shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-    <div className="px-7 pt-5">
-      <h2 className="text-lg font-bold text-neutral-950">{title}</h2>
+const EmployeeTable = ({ title, employees, tone = "violet" }) => (
+  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
+    <div className="flex items-center justify-between px-5 pt-4">
+      <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+        {title}
+        <span
+          className={`grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs ${
+            tone === "pink" ? "bg-pink-100 text-pink-500" : "bg-violet-100 text-violet-600"
+          }`}
+        >
+          {employees.length}
+        </span>
+      </h2>
     </div>
-    <table className="mt-1 w-full text-left text-xs text-neutral-900">
-      <thead className="border-b border-slate-100 text-neutral-700">
+    <table className="mt-3 w-full text-left text-xs text-[#10172a] dark:text-white">
+      <thead className="border-b border-slate-100 text-slate-500 dark:text-white">
         <tr>
-          <th className="w-16 px-5 py-3 font-medium">Employee</th>
-          <th className="px-3 py-3 font-medium">Job</th>
-          <th className="px-3 py-3 font-medium">Client</th>
-          <th className="px-3 py-3 font-medium">Date</th>
+          <th className="px-5 py-2.5 font-extrabold">Employee</th>
+          <th className="px-3 py-2.5 font-extrabold">Job</th>
+          <th className="px-3 py-2.5 font-extrabold">Client</th>
+          <th className="px-3 py-2.5 font-extrabold">{tone === "pink" ? "Status" : "Date"}</th>
         </tr>
       </thead>
       <tbody>
         {employees.length === 0 && (
           <tr>
-            <td colSpan="4" className="px-5 py-6 text-center text-neutral-500">
+            <td colSpan="4" className="px-5 py-5 text-center text-neutral-500 dark:text-white">
               No employees to show.
             </td>
           </tr>
@@ -507,15 +655,23 @@ const EmployeeTable = ({ title, employees }) => (
 
         {employees.map((employee, index) => (
           <tr key={`${title}-${index}`}>
-            <td className="px-5 py-2">
-              <div className="flex items-center gap-4">
-                <Avatar />
-                <span>{employee.name}</span>
+            <td className="px-5 py-2.5">
+              <div className="flex items-center gap-3">
+                <Avatar name={employee.name} />
+                <span className="font-semibold">{employee.name}</span>
               </div>
             </td>
-            <td className="px-3 py-2">{employee.job}</td>
-            <td className="px-3 py-2">{employee.client}</td>
-            <td className="px-3 py-2">{employee.date}</td>
+            <td className="px-3 py-2.5 font-medium">{employee.job}</td>
+            <td className="px-3 py-2.5 font-medium">{employee.client}</td>
+            <td className="px-3 py-2.5 font-medium">
+              {employee.date === "Available" ? (
+                <span className="rounded-full bg-green-100 px-3 py-1 text-[11px] font-bold text-green-600">
+                  Available
+                </span>
+              ) : (
+                employee.date
+              )}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -524,22 +680,176 @@ const EmployeeTable = ({ title, employees }) => (
 );
 
 const PlaceholderPanel = ({ title, children }) => (
-  <section className="rounded-lg bg-white px-8 py-10 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
+  <section className={`rounded-lg border border-pink-100 bg-white px-8 py-10 ${dashboardCardShadow}`}>
     <h1
-      className="text-2xl uppercase text-neutral-950"
+      className="text-2xl uppercase text-neutral-950 dark:text-white"
       style={{ fontFamily: "var(--font-bruno)" }}
     >
       {title}
     </h1>
-    <p className="mt-3 text-sm font-medium text-neutral-600">{children}</p>
+    <p className="mt-3 text-sm font-medium text-neutral-600 dark:text-white">{children}</p>
   </section>
 );
 
+const RecentActivities = ({ tasks, employees }) => {
+  const activities = [
+    ...employees.slice(0, 2).map((employee, index) => ({
+      name: getUserName(employee),
+      text: index === 0 ? "logged in" : "updated their profile",
+      time: employee.updatedAt || employee.createdAt,
+    })),
+    ...tasks.slice(0, 3).map((task) => ({
+      name: getUserName(task.assignedTo || task.createdBy),
+      text: `updated task "${task.title || "Untitled Task"}"`,
+      time: task.updatedAt || task.createdAt || task.dueDate,
+    })),
+  ].slice(0, 4);
+
+  const fallbackActivities = [
+    { name: "Luis Emmanuel Reyes", text: "logged in", time: "May 09, 2026 at 10:15 AM" },
+    { name: "Kate Valdez", text: 'updated task "SEO Audit"', time: "May 09, 2026 at 9:00 AM" },
+    { name: "Maria Santos", text: 'posted announcement "New Company Policy"', time: "May 09, 2026 at 8:45 AM" },
+    { name: "John Carlo", text: 'completed task "Oplan Launch 2"', time: "May 09, 2026 at 8:30 AM" },
+  ];
+  const visibleActivities = activities.length > 0 ? activities : fallbackActivities;
+
+  return (
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+          <span className="text-[#c72fb2]">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <path d="M4 13h4l2-7 4 14 2-7h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          Recent Activities
+        </h2>
+        <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
+          View all
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {visibleActivities.map((activity, index) => (
+          <div key={`${activity.name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+            <Avatar name={activity.name} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+                {activity.name} <span className="font-semibold">{activity.text}</span>
+              </span>
+              <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-white">
+                {typeof activity.time === "string" && activity.time.includes(" at ")
+                  ? activity.time
+                  : formatDate(activity.time)}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const calendarDotStyles = {
+  blue: "bg-blue-500",
+  emerald: "bg-emerald-500",
+  orange: "bg-orange-500",
+  pink: "bg-pink-500",
+  violet: "bg-violet-600",
+};
+
+const calendarTypeStyles = {
+  "Company Event": "bg-violet-50 text-violet-700",
+  Meeting: "bg-orange-50 text-orange-600",
+  Deadline: "bg-blue-50 text-blue-700",
+  Leave: "bg-pink-50 text-pink-700",
+  Holiday: "bg-emerald-50 text-emerald-700",
+  Birthday: "bg-violet-50 text-violet-700",
+  Personal: "bg-emerald-50 text-emerald-700",
+};
+
+const normalizeCalendarEvent = (event) => {
+  const dateKey = toDateKey(event.date);
+  const tone = event.color || (
+    event.type === "Deadline" ? "blue" :
+    event.type === "Leave" ? "pink" :
+    event.type === "Holiday" || event.type === "Company Event" ? "emerald" :
+    event.type === "Birthday" ? "violet" :
+    "orange"
+  );
+
+  return {
+    ...event,
+    id: event._id || event.id,
+    dateKey,
+    time: event.startTime === "All Day" ? "All Day" : [event.startTime, event.endTime].filter(Boolean).join(" - "),
+    dot: calendarDotStyles[tone] || calendarDotStyles.orange,
+    typeClass: calendarTypeStyles[event.type] || calendarTypeStyles.Meeting,
+  };
+};
+
+const UpcomingEvents = ({ events }) => {
+  const todayKey = toDateKey(new Date());
+  const upcomingEvents = events
+    .map(normalizeCalendarEvent)
+    .filter((event) => event.dateKey >= todayKey)
+    .sort((first, second) => first.dateKey.localeCompare(second.dateKey) || String(first.startTime || "").localeCompare(String(second.startTime || "")))
+    .slice(0, 6);
+
+  return (
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+          <span className="text-[#c72fb2]">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <rect x="5" y="5" width="14" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M8 3v4M16 3v4M5 10h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </span>
+          Upcoming Events
+          <span className="grid h-6 min-w-6 place-items-center rounded-full bg-violet-100 px-2 text-xs font-black text-violet-600">
+            {upcomingEvents.length}
+          </span>
+        </h2>
+        <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
+          View all
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {upcomingEvents.length === 0 && (
+          <p className="py-6 text-center text-sm font-semibold text-slate-500 dark:text-white">
+            No upcoming events.
+          </p>
+        )}
+        {upcomingEvents.map((event) => (
+          <div key={event.id || `${event.title}-${event.dateKey}`} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+            <span className={`h-3 w-3 rounded-full ${event.dot}`} />
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+                {event.title}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
+                {formatDate(event.date)} {event.time ? `• ${event.time}` : ""}
+              </span>
+            </span>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${event.typeClass}`}>
+              {event.type || "Event"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 const AdminDashboard = ({ activePage = "dashboard" }) => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [budgetEntries, setBudgetEntries] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [taskStatusCounts, setTaskStatusCounts] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const activeTopTab = ["dashboard", "newsfeed", "messages"].includes(activePage)
     ? activePage
@@ -547,7 +857,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
   const stats = statItems.map((item) => ({
     ...item,
-    value: tasks.filter((task) => task.status === item.key).length,
+    value: taskStatusCounts[item.key] ?? tasks.filter((task) => task.status === item.key).length,
   }));
 
   const activeTaskAssigneeIds = new Set(
@@ -585,30 +895,38 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
     const loadHomeData = async () => {
       try {
+        setIsLoading(true);
         setLoadError("");
-        const [taskData, employeeData, clientData, budgetData] = await Promise.all([
-          taskAPI.getAll(),
-          employeeAPI.getAll(),
-          clientAPI.getAll(),
-          budgetAPI.getAll(),
+        const [summary, currentMonthEvents, nextMonthEvents] = await Promise.all([
+          dashboardAPI.getSummary(),
+          calendarAPI.getAll({ month: getCurrentMonthKey() }),
+          calendarAPI.getAll({ month: getNextMonthKey() }),
         ]);
 
         if (!isMounted) {
           return;
         }
 
-        setTasks(Array.isArray(taskData) ? taskData : []);
-        setEmployees(Array.isArray(employeeData) ? employeeData : []);
-        setClients(Array.isArray(clientData) ? clientData : []);
-        setBudgetEntries(Array.isArray(budgetData) ? budgetData : []);
+        setTasks(Array.isArray(summary.recentTasks) ? summary.recentTasks : []);
+        setEmployees(Array.isArray(summary.recentEmployees) ? summary.recentEmployees : []);
+        setClients(Array.isArray(summary.recentClients) ? summary.recentClients : []);
+        setBudgetEntries(Array.isArray(summary.recentBudgetEntries) ? summary.recentBudgetEntries : []);
+        setCalendarEvents([
+          ...(Array.isArray(currentMonthEvents) ? currentMonthEvents : []),
+          ...(Array.isArray(nextMonthEvents) ? nextMonthEvents : []),
+        ]);
+        setTaskStatusCounts(summary.taskStatusCounts || {});
+        setLoadError("");
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
-        setLoadError(
-          error.response?.data?.message || "Unable to load dashboard data."
-        );
+        setLoadError(getApiErrorMessage(error, "Unable to load dashboard data."));
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -619,8 +937,12 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
     };
   }, []);
 
+  if (activeTopTab === "dashboard" && isLoading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-        <div className="mx-auto max-w-[1500px] space-y-5">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}
@@ -629,20 +951,38 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
           {activeTopTab === "dashboard" && (
             <>
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <header className="pb-1">
+                <p className="text-sm font-black text-[#10172a] dark:text-white">
+           
+                  Welcome back, {getUserName(user)}!
+                </p>
+                <h1
+                  className="mt-1 text-3xl uppercase leading-none text-neutral-950 dark:text-white"
+                  style={{ fontFamily: "var(--font-bruno)" }}
+                >
+                  Dashboard
+                </h1>
+              </header>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {stats.map((item) => (
                   <StatCard key={item.label} item={item} />
                 ))}
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[1.65fr_0.95fr]">
+              <div className="grid gap-4 xl:grid-cols-[1.85fr_0.82fr]">
                 <MonthlyChart tasks={tasks} />
                 <ExpenseChart budgetEntries={budgetEntries} />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <EmployeeTable title="Working" employees={workingEmployees} />
-                <EmployeeTable title="Not Working" employees={notWorkingEmployees} />
+                <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.6fr_0.85fr]">
+                <RecentActivities tasks={tasks} employees={employees} />
+                <UpcomingEvents events={calendarEvents} />
               </div>
             </>
           )}

@@ -16,9 +16,21 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    middleInitial: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     lastName: {
       type: String,
       required: true,
+      trim: true,
+    },
+
+    companyName: {
+      type: String,
+      default: "",
       trim: true,
     },
 
@@ -41,9 +53,20 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    coverPhoto: {
+      type: String,
+      default: "",
+    },
+
     phone: {
       type: String,
       default: "",
+    },
+
+    country: {
+      type: String,
+      default: "Philippines",
+      trim: true,
     },
 
     position: {
@@ -55,6 +78,15 @@ const userSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+
+    lastSeen: {
+      type: Date,
     },
 
     resetPasswordToken: {
@@ -96,6 +128,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
     this.password
   );
 };
+
+userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ role: 1, isActive: 1, firstName: 1, lastName: 1 });
+userSchema.index({ role: 1, isOnline: 1, lastSeen: -1 });
 
 const User = mongoose.model("User", userSchema);
 

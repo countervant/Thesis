@@ -1,17 +1,28 @@
 import { useEffect, useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
 
+const formatDateValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const todayInputDate = () => formatDateValue(new Date());
+
+const isPastInputDate = (date) => Boolean(date) && date < todayInputDate();
+
 const formatInputDate = (value) => {
   if (!value) {
-    return new Date().toISOString().slice(0, 10);
+    return todayInputDate();
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString().slice(0, 10);
+    return todayInputDate();
   }
 
-  return date.toISOString().slice(0, 10);
+  return formatDateValue(date);
 };
 
 const emptyForm = {
@@ -23,7 +34,7 @@ const emptyForm = {
 };
 
 const FieldLabel = ({ children }) => (
-  <label className="text-sm font-medium text-neutral-800">{children}</label>
+  <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
 const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
@@ -78,6 +89,11 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
       return;
     }
 
+    if (isPastInputDate(formData.date)) {
+      setErrorMessage("Past dates cannot be selected.");
+      return;
+    }
+
     if (!Number.isFinite(amount) || amount <= 0) {
       setErrorMessage("Amount must be greater than 0.");
       return;
@@ -113,11 +129,11 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950">
-      <section className="max-h-full w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl">
-        <header className="border-b border-neutral-300 px-8 py-11 sm:px-11">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950 dark:text-white">
+      <section className="max-h-full w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl dark:bg-[#070707] dark:ring-1 dark:ring-neutral-800">
+        <header className="border-b border-neutral-300 px-8 py-11 dark:border-neutral-800 sm:px-11">
           <h1
-            className="text-2xl uppercase leading-none text-neutral-950 sm:text-3xl"
+            className="text-2xl uppercase leading-none text-neutral-950 dark:text-white sm:text-3xl"
             style={{ fontFamily: "var(--font-bruno)" }}
           >
             {isEditing ? "Edit Entry" : "New Entry"}
@@ -140,7 +156,7 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
               <select
                 value={formData.type}
                 onChange={(event) => updateField("type", event.target.value)}
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:focus:ring-pink-950"
               >
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
@@ -151,9 +167,10 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
               <FieldLabel>Date</FieldLabel>
               <input
                 type="date"
+                min={todayInputDate()}
                 value={formData.date}
                 onChange={(event) => updateField("date", event.target.value)}
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-300 dark:focus:ring-pink-950"
               />
             </div>
           </div>
@@ -165,7 +182,7 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
               value={formData.description}
               onChange={(event) => updateField("description", event.target.value)}
               placeholder="Entry description..."
-              className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+              className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
             />
           </div>
 
@@ -177,19 +194,19 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
                 value={formData.category}
                 onChange={(event) => updateField("category", event.target.value)}
                 placeholder="General..."
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
               />
             </div>
 
             <div className="space-y-1">
-              <FieldLabel>Amount ($)</FieldLabel>
+              <FieldLabel>Amount (₱)</FieldLabel>
               <input
                 type="text"
                 inputMode="decimal"
                 value={formData.amount}
                 onChange={(event) => updateField("amount", event.target.value)}
                 placeholder="0.00"
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
               />
             </div>
           </div>
@@ -198,7 +215,7 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
             <button
               type="button"
               onClick={handleCancel}
-              className="h-10 rounded-lg border border-[#9a55ff] bg-transparent text-xs font-semibold text-neutral-700 transition hover:bg-purple-50"
+              className="h-10 rounded-lg border border-[#9a55ff] bg-transparent text-xs font-semibold text-neutral-700 transition hover:bg-purple-50 dark:text-neutral-300 dark:hover:bg-neutral-900"
             >
               Cancel
             </button>

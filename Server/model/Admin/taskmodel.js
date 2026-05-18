@@ -25,10 +25,31 @@ const taskSchema = new mongoose.Schema(
       default: "medium",
     },
 
+    startDate: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+
     dueDate: {
       type: Date,
       required: true,
     },
+
+    subtasks: [
+      {
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        completed: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
 
     completedAt: {
       type: Date,
@@ -78,6 +99,12 @@ const taskSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+taskSchema.index({ assignedTo: 1, createdAt: -1 });
+taskSchema.index({ createdBy: 1, createdAt: -1 });
+taskSchema.index({ status: 1, dueDate: 1 });
+taskSchema.index({ priority: 1, dueDate: 1 });
+taskSchema.index({ createdAt: -1 });
 
 const Task = mongoose.model("Task", taskSchema);
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import Welcome from '../../components/auth/Welcome.jsx';
 import RegisterPage from '../../components/auth/RegisterPage.jsx';
+import AuthThemeToggle from '../../components/auth/AuthThemeToggle.jsx';
 const Register = () => {
   return (
     <>
@@ -9,10 +10,11 @@ const Register = () => {
       className="auth-screen flex min-h-screen flex-col md:flex-row-reverse"
     >
 
-    <Welcome order='2' order1='1' text = 'Create Account'/>
+    <Welcome order='2' order1='1' text = 'Create Account' />
     <RegisterPage order='1' order1='2' />
     
     </div>
+    <AuthThemeToggle />
     
     </>
   )

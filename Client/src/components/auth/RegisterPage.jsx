@@ -4,15 +4,56 @@ import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
+import CountrySelect from "../CountrySelect.jsx";
 import { authAPI } from "../../services/api.js";
 import { validateEmail } from "../../utils/emailValidation.js";
+import {
+  getPhoneValidationMessage,
+  limitPhoneNumberLength,
+} from "../../utils/phoneValidation.js";
+import {
+  applyCountryDialCode,
+  defaultCountry,
+  getCountryDialCode,
+} from "../../utils/countries.js";
+import { getAuthErrorMessage } from "../../utils/authErrors.js";
+
+const fieldNames = {
+  firstName: `register_given_${Date.now()}`,
+  middleInitial: `register_middle_${Date.now()}`,
+  lastName: `register_family_${Date.now()}`,
+  companyName: `register_company_${Date.now()}`,
+  email: `register_contact_${Date.now()}`,
+  phone: `register_line_${Date.now()}`,
+  password: `register_secret_${Date.now()}`,
+  confirmPassword: `register_secret_confirm_${Date.now()}`,
+};
+
+const antiAutofillProps = {
+  autoComplete: "new-password",
+  autoCorrect: "off",
+  autoCapitalize: "none",
+  spellCheck: "false",
+  "data-lpignore": "true",
+  "data-1p-ignore": "true",
+  "data-bwignore": "true",
+  "data-form-type": "other",
+};
+
+const preventAutofill = (event) => {
+  event.currentTarget.removeAttribute("readOnly");
+};
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
+  const [middleInitial, setMiddleInitial] = useState("");
   const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [country, setCountry] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -23,9 +64,13 @@ const RegisterPage = ({ order, order1 }) => {
 
   const resetForm = useCallback(() => {
     setFirstName("");
+    setMiddleInitial("");
     setLastName("");
+    setCompanyName("");
     setEmail("");
     setEmailError("");
+    setCountry("");
+    setPhone("");
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -35,6 +80,17 @@ const RegisterPage = ({ order, order1 }) => {
     const value = e.target.value;
     setEmail(value);
     setEmailError(validateEmail(value));
+  };
+
+  const handleCountryChange = (nextCountry) => {
+    setPhone((currentPhone) =>
+      applyCountryDialCode(
+        currentPhone || getCountryDialCode(nextCountry),
+        nextCountry,
+        country || nextCountry
+      )
+    );
+    setCountry(nextCountry);
   };
 
   const handleSubmit = async (e) => {
@@ -50,8 +106,20 @@ const RegisterPage = ({ order, order1 }) => {
       return;
     }
 
+    if (!companyName.trim()) {
+      setError("Company name is required");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
+      return;
+    }
+
+    const selectedCountry = country || defaultCountry;
+    const phoneValidation = getPhoneValidationMessage(phone, selectedCountry);
+    if (phoneValidation) {
+      setError(phoneValidation);
       return;
     }
 
@@ -68,12 +136,21 @@ const RegisterPage = ({ order, order1 }) => {
     setLoading(true);
 
     try {
-      await authAPI.register(firstName.trim(), lastName.trim(), email, password);
+      await authAPI.register(
+        firstName.trim(),
+        middleInitial.trim(),
+        lastName.trim(),
+        companyName.trim(),
+        email,
+        password,
+        phone.trim(),
+        selectedCountry
+      );
       resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
       setTimeout(() => navigate("/"), 1200);
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      setError(getAuthErrorMessage(err, "Registration failed. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -96,7 +173,7 @@ const RegisterPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0`}
+        className={`order-${order} md:order-${order1} w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0 dark:bg-[#111111]`}
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -121,114 +198,215 @@ const RegisterPage = ({ order, order1 }) => {
           </div>
         )}
 
-        <img
-          src={logo}
-          alt="CLIENTRA"
-          className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain"
-        />
-        <h2
-          className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-10 tracking-wide uppercase"
-          style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
-        >
-          Create Account
-        </h2>
-
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8"
+          className="w-full max-w-sm sm:max-w-md md:max-w-2xl -translate-y-4 space-y-6 rounded-2xl border border-transparent px-10 py-7 sm:space-y-8 dark:border-pink-200/90 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
+          data-form-type="other"
         >
+          <div className="flex flex-col items-center">
+            <img
+              src={logo}
+              alt="CLIENTRA"
+              className="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain"
+            />
+            <h2
+              className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-10 tracking-wide uppercase dark:text-white"
+              style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
+            >
+              Create Account
+            </h2>
+          </div>
+
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="hidden"
+          />
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="hidden"
+          />
+
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded dark:border-red-400/60 dark:bg-red-500/10 dark:text-red-200">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="border-b border-black mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_0.75fr_1fr] gap-6">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
                 type="text"
+                name={fieldNames.firstName}
                 placeholder="First Name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                autoComplete="given-name"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
 
-            <div className="border-b border-black mb-2">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
                 type="text"
+                name={fieldNames.middleInitial}
+                placeholder="Middle Initial (Optional)"
+                value={middleInitial}
+                onChange={(e) => setMiddleInitial(e.target.value.slice(0, 5))}
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
+              />
+            </div>
+
+            <div className="border-b border-black mb-2 dark:border-white/40">
+              <input
+                type="text"
+                name={fieldNames.lastName}
                 placeholder="Last Name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                autoComplete="family-name"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
           </div>
 
-          <div>
-            <div className="border-b border-black mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="border-b border-black mb-2 dark:border-white/40">
               <input
-                type="email"
+                type="text"
+                name={fieldNames.email}
+                inputMode="email"
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
-                autoComplete="off"
-                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
                 required
               />
             </div>
             {emailError && (
-              <p className="text-sm text-red-500">{emailError}</p>
+              <p className="text-sm text-red-500 sm:col-start-1 sm:row-start-2 dark:text-red-300">{emailError}</p>
             )}
+
+            <div className="border-b border-black mb-2 dark:border-white/40">
+              <input
+                type="text"
+                name={fieldNames.companyName}
+                placeholder="Company Name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
+                required
+              />
+            </div>
           </div>
 
-          <div className="border-b-2 border-gray-400 flex items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.2fr] gap-6">
+            <div className="border-b border-black mb-2 dark:border-white/40">
+              <CountrySelect
+                value={country}
+                onChange={handleCountryChange}
+                autoComplete="country-name"
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 dark:text-white"
+                required
+              />
+            </div>
+
+            <div className="border-b border-black mb-2 dark:border-white/40">
+              <input
+                type="tel"
+                name={fieldNames.phone}
+                placeholder="Phone"
+                value={phone}
+                onChange={(event) =>
+                  setPhone(
+                    limitPhoneNumberLength(
+                      event.target.value,
+                      country || defaultCountry
+                    )
+                  )
+                }
+                {...antiAutofillProps}
+                readOnly
+                onFocus={preventAutofill}
+                className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="border-b-2 border-gray-400 flex items-center dark:border-white/40">
             <input
-              type={showPassword ? "text" : "password"}
+              type="text"
+              name={fieldNames.password}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+              {...antiAutofillProps}
+              readOnly
+              onFocus={preventAutofill}
+              style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
+              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3 dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
-                <img src={hide} alt="Hide" className="w-5 h-5" />
+                <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
               ) : (
-                <img src={view} alt="Show" className="w-5 h-5" />
+                <img src={view} alt="Show" className="w-5 h-5 dark:invert" />
               )}
             </button>
           </div>
 
-          <div className="border-b-2 border-gray-400 flex items-center">
+          <div className="border-b-2 border-gray-400 flex items-center dark:border-white/40">
             <input
-              type={showPassword ? "text" : "password"}
+              type="text"
+              name={fieldNames.confirmPassword}
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+              {...antiAutofillProps}
+              readOnly
+              onFocus={preventAutofill}
+              style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
+              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400 dark:text-white dark:placeholder:text-white/85"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3"
+              className="text-pink-500 hover:text-pink-600 focus:outline-none pb-2 pl-3 dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
-                <img src={hide} alt="Hide" className="w-5 h-5" />
+                <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
               ) : (
-                <img src={view} alt="Show" className="w-5 h-5" />
+                <img src={view} alt="Show" className="w-5 h-5 dark:invert" />
               )}
             </button>
           </div>
@@ -236,7 +414,7 @@ const RegisterPage = ({ order, order1 }) => {
           <button
             type="submit"
             disabled={loading || isEmailInvalid}
-            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 rounded-lg text-white font-medium text-base sm:text-lg bg-linear-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-all duration-200 shadow-lg mt-6 sm:mt-8 disabled:opacity-50 disabled:cursor-not-allowed dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)]"
           >
             {loading ? "Creating Account..." : "Create Account"}
           </button>
