@@ -88,19 +88,6 @@ const formatRole = (role = "") => {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 };
 
-const getPositionDisplay = (formData, role) => {
-  const normalizedRole = role?.toLowerCase() || "";
-  const position = formData.position.trim();
-
-  if (normalizedRole === "client") return "Client";
-  if (normalizedRole === "employee") {
-    return ["Employee", position].filter(Boolean).join(" - ");
-  }
-  if (normalizedRole === "admin") return ["Admin", position].filter(Boolean).join(" - ");
-
-  return position || formatRole(role);
-};
-
 const Profile = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();

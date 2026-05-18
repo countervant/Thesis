@@ -335,7 +335,7 @@ router.post("/reset-password", async (req, res) => {
             lastSeen: new Date(),
           },
           {
-            new: true,
+            returnDocument: "after",
             select: "firstName lastName email role companyName isActive isOnline lastSeen",
           }
         ).lean();

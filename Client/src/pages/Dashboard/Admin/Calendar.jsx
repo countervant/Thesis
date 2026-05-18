@@ -180,11 +180,37 @@ const AdminCalendar = () => {
   };
 
   useEffect(() => {
-    loadEvents().catch((error) => console.error("Unable to load calendar events", error));
+    let isActive = true;
+
+    calendarAPI
+      .getAll({ month: monthKey(currentMonth) })
+      .then((data) => {
+        if (isActive) {
+          setEvents(data.map(normalizeEvent));
+        }
+      })
+      .catch((error) => console.error("Unable to load calendar events", error));
+
+    return () => {
+      isActive = false;
+    };
   }, [currentMonth]);
 
   useEffect(() => {
-    loadDepartments().catch((error) => console.error("Unable to load calendar departments", error));
+    let isActive = true;
+
+    calendarAPI
+      .getDepartments()
+      .then((data) => {
+        if (isActive) {
+          setDepartments(data);
+        }
+      })
+      .catch((error) => console.error("Unable to load calendar departments", error));
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const monthEvents = useMemo(() => {

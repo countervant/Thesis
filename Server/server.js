@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
+import fs from "fs";
 import express from "express";
 import cors from "cors";
 
@@ -23,6 +24,31 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 const port = process.env.PORT || 5000;
+const isProduction = process.env.NODE_ENV === "production";
+const clientDistPath = path.resolve(__dirname, "../Client/dist");
+
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+
+const requireEnv = (name) => {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    throw new Error(`${name} is not set`);
+  }
+
+  return value.trim();
+};
+
+const validateRuntimeConfig = () => {
+  requireEnv("MONGODB_URI");
+  const jwtSecret = requireEnv("JWT_SECRET");
+
+  if (isProduction && jwtSecret === "replace_this_with_a_long_random_secret") {
+    throw new Error("JWT_SECRET must be changed before production deployment");
+  }
+};
+
+validateRuntimeConfig();
 
 // CORS – accept origins from env or fall back to common dev ports
 const defaultOrigins = [
@@ -46,11 +72,14 @@ const parseOrigins = (...values) =>
 const allowedOrigins = [
   ...new Set([
     ...parseOrigins(process.env.CORS_ORIGINS, process.env.FRONTEND_URL),
-    ...defaultOrigins,
+    ...(isProduction ? [] : defaultOrigins),
   ]),
 ];
 
-console.log("[startup] Allowed CORS origins:", allowedOrigins.join(", "));
+console.log(
+  "[startup] Allowed CORS origins:",
+  allowedOrigins.length ? allowedOrigins.join(", ") : "same-origin only"
+);
 
 app.use(
   cors({
@@ -72,10 +101,28 @@ app.get("/api/health", (req, res) => {
   res.status(isDbConnected() ? 200 : 503).json({
     ok: isDbConnected(),
     database: isDbConnected() ? "connected" : "disconnected",
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
-app.use("/api/database", databaseDiagnostics);
+app.use("/api/database", (req, res, next) => {
+  if (!isProduction) {
+    return next();
+  }
+
+  if (process.env.ENABLE_DATABASE_DIAGNOSTICS !== "true") {
+    return res.status(404).json({ message: "API route not found" });
+  }
+
+  const expectedToken = process.env.DATABASE_DIAGNOSTICS_TOKEN;
+  const providedToken = req.get("x-diagnostics-token");
+
+  if (!expectedToken || providedToken !== expectedToken) {
+    return res.status(403).json({ message: "Diagnostics are not available" });
+  }
+
+  return next();
+}, databaseDiagnostics);
 
 app.use("/api", (req, res, next) => {
   if (!isDbConnected()) {
@@ -103,6 +150,24 @@ app.use("/api", (req, res) => {
   console.warn(`[route] No API route matched: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ message: "API route not found" });
 });
+
+if (isProduction) {
+  if (fs.existsSync(clientDistPath)) {
+    app.use(
+      express.static(clientDistPath, {
+        maxAge: "1y",
+        immutable: true,
+        index: false,
+      })
+    );
+
+    app.get(/^(?!\/api).*/, (req, res) => {
+      res.sendFile(path.join(clientDistPath, "index.html"));
+    });
+  } else {
+    console.warn(`[startup] Client build not found at ${clientDistPath}; serving API only`);
+  }
+}
 
 app.use((error, req, res, next) => {
   console.error(`[server] Unhandled error for ${req.method} ${req.originalUrl}:`, error);

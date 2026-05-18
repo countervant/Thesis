@@ -91,22 +91,6 @@ const toggleUserHeart = (hearts, user) => {
   return [...safeHearts, user];
 };
 
-const getPostTopic = (post) => {
-  const content = post.content.toLowerCase();
-  const hashTag = post.content.match(/#([a-z0-9][a-z0-9_-]*)/i)?.[1];
-
-  if (hashTag) {
-    return hashTag
-      .replace(/[-_]+/g, " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
-  }
-  if (content.includes("client") || content.includes("feedback")) return "Client Feedback";
-  if (content.includes("feature") || content.includes("update")) return "New Features";
-  if (content.includes("team") || content.includes("employee")) return "Team Building";
-  if (content.includes("announce") || content.includes("notice")) return "Announcements";
-  return "Project Update";
-};
-
 const extractPostHashtags = (post) => {
   const tags = post.content.match(/#[a-z0-9][a-z0-9_-]*/gi) || [];
   return tags.map((tag) =>

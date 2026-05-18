@@ -567,14 +567,12 @@ const ExpenseChart = ({ budgetEntries }) => {
     );
   }, [budgetEntries]);
 
-  useEffect(() => {
-    if (!monthOptions.includes(selectedMonth)) {
-      setSelectedMonth(getCurrentMonthKey());
-    }
-  }, [monthOptions, selectedMonth]);
+  const activeMonth = monthOptions.includes(selectedMonth)
+    ? selectedMonth
+    : getCurrentMonthKey();
 
   const filteredBudgetEntries = budgetEntries.filter(
-    (entry) => getMonthKey(entry.date || entry.createdAt) === selectedMonth
+    (entry) => getMonthKey(entry.date || entry.createdAt) === activeMonth
   );
   const expenseCategories = Object.entries(
     filteredBudgetEntries
@@ -625,7 +623,7 @@ const ExpenseChart = ({ budgetEntries }) => {
         <label className="relative">
           <span className="sr-only">Filter expense categories by month</span>
           <select
-            value={selectedMonth}
+            value={activeMonth}
             onChange={(event) => setSelectedMonth(event.target.value)}
             className="h-9 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-9 text-xs font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:text-white"
           >

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-export const getInitials = (userOrName, fallback = "U") => {
+const getInitials = (userOrName, fallback = "U") => {
   const firstName = userOrName?.firstName || "";
   const lastName = userOrName?.lastName || "";
   const explicitName =
@@ -32,18 +32,15 @@ const InitialsAvatar = ({
   user,
 }) => {
   const avatarSrc = src || user?.avatar || "";
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [avatarSrc]);
+  const [failedSrc, setFailedSrc] = useState("");
+  const imageFailed = failedSrc === avatarSrc;
 
   if (avatarSrc && !imageFailed) {
     return (
       <img
         src={avatarSrc}
         alt={alt}
-        onError={() => setImageFailed(true)}
+        onError={() => setFailedSrc(avatarSrc)}
         className={`${className} shrink-0 rounded-full object-cover`}
       />
     );
