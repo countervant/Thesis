@@ -4,23 +4,18 @@ import notification from "../../../assets/notification.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import progress from "../../../assets/progress.png";
 import taskIcon from "../../../assets/task.png";
+import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review", "Done"];
+const groupPreviewLimit = 5;
 const statusFromApi = {
   pending: "Pending",
   in_progress: "In progress",
   review: "In review",
   done: "Done",
 };
-const statusProgress = {
-  Pending: 0,
-  "In progress": 50,
-  "In review": 75,
-  Done: 100,
-};
-
 const normalizeSubtasks = (subtasks = []) => {
   if (!Array.isArray(subtasks)) return [];
 
@@ -33,8 +28,8 @@ const normalizeSubtasks = (subtasks = []) => {
     .filter((subtask) => subtask.title);
 };
 
-const getTaskProgress = (subtasks, status) => {
-  if (!subtasks.length) return statusProgress[status] ?? 0;
+const getTaskProgress = (subtasks) => {
+  if (!subtasks.length) return 0;
 
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
   return Math.round((completedCount / subtasks.length) * 100);
@@ -160,85 +155,140 @@ const normalizeTask = (task) => {
     assignedTo: task?.assignedTo,
     createdBy: task?.createdBy,
     subtasks,
-    progress: getTaskProgress(subtasks, status),
+    progress: getTaskProgress(subtasks),
   };
 };
 
 const TaskRow = ({ isExpanded, item, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
-  const progressValue = item.progress ?? getTaskProgress(item.subtasks, item.status);
+  const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
+  const isDone = item.status === "Done";
+  const progressSummary =
+    item.subtasks.length > 0
+      ? `${completedSubtasks} of ${item.subtasks.length} subtasks completed`
+      : "No subtasks yet";
 
   return (
     <article className="border-b border-pink-50 px-4 py-4 last:border-b-0">
-      <div className="grid gap-4 lg:grid-cols-[28px_1.35fr_100px_120px_150px_110px_44px] lg:items-center">
-        <button
-          type="button"
-          onClick={() => onToggleExpand(item.id)}
-          className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
-          aria-expanded={isExpanded}
-          aria-label={`${isExpanded ? "Hide" : "Show"} subtasks for ${item.title}`}
-        >
-          <span className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}>
-            <SmallIcon name="chevron" />
-          </span>
-        </button>
-        <div className="flex min-w-0 items-start gap-3">
-          <span className={`mt-1.5 h-3 w-1 rounded-full ${statusDots[item.status] || "bg-orange-500"}`} />
-          <span className="min-w-0">
-            <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
-            <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
-          </span>
-        </div>
-        <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.Medium}`}>
-          {item.priority}
-        </span>
-        <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
-          <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
-          {getDateStatus(item.dueDate) === "Today" ? "Today" : formatDate(item.dueDate)}
-        </span>
-        <span>
-          <span className="mb-1 block text-xs font-black text-[#10142d]">{progressValue}%</span>
-          <span className="block h-2 rounded-full bg-slate-100">
-            <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
-          </span>
-        </span>
-        <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || statusStyles.Pending}`}>
-          {item.status}
-        </span>
-        <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`View ${item.title} date`}>
-          <SmallIcon name="calendar" />
-        </button>
-      </div>
+      {isExpanded ? (
+        <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
+          <button
+            type="button"
+            onClick={() => onToggleExpand(item.id)}
+            className="flex min-w-0 items-center gap-3 text-left"
+            aria-expanded={isExpanded}
+            aria-label={`Hide subtasks for ${item.title}`}
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600">
+              <span className="rotate-90 transition-transform">
+                <SmallIcon name="chevron" />
+              </span>
+            </span>
+            <span className="h-10 w-1 shrink-0 rounded-full bg-pink-500" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-black text-[#10142d]">{item.title}</span>
+              <span className="mt-1 block truncate text-xs font-bold text-slate-500">{item.description || "No description"}</span>
+            </span>
+          </button>
 
-      {isExpanded && (
-        <div className="mt-4 rounded-xl border border-pink-50 bg-pink-50/30 px-4 py-3 lg:ml-11">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[10px] font-black uppercase text-slate-500">Subtasks</p>
-            <p className="text-[11px] font-black text-slate-500">
-              {item.subtasks.length > 0
-                ? `${completedSubtasks} of ${item.subtasks.length} completed`
-                : "No subtasks yet"}
-            </p>
+          <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
+            <p className="mb-2 text-[10px] font-black text-slate-500">Subtasks</p>
+            {item.subtasks.length > 0 ? (
+              <div className="space-y-1.5">
+                {item.subtasks.map((subtask, index) => (
+                  <label key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2 text-xs font-bold text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={subtask.completed}
+                      disabled={isDone}
+                      onChange={() => onToggleSubtask(item, index)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
+                      {subtask.title}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-slate-400">Ask your admin to add subtasks for this task.</p>
+            )}
           </div>
-          {item.subtasks.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {item.subtasks.map((subtask, index) => (
-                <label key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2 text-xs font-bold text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={subtask.completed}
-                    onChange={() => onToggleSubtask(item, index)}
-                    className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8]"
-                  />
-                  <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
-                    {subtask.title}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs font-bold text-slate-400">Ask your admin to add subtasks for this task.</p>
-          )}
+
+          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+            <p className="mb-5 text-[10px] font-black text-slate-500">Priority</p>
+            <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.Medium}`}>
+              {item.priority}
+            </span>
+          </div>
+
+          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+            <p className="mb-5 text-[10px] font-black text-slate-500">Due Date</p>
+            <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
+              <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
+              {getDateStatus(item.dueDate) === "Today" ? "Today" : formatDate(item.dueDate)}
+            </span>
+          </div>
+
+          <div>
+            <p className="mb-5 text-[10px] font-black text-slate-500">Progress</p>
+            <span className="mb-1 block text-xs font-black text-[#10142d]">{progressValue}%</span>
+            <span className="block h-2 rounded-full bg-slate-100">
+              <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
+            </span>
+            <p className="mt-2 text-[11px] font-black text-slate-500">{progressSummary}</p>
+          </div>
+
+          <div>
+            <p className="mb-5 text-[10px] font-black text-slate-500">Status</p>
+            <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || statusStyles.Pending}`}>
+              {item.status}
+            </span>
+          </div>
+
+          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50 lg:mt-7" aria-label={`View ${item.title} date`}>
+            <SmallIcon name="calendar" />
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[28px_1.35fr_100px_120px_150px_110px_44px] lg:items-center">
+          <button
+            type="button"
+            onClick={() => onToggleExpand(item.id)}
+            className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+            aria-expanded={isExpanded}
+            aria-label={`Show subtasks for ${item.title}`}
+          >
+            <span className="transition-transform">
+              <SmallIcon name="chevron" />
+            </span>
+          </button>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className={`mt-1.5 h-3 w-1 rounded-full ${statusDots[item.status] || "bg-orange-500"}`} />
+            <span className="min-w-0">
+              <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
+              <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
+            </span>
+          </div>
+          <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.Medium}`}>
+            {item.priority}
+          </span>
+          <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
+            {getDateStatus(item.dueDate) === "Today" ? "Today" : formatDate(item.dueDate)}
+          </span>
+          <span>
+            <span className="mb-1 block text-xs font-black text-[#10142d]">{progressValue}%</span>
+            <span className="block h-2 rounded-full bg-slate-100">
+              <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
+            </span>
+          </span>
+          <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || statusStyles.Pending}`}>
+            {item.status}
+          </span>
+          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`View ${item.title} date`}>
+            <SmallIcon name="calendar" />
+          </button>
         </div>
       )}
     </article>
@@ -269,6 +319,7 @@ const BoardColumn = ({ expandedTaskIds, onToggleExpand, onToggleSubtask, onViewC
       {tasks.length === 0 && <p className="py-6 text-center text-sm font-bold text-slate-500">No tasks.</p>}
       {tasks.map((task) => {
         const isExpanded = expandedTaskIds.has(task.id);
+        const isDone = task.status === "Done";
         return (
         <article key={task.id} className="rounded-xl border border-pink-50 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
@@ -311,8 +362,9 @@ const BoardColumn = ({ expandedTaskIds, onToggleExpand, onToggleSubtask, onViewC
                   <input
                     type="checkbox"
                     checked={subtask.completed}
+                    disabled={isDone}
                     onChange={() => onToggleSubtask(task, index)}
-                    className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8]"
+                    className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
                   />
                   <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
                     {subtask.title}
@@ -342,7 +394,9 @@ const EmpTask = () => {
   const [viewMode, setViewMode] = useState("List");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -397,6 +451,10 @@ const EmpTask = () => {
       });
   }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, tasks, visibleGroup]);
 
+  useEffect(() => {
+    setExpandedGroups({});
+  }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, visibleGroup]);
+
   const dueTodayTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
   const overdueTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
   const upcomingTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Upcoming" && task.status !== "Done");
@@ -427,6 +485,32 @@ const EmpTask = () => {
     ));
   };
 
+  const getGroupItems = (groupKey, items) =>
+    expandedGroups[groupKey] ? items : items.slice(0, groupPreviewLimit);
+
+  const getGroupFooter = (groupKey, items, label, toneClass) => {
+    if (items.length <= groupPreviewLimit) {
+      return null;
+    }
+
+    const isExpanded = Boolean(expandedGroups[groupKey]);
+
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          setExpandedGroups((currentGroups) => ({
+            ...currentGroups,
+            [groupKey]: !isExpanded,
+          }))
+        }
+        className={`text-sm font-black ${toneClass}`}
+      >
+        {isExpanded ? "Show less" : `View all ${label} (${items.length})`}
+      </button>
+    );
+  };
+
   function handleToggleExpand(taskId) {
     setExpandedTaskIds((currentIds) => {
       const nextIds = new Set(currentIds);
@@ -439,13 +523,7 @@ const EmpTask = () => {
     });
   }
 
-  const handleToggleSubtask = async (task, subtaskIndex) => {
-    const nextSubtasks = task.subtasks.map((subtask, index) =>
-      index === subtaskIndex
-        ? { ...subtask, completed: !subtask.completed }
-        : subtask
-    );
-
+  const updateTaskSubtasks = async (task, nextSubtasks) => {
     try {
       setErrorMessage("");
       setNoticeMessage("");
@@ -459,6 +537,46 @@ const EmpTask = () => {
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to update subtask."));
     }
+  };
+
+  const handleToggleSubtask = async (task, subtaskIndex) => {
+    if (task.status === "Done") {
+      return;
+    }
+
+    const toggledSubtask = task.subtasks[subtaskIndex];
+    const nextSubtasks = task.subtasks.map((subtask, index) =>
+      index === subtaskIndex
+        ? { ...subtask, completed: !subtask.completed }
+        : subtask
+    );
+    const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
+    const willCompleteTask =
+      isCompletingSubtask &&
+      nextSubtasks.length > 0 &&
+      nextSubtasks.every((subtask) => subtask.completed);
+
+    if (willCompleteTask) {
+      setConfirmAction({
+        icon: "done",
+        title: "Are you sure you are done?",
+        message: `This will mark "${task.title}" as done.`,
+        confirmLabel: "Yes, done",
+        onConfirm: () => updateTaskSubtasks(task, nextSubtasks),
+      });
+      return;
+    }
+
+    await updateTaskSubtasks(task, nextSubtasks);
+  };
+
+  const closeConfirm = () => setConfirmAction(null);
+
+  const confirmCurrentAction = async () => {
+    const action = confirmAction;
+    if (!action) return;
+    setConfirmAction(null);
+    await action.onConfirm();
   };
 
   const handleViewCalendar = (task) => {
@@ -556,31 +674,36 @@ const EmpTask = () => {
             title="Overdue"
             count={overdueTasks.length}
             tone="text-rose-500"
-            footer={overdueTasks.length > 0 && <button type="button" onClick={() => setVisibleGroup("Overdue")} className="text-sm font-black text-rose-500">View all overdue ({overdueTasks.length})</button>}
+            footer={getGroupFooter("overdue", overdueTasks, "overdue", "text-rose-500")}
           >
-            {renderTaskRows(overdueTasks)}
+            {renderTaskRows(getGroupItems("overdue", overdueTasks))}
           </TaskGroup>
 
           <TaskGroup
             title="Due Today"
             count={dueTodayTasks.length}
             tone="text-orange-500"
-            footer={dueTodayTasks.length > 0 && <button type="button" onClick={() => setVisibleGroup("Due Today")} className="text-sm font-black text-orange-500">View all due today ({dueTodayTasks.length})</button>}
+            footer={getGroupFooter("dueToday", dueTodayTasks, "due today", "text-orange-500")}
           >
-            {renderTaskRows(dueTodayTasks)}
+            {renderTaskRows(getGroupItems("dueToday", dueTodayTasks))}
           </TaskGroup>
 
           <TaskGroup
             title="Upcoming"
             count={upcomingTasks.length}
             tone="text-slate-700"
-            footer={upcomingTasks.length > 0 && <button type="button" onClick={() => setVisibleGroup("Upcoming")} className="text-sm font-black text-pink-600">View all upcoming ({upcomingTasks.length})</button>}
+            footer={getGroupFooter("upcoming", upcomingTasks, "upcoming", "text-pink-600")}
           >
-            {renderTaskRows(upcomingTasks)}
+            {renderTaskRows(getGroupItems("upcoming", upcomingTasks))}
           </TaskGroup>
 
-          <TaskGroup title="Completed" count={completedTasks.length} tone="text-emerald-600">
-            {renderTaskRows(completedTasks)}
+          <TaskGroup
+            title="Completed"
+            count={completedTasks.length}
+            tone="text-emerald-600"
+            footer={getGroupFooter("completed", completedTasks, "completed", "text-emerald-600")}
+          >
+            {renderTaskRows(getGroupItems("completed", completedTasks))}
           </TaskGroup>
         </>
       )}
@@ -601,6 +724,15 @@ const EmpTask = () => {
           ))}
         </div>
       )}
+      <ConfirmDialog
+        confirmLabel={confirmAction?.confirmLabel}
+        icon={confirmAction?.icon}
+        isOpen={Boolean(confirmAction)}
+        message={confirmAction?.message}
+        onCancel={closeConfirm}
+        onConfirm={confirmCurrentAction}
+        title={confirmAction?.title}
+      />
     </div>
   );
 };

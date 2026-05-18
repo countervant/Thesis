@@ -4,13 +4,15 @@ import notification from "../../../assets/notification.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import progress from "../../../assets/progress.png";
 import taskIcon from "../../../assets/task.png";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
+import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
-const pageSizeOptions = [10, 20, 50];
 const notificationTargetKey = "clientraNotificationTarget";
+const groupPreviewLimit = 5;
 const statusFromApi = {
   pending: "Pending",
   in_progress: "In progress",
@@ -40,6 +42,17 @@ const getEntityId = (entity) => {
   if (!entity) return "";
   if (typeof entity === "string") return entity;
   return entity._id || entity.id || "";
+};
+
+const getPersonName = (person) => {
+  if (!person) return "Unassigned";
+  if (typeof person === "string") return "Assigned user";
+  return (
+    [person.firstName, person.lastName].filter(Boolean).join(" ") ||
+    person.email ||
+    person.name ||
+    "Assigned user"
+  );
 };
 
 const formatReadableDate = (date) => {
@@ -92,13 +105,6 @@ const progressColors = {
   Done: "bg-emerald-500",
 };
 
-const statusProgress = {
-  Pending: 0,
-  "In progress": 50,
-  "In review": 75,
-  Done: 100,
-};
-
 const normalizeSubtasks = (subtasks = []) => {
   if (!Array.isArray(subtasks)) return [];
 
@@ -111,8 +117,8 @@ const normalizeSubtasks = (subtasks = []) => {
     .filter((subtask) => subtask.title);
 };
 
-const getTaskProgress = (subtasks, status) => {
-  if (!subtasks.length) return statusProgress[status] ?? 0;
+const getTaskProgress = (subtasks) => {
+  if (!subtasks.length) return 0;
 
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
   return Math.round((completedCount / subtasks.length) * 100);
@@ -146,7 +152,7 @@ const normalizeTask = (task) => {
     priority: task?.priority || "medium",
     assignedTo: task?.assignedTo,
     subtasks,
-    progress: getTaskProgress(subtasks, status),
+    progress: getTaskProgress(subtasks),
   };
 };
 
@@ -346,9 +352,15 @@ const SelectControl = ({ label, onChange, options, value }) => (
   </label>
 );
 
-const TaskRow = ({ isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
-  const progressValue = item.progress ?? getTaskProgress(item.subtasks, item.status);
+const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
+  const effectiveExpanded = canAccessSubtasks && isExpanded;
+  const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
+  const isDone = item.status === "Done";
+  const progressSummary =
+    item.subtasks.length > 0
+      ? `${completedSubtasks} of ${item.subtasks.length} subtasks completed`
+      : "No subtasks yet";
 
   return (
     <article
@@ -357,80 +369,160 @@ const TaskRow = ({ isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand
         isFocused ? "bg-pink-50/60 ring-2 ring-inset ring-pink-200" : ""
       }`}
     >
-      <div className="grid gap-4 lg:grid-cols-[28px_1.35fr_100px_130px_150px_112px_72px] lg:items-center">
-        <button
-          type="button"
-          onClick={() => onToggleExpand(item.id)}
-          className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
-          aria-expanded={isExpanded}
-          aria-label={`${isExpanded ? "Hide" : "Show"} subtasks for ${item.title}`}
-        >
-          <span className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}>
-            <SmallIcon name="chevron" />
-          </span>
-        </button>
-        <div className="flex min-w-0 items-start gap-3">
-          <span className={`mt-1.5 h-3 w-1 rounded-full ${statusDots[item.status] || "bg-pink-500"}`} />
-          <span className="min-w-0">
-            <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
-            <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
+      {effectiveExpanded ? (
+        <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
+          <button
+            type="button"
+            onClick={() => onToggleExpand(item.id)}
+            className="flex min-w-0 items-center gap-3 text-left"
+            aria-expanded={isExpanded}
+            aria-label={`Hide subtasks for ${item.title}`}
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600">
+              <span className="rotate-90 transition-transform">
+                <SmallIcon name="chevron" />
+              </span>
+            </span>
+            <span className="h-10 w-1 shrink-0 rounded-full bg-pink-500" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-black text-[#10142d]">{item.title}</span>
+              <span className="mt-1 block truncate text-xs font-bold text-slate-500">{item.description || "No description"}</span>
+            </span>
+          </button>
+
+          <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
+            <p className="mb-2 text-[10px] font-black text-slate-500">Subtasks</p>
+            {item.subtasks.length > 0 ? (
+              <div className="space-y-1.5">
+                {item.subtasks.map((subtask, index) => (
+                  <label key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2 text-xs font-bold text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={subtask.completed}
+                      disabled={isDone}
+                      onChange={() => onToggleSubtask(item, index)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
+                      {subtask.title}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-slate-400">Add subtasks by editing this task.</p>
+            )}
+          </div>
+
+          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+            <p className="mb-5 text-[10px] font-black text-slate-500">Priority</p>
+            <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.medium}`}>
+              {item.priority}
+            </span>
+          </div>
+
+          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+            <p className="mb-5 text-[10px] font-black text-slate-500">Due Date</p>
+            <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
+              <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
+              {formatReadableDate(item.dueDate)}
+            </span>
+          </div>
+
+          <div>
+            <p className="mb-5 text-[10px] font-black text-slate-500">Progress</p>
+            <span className="mb-1 block text-xs font-black text-[#10142d]">{progressValue}%</span>
+            <span className="block h-2 rounded-full bg-slate-100">
+              <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
+            </span>
+            <p className="mt-2 text-[11px] font-black text-slate-500">{progressSummary}</p>
+          </div>
+
+          <div>
+            <p className="mb-5 text-[10px] font-black text-slate-500">Status</p>
+            <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
+              {item.status}
+            </span>
+          </div>
+
+          <span className="flex items-center gap-1 lg:justify-end lg:pt-8">
+            {!isDone && (
+              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                <SmallIcon name="edit" />
+              </button>
+            )}
+            <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+              <SmallIcon name="delete" />
+            </button>
           </span>
         </div>
-        <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.medium}`}>
-          {item.priority}
-        </span>
-        <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
-          <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
-          {formatReadableDate(item.dueDate)}
-        </span>
-        <span>
-          <span className="mb-1 block text-xs font-black text-[#10142d]">{progressValue}%</span>
-          <span className="block h-2 rounded-full bg-slate-100">
-            <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
-          </span>
-        </span>
-        <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
-          {item.status}
-        </span>
-        <span className="flex items-center gap-1">
-          <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-            <SmallIcon name="edit" />
-          </button>
-          <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
-            <SmallIcon name="delete" />
-          </button>
-        </span>
-      </div>
-
-      {isExpanded && (
-        <div className="mt-4 rounded-xl border border-pink-50 bg-pink-50/30 px-4 py-3 lg:ml-11">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[10px] font-black uppercase text-slate-500">Subtasks</p>
-            <p className="text-[11px] font-black text-slate-500">
-              {item.subtasks.length > 0
-                ? `${completedSubtasks} of ${item.subtasks.length} completed`
-                : "No subtasks yet"}
-            </p>
-          </div>
-          {item.subtasks.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {item.subtasks.map((subtask, index) => (
-                <label key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2 text-xs font-bold text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={subtask.completed}
-                    onChange={() => onToggleSubtask(item, index)}
-                    className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8]"
-                  />
-                  <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
-                    {subtask.title}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs font-bold text-slate-400">Add subtasks by editing this task.</p>
+      ) : (
+        <div className={`grid gap-4 ${
+          canAccessSubtasks
+            ? "lg:grid-cols-[28px_1.35fr_100px_130px_150px_112px_72px]"
+            : "lg:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_72px]"
+        } lg:items-center`}>
+          {canAccessSubtasks && (
+            <button
+              type="button"
+              onClick={() => onToggleExpand(item.id)}
+              className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+              aria-expanded={effectiveExpanded}
+              aria-label={`Show subtasks for ${item.title}`}
+            >
+              <span className="transition-transform">
+                <SmallIcon name="chevron" />
+              </span>
+            </button>
           )}
+          <div className={`flex min-w-0 items-start gap-3 ${!canAccessSubtasks ? "lg:border-r lg:border-pink-50 lg:pr-5" : ""}`}>
+            <span className={`mt-1.5 h-8 w-1 rounded-full ${statusDots[item.status] || "bg-pink-500"}`} />
+            <span className="min-w-0">
+              <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
+              <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
+            </span>
+          </div>
+          {!canAccessSubtasks && (
+            <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
+              <p className="mb-2 text-[10px] font-black text-slate-500">Assigned to</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <InitialsAvatar
+                  className="h-11 w-11"
+                  textClassName="text-xs"
+                  user={item.assignedTo}
+                />
+                <span className="min-w-0 truncate text-sm font-black text-[#10142d]">
+                  {getPersonName(item.assignedTo)}
+                </span>
+              </div>
+            </div>
+          )}
+          <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.medium}`}>
+            {item.priority}
+          </span>
+          <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
+            {formatReadableDate(item.dueDate)}
+          </span>
+          <span>
+            <span className="mb-1 block text-xs font-black text-[#10142d]">{progressValue}%</span>
+            <span className="block h-2 rounded-full bg-slate-100">
+              <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
+            </span>
+          </span>
+          <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
+            {item.status}
+          </span>
+          <span className="flex items-center gap-1">
+            {!isDone && (
+              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                <SmallIcon name="edit" />
+              </button>
+            )}
+            <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+              <SmallIcon name="delete" />
+            </button>
+          </span>
         </div>
       )}
     </article>
@@ -456,6 +548,7 @@ const Tasks = ({
   onNavigate,
   refreshKey = 0,
 }) => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -466,9 +559,9 @@ const Tasks = ({
   const [viewMode, setViewMode] = useState("List");
   const [confirmAction, setConfirmAction] = useState(null);
   const [focusedTaskId, setFocusedTaskId] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const currentUserId = getEntityId(user);
 
   useEffect(() => {
     let isMounted = true;
@@ -560,20 +653,21 @@ const Tasks = ({
     });
   }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, tasks]);
 
-  const totalPages = Math.max(1, Math.ceil(visibleTasks.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedPriority, selectedTaskStatus, pageSize, sortBy]);
+    setExpandedGroups({});
+  }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy]);
 
-  const dueTodayTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
-  const overdueTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
-  const upcomingTasks = visibleTasks.filter((task) => {
+  const isAssignedToCurrentUser = (task) =>
+    Boolean(currentUserId) && getEntityId(task.assignedTo) === currentUserId;
+  const myTasks = visibleTasks.filter(isAssignedToCurrentUser);
+  const teamTasks = visibleTasks.filter((task) => !isAssignedToCurrentUser(task));
+  const dueTodayTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
+  const overdueTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
+  const upcomingTasks = teamTasks.filter((task) => {
     const dateStatus = getDateStatus(task.dueDate);
     return (dateStatus === "Week" || dateStatus === "Upcoming") && task.status !== "Done";
   });
-  const completedTasks = visibleTasks.filter((task) => task.status === "Done");
+  const completedTasks = teamTasks.filter((task) => task.status === "Done");
 
   const taskStats = [
     { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
@@ -595,6 +689,7 @@ const Tasks = ({
     return items.map((task) => (
       <TaskRow
         key={task.id}
+        canAccessSubtasks={isAssignedToCurrentUser(task)}
         isExpanded={expandedTaskIds.has(task.id)}
         isFocused={focusedTaskId === task.id}
         item={task}
@@ -606,11 +701,41 @@ const Tasks = ({
     ));
   };
 
+  const getGroupItems = (groupKey, items) =>
+    expandedGroups[groupKey] ? items : items.slice(0, groupPreviewLimit);
+
+  const getGroupFooter = (groupKey, items, label, toneClass) => {
+    if (items.length <= groupPreviewLimit) {
+      return null;
+    }
+
+    const isExpanded = Boolean(expandedGroups[groupKey]);
+
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          setExpandedGroups((currentGroups) => ({
+            ...currentGroups,
+            [groupKey]: !isExpanded,
+          }))
+        }
+        className={`text-sm font-black ${toneClass}`}
+      >
+        {isExpanded ? "Show less" : `View all ${label} (${items.length})`}
+      </button>
+    );
+  };
+
   const handleAddTask = () => {
     onNavigate?.("add-task");
   };
 
   const handleEditTask = (task) => {
+    if (task.status === "Done") {
+      return;
+    }
+
     onEditTask?.(task);
   };
 
@@ -626,13 +751,7 @@ const Tasks = ({
     });
   }
 
-  const handleToggleSubtask = async (task, subtaskIndex) => {
-    const nextSubtasks = task.subtasks.map((subtask, index) =>
-      index === subtaskIndex
-        ? { ...subtask, completed: !subtask.completed }
-        : subtask
-    );
-
+  const updateTaskSubtasks = async (task, nextSubtasks) => {
     try {
       setErrorMessage("");
       const updatedTask = await taskAPI.update(task.id, {
@@ -653,6 +772,37 @@ const Tasks = ({
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to update subtask.");
     }
+  };
+
+  const handleToggleSubtask = async (task, subtaskIndex) => {
+    if (!isAssignedToCurrentUser(task) || task.status === "Done") {
+      return;
+    }
+
+    const toggledSubtask = task.subtasks[subtaskIndex];
+    const nextSubtasks = task.subtasks.map((subtask, index) =>
+      index === subtaskIndex
+        ? { ...subtask, completed: !subtask.completed }
+        : subtask
+    );
+    const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
+    const willCompleteTask =
+      isCompletingSubtask &&
+      nextSubtasks.length > 0 &&
+      nextSubtasks.every((subtask) => subtask.completed);
+
+    if (willCompleteTask) {
+      setConfirmAction({
+        icon: "done",
+        title: "Are you sure you are done?",
+        message: `This will mark "${task.title}" as done.`,
+        confirmLabel: "Yes, done",
+        onConfirm: () => updateTaskSubtasks(task, nextSubtasks),
+      });
+      return;
+    }
+
+    await updateTaskSubtasks(task, nextSubtasks);
   };
 
   const handleDeleteTask = async (task) => {
@@ -777,90 +927,53 @@ const Tasks = ({
             {!isLoading && (
               <>
                 <TaskGroup
+                  count={myTasks.length}
+                  footer={getGroupFooter("myTasks", myTasks, "my tasks", "text-pink-600")}
+                  title="My Tasks"
+                  tone="text-pink-600"
+                >
+                  {renderTaskRows(getGroupItems("myTasks", myTasks))}
+                </TaskGroup>
+
+                <TaskGroup
                   count={overdueTasks.length}
-                  footer={overdueTasks.length > 0 && <button type="button" className="text-sm font-black text-rose-500">View all overdue ({overdueTasks.length})</button>}
+                  footer={getGroupFooter("overdue", overdueTasks, "overdue", "text-rose-500")}
                   title="Overdue"
                   tone="text-rose-500"
                 >
-                  {renderTaskRows(overdueTasks)}
+                  {renderTaskRows(getGroupItems("overdue", overdueTasks))}
                 </TaskGroup>
 
                 <TaskGroup
                   count={dueTodayTasks.length}
-                  footer={dueTodayTasks.length > 0 && <button type="button" className="text-sm font-black text-orange-500">View all due today ({dueTodayTasks.length})</button>}
+                  footer={getGroupFooter("dueToday", dueTodayTasks, "due today", "text-orange-500")}
                   title="Due Today"
                   tone="text-orange-500"
                 >
-                  {renderTaskRows(dueTodayTasks)}
+                  {renderTaskRows(getGroupItems("dueToday", dueTodayTasks))}
                 </TaskGroup>
 
                 <TaskGroup
                   count={upcomingTasks.length}
-                  footer={upcomingTasks.length > 0 && <button type="button" className="text-sm font-black text-pink-600">View all upcoming ({upcomingTasks.length})</button>}
+                  footer={getGroupFooter("upcoming", upcomingTasks, "upcoming", "text-pink-600")}
                   title="Upcoming"
                   tone="text-slate-700"
                 >
-                  {renderTaskRows(upcomingTasks.slice(0, pageSize))}
+                  {renderTaskRows(getGroupItems("upcoming", upcomingTasks))}
                 </TaskGroup>
 
                 <TaskGroup
                   count={completedTasks.length}
+                  footer={getGroupFooter("completed", completedTasks, "completed", "text-emerald-600")}
                   title="Completed"
                   tone="text-emerald-600"
                 >
-                  {renderTaskRows(completedTasks.slice(0, pageSize))}
+                  {renderTaskRows(getGroupItems("completed", completedTasks))}
                 </TaskGroup>
               </>
             )}
           </section>
 
-          {!isLoading && visibleTasks.length > 0 && (
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={safePage === 1}
-                className="grid h-9 w-9 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
-                aria-label="Previous page"
-              >
-                <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
-                  <path d="m12 5-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              <span className="grid h-9 min-w-9 place-items-center rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.25)]">
-                {safePage}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                disabled={safePage === totalPages}
-                className="grid h-9 w-9 place-items-center rounded-lg border border-pink-100 bg-white text-[#c72fb2] shadow-[0_3px_4px_rgba(190,65,158,0.18)] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-45"
-                aria-label="Next page"
-              >
-                <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
-                  <path d="m8 5 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              <label className="flex items-center gap-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                <span>Show</span>
-                <select
-                  value={pageSize}
-                  onChange={(event) => setPageSize(Number(event.target.value))}
-                  className="h-9 rounded-lg border border-pink-100 bg-white px-3 text-xs font-semibold text-neutral-900 shadow-[0_3px_4px_rgba(190,65,158,0.12)] outline-none focus:border-[#db4ab5] dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
-                >
-                  {pageSizeOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <span>per page</span>
-              </label>
-            </div>
-          )}
           <ConfirmDialog
             confirmLabel={confirmAction?.confirmLabel}
             icon={confirmAction?.icon}

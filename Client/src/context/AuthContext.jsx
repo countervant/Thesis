@@ -135,6 +135,7 @@ export const AuthProvider = ({ children }) => {
     authAPI.clearSessionCache();
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    sessionStorage.removeItem("clientraBackLockedAfterLogin");
   };
 
   const updateUser = useCallback((userData) => {

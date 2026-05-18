@@ -78,6 +78,7 @@ const LoginPage = ({ order, order1 }) => {
       }
 
       login(userData, data.token);
+      sessionStorage.setItem("clientraBackLockedAfterLogin", "true");
       resetForm();
       navigate(dashboardPathByRole[role] || "/dashboard", {
         replace: true,

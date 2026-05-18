@@ -316,16 +316,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             </div>
             <div className="space-y-2">
               {formData.subtasks.map((subtask, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-[32px_minmax(0,1fr)_36px] sm:items-center">
-                  <label className="grid h-8 w-8 place-items-center">
-                    <span className="sr-only">Mark subtask complete</span>
-                    <input
-                      type="checkbox"
-                      checked={subtask.completed}
-                      onChange={(event) => updateSubtask(index, "completed", event.target.checked)}
-                      className="h-4 w-4 rounded border-neutral-300 accent-[#dc4fb2]"
-                    />
-                  </label>
+                <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_36px] sm:items-center">
                   <input
                     type="text"
                     value={subtask.title}

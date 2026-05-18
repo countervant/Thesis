@@ -3,7 +3,17 @@ import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/review.png";
 import done from "../../../assets/done.png";
-import { calendarAPI, dashboardAPI, getApiErrorMessage } from "../../../services/api.js";
+import {
+  authAPI,
+  budgetAPI,
+  calendarAPI,
+  clientAPI,
+  dashboardAPI,
+  employeeAPI,
+  getApiErrorMessage,
+  newsfeedAPI,
+  taskAPI,
+} from "../../../services/api.js";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
@@ -17,10 +27,13 @@ const statItems = [
 
 const timelineDays = ["M", "T", "W", "T", "F", "S", "S"];
 const timelineDayCount = 21;
+const monthlyOverviewVisibleRows = 10;
+const compactListVisibleRows = 5;
+const modalListVisibleRows = 10;
 const timelineTasks = [
   {
     name: "Start",
-    effort: 2,
+    priority: "medium",
     progress: 100,
     marker: "dot",
     segments: [
@@ -29,7 +42,7 @@ const timelineTasks = [
   },
   {
     name: "Design",
-    effort: 3,
+    priority: "high",
     progress: 0,
     marker: "dot",
     segments: [
@@ -38,7 +51,7 @@ const timelineTasks = [
   },
   {
     name: "Review",
-    effort: 0,
+    priority: "low",
     progress: 100,
     marker: "diamond",
     segments: [
@@ -47,7 +60,7 @@ const timelineTasks = [
   },
   {
     name: "User tests",
-    effort: 2,
+    priority: "medium",
     progress: 50,
     marker: "dot",
     segments: [
@@ -56,7 +69,7 @@ const timelineTasks = [
   },
   {
     name: "Programm...",
-    effort: 3,
+    priority: "high",
     progress: 0,
     marker: "dot",
     segments: [
@@ -134,6 +147,20 @@ const formatDate = (value) => {
   });
 };
 
+const formatActivityTime = (value) => {
+  if (!value) return "No date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 const getMonthKey = (value) => {
   const date = parseCalendarDate(value);
   const fallbackDate = date || new Date();
@@ -176,6 +203,9 @@ const getUserName = (value) => {
   const name = `${firstName} ${lastName}`.trim();
   return name || value?.email || "Unassigned";
 };
+
+const getClientName = (value) =>
+  value?.companyName || value?.contactPerson || value?.email || "Client";
 
 const toDateKey = (value) => {
   const date = parseCalendarDate(value);
@@ -346,13 +376,38 @@ const StatCard = ({ item }) => {
 };
 
 const ProgressRing = ({ value }) => (
-  <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-[#a8a2ff] text-[9px] font-semibold text-[#9b91ff]">
+  <span className="grid h-6 min-w-9 place-items-center rounded-full border-2 border-[#a8a2ff] px-1.5 text-[9px] font-semibold text-[#9b91ff]">
     {value}
   </span>
 );
 
+const getTaskProgress = (subtasks = []) => {
+  if (!Array.isArray(subtasks) || subtasks.length === 0) return 0;
+  const completedCount = subtasks.filter((subtask) => subtask?.completed).length;
+  return Math.round((completedCount / subtasks.length) * 100);
+};
+
+const priorityBadgeStyles = {
+  high: "bg-pink-50 text-pink-600 ring-pink-100",
+  medium: "bg-orange-50 text-orange-600 ring-orange-100",
+  low: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+};
+
+const normalizePriority = (priority) => {
+  const normalizedPriority = String(priority || "medium").toLowerCase();
+  return priorityBadgeStyles[normalizedPriority] ? normalizedPriority : "medium";
+};
+
+const getPriorityInitial = (priority) => normalizePriority(priority)[0].toUpperCase();
+
+const getPriorityBadgeClass = (priority) => {
+  const normalizedPriority = normalizePriority(priority);
+  return priorityBadgeStyles[normalizedPriority];
+};
+
 const MonthlyChart = ({ tasks }) => {
   const tasksWithDates = tasks
+    .filter((task) => task?.status !== "done")
     .map((task) => ({
       ...task,
       calendarStartDate: parseCalendarDate(task.startDate || task.createdAt || task.dueDate),
@@ -374,17 +429,20 @@ const MonthlyChart = ({ tasks }) => {
     formatWeekLabel(addDays(timelineStart, dayOffset))
   );
   const colors = ["#7c5cff", "#ff4ba2", "#ff8a1f", "#25c24d", "#35b5ff"];
+  const shouldScrollRows = tasksWithDates.length > monthlyOverviewVisibleRows;
+  const chartRowsMaxHeight = monthlyOverviewVisibleRows * 40;
 
-  const chartTasks = tasksWithDates.slice(0, 5).map((task, index) => {
+  const chartTasks = tasksWithDates.map((task, index) => {
     const rawStart = daysBetween(timelineStart, task.calendarStartDate);
     const rawEnd = Math.max(rawStart, daysBetween(timelineStart, task.calendarDueDate));
     const start = Math.min(Math.max(rawStart + 0.1, 0), visibleDayCount - 1);
     const end = Math.min(Math.max(rawEnd + 1, 0.8), visibleDayCount);
     const width = Math.max(end - start, 0.8);
     return {
+      id: task._id || task.id || `${task.title || "task"}-${index}`,
       name: task.title?.length > 12 ? `${task.title.slice(0, 10)}...` : task.title || "Task",
-      effort: task.priority === "high" ? 3 : task.priority === "medium" ? 2 : 1,
-      progress: task.status === "done" ? 100 : task.status === "review" ? 75 : task.status === "in_progress" ? 50 : 0,
+      priority: normalizePriority(task.priority),
+      progress: getTaskProgress(task.subtasks),
       segments: [
         {
           start,
@@ -404,29 +462,38 @@ const MonthlyChart = ({ tasks }) => {
     <div className="mb-4 flex items-center justify-between gap-4">
       <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Monthly Overview</h2>
     </div>
-    <div className="grid grid-cols-[178px_1fr] overflow-x-auto">
+    <div
+      className={`grid grid-cols-[178px_1fr] overflow-x-auto ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
+      style={shouldScrollRows ? { maxHeight: `${40 + chartRowsMaxHeight}px` } : undefined}
+    >
       <div className="border-r border-slate-200 pr-4">
         <p className="h-10 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-white">
           Tasks
         </p>
-        {visibleTasks.slice(0, 4).map((task, index) => (
-          <div
-            key={task.name}
-            className="grid h-10 grid-cols-[1fr_22px_30px] items-center gap-2 text-xs text-[#10172a] dark:text-white"
-          >
-            <span className="flex min-w-0 items-center gap-2 font-semibold">
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: colors[index % colors.length] }}
-              />
-              <span className="truncate">
-              {task.name}
+        {visibleTasks.map((task, index) => {
+          const priorityClass = getPriorityBadgeClass(task.priority);
+
+          return (
+            <div
+              key={task.id || task.name}
+              className="grid h-10 grid-cols-[1fr_28px_42px] items-center gap-2 text-xs text-[#10172a] dark:text-white"
+            >
+              <span className="flex min-w-0 items-center gap-2 font-semibold">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: colors[index % colors.length] }}
+                />
+                <span className="truncate">
+                {task.name}
+                </span>
               </span>
-            </span>
-            <span>{task.effort}</span>
-            <ProgressRing value={task.progress || 50} />
-          </div>
-        ))}
+              <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-black ring-1 ${priorityClass}`}>
+                {getPriorityInitial(task.priority)}
+              </span>
+              <ProgressRing value={`${task.progress ?? 0}%`} />
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ minWidth: `${chartMinWidth}px` }}>
@@ -456,9 +523,9 @@ const MonthlyChart = ({ tasks }) => {
             }}
           />
           <div className="relative">
-            {visibleTasks.slice(0, 4).map((task) => (
+            {visibleTasks.map((task) => (
               <div
-                key={task.name}
+                key={task.id || task.name}
                 className="relative h-10 border-b border-neutral-100 last:border-b-0"
               >
                 {task.segments.map((segment, index) => (
@@ -617,25 +684,19 @@ const ExpenseChart = ({ budgetEntries }) => {
           </span>
         ))}
       </div>
+
     </section>
   );
 };
 
-const EmployeeTable = ({ title, employees, tone = "violet" }) => (
-  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
-    <div className="flex items-center justify-between px-5 pt-4">
-      <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
-        {title}
-        <span
-          className={`grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs ${
-            tone === "pink" ? "bg-pink-100 text-pink-500" : "bg-violet-100 text-violet-600"
-          }`}
-        >
-          {employees.length}
-        </span>
-      </h2>
-    </div>
-    <table className="mt-3 w-full text-left text-xs text-[#10172a] dark:text-white">
+const EmployeeTable = ({ title, employees, tone = "violet" }) => {
+  const [isViewingAll, setIsViewingAll] = useState(false);
+  const canViewAll = employees.length > compactListVisibleRows;
+  const tableMaxHeight = compactListVisibleRows * 52 + 38;
+  const modalTableMaxHeight = modalListVisibleRows * 52 + 38;
+
+  const renderTable = () => (
+    <table className="w-full min-w-[520px] text-left text-xs text-[#10172a] dark:text-white">
       <thead className="border-b border-slate-100 text-slate-500 dark:text-white">
         <tr>
           <th className="px-5 py-2.5 font-extrabold">Employee</th>
@@ -654,7 +715,7 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
         )}
 
         {employees.map((employee, index) => (
-          <tr key={`${title}-${index}`}>
+          <tr key={`${title}-${index}`} className="border-b border-slate-50 last:border-b-0">
             <td className="px-5 py-2.5">
               <div className="flex items-center gap-3">
                 <Avatar name={employee.name} />
@@ -676,8 +737,50 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => (
         ))}
       </tbody>
     </table>
-  </section>
-);
+  );
+
+  return (
+    <>
+      <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
+        <div className="flex items-center justify-between gap-4 px-5 pt-4">
+          <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+            {title}
+            <span
+              className={`grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs ${
+                tone === "pink" ? "bg-pink-100 text-pink-500" : "bg-violet-100 text-violet-600"
+              }`}
+            >
+              {employees.length}
+            </span>
+          </h2>
+          {canViewAll && (
+            <button
+              type="button"
+              onClick={() => setIsViewingAll(true)}
+              className="shrink-0 text-xs font-black text-pink-600 transition hover:text-pink-700"
+            >
+              View all
+            </button>
+          )}
+        </div>
+        <div
+          className={`mt-3 overflow-x-auto ${canViewAll ? "overflow-y-auto" : ""}`}
+          style={canViewAll ? { maxHeight: `${tableMaxHeight}px` } : undefined}
+        >
+          {renderTable()}
+        </div>
+      </section>
+
+      {isViewingAll && (
+        <FloatingListPanel title={title} onClose={() => setIsViewingAll(false)}>
+          <div className="overflow-x-auto overflow-y-auto pr-2" style={{ maxHeight: `${modalTableMaxHeight}px` }}>
+            {renderTable()}
+          </div>
+        </FloatingListPanel>
+      )}
+    </>
+  );
+};
 
 const PlaceholderPanel = ({ title, children }) => (
   <section className={`rounded-lg border border-pink-100 bg-white px-8 py-10 ${dashboardCardShadow}`}>
@@ -691,61 +794,150 @@ const PlaceholderPanel = ({ title, children }) => (
   </section>
 );
 
-const RecentActivities = ({ tasks, employees }) => {
-  const activities = [
-    ...employees.slice(0, 2).map((employee, index) => ({
-      name: getUserName(employee),
-      text: index === 0 ? "logged in" : "updated their profile",
-      time: employee.updatedAt || employee.createdAt,
-    })),
-    ...tasks.slice(0, 3).map((task) => ({
-      name: getUserName(task.assignedTo || task.createdBy),
-      text: `updated task "${task.title || "Untitled Task"}"`,
-      time: task.updatedAt || task.createdAt || task.dueDate,
-    })),
-  ].slice(0, 4);
-
-  const fallbackActivities = [
-    { name: "Luis Emmanuel Reyes", text: "logged in", time: "May 09, 2026 at 10:15 AM" },
-    { name: "Kate Valdez", text: 'updated task "SEO Audit"', time: "May 09, 2026 at 9:00 AM" },
-    { name: "Maria Santos", text: 'posted announcement "New Company Policy"', time: "May 09, 2026 at 8:45 AM" },
-    { name: "John Carlo", text: 'completed task "Oplan Launch 2"', time: "May 09, 2026 at 8:30 AM" },
-  ];
-  const visibleActivities = activities.length > 0 ? activities : fallbackActivities;
-
-  return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+const FloatingListPanel = ({ children, onClose, title }) => (
+  <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
+    <section className={`w-full max-w-3xl rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
-        <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
-          <span className="text-[#c72fb2]">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-              <path d="M4 13h4l2-7 4 14 2-7h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          Recent Activities
-        </h2>
-        <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
-          View all
+        <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">{title}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid h-8 w-8 place-items-center rounded-full border border-pink-100 text-sm font-black text-pink-600 transition hover:bg-pink-50"
+          aria-label={`Close ${title}`}
+        >
+          x
         </button>
       </div>
-      <div className="divide-y divide-slate-100">
-        {visibleActivities.map((activity, index) => (
-          <div key={`${activity.name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-            <Avatar name={activity.name} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
-                {activity.name} <span className="font-semibold">{activity.text}</span>
-              </span>
-              <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-white">
-                {typeof activity.time === "string" && activity.time.includes(" at ")
-                  ? activity.time
-                  : formatDate(activity.time)}
-              </span>
-            </span>
-          </div>
-        ))}
-      </div>
+      {children}
     </section>
+  </div>
+);
+
+const activityTimestamp = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const RecentActivities = ({
+  budgetEntries,
+  calendarEvents,
+  clients,
+  employees,
+  newsfeedActivities,
+  tasks,
+}) => {
+  const [isViewingAll, setIsViewingAll] = useState(false);
+  const activities = [
+    ...tasks.map((task) => {
+      const actor = task.status === "done" ? task.assignedTo : task.createdBy || task.assignedTo;
+      return {
+        id: `task-${task._id || task.id}`,
+        name: getUserName(actor),
+        text: `${task.status === "done" ? "completed" : "updated"} task "${task.title || "Untitled Task"}"`,
+        time: task.updatedAt || task.completedAt || task.createdAt || task.dueDate,
+      };
+    }),
+    ...employees.map((employee) => ({
+      id: `employee-${employee._id || employee.id}`,
+      name: getUserName(employee),
+      text: "updated their profile",
+      time: employee.updatedAt || employee.createdAt,
+    })),
+    ...clients.map((client) => ({
+      id: `client-${client._id || client.id}`,
+      name: getClientName(client),
+      text: "was added as a client",
+      time: client.updatedAt || client.createdAt,
+    })),
+    ...budgetEntries.map((entry) => ({
+      id: `budget-${entry._id || entry.id}`,
+      name: entry.category || entry.type || "Budget",
+      text: `recorded ${entry.type || "budget"} entry "${entry.description || "Untitled"}"`,
+      time: entry.updatedAt || entry.createdAt || entry.date,
+    })),
+    ...calendarEvents.map((event) => ({
+      id: `event-${event._id || event.id}`,
+      name: event.title || "Calendar event",
+      text: `scheduled ${event.type || "event"}`,
+      time: event.updatedAt || event.createdAt || event.date,
+    })),
+    ...newsfeedActivities.map((post) => ({
+      id: `post-${post._id || post.id}`,
+      name: getUserName(post.author),
+      text: `posted "${String(post.content || "an update").slice(0, 42)}${String(post.content || "").length > 42 ? "..." : ""}"`,
+      time: post.updatedAt || post.createdAt,
+    })),
+  ]
+    .filter((activity) => activity.time)
+    .sort((first, second) => activityTimestamp(second.time) - activityTimestamp(first.time));
+  const canViewAll = activities.length > compactListVisibleRows;
+  const listMaxHeight = compactListVisibleRows * 58;
+  const modalListMaxHeight = modalListVisibleRows * 58;
+
+  const ActivityRow = ({ activity, index }) => (
+    <div key={activity.id || `${activity.name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+      <Avatar name={activity.name} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+          {activity.name} <span className="font-semibold">{activity.text}</span>
+        </span>
+        <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-white">
+          {formatActivityTime(activity.time)}
+        </span>
+      </span>
+    </div>
+  );
+
+  return (
+    <>
+      <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+            <span className="text-[#c72fb2]">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+                <path d="M4 13h4l2-7 4 14 2-7h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            Recent Activities
+          </h2>
+          {canViewAll && (
+            <button
+              type="button"
+              onClick={() => setIsViewingAll(true)}
+              className="shrink-0 text-xs font-black text-pink-600 transition hover:text-pink-700"
+            >
+              View all
+            </button>
+          )}
+        </div>
+        <div
+          className={`divide-y divide-slate-100 ${canViewAll ? "overflow-y-auto pr-2" : ""}`}
+          style={canViewAll ? { maxHeight: `${listMaxHeight}px` } : undefined}
+        >
+          {activities.length === 0 && (
+            <p className="py-6 text-center text-sm font-semibold text-slate-500 dark:text-white">
+              No recent activities yet.
+            </p>
+          )}
+          {activities.map((activity, index) => (
+            <ActivityRow key={activity.id || `${activity.name}-${index}`} activity={activity} index={index} />
+          ))}
+        </div>
+      </section>
+
+      {isViewingAll && (
+        <FloatingListPanel title="Recent Activities" onClose={() => setIsViewingAll(false)}>
+          <div
+            className="divide-y divide-slate-100 overflow-y-auto pr-2"
+            style={{ maxHeight: `${modalListMaxHeight}px` }}
+          >
+            {activities.map((activity, index) => (
+              <ActivityRow key={activity.id || `${activity.name}-${index}`} activity={activity} index={index} />
+            ))}
+          </div>
+        </FloatingListPanel>
+      )}
+    </>
   );
 };
 
@@ -788,12 +980,15 @@ const normalizeCalendarEvent = (event) => {
 };
 
 const UpcomingEvents = ({ events }) => {
+  const [isViewingAll, setIsViewingAll] = useState(false);
   const todayKey = toDateKey(new Date());
   const upcomingEvents = events
     .map(normalizeCalendarEvent)
     .filter((event) => event.dateKey >= todayKey)
-    .sort((first, second) => first.dateKey.localeCompare(second.dateKey) || String(first.startTime || "").localeCompare(String(second.startTime || "")))
-    .slice(0, 6);
+    .sort((first, second) => first.dateKey.localeCompare(second.dateKey) || String(first.startTime || "").localeCompare(String(second.startTime || "")));
+  const canViewAll = upcomingEvents.length > compactListVisibleRows;
+  const listMaxHeight = compactListVisibleRows * 58;
+  const modalListMaxHeight = modalListVisibleRows * 58;
 
   return (
     <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
@@ -810,11 +1005,20 @@ const UpcomingEvents = ({ events }) => {
             {upcomingEvents.length}
           </span>
         </h2>
-        <button type="button" className="text-xs font-black text-pink-600 transition hover:text-pink-700">
-          View all
-        </button>
+        {canViewAll && (
+          <button
+            type="button"
+            onClick={() => setIsViewingAll(true)}
+            className="shrink-0 text-xs font-black text-pink-600 transition hover:text-pink-700"
+          >
+            View all
+          </button>
+        )}
       </div>
-      <div className="divide-y divide-slate-100">
+      <div
+        className={`divide-y divide-slate-100 ${canViewAll ? "overflow-y-auto pr-2" : ""}`}
+        style={canViewAll ? { maxHeight: `${listMaxHeight}px` } : undefined}
+      >
         {upcomingEvents.length === 0 && (
           <p className="py-6 text-center text-sm font-semibold text-slate-500 dark:text-white">
             No upcoming events.
@@ -828,7 +1032,7 @@ const UpcomingEvents = ({ events }) => {
                 {event.title}
               </span>
               <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
-                {formatDate(event.date)} {event.time ? `• ${event.time}` : ""}
+                {formatDate(event.date)} {event.time ? `- ${event.time}` : ""}
               </span>
             </span>
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${event.typeClass}`}>
@@ -837,6 +1041,105 @@ const UpcomingEvents = ({ events }) => {
           </div>
         ))}
       </div>
+
+      {isViewingAll && (
+        <FloatingListPanel title="Upcoming Events" onClose={() => setIsViewingAll(false)}>
+          <div
+            className="divide-y divide-slate-100 overflow-y-auto pr-2"
+            style={{ maxHeight: `${modalListMaxHeight}px` }}
+          >
+            {upcomingEvents.map((event) => (
+              <div key={event.id || `${event.title}-${event.dateKey}`} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                <span className={`h-3 w-3 rounded-full ${event.dot}`} />
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+                    {event.title}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
+                    {formatDate(event.date)} {event.time ? `- ${event.time}` : ""}
+                  </span>
+                </span>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${event.typeClass}`}>
+                  {event.type || "Event"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </FloatingListPanel>
+      )}
+    </section>
+  );
+};
+
+const OnlineTeam = ({ members }) => {
+  const [isViewingAll, setIsViewingAll] = useState(false);
+  const canViewAll = members.length > compactListVisibleRows;
+  const listMaxHeight = compactListVisibleRows * 54;
+  const modalListMaxHeight = modalListVisibleRows * 54;
+
+  const MemberRow = ({ member, index }) => (
+    <div key={member._id || member.id || `${member.email}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+      <span className="relative shrink-0">
+        <Avatar name={getUserName(member)} />
+        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+          {getUserName(member)}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
+          {member.role || "Team member"}
+        </span>
+      </span>
+    </div>
+  );
+
+  return (
+    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          Online Team
+          <span className="grid h-6 min-w-6 place-items-center rounded-full bg-emerald-100 px-2 text-xs font-black text-emerald-600">
+            {members.length}
+          </span>
+        </h2>
+        {canViewAll && (
+          <button
+            type="button"
+            onClick={() => setIsViewingAll(true)}
+            className="shrink-0 text-xs font-black text-pink-600 transition hover:text-pink-700"
+          >
+            View all
+          </button>
+        )}
+      </div>
+      <div
+        className={`divide-y divide-slate-100 ${canViewAll ? "overflow-y-auto pr-2" : ""}`}
+        style={canViewAll ? { maxHeight: `${listMaxHeight}px` } : undefined}
+      >
+        {members.length === 0 && (
+          <p className="py-6 text-center text-sm font-semibold text-slate-500 dark:text-white">
+            No team members online.
+          </p>
+        )}
+        {members.map((member, index) => (
+          <MemberRow key={member._id || member.id || `${member.email}-${index}`} member={member} index={index} />
+        ))}
+      </div>
+
+      {isViewingAll && (
+        <FloatingListPanel title="Online Team" onClose={() => setIsViewingAll(false)}>
+          <div
+            className="divide-y divide-slate-100 overflow-y-auto pr-2"
+            style={{ maxHeight: `${modalListMaxHeight}px` }}
+          >
+            {members.map((member, index) => (
+              <MemberRow key={member._id || member.id || `${member.email}-${index}`} member={member} index={index} />
+            ))}
+          </div>
+        </FloatingListPanel>
+      )}
     </section>
   );
 };
@@ -848,6 +1151,8 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   const [clients, setClients] = useState([]);
   const [budgetEntries, setBudgetEntries] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const [newsfeedActivities, setNewsfeedActivities] = useState([]);
+  const [onlineTeam, setOnlineTeam] = useState([]);
   const [taskStatusCounts, setTaskStatusCounts] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -897,8 +1202,24 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
       try {
         setIsLoading(true);
         setLoadError("");
-        const [summary, currentMonthEvents, nextMonthEvents] = await Promise.all([
+        const [
+          summary,
+          allTasks,
+          allEmployees,
+          allClients,
+          allBudgetEntries,
+          newsfeedActivity,
+          onlineMembers,
+          currentMonthEvents,
+          nextMonthEvents,
+        ] = await Promise.all([
           dashboardAPI.getSummary(),
+          taskAPI.getAll({ limit: 100 }),
+          employeeAPI.getAll({ limit: 100 }).catch(() => []),
+          clientAPI.getAll({ limit: 100 }).catch(() => []),
+          budgetAPI.getAll({ limit: 100 }).catch(() => []),
+          newsfeedAPI.getActivity({ limit: 20 }).catch(() => []),
+          authAPI.getOnlineTeam().catch(() => []),
           calendarAPI.getAll({ month: getCurrentMonthKey() }),
           calendarAPI.getAll({ month: getNextMonthKey() }),
         ]);
@@ -907,14 +1228,16 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
           return;
         }
 
-        setTasks(Array.isArray(summary.recentTasks) ? summary.recentTasks : []);
-        setEmployees(Array.isArray(summary.recentEmployees) ? summary.recentEmployees : []);
-        setClients(Array.isArray(summary.recentClients) ? summary.recentClients : []);
-        setBudgetEntries(Array.isArray(summary.recentBudgetEntries) ? summary.recentBudgetEntries : []);
+        setTasks(Array.isArray(allTasks) ? allTasks : Array.isArray(summary.recentTasks) ? summary.recentTasks : []);
+        setEmployees(Array.isArray(allEmployees) ? allEmployees : Array.isArray(summary.recentEmployees) ? summary.recentEmployees : []);
+        setClients(Array.isArray(allClients) ? allClients : Array.isArray(summary.recentClients) ? summary.recentClients : []);
+        setBudgetEntries(Array.isArray(allBudgetEntries) ? allBudgetEntries : Array.isArray(summary.recentBudgetEntries) ? summary.recentBudgetEntries : []);
         setCalendarEvents([
           ...(Array.isArray(currentMonthEvents) ? currentMonthEvents : []),
           ...(Array.isArray(nextMonthEvents) ? nextMonthEvents : []),
         ]);
+        setNewsfeedActivities(Array.isArray(newsfeedActivity) ? newsfeedActivity : []);
+        setOnlineTeam(Array.isArray(onlineMembers) ? onlineMembers : []);
         setTaskStatusCounts(summary.taskStatusCounts || {});
         setLoadError("");
       } catch (error) {
@@ -980,9 +1303,17 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
                 <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.6fr_0.85fr]">
-                <RecentActivities tasks={tasks} employees={employees} />
+              <div className="grid gap-4 xl:grid-cols-3">
                 <UpcomingEvents events={calendarEvents} />
+                <OnlineTeam members={onlineTeam} />
+                <RecentActivities
+                  budgetEntries={budgetEntries}
+                  calendarEvents={calendarEvents}
+                  clients={clients}
+                  employees={employees}
+                  newsfeedActivities={newsfeedActivities}
+                  tasks={tasks}
+                />
               </div>
             </>
           )}

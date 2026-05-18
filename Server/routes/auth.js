@@ -567,7 +567,7 @@ router.post("/reset-password", async (req, res) => {
         };
         const [employees, total] = await Promise.all([
           User.find(query)
-          .select("firstName lastName email phone country position role isActive")
+          .select("firstName lastName email phone country position role isActive createdAt updatedAt")
           .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)

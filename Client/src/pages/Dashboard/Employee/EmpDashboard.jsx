@@ -14,13 +14,6 @@ const statusFromApi = {
   review: "In review",
 };
 
-const statusProgress = {
-  Done: 100,
-  "In progress": 50,
-  "In review": 75,
-  Pending: 0,
-};
-
 const toneStyles = {
   blue: "bg-blue-50 text-blue-600 ring-blue-100",
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
@@ -116,8 +109,8 @@ const normalizeSubtasks = (subtasks = []) => {
     .filter((subtask) => subtask.title);
 };
 
-const getTaskProgress = (subtasks, status) => {
-  if (!subtasks.length) return statusProgress[status] ?? 0;
+const getTaskProgress = (subtasks) => {
+  if (!subtasks.length) return 0;
   const completed = subtasks.filter((subtask) => subtask.completed).length;
   return Math.round((completed / subtasks.length) * 100);
 };
@@ -134,7 +127,7 @@ const normalizeTask = (item) => {
     priority: item?.priority ? item.priority[0].toUpperCase() + item.priority.slice(1) : "Medium",
     status,
     subtasks,
-    progress: getTaskProgress(subtasks, status),
+    progress: getTaskProgress(subtasks),
   };
 };
 

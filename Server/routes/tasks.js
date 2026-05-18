@@ -21,7 +21,7 @@ const taskQueryForUser = (user) => {
   }
 
   return {
-    $or: [{ assignedTo: user._id }, { createdBy: user._id }],
+    assignedTo: user._id,
   };
 };
 
@@ -42,10 +42,10 @@ const getStatusFromSubtasks = (subtasks, fallbackStatus) => {
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
   if (completedCount === subtasks.length) return "done";
   if (completedCount > 0) return "in_progress";
-  return "pending";
+  return fallbackStatus;
 };
 
-const normalizeTaskPayload = (body, userId) => {
+const normalizeTaskPayload = (body, userId, options = {}) => {
   const title = body.title?.trim();
   const dueDate = body.dueDate ? new Date(body.dueDate) : null;
   const startDate = body.startDate ? new Date(body.startDate) : dueDate;
@@ -64,7 +64,7 @@ const normalizeTaskPayload = (body, userId) => {
     dueDate,
     status: getStatusFromSubtasks(subtasks, fallbackStatus),
     priority: allowedPriorities.includes(priority) ? priority : "medium",
-    assignedTo: body.assignedTo || userId,
+    assignedTo: options.assignedTo ?? body.assignedTo ?? userId,
     subtasks,
   };
 };
@@ -89,7 +89,9 @@ router.get("/", protect, async (req, res) => {
 
     if (allowedStatuses.includes(req.query.status)) query.status = req.query.status;
     if (allowedPriorities.includes(req.query.priority)) query.priority = req.query.priority;
-    if (req.query.assignedTo) query.assignedTo = req.query.assignedTo;
+    if (req.user.role === "admin" && req.query.assignedTo) {
+      query.assignedTo = req.query.assignedTo;
+    }
     if (req.query.dueFrom || req.query.dueTo) {
       query.dueDate = {};
       if (req.query.dueFrom) query.dueDate.$gte = new Date(req.query.dueFrom);
@@ -118,7 +120,13 @@ router.get("/", protect, async (req, res) => {
 
 router.post("/", protect, async (req, res) => {
   try {
-    const payload = normalizeTaskPayload(req.body, req.user._id);
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can create tasks" });
+    }
+
+    const payload = normalizeTaskPayload(req.body, req.user._id, {
+      assignedTo: req.body.assignedTo,
+    });
 
     if (!payload.title) {
       return res.status(400).json({ message: "Task title is required" });
@@ -173,6 +181,26 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
+    if (req.user.role !== "admin") {
+      if (task.status === "done") {
+        return res.status(403).json({ message: "Completed tasks cannot be updated" });
+      }
+
+      const subtasks = normalizeSubtasks(req.body.subtasks ?? task.subtasks);
+      task.subtasks = subtasks;
+      task.status = getStatusFromSubtasks(subtasks, task.status);
+      task.completedAt = task.status === "done" ? task.completedAt || new Date() : undefined;
+
+      await task.save();
+
+      const updatedTask = await Task.findById(task._id)
+        .populate("assignedTo", "firstName lastName email role")
+        .populate("createdBy", "firstName lastName email role")
+        .lean();
+
+      return res.status(200).json(updatedTask);
+    }
+
     const payload = normalizeTaskPayload(
       {
         title: req.body.title ?? task.title,
@@ -184,7 +212,10 @@ router.put("/:id", protect, async (req, res) => {
         assignedTo: req.body.assignedTo ?? task.assignedTo,
         subtasks: req.body.subtasks ?? task.subtasks,
       },
-      req.user._id
+      req.user._id,
+      {
+        assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
+      }
     );
 
     if (!payload.title) {
@@ -236,6 +267,10 @@ router.put("/:id", protect, async (req, res) => {
 
 router.delete("/:id", protect, async (req, res) => {
   try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can delete tasks" });
+    }
+
     const task = await Task.findOneAndDelete({
       _id: req.params.id,
       ...taskQueryForUser(req.user),

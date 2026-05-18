@@ -70,6 +70,14 @@ const asArray = (data, label) => {
     return data.data;
   }
 
+  if (Array.isArray(data?.tasks)) {
+    return data.tasks;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
   console.warn(`[api] Expected ${label} to be an array, received:`, data);
   return [];
 };
@@ -315,8 +323,9 @@ export const newsfeedAPI = {
     clearCache("/newsfeed", "/newsfeed/activity");
   },
 
-  getActivity: async () => {
-    return asArray(await cachedGet("/newsfeed/activity"), "newsfeed activity");
+  getActivity: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    return asArray(await cachedGet(`/newsfeed/activity${query ? `?${query}` : ""}`), "newsfeed activity");
   },
 
   getMedia: async (id) => {

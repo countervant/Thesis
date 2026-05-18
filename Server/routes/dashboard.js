@@ -7,7 +7,7 @@ import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 
 const router = express.Router();
-const userFields = "firstName lastName email role position companyName isActive isOnline lastSeen";
+const userFields = "firstName lastName email role position companyName isActive isOnline lastSeen createdAt updatedAt";
 
 router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
