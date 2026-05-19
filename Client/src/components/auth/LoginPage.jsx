@@ -100,18 +100,18 @@ const LoginPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`con order-${order} md:order-${order1} flex min-h-screen w-full items-center justify-center bg-gray-100 px-6 py-12 sm:px-10 md:w-1/2 md:px-12 md:py-0 dark:bg-[#111111]`}
+        className={`con order-${order} md:order-${order1} relative z-20 -mt-24 flex w-full items-start justify-center bg-transparent px-3 pb-8 pt-0 sm:px-10 md:mt-0 md:min-h-screen md:w-1/2 md:items-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
       >
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-sm space-y-6 bg-transparent sm:max-w-md sm:space-y-8 dark:max-w-[528px] dark:rounded-2xl dark:border dark:border-pink-200/90 dark:px-10 dark:py-12 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="min-h-[640px] w-full max-w-none space-y-7 rounded-[3rem] bg-white px-7 py-12 shadow-[0_22px_45px_rgba(15,23,42,0.18)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
         >
-          <div className="mb-8 flex flex-col items-center sm:mb-10">
+          <div className="mb-7 flex flex-col items-center sm:mb-10">
             <img
               src={logo}
               alt="CLIENTRA"
-              className="h-32 w-32 object-contain sm:h-40 sm:w-40 md:h-44 md:w-44"
+              className="hidden object-contain md:block md:h-44 md:w-44"
             />
             <h2
               className="mt-0 text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl dark:text-white"
@@ -119,6 +119,9 @@ const LoginPage = ({ order, order1 }) => {
             >
               LOG IN
             </h2>
+            <p className="mt-4 text-center text-base font-medium text-slate-500 md:hidden">
+              Welcome back! Please sign in to continue.
+            </p>
           </div>
 
           {error && (
@@ -127,65 +130,91 @@ const LoginPage = ({ order, order1 }) => {
             </div>
           )}
 
-          <div className="space-y-6 sm:space-y-8">
+          <div className="space-y-8 sm:space-y-8">
             <div>
+              <label className="mb-3 block text-xl font-medium text-slate-500 md:hidden">Email</label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-pink-500 md:hidden">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" aria-hidden="true">
+                    <path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                  </svg>
+                </span>
               <input
                 type="email"
-                placeholder="Email"
+                placeholder="Enter your email"
                 value={email}
                 onChange={handleEmailChange}
                 disabled={loading}
                 autoComplete="off"
-                className="w-full border-0 border-b border-black bg-transparent pb-2 text-gray-800 outline-none placeholder:text-gray-400 focus:ring-0 dark:border-white/40 dark:bg-[#283241] dark:text-white dark:placeholder:text-white/85"
+                className="h-16 w-full rounded-xl border border-slate-200 bg-white pl-20 pr-4 text-xl font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:h-auto md:rounded-none md:border-0 md:border-b md:border-black md:bg-transparent md:px-0 md:pb-2 md:text-base md:focus:border-black md:focus:ring-0 dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85 dark:md:bg-[#283241]"
                 required
               />
+              </div>
               {emailError && (
-                <p className="mt-2 text-sm text-red-500 dark:font-semibold dark:text-red-300">{emailError}</p>
+                <p className="mt-3 text-base text-red-500 md:text-sm dark:font-semibold dark:text-red-300">{emailError}</p>
               )}
             </div>
 
-            <div className="flex items-center border-b-2 border-gray-400 dark:border-white/40 dark:bg-[#283241]">
+            <div>
+              <label className="mb-3 block text-xl font-medium text-slate-500 md:hidden">Password</label>
+              <div className="relative flex h-16 items-center rounded-xl border border-slate-200 bg-white md:h-auto md:rounded-none md:border-0 md:border-b-2 md:border-gray-400 md:bg-transparent dark:border-white/40 dark:bg-[#1f2937] dark:md:bg-[#283241]">
+                <span className="pointer-events-none absolute left-5 text-pink-500 md:hidden">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" aria-hidden="true">
+                    <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                  </svg>
+                </span>
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="Password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 autoComplete="current-password"
-                className="min-w-0 flex-1 border-0 bg-transparent pb-2 text-gray-800 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85"
+                className="min-w-0 flex-1 border-0 bg-transparent pl-20 pr-2 text-xl font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:pl-0 md:pb-2 md:text-base dark:text-white dark:placeholder:text-white/85"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                className="grid pb-2 pl-3 text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
+                className="grid px-5 text-pink-500 transition hover:text-pink-600 md:pb-2 md:pl-3 md:pr-0 dark:opacity-70 dark:hover:opacity-100"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
-                  <img src={hide} alt="" className="h-5 w-5 dark:invert" />
+                  <img src={hide} alt="" className="h-7 w-7 md:h-5 md:w-5 dark:invert" />
                 ) : (
-                  <img src={view} alt="" className="h-5 w-5 dark:invert" />
+                  <img src={view} alt="" className="h-7 w-7 md:h-5 md:w-5 dark:invert" />
                 )}
               </button>
+              </div>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading || isEmailInvalid}
-            className="mt-6 w-full rounded-lg bg-linear-to-r from-pink-500 to-purple-600 py-3 text-base font-medium text-white shadow-lg transition-all duration-200 hover:from-pink-600 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-8 sm:text-lg dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)] dark:hover:brightness-110"
+            className="mt-8 w-full rounded-xl bg-linear-to-r from-pink-500 to-purple-600 py-5 text-2xl font-bold text-white shadow-lg transition-all duration-200 hover:from-pink-600 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-8 md:py-3 md:text-lg dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)] dark:hover:brightness-110"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
 
-          <div>
+          <div className="flex items-center gap-7 pt-3 text-xl font-medium text-slate-500 md:hidden">
+            <span className="h-px flex-1 bg-slate-200" />
+            or
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <div className="pt-1 md:pt-0">
             <AuthenticationHelper
               link="/register"
               Label="Create Account"
               Label1="Forgot Password?"
+              mobileInline
             />
           </div>
+          <p className="pt-4 text-center text-sm font-medium text-slate-500 md:hidden">
+            &copy; 2026 Dream Light Visual. All rights reserved.
+          </p>
         </form>
       </div>
     </>
