@@ -152,23 +152,6 @@ const ProfileInfoIcon = ({ name }) => {
   return <svg {...props}><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
 };
 
-const getEmployeeId = (user) =>
-  String(user?._id || user?.id || "EMP-000123").startsWith("EMP-")
-    ? String(user?._id || user?.id || "EMP-000123")
-    : `EMP-${String(user?._id || user?.id || "000123").slice(-6).toUpperCase()}`;
-
-const profileSkills = [
-  "UI/UX Design",
-  "React",
-  "JavaScript",
-  "System Management",
-  "Database Management",
-  "Problem Solving",
-  "Communication",
-  "Leadership",
-  "Teamwork",
-];
-
 const HeartIcon = ({ filled = false }) => (
   <img
     src={filled ? redHeartIcon : heartIcon}

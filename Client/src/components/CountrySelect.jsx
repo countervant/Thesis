@@ -4,7 +4,14 @@ import { countryOptions } from "../utils/countries.js";
 const CountrySelect = ({ className = "", onChange, value, ...props }) => {
   const wrapperRef = useRef(null);
   const [query, setQuery] = useState(value || "");
+  const [lastValue, setLastValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
+
+  if ((value || "") !== lastValue) {
+    setLastValue(value || "");
+    setQuery(value || "");
+  }
+
   const options = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return countryOptions;
@@ -15,10 +22,6 @@ const CountrySelect = ({ className = "", onChange, value, ...props }) => {
         .some((item) => item.toLowerCase().includes(normalizedQuery))
     );
   }, [query]);
-
-  useEffect(() => {
-    setQuery(value || "");
-  }, [value]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {

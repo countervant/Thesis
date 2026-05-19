@@ -162,7 +162,20 @@ const EmpCalendar = () => {
   };
 
   useEffect(() => {
-    loadEvents().catch((error) => console.error("Unable to load employee calendar events", error));
+    let isActive = true;
+
+    calendarAPI
+      .getAll({ month: monthKey(currentMonth) })
+      .then((data) => {
+        if (isActive) {
+          setEvents(data.map(normalizeEvent));
+        }
+      })
+      .catch((error) => console.error("Unable to load employee calendar events", error));
+
+    return () => {
+      isActive = false;
+    };
   }, [currentMonth]);
 
   const filteredEvents = useMemo(() => {

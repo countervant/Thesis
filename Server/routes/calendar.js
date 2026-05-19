@@ -90,7 +90,7 @@ router.post("/departments", protect, async (req, res) => {
           createdBy: req.user._id,
         },
       },
-      { new: true, upsert: true, runValidators: true }
+      { returnDocument: "after", upsert: true, runValidators: true }
     );
 
     res.status(201).json(department);
