@@ -8,7 +8,7 @@ export const getAuthErrorMessage = (error, fallback) => {
   }
 
   if (error.request && !error.response) {
-    return "Cannot reach the backend server. Run npm run dev and check http://localhost:5000/api/health.";
+    return "Cannot reach the backend server. Check VITE_API_URL and make sure the deployed backend health endpoint is online.";
   }
 
   return fallback;
