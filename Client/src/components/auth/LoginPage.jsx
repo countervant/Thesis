@@ -216,6 +216,9 @@ const LoginPage = ({ order, order1 }) => {
             &copy; 2026 Dream Light Visual. All rights reserved.
           </p>
         </form>
+        <p className="absolute bottom-8 hidden text-center text-xs font-medium text-slate-500 md:block">
+          &copy; 2026 Dream Light Visual. All rights reserved.
+        </p>
       </div>
     </>
   );

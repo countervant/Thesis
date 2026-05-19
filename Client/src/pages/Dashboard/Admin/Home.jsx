@@ -363,14 +363,17 @@ const StatCard = ({ item }) => {
   const style = statStyles[item.key] || statStyles.in_progress;
 
   return (
-  <section className={`flex h-24 items-center gap-4 rounded-2xl border border-pink-100 bg-white px-5 ${dashboardCardShadow}`}>
-    <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${style.tile}`}>
-      <Icon name={item.icon} className={`h-9 w-9 ${style.text}`} />
+  <section className={`relative flex min-h-[150px] flex-col items-start justify-between rounded-3xl border border-pink-100 bg-white px-5 py-5 md:min-h-0 md:h-24 md:flex-row md:items-center md:justify-start md:gap-4 md:rounded-2xl md:py-0 ${dashboardCardShadow}`}>
+    <span className={`grid h-16 w-16 shrink-0 place-items-center rounded-2xl md:h-14 md:w-14 ${style.tile}`}>
+      <Icon name={item.icon} className={`h-10 w-10 md:h-9 md:w-9 ${style.text}`} />
     </span>
     <div className="leading-tight">
-      <p className="text-2xl font-extrabold text-[#10172a] dark:text-white">{item.value}</p>
-      <p className="mt-1.5 text-xs font-semibold text-slate-500 dark:text-neutral-100">{item.label}</p>
+      <p className="text-3xl font-extrabold text-[#10172a] md:text-2xl dark:text-white">{item.value}</p>
+      <p className="mt-2 text-base font-semibold text-slate-500 md:mt-1.5 md:text-xs dark:text-neutral-100">{item.label}</p>
     </div>
+    <span className={`absolute bottom-5 right-5 grid h-9 w-9 place-items-center rounded-full md:hidden ${style.tile}`}>
+      <span className={`text-2xl font-black ${style.text}`}>&rsaquo;</span>
+    </span>
   </section>
   );
 };
@@ -458,9 +461,12 @@ const MonthlyChart = ({ tasks }) => {
   const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
 
   return (
-  <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white px-5 py-5 ${dashboardCardShadow}`}>
+  <section className={`overflow-hidden rounded-3xl border border-pink-100 bg-white px-5 py-6 md:rounded-2xl md:py-5 ${dashboardCardShadow}`}>
     <div className="mb-4 flex items-center justify-between gap-4">
-      <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Monthly Overview</h2>
+      <h2 className="text-2xl font-extrabold text-[#10172a] md:text-base dark:text-white">Monthly Overview</h2>
+      <button type="button" className="hidden h-10 rounded-2xl border border-slate-200 px-4 text-sm font-black text-[#10172a] shadow-sm md:hidden">
+        This Month
+      </button>
     </div>
     <div
       className={`grid grid-cols-[178px_1fr] overflow-x-auto ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
@@ -617,9 +623,9 @@ const ExpenseChart = ({ budgetEntries }) => {
     }).format(Math.abs(Number(amount) || 0));
 
   return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-5 ${dashboardCardShadow}`}>
+    <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-6 md:rounded-2xl md:py-5 ${dashboardCardShadow}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
+        <h2 className="text-2xl font-extrabold text-[#10172a] md:text-base dark:text-white">Expense Summary</h2>
         <label className="relative">
           <span className="sr-only">Filter expense categories by month</span>
           <select
@@ -739,9 +745,9 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
 
   return (
     <>
-      <section className={`overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}>
+      <section className={`overflow-hidden rounded-3xl border border-pink-100 bg-white md:rounded-2xl ${dashboardCardShadow}`}>
         <div className="flex items-center justify-between gap-4 px-5 pt-4">
-          <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-[#10172a] md:text-base dark:text-white">
             {title}
             <span
               className={`grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs ${
@@ -888,7 +894,7 @@ const RecentActivities = ({
 
   return (
     <>
-      <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+      <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-4 md:rounded-2xl ${dashboardCardShadow}`}>
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
             <span className="text-[#c72fb2]">
@@ -989,7 +995,7 @@ const UpcomingEvents = ({ events }) => {
   const modalListMaxHeight = modalListVisibleRows * 58;
 
   return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+    <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-4 md:rounded-2xl ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
           <span className="text-[#c72fb2]">
@@ -1093,7 +1099,7 @@ const OnlineTeam = ({ members }) => {
   );
 
   return (
-    <section className={`rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+    <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-4 md:rounded-2xl ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />

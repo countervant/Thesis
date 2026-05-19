@@ -9,6 +9,7 @@ import employeeIcon from "../assets/employee.png";
 import heartIcon from "../assets/heart.png";
 import leaveRequestIcon from "../assets/leaverequest.png";
 import messagesIcon from "../assets/messages.png";
+import menuIcon from "../assets/menu.png";
 import newsfeedIcon from "../assets/newsfeed.png";
 import notificationIcon from "../assets/notification.png";
 import logoutIcon from "../assets/logout.png";
@@ -398,6 +399,22 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       !readNotificationSet.has(notification.id) &&
       !hiddenNotificationSet.has(notification.id)
   ).length;
+  const mobileNavItems =
+    user?.role === "employee"
+      ? [
+          { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+          { id: "tasks", label: "Tasks", icon: "tasks" },
+          { id: "calendar", label: "Calendar", icon: "calendar" },
+          { id: "leave-request", label: "Leave", icon: "leave-request" },
+          { id: "settings", label: "Settings", icon: "settings" },
+        ]
+      : [
+          { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+          { id: "tasks", label: "Tasks", icon: "tasks" },
+          { id: "calendar", label: "Calendar", icon: "calendar" },
+          { id: "employee", label: "Employee", icon: "employee" },
+          { id: "settings", label: "Settings", icon: "settings" },
+        ];
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
@@ -613,6 +630,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     onLogout?.();
   };
 
+  const handleSideNavNavigate = (page) => {
+    onNavigate?.(page);
+    if (window.innerWidth < 768) {
+      setIsSidebarExpanded(false);
+    }
+  };
+
   const toggleSidebar = () => {
     setIsSidebarExpanded((isExpanded) => {
       const nextIsExpanded = !isExpanded;
@@ -630,12 +654,27 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fd] text-neutral-950 dark:bg-neutral-950 dark:text-white">
+    <div className="min-h-screen bg-[#fbf9ff] text-neutral-950 dark:bg-neutral-950 dark:text-white md:bg-[#f8f9fd]">
       <header
-        className={`fixed right-0 top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-neutral-200 bg-[#f8f9fd] px-4 transition-[left] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 ${
+        className={`fixed right-0 top-0 z-30 flex h-[92px] items-center justify-between gap-3 bg-[#fbf9ff]/95 px-6 transition-[left] duration-300 ease-in-out dark:bg-neutral-950 md:h-14 md:gap-4 md:border-b md:border-neutral-200 md:bg-[#f8f9fd] md:px-4 dark:md:border-neutral-800 dark:md:bg-neutral-950 ${
           isSidebarExpanded ? "left-0 md:left-[220px]" : "left-0 md:left-[68px]"
         }`}
       >
+        <div className="flex items-center gap-5 md:hidden">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="grid h-11 w-11 place-items-center text-neutral-950 dark:text-white"
+            aria-label="Open menu"
+          >
+            <img src={menuIcon} alt="" className="h-7 w-7 object-contain" aria-hidden="true" />
+          </button>
+          <div className="leading-tight">
+            <p className="text-base font-semibold text-[#10172a] dark:text-white">Welcome back,</p>
+            <p className="text-lg font-black text-[#10172a] dark:text-white">{getUserName(user)}!</p>
+          </div>
+        </div>
+
         {activePage === "newsfeed" ? (
           <label
             className={`relative hidden w-full flex-1 md:block ${
@@ -663,7 +702,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 md:gap-2.5">
           <button
             type="button"
             onClick={() => onNavigate?.("messages")}
@@ -694,7 +733,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsNotificationOpen((isOpen) => !isOpen)}
-              className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="relative grid h-12 w-12 place-items-center rounded-2xl border border-slate-100 bg-white text-neutral-900 shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white md:h-10 md:w-10 md:rounded-xl md:shadow-none"
               aria-label="Notifications"
               aria-expanded={isNotificationOpen}
               aria-haspopup="dialog"
@@ -931,13 +970,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
-              className="flex h-10 min-w-[190px] items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-2.5 text-left text-neutral-900 transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              className="flex h-12 min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-2 text-left text-neutral-900 shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white md:h-10 md:min-w-[190px] md:rounded-xl md:border-slate-200 md:px-2.5 md:shadow-none"
               aria-label="Account menu"
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
             >
               <UserAvatar user={user} />
-              <span className="min-w-0 flex-1">
+              <span className="hidden min-w-0 flex-1 md:block">
                 <span className="block truncate text-sm font-extrabold text-[#10172a] dark:text-white">
                   {getUserName(user)}
                 </span>
@@ -947,7 +986,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               </span>
               <svg
                 viewBox="0 0 20 20"
-                className={`h-4 w-4 shrink-0 transition-transform ${
+                className={`hidden h-4 w-4 shrink-0 transition-transform md:block ${
                   isAccountMenuOpen ? "rotate-180" : "rotate-0"
                 }`}
                 aria-hidden="true"
@@ -1024,16 +1063,25 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         </div>
       </header>
 
+      {isSidebarExpanded && (
+        <button
+          type="button"
+          onClick={() => setIsSidebarExpanded(false)}
+          className="fixed inset-0 z-30 bg-slate-950/35 backdrop-blur-[2px] md:hidden"
+          aria-label="Close navigation menu"
+        />
+      )}
+
       <aside
         onClick={expandSidebar}
-        className={`fixed left-0 top-0 z-40 hidden h-screen flex-col overflow-visible border-r border-neutral-300 bg-[#f8f9fd] transition-[width] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 md:flex ${
-          isSidebarExpanded ? "w-[220px]" : "w-[68px]"
+        className={`fixed left-0 top-0 z-40 flex h-screen flex-col overflow-visible border-r border-neutral-300 bg-[#f8f9fd] shadow-2xl transition-[transform,width] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 md:translate-x-0 md:shadow-none ${
+          isSidebarExpanded ? "w-[260px] translate-x-0 md:w-[220px]" : "w-[260px] -translate-x-full md:w-[68px]"
         }`}
       >
         <div className="relative flex h-14 items-center px-2.5">
           <button
             type="button"
-            onClick={() => onNavigate?.("dashboard")}
+            onClick={() => handleSideNavNavigate("dashboard")}
             className={`flex min-w-0 items-center transition-all duration-300 ${
               isSidebarExpanded ? "w-full justify-start gap-2 pr-8" : "w-full justify-center"
             }`}
@@ -1078,7 +1126,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => onNavigate?.(item.id)}
+                    onClick={() => handleSideNavNavigate(item.id)}
                     className={`flex h-11 items-center rounded-xl text-[13px] font-bold transition-all duration-300 ease-in-out active:scale-95 ${
                       isSidebarExpanded
                         ? "w-full justify-start gap-2.5 px-3"
@@ -1154,8 +1202,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       </button>
 
       <main
-        className={`px-4 pt-[70px] transition-[margin] duration-300 ease-in-out md:px-5 lg:px-6 ${
-          isMessagesPage ? "pb-0" : "pb-8"
+        className={`px-4 pt-[102px] transition-[margin] duration-300 ease-in-out md:px-5 md:pt-[70px] lg:px-6 ${
+          isMessagesPage ? "pb-0" : "pb-28 md:pb-8"
         } ${
           isSidebarExpanded ? "md:ml-[220px]" : "md:ml-[68px]"
         }`}
@@ -1164,6 +1212,35 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           {children}
         </div>
       </main>
+      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 pb-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 md:hidden ${
+        isSidebarExpanded ? "translate-y-full" : "translate-y-0"
+      }`}>
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          {mobileNavItems.map((item) => {
+            const isActive = activePage === item.id || (activePage === "add-task" && item.id === "tasks");
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onNavigate?.(item.id)}
+                className={`flex min-h-[66px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-black transition ${
+                  isActive
+                    ? "bg-pink-50 text-[#e11d9c]"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                <Icon
+                  name={item.icon}
+                  className={`h-7 w-7 object-contain ${
+                    isActive ? "" : "opacity-70 grayscale"
+                  }`}
+                />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
       <ConfirmDialog
         confirmLabel={notificationDeleteAction?.confirmLabel}
         icon="delete"

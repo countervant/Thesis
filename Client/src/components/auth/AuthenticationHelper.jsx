@@ -27,9 +27,11 @@ const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => 
         <Link to={link} onClick={handlePrimaryClick} className="hover:text-pink-600">
           {Label}
         </Link>
-        <Link to = '/ForgotPassword' className="hover:text-pink-600">
-          {Label1}
-        </Link>
+        {Label1 && (
+          <Link to = '/ForgotPassword' className="hover:text-pink-600">
+            {Label1}
+          </Link>
+        )}
       </div>
     </>
   );

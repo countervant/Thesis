@@ -7,11 +7,11 @@ const Register = () => {
     <>
     <div
       data-auth-screen
-      className="auth-screen flex min-h-screen flex-col md:flex-row"
+      className="auth-screen flex min-h-screen flex-col bg-gray-100 md:flex-row-reverse"
     >
 
-    <RegisterPage order='1' order1='1' />
-    <Welcome order='2' order1='2' text = 'Create Account' />
+    <Welcome order='0' order1='0' text = 'Create Account' mobileAuthHero />
+    <RegisterPage order='0' order1='0' />
     
     </div>
     <AuthThemeToggle />
