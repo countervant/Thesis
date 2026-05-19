@@ -6,7 +6,6 @@ const calendarDepartmentSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      unique: true,
     },
     color: {
       type: String,
@@ -21,7 +20,7 @@ const calendarDepartmentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-calendarDepartmentSchema.index({ name: 1 });
+calendarDepartmentSchema.index({ name: 1 }, { unique: true });
 
 const CalendarDepartment = mongoose.model("CalendarDepartment", calendarDepartmentSchema);
 
