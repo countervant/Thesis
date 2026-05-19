@@ -132,9 +132,9 @@ const LoginPage = ({ order, order1 }) => {
 
           <div className="space-y-5 sm:space-y-8">
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-500 md:hidden">Email</label>
+              <label className="mb-2 block text-sm font-medium text-slate-500">Email</label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-pink-500 md:hidden">
+                <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-pink-500">
                   <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
                     <path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
                   </svg>
@@ -146,7 +146,7 @@ const LoginPage = ({ order, order1 }) => {
                 onChange={handleEmailChange}
                 disabled={loading}
                 autoComplete="off"
-                className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:h-auto md:rounded-none md:border-0 md:border-b md:border-black md:bg-transparent md:px-0 md:pb-2 md:text-base md:focus:border-black md:focus:ring-0 dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85 dark:md:bg-[#283241]"
+                className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
                 required
               />
               </div>
@@ -156,9 +156,9 @@ const LoginPage = ({ order, order1 }) => {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-500 md:hidden">Password</label>
-              <div className="relative flex h-12 items-center rounded-lg border border-slate-200 bg-white md:h-auto md:rounded-none md:border-0 md:border-b-2 md:border-gray-400 md:bg-transparent dark:border-white/40 dark:bg-[#1f2937] dark:md:bg-[#283241]">
-                <span className="pointer-events-none absolute left-5 text-pink-500 md:hidden">
+              <label className="mb-2 block text-sm font-medium text-slate-500">Password</label>
+              <div className="relative flex h-12 items-center rounded-lg border border-slate-200 bg-white dark:border-white/40 dark:bg-[#1f2937]">
+                <span className="pointer-events-none absolute left-5 text-pink-500">
                   <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
                     <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
                   </svg>
@@ -170,14 +170,14 @@ const LoginPage = ({ order, order1 }) => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 autoComplete="current-password"
-                className="min-w-0 flex-1 border-0 bg-transparent pl-14 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:pl-0 md:pb-2 md:text-base dark:text-white dark:placeholder:text-white/85"
+                className="min-w-0 flex-1 border-0 bg-transparent pl-14 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                className="grid px-5 text-pink-500 transition hover:text-pink-600 md:pb-2 md:pl-3 md:pr-0 dark:opacity-70 dark:hover:opacity-100"
+                className="grid px-5 text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (

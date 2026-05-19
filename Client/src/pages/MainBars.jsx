@@ -669,10 +669,6 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           >
             <img src={menuIcon} alt="" className="h-7 w-7 object-contain" aria-hidden="true" />
           </button>
-          <div className="leading-tight">
-            <p className="text-base font-semibold text-[#10172a] dark:text-white">Welcome back,</p>
-            <p className="text-lg font-black text-[#10172a] dark:text-white">{getUserName(user)}!</p>
-          </div>
         </div>
 
         {activePage === "newsfeed" ? (
