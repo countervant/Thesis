@@ -1,5 +1,8 @@
+import { useMemo, useState } from "react";
+
 const privacyItems = [
   {
+    id: "profileVisibility",
     title: "Profile Visibility",
     description: "Choose who can view your profile.",
     icon: "person",
@@ -7,6 +10,7 @@ const privacyItems = [
     value: "Everyone",
   },
   {
+    id: "onlineStatus",
     title: "Online Status",
     description: "Show when you are online.",
     icon: "status",
@@ -14,6 +18,7 @@ const privacyItems = [
     enabled: true,
   },
   {
+    id: "activityVisibility",
     title: "Activity Visibility",
     description: "Allow others to see your activity.",
     icon: "hide",
@@ -21,6 +26,7 @@ const privacyItems = [
     enabled: false,
   },
   {
+    id: "personalInformation",
     title: "Personal Information",
     description: "Choose who can see your personal information.",
     icon: "users",
@@ -28,6 +34,29 @@ const privacyItems = [
     value: "Only Me",
   },
 ];
+
+const selectOptions = ["Everyone", "Team Only", "Only Me"];
+
+const getStorageKey = (user) => `clientraPrivacySettings:${user?._id || user?.id || user?.email || "guest"}`;
+
+const getDefaultSettings = () =>
+  privacyItems.reduce(
+    (settings, item) => ({
+      ...settings,
+      [item.id]: item.control === "select" ? item.value : item.enabled,
+    }),
+    {}
+  );
+
+const loadSettings = (user) => {
+  const defaultSettings = getDefaultSettings();
+  try {
+    const savedSettings = JSON.parse(localStorage.getItem(getStorageKey(user)) || "{}");
+    return { ...defaultSettings, ...savedSettings };
+  } catch {
+    return defaultSettings;
+  }
+};
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = { viewBox: "0 0 24 24", fill: "none", className, "aria-hidden": "true" };
@@ -42,8 +71,12 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   return <svg {...props}><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 };
 
-const Toggle = ({ enabled }) => (
-  <span
+const Toggle = ({ enabled, onClick, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={label}
+    aria-pressed={enabled}
     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
       enabled
         ? "bg-linear-to-r from-[#f472b6] to-[#c72fb2] shadow-[0_6px_14px_rgba(199,47,178,0.22)]"
@@ -51,68 +84,114 @@ const Toggle = ({ enabled }) => (
     }`}
   >
     <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-5" : "translate-x-0"}`} />
-  </span>
-);
-
-const SelectControl = ({ value }) => (
-  <button
-    type="button"
-    className="flex h-10 min-w-[150px] items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-[#10142d] transition hover:border-pink-200 hover:bg-pink-50/40 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
-  >
-    {value}
-    <Icon name="chevron" className="h-4 w-4 text-slate-500" />
   </button>
 );
 
-const PrivacySettings = () => (
-  <div className="space-y-5">
-    <header>
-      <h2 className="text-3xl font-black text-[#10142d] dark:text-white">
-        Privacy Settings
-      </h2>
-      <p className="mt-2 text-sm font-semibold text-slate-500">
-        Control your privacy and visibility settings.
-      </p>
-    </header>
-
-    <section className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
-      <div className="divide-y divide-pink-50">
-        {privacyItems.map((item) => (
-          <div key={item.title} className="flex flex-wrap items-center justify-between gap-4 py-5 first:pt-0 last:pb-0">
-            <div className="flex min-w-0 items-center gap-4">
-              <span className="grid h-13 w-13 shrink-0 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
-                <Icon name={item.icon} className="h-6 w-6" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-black text-[#10142d] dark:text-white">
-                  {item.title}
-                </span>
-                <span className="mt-1 block text-sm font-semibold leading-5 text-slate-500">
-                  {item.description}
-                </span>
-              </span>
-            </div>
-
-            {item.control === "select" ? (
-              <SelectControl value={item.value} />
-            ) : (
-              <Toggle enabled={item.enabled} />
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
-
-    <div className="flex justify-end">
-      <button
-        type="button"
-        className="flex h-8 min-w-[132px] items-center justify-center gap-2 rounded-lg bg-linear-to-r from-[#f472b6] to-[#c72fb2] px-4 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(227,71,179,0.2)] transition hover:brightness-105"
-      >
-        <Icon name="save" className="h-4 w-4" />
-        Save Changes
-      </button>
-    </div>
-  </div>
+const SelectControl = ({ value, onChange, label }) => (
+  <span className="relative inline-flex min-w-[150px] items-center">
+    <select
+      value={value}
+      onChange={onChange}
+      aria-label={label}
+      className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-4 pr-9 text-sm font-semibold text-[#10142d] outline-none transition hover:border-pink-200 hover:bg-pink-50/40 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
+    >
+      {selectOptions.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+    <Icon name="chevron" className="pointer-events-none absolute right-3 h-4 w-4 text-slate-500" />
+  </span>
 );
+
+const PrivacySettings = ({ user }) => {
+  const savedSettings = useMemo(() => loadSettings(user), [user]);
+  const [settings, setSettings] = useState(savedSettings);
+  const [message, setMessage] = useState("");
+
+  const updateSetting = (id, value) => {
+    setSettings((currentSettings) => ({ ...currentSettings, [id]: value }));
+    setMessage("");
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem(getStorageKey(user), JSON.stringify(settings));
+    setMessage("Privacy settings saved.");
+  };
+
+  const resetSettings = () => {
+    setSettings(loadSettings(user));
+    setMessage("Changes cancelled.");
+  };
+
+  return (
+    <div className="space-y-5">
+      <header>
+        <h2 className="text-3xl font-black text-[#10142d] dark:text-white">
+          Privacy Settings
+        </h2>
+        <p className="mt-2 text-sm font-semibold text-slate-500">
+          Control your privacy and visibility settings.
+        </p>
+      </header>
+
+      <section className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+        <div className="divide-y divide-pink-50">
+          {privacyItems.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 py-5 first:pt-0 last:pb-0">
+              <div className="flex min-w-0 items-center gap-4">
+                <span className="grid h-13 w-13 shrink-0 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
+                  <Icon name={item.icon} className="h-6 w-6" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-[#10142d] dark:text-white">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold leading-5 text-slate-500">
+                    {item.description}
+                  </span>
+                </span>
+              </div>
+
+              {item.control === "select" ? (
+                <SelectControl
+                  value={settings[item.id]}
+                  onChange={(event) => updateSetting(item.id, event.target.value)}
+                  label={item.title}
+                />
+              ) : (
+                <Toggle
+                  enabled={Boolean(settings[item.id])}
+                  onClick={() => updateSetting(item.id, !settings[item.id])}
+                  label={`Toggle ${item.title}`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {message && <p className="mr-auto text-xs font-black text-emerald-500">{message}</p>}
+        <button
+          type="button"
+          onClick={resetSettings}
+          className="h-8 min-w-[110px] rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 transition hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={saveSettings}
+          className="flex h-8 min-w-[132px] items-center justify-center gap-2 rounded-lg bg-linear-to-r from-[#f472b6] to-[#c72fb2] px-4 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(227,71,179,0.2)] transition hover:brightness-105"
+        >
+          <Icon name="save" className="h-4 w-4" />
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default PrivacySettings;

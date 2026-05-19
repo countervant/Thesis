@@ -19,6 +19,12 @@ const getFullName = (user) =>
 const getDepartment = (user, fallback = "") =>
   String(fallback || user?.companyName || user?.position || "Unassigned").trim() || "Unassigned";
 
+const leaveRequestPopulate = [
+  { path: "employee", select: "firstName lastName email position companyName role avatar" },
+  { path: "reviewedBy", select: "firstName lastName email role" },
+  { path: "comments.author", select: "firstName lastName email role position companyName avatar" },
+];
+
 const dayMs = 24 * 60 * 60 * 1000;
 
 const getDurationDays = (startDate, endDate) =>
@@ -116,8 +122,7 @@ router.get("/", protect, async (req, res) => {
 
     const [requests, total, summary, leaveTypes, departments] = await Promise.all([
       LeaveRequest.find(query)
-        .populate("employee", "firstName lastName email position companyName role avatar")
-        .populate("reviewedBy", "firstName lastName email role")
+        .populate(leaveRequestPopulate)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -198,7 +203,7 @@ router.post("/", protect, async (req, res) => {
     });
 
     const createdRequest = await LeaveRequest.findById(leaveRequest._id)
-      .populate("employee", "firstName lastName email position companyName role avatar")
+      .populate(leaveRequestPopulate)
       .lean();
 
     res.status(201).json(createdRequest);
@@ -211,6 +216,7 @@ router.post("/", protect, async (req, res) => {
 router.patch("/:id/status", protect, authorize("admin"), async (req, res) => {
   try {
     const status = String(req.body.status || "");
+    const comment = String(req.body.comment || "").trim();
 
     if (!["Approved", "Rejected"].includes(status)) {
       return res.status(400).json({ message: "Status must be Approved or Rejected" });
@@ -225,17 +231,58 @@ router.patch("/:id/status", protect, authorize("admin"), async (req, res) => {
     leaveRequest.status = status;
     leaveRequest.reviewedBy = req.user._id;
     leaveRequest.reviewedAt = new Date();
+    if (comment) {
+      leaveRequest.comments.push({
+        author: req.user._id,
+        text: comment,
+      });
+    }
     await leaveRequest.save();
 
     const updatedRequest = await LeaveRequest.findById(leaveRequest._id)
-      .populate("employee", "firstName lastName email position companyName role avatar")
-      .populate("reviewedBy", "firstName lastName email role")
+      .populate(leaveRequestPopulate)
       .lean();
 
     res.status(200).json(updatedRequest);
   } catch (error) {
     console.error("Update leave request status error:", error);
     res.status(500).json({ message: "Unable to update leave request status" });
+  }
+});
+
+router.post("/:id/comments", protect, async (req, res) => {
+  try {
+    const text = String(req.body.text || "").trim();
+
+    if (!text) {
+      return res.status(400).json({ message: "Comment is required" });
+    }
+
+    const leaveRequest = await LeaveRequest.findById(req.params.id);
+
+    if (!leaveRequest) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    const isOwner = String(leaveRequest.employee) === String(req.user._id);
+    if (req.user.role !== "admin" && !isOwner) {
+      return res.status(403).json({ message: "You cannot comment on this leave request" });
+    }
+
+    leaveRequest.comments.push({
+      author: req.user._id,
+      text,
+    });
+    await leaveRequest.save();
+
+    const updatedRequest = await LeaveRequest.findById(leaveRequest._id)
+      .populate(leaveRequestPopulate)
+      .lean();
+
+    res.status(201).json(updatedRequest);
+  } catch (error) {
+    console.error("Add leave request comment error:", error);
+    res.status(500).json({ message: "Unable to add leave request comment" });
   }
 });
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
+import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { useAuth } from "../../../context/AuthContext";
 import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
 
@@ -47,6 +48,8 @@ const SmallIcon = ({ name, className = "h-4 w-4" }) => {
   if (name === "calendar") return <svg {...props}><rect x="5" y="5" width="14" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" /><path d="M8 3v4M16 3v4M5 10h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "person") return <svg {...props}><circle cx="12" cy="8" r="3" stroke="currentColor" strokeWidth="1.8" /><path d="M5.5 19c.8-3.4 3-5.2 6.5-5.2s5.7 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "leave") return <svg {...props}><path d="M8 4h8M8 20h8M9 4c0 4.2 6 4.2 6 8s-6 3.8-6 8M15 4c0 4.2-6 4.2-6 8s6 3.8 6 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  if (name === "time") return <svg {...props}><circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" /><path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "message") return <svg {...props}><path d="M5 6h14v10H9l-4 3V6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "chevron") return <svg {...props}><path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   return <svg {...props}><circle cx="12" cy="12" r="1.8" fill="currentColor" /><circle cx="12" cy="5" r="1.8" fill="currentColor" /><circle cx="12" cy="19" r="1.8" fill="currentColor" /></svg>;
 };
@@ -100,6 +103,19 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatDateWithWeekday = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    weekday: "short",
+  });
+};
+
 const formatDates = (request) => {
   const start = formatDate(request?.startDate);
   const end = formatDate(request?.endDate);
@@ -126,6 +142,28 @@ const normalizeRequest = (request) => ({
   submitted: formatDateTime(request.createdAt),
   approvedBy: request.reviewedBy ? `${getUserName(request.reviewedBy)} (${request.reviewedBy.role || "Reviewer"})` : "-",
 });
+
+const DetailSection = ({ children, icon, title }) => (
+  <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex items-center gap-3">
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-500">
+        <SmallIcon name={icon} />
+      </span>
+      <h3 className="text-sm font-black text-[#111936]">{title}</h3>
+    </div>
+    {children}
+  </section>
+);
+
+const DetailLine = ({ icon, label, value }) => (
+  <div className="grid grid-cols-[28px_1fr_1.25fr] items-center gap-3 border-b border-slate-100 py-3 text-xs last:border-b-0">
+    <span className="grid h-7 w-7 place-items-center rounded-md bg-pink-50 text-pink-500">
+      <SmallIcon name={icon} />
+    </span>
+    <span className="font-bold text-slate-500">{label}</span>
+    <span className="font-black text-[#111936]">{value || "-"}</span>
+  </div>
+);
 
 const monthName = (date) =>
   date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -218,6 +256,8 @@ const EmpLeaverequest = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [detailRequestId, setDetailRequestId] = useState("");
+  const [commentText, setCommentText] = useState("");
 
   const loadRequests = useCallback(async () => {
     try {
@@ -260,6 +300,16 @@ const EmpLeaverequest = () => {
     () => requests.filter((request) => !statusFilter || request.status === statusFilter),
     [requests, statusFilter]
   );
+  const detailRequest = requests.find((request) => getEntityId(request) === detailRequestId) || null;
+
+  const updateRequestInState = (updatedRequest) => {
+    const normalizedRequest = normalizeRequest(updatedRequest);
+    const requestId = getEntityId(normalizedRequest);
+    setRequests((currentRequests) =>
+      currentRequests.map((item) => (getEntityId(item) === requestId ? normalizedRequest : item))
+    );
+    setDetailRequestId((currentId) => (currentId === requestId ? requestId : currentId));
+  };
 
   const updateField = (field, value) => {
     setForm((currentForm) => {
@@ -323,6 +373,21 @@ const EmpLeaverequest = () => {
 
   const handleNextMonth = () => {
     setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1));
+  };
+
+  const handleAddComment = async (request) => {
+    const requestId = getEntityId(request);
+    const text = commentText.trim();
+    if (!requestId || !text) return;
+
+    try {
+      setErrorMessage("");
+      const updatedRequest = await leaveRequestAPI.comment(requestId, text);
+      updateRequestInState(updatedRequest);
+      setCommentText("");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to add comment."));
+    }
   };
 
   return (
@@ -494,16 +559,25 @@ const EmpLeaverequest = () => {
                   <td className="px-3 py-4 font-bold text-slate-600">{item.submitted}</td>
                   <td className="px-3 py-4 font-bold text-slate-600">{item.approvedBy}</td>
                   <td className="px-3 py-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentMonth(new Date(new Date(item.startDate).getFullYear(), new Date(item.startDate).getMonth(), 1));
-                      }}
-                      className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50"
-                      aria-label={`View ${item.id} on calendar`}
-                    >
-                      <SmallIcon name="calendar" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDetailRequestId(getEntityId(item))}
+                        className="h-9 rounded-lg border border-pink-100 bg-pink-50 px-3 text-xs font-black text-pink-700 hover:bg-pink-100"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentMonth(new Date(new Date(item.startDate).getFullYear(), new Date(item.startDate).getMonth(), 1));
+                        }}
+                        className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50"
+                        aria-label={`View ${item.id} on calendar`}
+                      >
+                        <SmallIcon name="calendar" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -514,6 +588,191 @@ const EmpLeaverequest = () => {
           <span>{filteredHistory.length} of {requests.length} requests</span>
         </div>
       </Card>
+
+      {detailRequest && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+          <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-6 text-[#111936] shadow-2xl ring-1 ring-slate-200">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <span className="grid h-12 w-12 place-items-center rounded-xl bg-pink-50 text-pink-500">
+                  <SmallIcon name="calendar" className="h-6 w-6" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-black">Leave Request Details</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    View the details and current status of this leave request.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusPill status={detailRequest.status} />
+                <button
+                  type="button"
+                  onClick={() => setDetailRequestId("")}
+                  className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Close leave request details"
+                >
+                  <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" aria-hidden="true">
+                    <path d="m5 5 10 10M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DetailSection icon="person" title="Employee Information">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                  <InitialsAvatar
+                    alt={getUserName(user)}
+                    className="h-24 w-24"
+                    fallback="ME"
+                    textClassName="text-2xl"
+                    user={user}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-black">{getUserName(user)}</p>
+                    <p className="text-sm font-bold text-slate-500">{user?.role || "Employee"}</p>
+                    <div className="mt-4 grid gap-3 text-sm font-bold text-slate-600">
+                      <p className="grid grid-cols-[24px_120px_1fr] items-center gap-2">
+                        <SmallIcon name="person" />
+                        <span>Department</span>
+                        <span className="font-black text-[#111936]">{user?.department || detailRequest.department || "-"}</span>
+                      </p>
+                      <p className="grid grid-cols-[24px_120px_1fr] items-center gap-2">
+                        <SmallIcon name="leave" />
+                        <span>Request ID</span>
+                        <span className="font-black text-[#111936]">{detailRequest.id}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </DetailSection>
+
+              <DetailSection icon="calendar" title="Request Information">
+                <DetailLine icon="leave" label="Leave Type" value={detailRequest.type} />
+                <DetailLine icon="calendar" label="Start Date" value={formatDateWithWeekday(detailRequest.startDate)} />
+                <DetailLine icon="calendar" label="End Date" value={formatDateWithWeekday(detailRequest.endDate)} />
+                <DetailLine icon="time" label="Total Days" value={detailRequest.duration} />
+                <DetailLine icon="calendar" label="Submitted Date" value={detailRequest.submitted} />
+                <DetailLine icon="message" label="Reason" value={detailRequest.reason} />
+              </DetailSection>
+
+              <DetailSection icon="time" title="Leave Timeline">
+                <div className="space-y-0">
+                  {[
+                    {
+                      label: "Request Submitted",
+                      date: detailRequest.submitted,
+                      complete: true,
+                    },
+                    {
+                      label: "Under Review",
+                      date: detailRequest.reviewedAt ? formatDateTime(detailRequest.reviewedAt) : "Waiting for review",
+                      complete: detailRequest.status !== "Pending",
+                    },
+                    {
+                      label: detailRequest.status === "Rejected" ? "Rejected" : "Approved",
+                      date: detailRequest.status === "Pending" ? "Not completed" : formatDateTime(detailRequest.reviewedAt || detailRequest.updatedAt),
+                      complete: detailRequest.status !== "Pending",
+                      rejected: detailRequest.status === "Rejected",
+                    },
+                  ].map((item, index, items) => (
+                    <div key={item.label} className="grid grid-cols-[28px_1fr_auto] gap-3">
+                      <span className="relative flex justify-center">
+                        <span className={`mt-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white ${
+                          item.rejected ? "bg-rose-500" : item.complete ? "bg-emerald-500" : "bg-orange-500"
+                        }`}>
+                          {item.complete ? (item.rejected ? "x" : "✓") : ""}
+                        </span>
+                        {index < items.length - 1 && <span className="absolute top-7 h-full w-px bg-slate-200" />}
+                      </span>
+                      <span className="pb-5">
+                        <span className="block text-sm font-black">{item.label}</span>
+                        <span className="mt-1 block text-xs font-bold text-slate-500">{item.date || "-"}</span>
+                      </span>
+                      <span className={`mt-0.5 h-fit rounded-full px-3 py-1 text-[11px] font-black ${
+                        item.rejected ? "bg-rose-50 text-rose-600" : item.complete ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+                      }`}>
+                        {item.rejected ? "Rejected" : item.complete ? "Completed" : "Pending"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </DetailSection>
+
+              <DetailSection icon="message" title="Comments">
+                <div className="space-y-4">
+                  {detailRequest.comments?.length > 0 ? (
+                    detailRequest.comments.map((comment) => {
+                      const authorName = getUserName(comment.author);
+
+                      return (
+                        <div key={comment._id || `${authorName}-${comment.createdAt}`} className="flex gap-3">
+                          <InitialsAvatar
+                            alt={authorName}
+                            className="h-11 w-11"
+                            fallback="U"
+                            user={comment.author}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-black">
+                                {authorName}
+                                {comment.author?.role ? (
+                                  <span className="ml-2 rounded-full bg-pink-50 px-2 py-0.5 text-[10px] font-black uppercase text-pink-600">
+                                    {comment.author.role}
+                                  </span>
+                                ) : null}
+                              </p>
+                              <span className="text-xs font-bold text-slate-400">{formatDateTime(comment.createdAt)}</span>
+                            </div>
+                            <p className="mt-1 text-sm font-semibold text-slate-600">{comment.text}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
+                      No comments yet.
+                    </p>
+                  )}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <label className="block">
+                      <span className="sr-only">Add comment</span>
+                      <textarea
+                        value={commentText}
+                        onChange={(event) => setCommentText(event.target.value)}
+                        placeholder="Write a comment..."
+                        className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                      />
+                    </label>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleAddComment(detailRequest)}
+                        disabled={!commentText.trim()}
+                        className="h-9 rounded-xl bg-pink-600 px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Add Comment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </DetailSection>
+            </div>
+
+            <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
+              <button
+                type="button"
+                onClick={() => setDetailRequestId("")}
+                className="h-11 rounded-xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

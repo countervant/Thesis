@@ -1,5 +1,24 @@
 import mongoose from "mongoose";
 
+const leaveRequestCommentSchema = new mongoose.Schema(
+  {
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1000,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
 const leaveRequestSchema = new mongoose.Schema(
   {
     requestCode: {
@@ -70,6 +89,7 @@ const leaveRequestSchema = new mongoose.Schema(
     reviewedAt: {
       type: Date,
     },
+    comments: [leaveRequestCommentSchema],
   },
   {
     timestamps: true,

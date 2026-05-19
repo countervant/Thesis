@@ -22,6 +22,14 @@ const overviewItems = [
 
 const quickActions = ["Change Password", "Deactivate Account"];
 
+const supportInitialState = {
+  subject: "",
+  category: "Account",
+  message: "",
+};
+
+const getSupportKey = (user) => `clientraSupportTickets:${user?._id || user?.id || user?.email || "guest"}`;
+
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const commonProps = {
     viewBox: "0 0 24 24",
@@ -41,16 +49,92 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   if (name === "clock") return <svg {...commonProps}><circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" /><path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "monitor") return <svg {...commonProps}><path d="M5 5h14v11H5zM9 20h6M12 16v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "bolt") return <svg {...commonProps}><path d="m13 2-7 12h5l-1 8 8-13h-5l1-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
+  if (name === "x") return <svg {...commonProps}><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   return <svg {...commonProps}><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 };
 
 const Settings = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("Profile");
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
+  const [supportForm, setSupportForm] = useState(supportInitialState);
+  const [supportMessage, setSupportMessage] = useState("");
+  const [deactivateReason, setDeactivateReason] = useState("");
   const isSecurityTab = activeTab === "Security";
   const isNotificationTab = activeTab === "Notifications";
   const isPrivacyTab = activeTab === "Privacy";
   const usesFullContent = isSecurityTab || isNotificationTab || isPrivacyTab;
+
+  const openPasswordSettings = () => {
+    setActiveTab("Security");
+    setTimeout(() => window.dispatchEvent(new Event("clientra:open-password-settings")), 0);
+  };
+
+  const handleQuickAction = (action) => {
+    if (action === "Change Password") {
+      openPasswordSettings();
+      return;
+    }
+    setDeactivateReason("");
+    setIsDeactivateOpen(true);
+  };
+
+  const updateSupportField = (field, value) => {
+    setSupportForm((currentForm) => ({ ...currentForm, [field]: value }));
+    setSupportMessage("");
+  };
+
+  const saveSupportTicket = ({ subject, category, message, type = "support" }) => {
+    const ticket = {
+      id: `${type}-${Date.now()}`,
+      subject,
+      category,
+      message,
+      status: "Open",
+      createdAt: new Date().toISOString(),
+      user: user?.email || user?.companyName || "Guest",
+    };
+
+    const storageKey = getSupportKey(user);
+    let currentTickets = [];
+    try {
+      currentTickets = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    } catch {
+      currentTickets = [];
+    }
+    localStorage.setItem(storageKey, JSON.stringify([ticket, ...currentTickets]));
+    return ticket;
+  };
+
+  const submitSupport = (event) => {
+    event.preventDefault();
+    if (!supportForm.subject.trim() || !supportForm.message.trim()) {
+      setSupportMessage("Please add a subject and message.");
+      return;
+    }
+    saveSupportTicket({
+      subject: supportForm.subject.trim(),
+      category: supportForm.category,
+      message: supportForm.message.trim(),
+    });
+    setSupportForm(supportInitialState);
+    setSupportMessage("Support request submitted.");
+  };
+
+  const submitDeactivateRequest = (event) => {
+    event.preventDefault();
+    saveSupportTicket({
+      subject: "Deactivate account request",
+      category: "Account",
+      message: deactivateReason.trim() || "User requested account deactivation.",
+      type: "deactivate",
+    });
+    setDeactivateReason("");
+    setIsDeactivateOpen(false);
+    setIsSupportOpen(true);
+    setSupportMessage("Deactivate account request submitted to support.");
+  };
 
   return (
     <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
@@ -99,6 +183,7 @@ const Settings = () => {
                 </div>
                 <button
                   type="button"
+                  onClick={() => setIsSupportOpen(true)}
                   className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
                 >
                   Contact Support
@@ -112,9 +197,9 @@ const Settings = () => {
             {isSecurityTab ? (
               <SecuritySettings user={user} />
             ) : isNotificationTab ? (
-              <NotificationSettings />
+              <NotificationSettings user={user} />
             ) : isPrivacyTab ? (
-              <PrivacySettings />
+              <PrivacySettings user={user} />
             ) : (
               <>
                 <ProfileSettings user={user} />
@@ -169,6 +254,7 @@ const Settings = () => {
                   <button
                     key={action}
                     type="button"
+                    onClick={() => handleQuickAction(action)}
                     className="flex h-11 w-full items-center justify-between text-left text-sm font-bold text-slate-700 transition hover:text-[#c72fb2] dark:text-slate-300"
                   >
                     <span>{action}</span>
@@ -190,6 +276,7 @@ const Settings = () => {
               </p>
               <button
                 type="button"
+                onClick={() => setActiveTab("Security")}
                 className="mt-4 h-9 w-full rounded-lg border border-[#b678ff] bg-white text-xs font-black text-[#8b35ff] transition hover:bg-violet-50"
               >
                 Go to Security
@@ -198,6 +285,126 @@ const Settings = () => {
           </aside>}
         </div>
       </div>
+
+      {isSupportOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
+          <section className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-[#10142d] dark:text-white">Contact Support</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Send your concern to the support team.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSupportOpen(false);
+                  setSupportMessage("");
+                }}
+                className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+              >
+                <Icon name="x" className="h-4 w-4" />
+              </button>
+            </div>
+
+            {supportMessage && (
+              <p className={`mt-4 rounded-xl px-4 py-3 text-sm font-black ${
+                supportMessage.includes("submitted") ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
+              }`}>
+                {supportMessage}
+              </p>
+            )}
+
+            <form onSubmit={submitSupport} className="mt-4 space-y-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Category</span>
+                <select
+                  value={supportForm.category}
+                  onChange={(event) => updateSupportField("category", event.target.value)}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                >
+                  <option>Account</option>
+                  <option>Security</option>
+                  <option>Notification</option>
+                  <option>Privacy</option>
+                  <option>Technical Issue</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Subject</span>
+                <input
+                  type="text"
+                  value={supportForm.subject}
+                  onChange={(event) => updateSupportField("subject", event.target.value)}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Message</span>
+                <textarea
+                  value={supportForm.message}
+                  onChange={(event) => updateSupportField("message", event.target.value)}
+                  rows={5}
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                />
+              </label>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSupportOpen(false)}
+                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(227,71,179,0.22)] transition hover:brightness-105"
+                >
+                  Submit Request
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {isDeactivateOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
+          <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
+            <h2 className="text-lg font-black text-[#10142d] dark:text-white">Deactivate Account</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              This will send a request to support so they can review the account deactivation.
+            </p>
+            <form onSubmit={submitDeactivateRequest} className="mt-4 space-y-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Reason</span>
+                <textarea
+                  value={deactivateReason}
+                  onChange={(event) => setDeactivateReason(event.target.value)}
+                  rows={4}
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeactivateOpen(false)}
+                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 min-w-[150px] rounded-lg bg-red-500 px-5 text-xs font-black text-white transition hover:bg-red-600"
+                >
+                  Send Request
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

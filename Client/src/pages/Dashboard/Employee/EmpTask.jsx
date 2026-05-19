@@ -295,91 +295,28 @@ const TaskRow = ({ isExpanded, item, onToggleExpand, onToggleSubtask, onViewCale
   );
 };
 
-const TaskGroup = ({ title, count, tone, children, footer }) => (
+const TaskGroup = ({ title, count, tone, children, footer, isOpen = true, onToggle }) => (
   <Card className="overflow-hidden">
-    <div className="flex items-center gap-3 px-5 py-4">
-      <span className={`text-lg font-black ${tone}`}>{">"}</span>
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-pink-50/60"
+      aria-expanded={isOpen}
+    >
+      <span className={`text-lg font-black transition-transform ${tone} ${isOpen ? "rotate-90" : ""}`}>
+        {">"}
+      </span>
       <h2 className={`text-sm font-black ${tone}`}>{title}</h2>
       <span className="text-sm font-black text-slate-400">({count})</span>
-    </div>
-    <div className="mx-5 overflow-hidden rounded-2xl border border-pink-50 bg-white">
-      {children}
-    </div>
-    {footer && <div className="py-4 text-center">{footer}</div>}
-  </Card>
-);
-
-const BoardColumn = ({ expandedTaskIds, onToggleExpand, onToggleSubtask, onViewCalendar, tasks, title, tone }) => (
-  <Card className="min-h-72 p-4">
-    <div className="mb-4 flex items-center justify-between">
-      <h2 className={`text-sm font-black ${tone}`}>{title}</h2>
-      <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-black text-slate-500">{tasks.length}</span>
-    </div>
-    <div className="space-y-3">
-      {tasks.length === 0 && <p className="py-6 text-center text-sm font-bold text-slate-500">No tasks.</p>}
-      {tasks.map((task) => {
-        const isExpanded = expandedTaskIds.has(task.id);
-        const isDone = task.status === "Done";
-        return (
-        <article key={task.id} className="rounded-xl border border-pink-50 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => onToggleExpand(task.id)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-pink-50 hover:text-pink-600"
-              aria-expanded={isExpanded}
-              aria-label={`${isExpanded ? "Hide" : "Show"} subtasks for ${task.title}`}
-            >
-              <span className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}>
-                <SmallIcon name="chevron" />
-              </span>
-            </button>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-[#10142d]">{task.title}</p>
-              <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-500">{task.description || "No description"}</p>
-            </div>
-            <button type="button" onClick={() => onViewCalendar(task)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-pink-50" aria-label={`View ${task.title} date`}>
-              <SmallIcon name="calendar" />
-            </button>
-          </div>
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <span className={`rounded-full px-3 py-1 text-xs font-black ${priorityStyles[task.priority] || priorityStyles.Medium}`}>{task.priority}</span>
-            <span className="text-xs font-bold text-slate-500">{formatDate(task.dueDate)}</span>
-          </div>
-          <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between text-[11px] font-black text-slate-500">
-              <span>Progress</span>
-              <span>{task.progress}%</span>
-            </div>
-            <span className="block h-2 rounded-full bg-slate-100">
-              <span className={`block h-2 rounded-full ${progressColors[task.status] || "bg-pink-500"}`} style={{ width: `${task.progress}%` }} />
-            </span>
-          </div>
-          {isExpanded && task.subtasks.length > 0 && (
-            <div className="mt-4 space-y-1.5">
-              {task.subtasks.slice(0, 4).map((subtask, index) => (
-                <label key={subtask.id || `${task.id}-${index}`} className="flex min-w-0 items-center gap-2 text-xs font-bold text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={subtask.completed}
-                    disabled={isDone}
-                    onChange={() => onToggleSubtask(task, index)}
-                    className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                  <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
-                    {subtask.title}
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-          {isExpanded && task.subtasks.length === 0 && (
-            <p className="mt-4 text-xs font-bold text-slate-400">No subtasks yet.</p>
-          )}
-        </article>
-        );
-      })}
-    </div>
+    </button>
+    {isOpen && (
+      <>
+        <div className="mx-5 overflow-hidden rounded-2xl border border-pink-50 bg-white">
+          {children}
+        </div>
+        {footer && <div className="py-4 text-center">{footer}</div>}
+      </>
+    )}
   </Card>
 );
 
@@ -391,12 +328,12 @@ const EmpTask = () => {
   const [selectedPriority, setSelectedPriority] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Due Date");
-  const [viewMode, setViewMode] = useState("List");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [confirmAction, setConfirmAction] = useState(null);
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -453,6 +390,7 @@ const EmpTask = () => {
 
   useEffect(() => {
     setExpandedGroups({});
+    setCollapsedGroups({});
   }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, visibleGroup]);
 
   const dueTodayTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
@@ -487,6 +425,15 @@ const EmpTask = () => {
 
   const getGroupItems = (groupKey, items) =>
     expandedGroups[groupKey] ? items : items.slice(0, groupPreviewLimit);
+
+  const isGroupOpen = (groupKey) => !collapsedGroups[groupKey];
+
+  const toggleGroupOpen = (groupKey) => {
+    setCollapsedGroups((currentGroups) => ({
+      ...currentGroups,
+      [groupKey]: !currentGroups[groupKey],
+    }));
+  };
 
   const getGroupFooter = (groupKey, items, label, toneClass) => {
     if (items.length <= groupPreviewLimit) {
@@ -623,7 +570,7 @@ const EmpTask = () => {
       </div>
 
       <Card className="p-5">
-        <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px_auto] xl:items-end">
+        <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
           <label className="relative block">
             <span className="sr-only">Search tasks</span>
             <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -638,19 +585,6 @@ const EmpTask = () => {
           <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
           <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
           <SelectControl label="Sort by" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
-          <div className="flex rounded-2xl bg-pink-50 p-1">
-            {["List", "Board"].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setViewMode(item)}
-                className={`flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-black ${viewMode === item ? "bg-white text-pink-700 shadow-sm" : "text-slate-500"}`}
-              >
-                <SmallIcon name={item === "List" ? "list" : "board"} />
-                {item}
-              </button>
-            ))}
-          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
@@ -668,13 +602,15 @@ const EmpTask = () => {
 
       {isLoading && <TaskListSkeleton rows={5} />}
 
-      {!isLoading && viewMode === "List" && (
+      {!isLoading && (
         <>
           <TaskGroup
             title="Overdue"
             count={overdueTasks.length}
             tone="text-rose-500"
             footer={getGroupFooter("overdue", overdueTasks, "overdue", "text-rose-500")}
+            isOpen={isGroupOpen("overdue")}
+            onToggle={() => toggleGroupOpen("overdue")}
           >
             {renderTaskRows(getGroupItems("overdue", overdueTasks))}
           </TaskGroup>
@@ -684,6 +620,8 @@ const EmpTask = () => {
             count={dueTodayTasks.length}
             tone="text-orange-500"
             footer={getGroupFooter("dueToday", dueTodayTasks, "due today", "text-orange-500")}
+            isOpen={isGroupOpen("dueToday")}
+            onToggle={() => toggleGroupOpen("dueToday")}
           >
             {renderTaskRows(getGroupItems("dueToday", dueTodayTasks))}
           </TaskGroup>
@@ -693,6 +631,8 @@ const EmpTask = () => {
             count={upcomingTasks.length}
             tone="text-slate-700"
             footer={getGroupFooter("upcoming", upcomingTasks, "upcoming", "text-pink-600")}
+            isOpen={isGroupOpen("upcoming")}
+            onToggle={() => toggleGroupOpen("upcoming")}
           >
             {renderTaskRows(getGroupItems("upcoming", upcomingTasks))}
           </TaskGroup>
@@ -702,27 +642,12 @@ const EmpTask = () => {
             count={completedTasks.length}
             tone="text-emerald-600"
             footer={getGroupFooter("completed", completedTasks, "completed", "text-emerald-600")}
+            isOpen={isGroupOpen("completed")}
+            onToggle={() => toggleGroupOpen("completed")}
           >
             {renderTaskRows(getGroupItems("completed", completedTasks))}
           </TaskGroup>
         </>
-      )}
-
-      {!isLoading && viewMode === "Board" && (
-        <div className="grid gap-5 xl:grid-cols-4">
-          {["Pending", "In progress", "In review", "Done"].map((status) => (
-            <BoardColumn
-              expandedTaskIds={expandedTaskIds}
-              key={status}
-              title={status}
-              tone={status === "Done" ? "text-emerald-600" : status === "Pending" ? "text-orange-500" : status === "In review" ? "text-blue-600" : "text-pink-600"}
-              tasks={visibleTasks.filter((task) => task.status === status)}
-              onToggleExpand={handleToggleExpand}
-              onToggleSubtask={handleToggleSubtask}
-              onViewCalendar={handleViewCalendar}
-            />
-          ))}
-        </div>
       )}
       <ConfirmDialog
         confirmLabel={confirmAction?.confirmLabel}

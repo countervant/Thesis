@@ -529,17 +529,28 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
   );
 };
 
-const TaskGroup = ({ children, count, footer, title, tone }) => (
+const TaskGroup = ({ children, count, footer, isOpen = true, onToggle, title, tone }) => (
   <Card className="overflow-hidden">
-    <div className="flex items-center gap-3 px-5 py-4">
-      <span className={`text-lg font-black ${tone}`}>{">"}</span>
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-pink-50/60"
+      aria-expanded={isOpen}
+    >
+      <span className={`text-lg font-black transition-transform ${tone} ${isOpen ? "rotate-90" : ""}`}>
+        {">"}
+      </span>
       <h2 className={`text-sm font-black ${tone}`}>{title}</h2>
       <span className="text-sm font-black text-slate-400">({count})</span>
-    </div>
-    <div className="mx-5 overflow-hidden rounded-2xl border border-pink-50 bg-white">
-      {children}
-    </div>
-    {footer && <div className="py-4 text-center">{footer}</div>}
+    </button>
+    {isOpen && (
+      <>
+        <div className="mx-5 overflow-hidden rounded-2xl border border-pink-50 bg-white">
+          {children}
+        </div>
+        {footer && <div className="py-4 text-center">{footer}</div>}
+      </>
+    )}
   </Card>
 );
 
@@ -556,11 +567,11 @@ const Tasks = ({
   const [selectedPriority, setSelectedPriority] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Due Date");
-  const [viewMode, setViewMode] = useState("List");
   const [confirmAction, setConfirmAction] = useState(null);
   const [focusedTaskId, setFocusedTaskId] = useState("");
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState({});
   const currentUserId = getEntityId(user);
 
   useEffect(() => {
@@ -655,6 +666,7 @@ const Tasks = ({
 
   useEffect(() => {
     setExpandedGroups({});
+    setCollapsedGroups({});
   }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy]);
 
   const isAssignedToCurrentUser = (task) =>
@@ -703,6 +715,15 @@ const Tasks = ({
 
   const getGroupItems = (groupKey, items) =>
     expandedGroups[groupKey] ? items : items.slice(0, groupPreviewLimit);
+
+  const isGroupOpen = (groupKey) => !collapsedGroups[groupKey];
+
+  const toggleGroupOpen = (groupKey) => {
+    setCollapsedGroups((currentGroups) => ({
+      ...currentGroups,
+      [groupKey]: !currentGroups[groupKey],
+    }));
+  };
 
   const getGroupFooter = (groupKey, items, label, toneClass) => {
     if (items.length <= groupPreviewLimit) {
@@ -880,7 +901,7 @@ const Tasks = ({
           </div>
 
           <Card className="p-5">
-            <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px_auto] xl:items-end">
+            <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
               <label className="relative block">
                 <span className="sr-only">Search tasks</span>
                 <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -895,21 +916,6 @@ const Tasks = ({
               <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
               <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
               <SelectControl label="Sort by" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
-              <div className="flex rounded-2xl bg-pink-50 p-1">
-                {["List", "Board"].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setViewMode(item)}
-                    className={`flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-black ${
-                      viewMode === item ? "bg-white text-pink-700 shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    <SmallIcon name={item === "List" ? "list" : "board"} />
-                    {item}
-                  </button>
-                ))}
-              </div>
             </div>
           </Card>
 
@@ -929,6 +935,8 @@ const Tasks = ({
                 <TaskGroup
                   count={myTasks.length}
                   footer={getGroupFooter("myTasks", myTasks, "my tasks", "text-pink-600")}
+                  isOpen={isGroupOpen("myTasks")}
+                  onToggle={() => toggleGroupOpen("myTasks")}
                   title="My Tasks"
                   tone="text-pink-600"
                 >
@@ -938,6 +946,8 @@ const Tasks = ({
                 <TaskGroup
                   count={overdueTasks.length}
                   footer={getGroupFooter("overdue", overdueTasks, "overdue", "text-rose-500")}
+                  isOpen={isGroupOpen("overdue")}
+                  onToggle={() => toggleGroupOpen("overdue")}
                   title="Overdue"
                   tone="text-rose-500"
                 >
@@ -947,6 +957,8 @@ const Tasks = ({
                 <TaskGroup
                   count={dueTodayTasks.length}
                   footer={getGroupFooter("dueToday", dueTodayTasks, "due today", "text-orange-500")}
+                  isOpen={isGroupOpen("dueToday")}
+                  onToggle={() => toggleGroupOpen("dueToday")}
                   title="Due Today"
                   tone="text-orange-500"
                 >
@@ -956,6 +968,8 @@ const Tasks = ({
                 <TaskGroup
                   count={upcomingTasks.length}
                   footer={getGroupFooter("upcoming", upcomingTasks, "upcoming", "text-pink-600")}
+                  isOpen={isGroupOpen("upcoming")}
+                  onToggle={() => toggleGroupOpen("upcoming")}
                   title="Upcoming"
                   tone="text-slate-700"
                 >
@@ -965,6 +979,8 @@ const Tasks = ({
                 <TaskGroup
                   count={completedTasks.length}
                   footer={getGroupFooter("completed", completedTasks, "completed", "text-emerald-600")}
+                  isOpen={isGroupOpen("completed")}
+                  onToggle={() => toggleGroupOpen("completed")}
                   title="Completed"
                   tone="text-emerald-600"
                 >
@@ -972,6 +988,7 @@ const Tasks = ({
                 </TaskGroup>
               </>
             )}
+
           </section>
 
           <ConfirmDialog

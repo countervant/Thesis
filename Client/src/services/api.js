@@ -584,8 +584,14 @@ export const leaveRequestAPI = {
     return response.data;
   },
 
-  updateStatus: async (id, status) => {
-    const response = await api.patch(`/leave-requests/${id}/status`, { status });
+  updateStatus: async (id, status, comment = "") => {
+    const response = await api.patch(`/leave-requests/${id}/status`, { status, comment });
+    clearCache("/leave-requests", "/dashboard");
+    return response.data;
+  },
+
+  comment: async (id, text) => {
+    const response = await api.post(`/leave-requests/${id}/comments`, { text });
     clearCache("/leave-requests", "/dashboard");
     return response.data;
   },
