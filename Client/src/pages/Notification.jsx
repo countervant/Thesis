@@ -45,6 +45,34 @@ const trimText = (text, fallback) => {
   return value.length > 90 ? `${value.slice(0, 87)}...` : value;
 };
 
+const NotificationItem = ({ notification, onOpen }) => (
+  <button
+    type="button"
+    onClick={() => onOpen(notification)}
+    className="flex w-full items-start gap-4 rounded-lg border border-neutral-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-pink-200 hover:bg-pink-50"
+  >
+    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white ring-1 ring-pink-100">
+      <img
+        src={notification.icon}
+        alt=""
+        className="h-6 w-6 object-contain"
+        aria-hidden="true"
+      />
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-sm font-bold text-neutral-950">
+        {notification.title}
+      </span>
+      <span className="mt-1 block text-sm text-neutral-700">
+        {notification.message}
+      </span>
+      <span className="mt-2 block text-xs font-semibold text-neutral-500">
+        {formatDateTime(notification.date)}
+      </span>
+    </span>
+  </button>
+);
+
 const buildNewsfeedNotifications = (posts, currentUserId) => {
   const notifications = [];
 
@@ -132,6 +160,7 @@ const Notification = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const [isAllNotificationsOpen, setIsAllNotificationsOpen] = useState(false);
 
   const currentUserId = useMemo(() => getEntityId(user), [user]);
 
@@ -194,6 +223,7 @@ const Notification = () => {
   };
 
   const openNotification = (notification) => {
+    setIsAllNotificationsOpen(false);
     handleNavigate(notification.target || "newsfeed");
   };
 
@@ -227,7 +257,7 @@ const Notification = () => {
               </div>
             )}
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-6">
               {isLoading && (
                 <NotificationSkeleton rows={6} />
               )}
@@ -238,39 +268,62 @@ const Notification = () => {
                 </div>
               )}
 
-              {!isLoading &&
-                notifications.map((notification) => (
-                  <button
-                    key={notification.id}
-                    type="button"
-                    onClick={() => openNotification(notification)}
-                    className="flex w-full items-start gap-4 rounded-lg border border-neutral-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-pink-200 hover:bg-pink-50"
-                  >
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white ring-1 ring-pink-100">
-                      <img
-                        src={notification.icon}
-                        alt=""
-                        className="h-6 w-6 object-contain"
-                        aria-hidden="true"
+              {!isLoading && notifications.length > 0 && (
+                <>
+                  <div className="max-h-[462px] space-y-3 overflow-y-auto pr-1">
+                    {notifications.map((notification) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onOpen={openNotification}
                       />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-neutral-950">
-                        {notification.title}
-                      </span>
-                      <span className="mt-1 block text-sm text-neutral-700">
-                        {notification.message}
-                      </span>
-                      <span className="mt-2 block text-xs font-semibold text-neutral-500">
-                        {formatDateTime(notification.date)}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+                    ))}
+                  </div>
+                  <div className="pt-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setIsAllNotificationsOpen(true)}
+                      className="text-sm font-black text-pink-600 transition hover:text-pink-700"
+                    >
+                      View all notifications
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </section>
         </div>
       </MainBars>
+
+      {isAllNotificationsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
+          <section className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
+            <div className="flex items-center justify-between gap-4 border-b border-neutral-100 px-5 py-4">
+              <div>
+                <h2 className="text-xl font-black text-neutral-950">All Notifications</h2>
+                <p className="text-xs font-bold text-neutral-500">{notifications.length} notifications</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAllNotificationsOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-neutral-200 text-sm font-black text-neutral-500 transition hover:bg-neutral-50"
+                aria-label="Close notifications"
+              >
+                x
+              </button>
+            </div>
+            <div className="max-h-[760px] space-y-3 overflow-y-auto p-5">
+              {notifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onOpen={openNotification}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
 
       <ConfirmDialog
         confirmLabel="Yes , log out"

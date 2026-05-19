@@ -149,6 +149,42 @@ const Field = ({ label, children }) => (
   </label>
 );
 
+const EventListTable = ({ events, onEdit, onDelete, compact = false }) => (
+  <table className={`w-full text-left text-xs ${compact ? "min-w-[960px]" : "min-w-[1180px]"}`}>
+    <thead className="sticky top-0 z-10 bg-white text-xs font-black text-slate-500">
+      <tr>{["Event", "Type", "Date & Time", "Participants / Assignees", "Calendar", "Actions"].map((heading) => <th key={heading} className="px-3 py-3">{heading}</th>)}</tr>
+    </thead>
+    <tbody className="divide-y divide-slate-100">
+      {events.map((event) => (
+        <tr key={event.id}>
+          <td className="px-3 py-3 font-black"><span className={`mr-4 inline-block h-3 w-3 rounded-full ${event.dot}`} />{event.title}</td>
+          <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.typeClass}`}>{event.type}</span></td>
+          <td className="px-3 py-3 font-bold text-slate-600">{formatDate(event.date)} <span className="ml-8">{event.time}</span></td>
+          <td className="px-3 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {(event.participants || []).slice(0, 4).map((participant) => <span key={participant} className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-pink-100 text-[10px] font-black text-pink-700">{participant}</span>)}
+              </div>
+              <span className="text-xs font-black text-slate-500">{event.department}</span>
+            </div>
+          </td>
+          <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.calendarClass}`}>{event.calendar}</span></td>
+          <td className="px-3 py-3">
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onEdit(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
+                <Icon name="edit" className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={() => onDelete(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
+                <Icon name="trash" className="h-4 w-4" />
+              </button>
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
 const AdminCalendar = () => {
   const today = new Date();
   const todayKey = toDateKey(today);
@@ -163,6 +199,7 @@ const AdminCalendar = () => {
   const [eventForm, setEventForm] = useState(null);
   const [departmentForm, setDepartmentForm] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showAllEventsPanel, setShowAllEventsPanel] = useState(false);
 
   const allDepartments = [
     ...baseDepartments,
@@ -194,6 +231,10 @@ const AdminCalendar = () => {
     });
   }, [enabledCalendars, events, selectedDepartment]);
 
+  const sortedMonthEvents = useMemo(() => {
+    return [...monthEvents].sort((first, second) => first.dateKey.localeCompare(second.dateKey) || first.startTime.localeCompare(second.startTime));
+  }, [monthEvents]);
+
   const stats = [
     { label: "Total Events", value: monthEvents.length, sublabel: "this month", tone: "violet", icon: "calendar" },
     { label: "Meetings", value: monthEvents.filter((event) => event.type === "Meeting").length, sublabel: "this month", tone: "orange", icon: "cup" },
@@ -223,6 +264,7 @@ const AdminCalendar = () => {
   };
 
   const editEvent = (event) => {
+    setShowAllEventsPanel(false);
     setEventForm({
       id: event.id,
       title: event.title,
@@ -267,6 +309,7 @@ const AdminCalendar = () => {
     if (!deleteTarget) return;
     await calendarAPI.delete(deleteTarget.id);
     setDeleteTarget(null);
+    setShowAllEventsPanel(false);
     await loadEvents();
   };
 
@@ -466,46 +509,43 @@ const AdminCalendar = () => {
           <div className="px-5 pt-4">
             <h2 className="text-base font-black">Event List <span className="text-xs font-bold text-slate-500">({formatMonth(currentMonth)})</span></h2>
           </div>
-          <div className="overflow-x-auto px-5 pb-4">
-            <table className="w-full min-w-[1180px] text-left text-xs">
-              <thead className="text-xs font-black text-slate-500">
-                <tr>{["Event", "Type", "Date & Time", "Participants / Assignees", "Calendar", "Actions"].map((heading) => <th key={heading} className="px-3 py-3">{heading}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {monthEvents.map((event) => (
-                  <tr key={event.id}>
-                    <td className="px-3 py-3 font-black"><span className={`mr-4 inline-block h-3 w-3 rounded-full ${event.dot}`} />{event.title}</td>
-                    <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.typeClass}`}>{event.type}</span></td>
-                    <td className="px-3 py-3 font-bold text-slate-600">{formatDate(event.date)} <span className="ml-8">{event.time}</span></td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex -space-x-2">
-                          {(event.participants || []).slice(0, 4).map((participant) => <span key={participant} className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-pink-100 text-[10px] font-black text-pink-700">{participant}</span>)}
-                        </div>
-                        <span className="text-xs font-black text-slate-500">{event.department}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.calendarClass}`}>{event.calendar}</span></td>
-                    <td className="px-3 py-3">
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => editEvent(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
-                          <Icon name="edit" className="h-4 w-4" />
-                        </button>
-                        <button type="button" onClick={() => setDeleteTarget(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
-                          <Icon name="trash" className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="px-5 pb-4">
+            <div className="max-h-[326px] overflow-auto">
+              <EventListTable events={sortedMonthEvents} onEdit={editEvent} onDelete={setDeleteTarget} />
+            </div>
             <div className="pt-3 text-center">
-              <button type="button" onClick={resetFilters} className="text-base font-black text-violet-700">View all events</button>
+              <button type="button" onClick={() => setShowAllEventsPanel(true)} className="text-base font-black text-violet-700">View all events</button>
             </div>
           </div>
         </Card>
       </section>
+
+      {showAllEventsPanel && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-6">
+          <section className="flex max-h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-black text-[#10142d]">All Events</h2>
+                <p className="text-xs font-bold text-slate-500">{formatMonth(currentMonth)} - {sortedMonthEvents.length} events</p>
+              </div>
+              <button type="button" onClick={() => setShowAllEventsPanel(false)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500">
+                x
+              </button>
+            </div>
+            <div className="overflow-auto p-5">
+              <EventListTable
+                compact
+                events={sortedMonthEvents}
+                onEdit={editEvent}
+                onDelete={(event) => {
+                  setShowAllEventsPanel(false);
+                  setDeleteTarget(event);
+                }}
+              />
+            </div>
+          </section>
+        </div>
+      )}
 
       {eventForm && (
         <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => setEventForm(null)}>

@@ -684,7 +684,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               aria-hidden="true"
             />
             {unreadMessageCount > 0 && (
-              <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[10px] font-bold leading-none text-white">
+              <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[8px] font-bold leading-none text-white">
                 {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
               </span>
             )}
@@ -707,7 +707,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 aria-hidden="true"
               />
               {unreadCount > 0 && (
-                <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[8px] font-bold leading-none text-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
