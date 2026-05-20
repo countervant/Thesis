@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AdminDashboard from "./Dashboard/Admin/Home.jsx";
@@ -61,10 +61,54 @@ const formatMessageTime = (value) => {
   });
 };
 
+const getMessageDateKey = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+};
+
+const formatMessageDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const dateKey = getMessageDateKey(date);
+
+  if (dateKey === getMessageDateKey(today)) return "Today";
+  if (dateKey === getMessageDateKey(yesterday)) return "Yesterday";
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+};
+
 const getMessageStatus = (message) => {
   if (message?.readAt) return "Seen";
   if (message?.deliveredAt) return "Delivered";
   return "Sent";
+};
+
+const getMessageInboxStateKey = (userId) =>
+  `clientraMessageInboxState:${userId || "guest"}`;
+
+const readMessageInboxState = (userId) => {
+  try {
+    const storedState = JSON.parse(
+      localStorage.getItem(getMessageInboxStateKey(userId)) || "{}"
+    );
+    return {
+      archivedIds: Array.isArray(storedState.archivedIds) ? storedState.archivedIds : [],
+      deletedIds: Array.isArray(storedState.deletedIds) ? storedState.deletedIds : [],
+    };
+  } catch {
+    return { archivedIds: [], deletedIds: [] };
+  }
 };
 
 const Avatar = ({ className = "h-12 w-12", user }) => (
@@ -155,9 +199,60 @@ const MessagesPanel = () => {
   const [bulkDraft, setBulkDraft] = useState("");
   const [selectedRecipientIds, setSelectedRecipientIds] = useState([]);
   const [openMenuMessageId, setOpenMenuMessageId] = useState("");
+  const [openInboxMenuId, setOpenInboxMenuId] = useState("");
+  const [inboxFilter, setInboxFilter] = useState("all");
+  const [inboxState, setInboxState] = useState(() =>
+    readMessageInboxState(currentUserId)
+  );
   const [newMessageSearch, setNewMessageSearch] = useState("");
   const threadEndRef = useRef(null);
   const activeUserIdRef = useRef("");
+
+  useEffect(() => {
+    setInboxState(readMessageInboxState(currentUserId));
+  }, [currentUserId]);
+
+  const updateInboxState = (updater) => {
+    setInboxState((currentState) => {
+      const nextState = updater(currentState);
+      localStorage.setItem(getMessageInboxStateKey(currentUserId), JSON.stringify(nextState));
+      return nextState;
+    });
+  };
+
+  const handleArchiveConversation = (participantId) => {
+    updateInboxState((currentState) => ({
+      archivedIds: Array.from(new Set([...currentState.archivedIds, participantId])),
+      deletedIds: currentState.deletedIds.filter((id) => id !== participantId),
+    }));
+    if (participantId === activeUserId && inboxFilter !== "archived") {
+      setActiveUserId("");
+      setActiveParticipant(null);
+      setMessages([]);
+    }
+    setOpenInboxMenuId("");
+  };
+
+  const handleUnarchiveConversation = (participantId) => {
+    updateInboxState((currentState) => ({
+      ...currentState,
+      archivedIds: currentState.archivedIds.filter((id) => id !== participantId),
+    }));
+    setOpenInboxMenuId("");
+  };
+
+  const handleDeleteConversation = (participantId) => {
+    updateInboxState((currentState) => ({
+      archivedIds: currentState.archivedIds.filter((id) => id !== participantId),
+      deletedIds: Array.from(new Set([...currentState.deletedIds, participantId])),
+    }));
+    if (participantId === activeUserId) {
+      setActiveUserId("");
+      setActiveParticipant(null);
+      setMessages([]);
+    }
+    setOpenInboxMenuId("");
+  };
 
   const conversationItems = useMemo(() => {
     const threadItems = threads
@@ -185,14 +280,21 @@ const MessagesPanel = () => {
       ...threadItems,
       ...(normalizedSearch ? newConversationItems : []),
     ].filter((item) => {
-      if (!normalizedSearch) return item.hasThread;
+      const participantId = getEntityId(item.participant);
+      const isArchived = inboxState.archivedIds.includes(participantId);
+      const isDeleted = inboxState.deletedIds.includes(participantId);
+      if (isDeleted) return false;
+      if (inboxFilter === "archived" && !isArchived) return false;
+      if (inboxFilter !== "archived" && isArchived) return false;
+      if (inboxFilter === "unread" && !item.unreadCount) return false;
+      if (!normalizedSearch) return item.hasThread || inboxFilter === "archived";
 
       const participant = item.participant;
       return [getDisplayName(participant), participant?.email, participant?.role]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(normalizedSearch));
     });
-  }, [searchTerm, threads, users]);
+  }, [inboxFilter, inboxState, searchTerm, threads, users]);
 
   useEffect(() => {
     activeUserIdRef.current = activeUserId;
@@ -597,42 +699,87 @@ const MessagesPanel = () => {
   });
 
   return (
-  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-neutral-300 bg-[#f1f1f1] text-neutral-950 dark:border-neutral-800 dark:bg-neutral-950 md:-mx-7 lg:-mx-9">
-    <aside className="hidden w-[310px] shrink-0 border-r border-neutral-300 bg-[#f5f5f5] px-4 py-7 dark:border-neutral-800 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[330px]">
+  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-slate-100 bg-white text-[#172033] dark:border-neutral-800 dark:bg-neutral-950 md:-mx-7 lg:-mx-9">
+    <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-neutral-800 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold leading-none">Messages</h1>
+        <h1 className="text-2xl font-black leading-none">Messages</h1>
         <button
           type="button"
           onClick={handleStartNewMessage}
-          className="grid h-11 w-11 place-items-center rounded-full text-neutral-950 transition hover:bg-white hover:text-[#dc4fb2] dark:text-white dark:hover:bg-neutral-900"
+          className="grid h-10 w-10 place-items-center rounded-full text-[#ff3faf] transition hover:bg-pink-50 dark:text-[#f472d0] dark:hover:bg-neutral-900"
           aria-label="New message"
           title="New message"
         >
-          <ComposeIcon />
+          <ComposeIcon className="h-6 w-6" />
         </button>
       </div>
 
-      <label className="mt-6 block">
-        <span className="sr-only">Search messages</span>
+      <label className="mt-6 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <span className="sr-only">Search inbox</span>
+        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.9" />
+          <path d="m15.5 15.5 4 4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
         <input
           type="search"
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Search"
-          className="h-11 w-full rounded-full border border-neutral-300 bg-white px-5 text-sm font-medium outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+          placeholder="Search messages..."
+          className="min-w-0 flex-1 border-0 bg-transparent text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
         />
       </label>
 
-      <div className="mt-7 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-5 grid grid-cols-3 gap-3 text-xs font-black">
+        <button
+          type="button"
+          onClick={() => setInboxFilter("all")}
+          className={`rounded-2xl px-4 py-3 ${
+            inboxFilter === "all"
+              ? "bg-pink-50 text-[#ff3faf]"
+              : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-300"
+          }`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setInboxFilter("unread")}
+          className={`rounded-2xl px-4 py-3 ${
+            inboxFilter === "unread"
+              ? "bg-pink-50 text-[#ff3faf]"
+              : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-300"
+          }`}
+        >
+          Unread
+          {threads.some((thread) => thread.unreadCount > 0) && (
+            <span className="ml-1 rounded-full bg-[#ff3faf] px-1.5 py-0.5 text-[10px] text-white">
+              {threads.reduce((total, thread) => total + (thread.unreadCount || 0), 0)}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setInboxFilter("archived")}
+          className={`rounded-2xl px-4 py-3 ${
+            inboxFilter === "archived"
+              ? "bg-pink-50 text-[#ff3faf]"
+              : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-300"
+          }`}
+        >
+          Archived
+        </button>
+      </div>
+
+      <div className="mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {isLoadingInbox && (
-          <p className="rounded-lg bg-white px-4 py-4 text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+          <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
             Loading messages...
           </p>
         )}
 
         {!isLoadingInbox && conversationItems.length === 0 && (
-          <p className="rounded-lg bg-white px-4 py-6 text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-            No people found.
+          <p className="rounded-2xl bg-slate-50 px-4 py-6 text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
+            No conversations yet.
           </p>
         )}
 
@@ -641,52 +788,127 @@ const MessagesPanel = () => {
           const participantId = getEntityId(participant);
           const isActive = participantId === activeUserId;
           const preview = item.lastMessage?.text || "Start a conversation";
+          const isArchived = inboxState.archivedIds.includes(participantId);
+          const isOnline = Boolean(participant?.isOnline || participant?.online);
 
           return (
           <button
             key={participantId}
             type="button"
             onClick={() => handleSelectConversation(participant)}
-            className={`flex w-full items-center gap-4 rounded-xl px-2 py-2 text-left transition ${
+            className={`relative flex w-full items-center gap-4 rounded-2xl px-3 py-4 pr-12 text-left transition ${
               isActive
-                ? "bg-white shadow-sm dark:bg-neutral-900"
-                : "hover:bg-white dark:hover:bg-neutral-900"
+                ? "bg-pink-50 shadow-[0_10px_28px_rgba(236,72,153,0.12)] dark:bg-neutral-900"
+                : "bg-white shadow-[0_6px_22px_rgba(15,23,42,0.06)] hover:bg-pink-50/70 dark:bg-neutral-950 dark:hover:bg-neutral-900"
             }`}
           >
-            <Avatar className="h-14 w-14 shrink-0" user={participant} />
+            <span className="relative shrink-0">
+              <Avatar className="h-12 w-12" user={participant} />
+              {isOnline && (
+                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950" />
+              )}
+            </span>
             <span className="min-w-0 flex-1">
               <span
-                className={`block truncate text-lg leading-tight ${
+                className={`block truncate text-sm leading-tight ${
                   isActive || item.unreadCount ? "font-extrabold" : "font-medium"
                 }`}
               >
                 {getDisplayName(participant)}
               </span>
               <span
-                className={`block truncate text-sm leading-tight ${
+                className={`mt-1 block truncate text-xs leading-tight text-slate-500 ${
                   item.unreadCount ? "font-bold" : "font-medium"
                 }`}
               >
                 {preview}
               </span>
             </span>
+            <span className="absolute right-12 top-4 text-[10px] font-bold text-slate-400">
+              {formatMessageTime(item.lastMessage?.createdAt) || ""}
+            </span>
             {item.unreadCount > 0 && (
-              <span className="grid h-6 min-w-6 place-items-center rounded-full bg-[#dc4fb2] px-2 text-xs font-bold text-white">
+              <span className="absolute bottom-4 right-12 grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3faf] px-1.5 text-[10px] font-bold text-white">
                 {item.unreadCount > 9 ? "9+" : item.unreadCount}
               </span>
             )}
+            <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpenInboxMenuId((currentId) =>
+                    currentId === participantId ? "" : participantId
+                  );
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setOpenInboxMenuId((currentId) =>
+                      currentId === participantId ? "" : participantId
+                    );
+                  }
+                }}
+                className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-white hover:text-[#ff3faf] dark:hover:bg-neutral-800"
+                aria-label="Conversation options"
+                aria-haspopup="menu"
+                aria-expanded={openInboxMenuId === participantId}
+              >
+                <span className="flex flex-col items-center gap-0.5" aria-hidden="true">
+                  <span className="h-1 w-1 rounded-full bg-current" />
+                  <span className="h-1 w-1 rounded-full bg-current" />
+                  <span className="h-1 w-1 rounded-full bg-current" />
+                </span>
+              </span>
+              {openInboxMenuId === participantId && (
+                <span
+                  className="absolute right-0 top-9 z-30 w-32 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 text-xs font-black shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+                  role="menu"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <span
+                    role="menuitem"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (isArchived) {
+                        handleUnarchiveConversation(participantId);
+                      } else {
+                        handleArchiveConversation(participantId);
+                      }
+                    }}
+                    className="block cursor-pointer px-3 py-2 text-left text-slate-700 hover:bg-pink-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
+                  >
+                    {isArchived ? "Unarchive" : "Archive"}
+                  </span>
+                  <span
+                    role="menuitem"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDeleteConversation(participantId);
+                    }}
+                    className="block cursor-pointer px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-neutral-800"
+                  >
+                    Delete
+                  </span>
+                </span>
+              )}
+            </span>
           </button>
           );
         })}
       </div>
     </aside>
 
-    <div className="flex min-w-0 flex-1 flex-col bg-[#f1f1f1] dark:bg-neutral-950">
-      <div className="flex items-center justify-between border-b border-neutral-300 bg-[#f5f5f5] px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
+    <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold leading-none">Messages</h1>
+          <h1 className="text-2xl font-black leading-none">Messages</h1>
           {activeName && (
-            <p className="mt-1 truncate text-sm font-semibold text-neutral-600 dark:text-neutral-300">
+            <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-neutral-300">
               {activeName}
             </p>
           )}
@@ -694,16 +916,16 @@ const MessagesPanel = () => {
         <button
           type="button"
           onClick={handleStartNewMessage}
-          className="grid h-11 w-11 place-items-center rounded-full text-neutral-950 transition hover:bg-white hover:text-[#dc4fb2] dark:text-white dark:hover:bg-neutral-900"
+          className="grid h-11 w-11 place-items-center rounded-full text-[#ff3faf] transition hover:bg-pink-50 dark:text-[#f472d0] dark:hover:bg-neutral-900"
           aria-label="New message"
           title="New message"
         >
-          <ComposeIcon />
+          <ComposeIcon className="h-6 w-6" />
         </button>
       </div>
 
       {conversationItems.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto border-b border-neutral-300 bg-[#f5f5f5] px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
+        <div className="flex gap-2 overflow-x-auto border-b border-slate-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
           {conversationItems.map((item) => {
             const participant = item.participant;
             const participantId = getEntityId(participant);
@@ -715,8 +937,8 @@ const MessagesPanel = () => {
                 onClick={() => handleSelectConversation(participant)}
                 className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${
                   participantId === activeUserId
-                    ? "bg-[#dc4fb2] text-white"
-                    : "bg-white text-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+                    ? "bg-[#ff3faf] text-white"
+                    : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-200"
                 }`}
               >
                 {getDisplayName(participant)}
@@ -727,55 +949,68 @@ const MessagesPanel = () => {
       )}
 
       {activeParticipant && (
-        <div className="hidden items-center gap-3 border-b border-neutral-300 bg-[#f5f5f5] px-7 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:flex">
-          <Avatar className="h-11 w-11" user={activeParticipant} />
+        <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex">
+          <Avatar className="h-12 w-12" user={activeParticipant} />
           <div className="min-w-0">
-            <p className="truncate text-lg font-extrabold">{activeName}</p>
-            <p className="truncate text-xs font-semibold capitalize text-neutral-500 dark:text-neutral-400">
-              {activeParticipant.role}
+            <p className="truncate text-base font-black">{activeName}</p>
+            <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
+              {(activeParticipant.isOnline || activeParticipant.online) && (
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              )}
+              {activeParticipant.isOnline || activeParticipant.online
+                ? "Online"
+                : activeParticipant.role || "Offline"}
             </p>
           </div>
         </div>
       )}
 
       {errorMessage && (
-        <p className="mx-4 mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-200 sm:mx-7">
+        <p className="mx-4 mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-200 sm:mx-8">
           {errorMessage}
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-7">
-        <div className="space-y-5">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-5 dark:bg-neutral-950 sm:px-8">
+        <div className="w-full space-y-3">
           {isLoadingThread && (
-            <p className="rounded-lg bg-white px-4 py-4 text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+            <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
               Loading conversation...
             </p>
           )}
 
           {!isLoadingThread && !activeUserId && (
-            <p className="rounded-lg bg-white px-4 py-8 text-center text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+            <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
               Select a person to start messaging.
             </p>
           )}
 
           {!isLoadingThread && activeUserId && messages.length === 0 && (
-            <p className="rounded-lg bg-white px-4 py-8 text-center text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+            <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
               No messages yet.
             </p>
           )}
 
-          {messages.map((message) => {
+          {messages.map((message, index) => {
             const isMine = getEntityId(message.sender) === currentUserId;
             const messageId = getEntityId(message);
             const isEditing = editingMessageId === messageId;
+            const messageDateKey = getMessageDateKey(message.createdAt);
+            const previousMessageDateKey = getMessageDateKey(messages[index - 1]?.createdAt);
+            const showDateDivider = messageDateKey && messageDateKey !== previousMessageDateKey;
 
             return (
+              <Fragment key={message._id || `${message.createdAt}-${message.text}`}>
+              {showDateDivider && (
+                <p className="py-1 text-center text-xs font-black text-slate-400">
+                  {formatMessageDate(message.createdAt)}
+                </p>
+              )}
               <div
-                key={message._id || `${message.createdAt}-${message.text}`}
-                className={`group/message flex items-center gap-2 ${isMine ? "justify-end" : ""}`}
+                className={`group/message flex items-end gap-3 ${isMine ? "justify-end" : ""}`}
               >
                 {!isMine && (
-                  <Avatar className="h-11 w-11 shrink-0" user={activeParticipant} />
+                  <Avatar className="h-9 w-9 shrink-0" user={activeParticipant} />
                 )}
                 {isMine && !isEditing && (
                   <div className="relative flex h-full min-h-10 items-center opacity-0 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
@@ -787,7 +1022,7 @@ const MessagesPanel = () => {
                         )
                       }
                       disabled={Boolean(busyMessageId)}
-                      className="grid h-10 w-10 place-items-center rounded-full bg-white text-black shadow-sm transition hover:bg-neutral-200 disabled:opacity-50"
+                      className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
                       aria-label="Message options"
                     >
                       <span className="flex flex-col items-center gap-0.5" aria-hidden="true">
@@ -824,10 +1059,10 @@ const MessagesPanel = () => {
                 )}
                 <div className={`flex max-w-[76%] flex-col ${isMine ? "items-end" : "items-start"} sm:max-w-[560px]`}>
                   <div
-                    className={`rounded-3xl px-5 py-3 text-sm font-medium ${
+                    className={`rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
                       isMine
-                        ? "bg-[#dc4fb2] text-black"
-                        : "bg-neutral-300 text-neutral-950 dark:bg-neutral-800 dark:text-white"
+                        ? "bg-pink-50 text-[#172033]"
+                        : "bg-slate-100 text-[#172033] dark:bg-neutral-800 dark:text-white"
                     }`}
                   >
                     {isEditing ? (
@@ -861,8 +1096,8 @@ const MessagesPanel = () => {
                       <>
                         <p className="break-words">{message.text}</p>
                         <p
-                          className={`mt-1 text-[10px] font-bold ${
-                            isMine ? "text-black/60" : "text-neutral-500 dark:text-neutral-400"
+                          className={`mt-1 text-right text-[10px] font-bold ${
+                            isMine ? "text-slate-400" : "text-slate-400 dark:text-neutral-400"
                           }`}
                         >
                           {formatMessageTime(message.createdAt)}
@@ -872,53 +1107,66 @@ const MessagesPanel = () => {
                     )}
                   </div>
                   {isMine && !isEditing && (
-                    <div className="mt-1 flex items-center gap-2 pr-2 text-[11px] font-bold text-neutral-500 dark:text-neutral-400">
+                    <div className="mt-1 flex items-center gap-2 pr-2 text-[11px] font-bold text-slate-400 dark:text-neutral-400">
                       {messageId === latestOutgoingId && (
                         <span>{getMessageStatus(message)}</span>
                       )}
                     </div>
                   )}
                 </div>
-                {isMine && <Avatar className="h-11 w-11 shrink-0" user={user} />}
               </div>
+              </Fragment>
             );
           })}
           <div ref={threadEndRef} />
         </div>
       </div>
 
-      <form onSubmit={handleSendMessage} className="flex shrink-0 items-center gap-3 border-t border-neutral-300 px-4 py-4 dark:border-neutral-800 sm:px-9">
-        <label className="relative min-w-0 flex-1">
-          <span className="sr-only">Message</span>
-          <input
-            type="text"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Aa"
-            maxLength={1000}
-            disabled={!activeUserId || isSending}
-            className="h-14 w-full rounded-full border-0 bg-neutral-300 px-7 pr-14 text-xl font-medium text-neutral-800 outline-none placeholder:text-neutral-500 focus:ring-2 focus:ring-[#dc4fb2] dark:bg-neutral-800 dark:text-white"
-          />
+      <form onSubmit={handleSendMessage} className="shrink-0 border-t border-slate-100 bg-white px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:px-8">
+        <div className="flex w-full items-center gap-3 rounded-full border border-slate-100 bg-white px-4 py-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] dark:border-neutral-800 dark:bg-neutral-900">
           <button
             type="button"
-            onClick={() => setDraft((currentDraft) => `${currentDraft} :)`)}
             disabled={!activeUserId || isSending}
-            className="absolute right-4 top-1/2 grid -translate-y-1/2 place-items-center text-neutral-950 transition hover:text-[#dc4fb2] dark:text-white"
-            aria-label="Choose emoji"
-            title="Choose emoji"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] disabled:opacity-40 dark:text-white dark:hover:bg-neutral-800"
+            aria-label="Attach file"
+            title="Attach file"
           >
-            <SmileIcon />
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <path d="m8.5 12.5 5.9-5.9a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.7-7.7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-        </label>
-        <button
-          type="submit"
-          disabled={!draft.trim() || !activeUserId || isSending}
-          className="grid h-12 w-12 shrink-0 place-items-center text-neutral-950 transition hover:text-[#dc4fb2] disabled:cursor-not-allowed disabled:opacity-40 dark:text-white"
-          aria-label="Send message"
-          title="Send message"
-        >
-          <SendIcon />
-        </button>
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Message</span>
+            <input
+              type="text"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Type your message..."
+              maxLength={1000}
+              disabled={!activeUserId || isSending}
+              className="h-10 w-full rounded-full border-0 bg-transparent px-2 pr-11 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+            />
+            <button
+              type="button"
+              onClick={() => setDraft((currentDraft) => `${currentDraft} :)`)}
+              disabled={!activeUserId || isSending}
+              className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
+              aria-label="Choose emoji"
+              title="Choose emoji"
+            >
+              <SmileIcon className="h-5 w-5" />
+            </button>
+          </label>
+          <button
+            type="submit"
+            disabled={!draft.trim() || !activeUserId || isSending}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff3faf] text-white shadow-[0_10px_22px_rgba(255,63,175,0.28)] transition hover:bg-[#e9369f] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Send message"
+            title="Send message"
+          >
+            <SendIcon className="h-5 w-5" />
+          </button>
+        </div>
       </form>
     </div>
     {isNewMessageOpen && (
