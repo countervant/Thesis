@@ -670,12 +670,16 @@ const EmpLeaverequest = () => {
                       date: detailRequest.reviewedAt ? formatDateTime(detailRequest.reviewedAt) : "Waiting for review",
                       complete: detailRequest.status !== "Pending",
                     },
-                    {
-                      label: detailRequest.status === "Rejected" ? "Rejected" : "Approved",
-                      date: detailRequest.status === "Pending" ? "Not completed" : formatDateTime(detailRequest.reviewedAt || detailRequest.updatedAt),
-                      complete: detailRequest.status !== "Pending",
-                      rejected: detailRequest.status === "Rejected",
-                    },
+                    ...(detailRequest.status === "Pending"
+                      ? []
+                      : [
+                          {
+                            label: detailRequest.status === "Rejected" ? "Rejected" : "Approved",
+                            date: formatDateTime(detailRequest.reviewedAt || detailRequest.updatedAt),
+                            complete: true,
+                            rejected: detailRequest.status === "Rejected",
+                          },
+                        ]),
                   ].map((item, index, items) => (
                     <div key={item.label} className="grid grid-cols-[28px_1fr_auto] gap-3">
                       <span className="relative flex justify-center">

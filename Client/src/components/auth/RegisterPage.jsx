@@ -80,6 +80,15 @@ const RegisterPage = ({ order, order1 }) => {
 
   const navigate = useNavigate();
 
+  const handleLoginClick = () => {
+    const authScreen = document.querySelector("[data-auth-screen]");
+    authScreen?.classList.add("auth-screen-exit-login");
+
+    window.setTimeout(() => {
+      navigate("/");
+    }, 420);
+  };
+
   const resetForm = useCallback(() => {
     setFirstName("");
     setMiddleInitial("");
@@ -469,7 +478,7 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="text-center text-sm font-bold text-slate-500">
             Already have an account?{" "}
-            <button type="button" onClick={() => navigate("/")} className="text-pink-500 hover:text-pink-600">
+            <button type="button" onClick={handleLoginClick} className="text-pink-500 hover:text-pink-600">
               Log In
             </button>
           </div>

@@ -124,19 +124,15 @@ const getTaskProgress = (subtasks) => {
   return Math.round((completedCount / subtasks.length) * 100);
 };
 
-const statusDots = {
-  Pending: "bg-orange-500",
-  "In progress": "bg-blue-500",
-  "In review": "bg-violet-500",
-  Done: "bg-emerald-500",
-};
-
 const normalizeTasks = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.tasks)) return data.tasks;
   if (Array.isArray(data?.data)) return data.data;
   return [];
 };
+
+const isMobileViewport = () =>
+  typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 
 const normalizeTask = (task) => {
   const subtasks = normalizeSubtasks(task?.subtasks);
@@ -328,6 +324,7 @@ const SmallIcon = ({ name, className = "h-4 w-4" }) => {
   const props = { viewBox: "0 0 24 24", fill: "none", className, "aria-hidden": "true" };
   if (name === "plus") return <svg {...props}><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
   if (name === "search") return <svg {...props}><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.8" /><path d="m15.5 15.5 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  if (name === "filter") return <svg {...props}><path d="M4 5h16l-6.2 7.2v5.3L10.2 19v-6.8L4 5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
   if (name === "calendar") return <svg {...props}><rect x="5" y="5" width="14" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" /><path d="M8 3v4M16 3v4M5 10h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "chevron") return <svg {...props}><path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "list") return <svg {...props}><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
@@ -339,11 +336,11 @@ const SmallIcon = ({ name, className = "h-4 w-4" }) => {
 
 const SelectControl = ({ label, onChange, options, value }) => (
   <label className="block">
-    <span className="mb-1 block text-[10px] font-black text-slate-500">{label}</span>
+    <span className="mb-1 block text-[9px] font-black text-slate-500 md:text-[10px]">{label}</span>
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:px-3 md:text-sm"
     >
       {options.map((option) => (
         <option key={option}>{option}</option>
@@ -352,7 +349,7 @@ const SelectControl = ({ label, onChange, options, value }) => (
   </label>
 );
 
-const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
+const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
   const effectiveExpanded = canAccessSubtasks && isExpanded;
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
@@ -365,7 +362,7 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
   return (
     <article
       id={`task-card-${item.id}`}
-      className={`border-b border-pink-50 px-4 py-4 last:border-b-0 ${
+      className={`rounded-xl border border-pink-50 bg-white px-3 py-3 shadow-sm md:rounded-none md:border-x-0 md:border-t-0 md:px-4 md:py-4 md:shadow-none md:last:border-b-0 ${
         isFocused ? "bg-pink-50/60 ring-2 ring-inset ring-pink-200" : ""
       }`}
     >
@@ -457,7 +454,73 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
           </span>
         </div>
       ) : (
-        <div className={`grid gap-4 ${
+        <>
+        <div className="grid grid-cols-[1fr_43%] gap-3 md:hidden">
+          <div className="flex min-w-0 gap-3">
+            <span className={`min-h-28 w-1 shrink-0 rounded-full ${accentClass}`} />
+            <div className="min-w-0 py-0.5">
+              <p className="truncate text-[13px] font-black leading-tight text-[#10142d]">{item.title}</p>
+              <p className="mt-1 truncate text-[11px] font-bold text-slate-500">{item.description || "No description"}</p>
+              <p className="mt-4 text-[10px] font-black text-slate-500">Assigned to</p>
+              <div className="mt-1 flex min-w-0 items-center gap-2">
+                <InitialsAvatar
+                  className="h-7 w-7"
+                  textClassName="text-[9px]"
+                  user={item.assignedTo}
+                />
+                <span className="min-w-0 truncate text-[11px] font-black text-[#10142d]">
+                  {getPersonName(item.assignedTo)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col">
+            <div className="flex items-start justify-between gap-2">
+              <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black capitalize ${priorityStyles[item.priority] || priorityStyles.medium}`}>
+                {item.priority}
+              </span>
+              <button
+                type="button"
+                onClick={canAccessSubtasks ? () => onToggleExpand(item.id) : undefined}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-50"
+                aria-label={canAccessSubtasks ? `Show subtasks for ${item.title}` : `More options for ${item.title}`}
+              >
+                <SmallIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <span className="mt-3 flex items-center gap-2 text-[10px] font-bold text-slate-600">
+              <SmallIcon name="calendar" className="h-3.5 w-3.5 text-slate-500" />
+              {formatReadableDate(item.dueDate)}
+            </span>
+
+            <span className="mt-3">
+              <span className="mb-1 block text-[11px] font-black text-[#10142d]">{progressValue}%</span>
+              <span className="block h-1.5 rounded-full bg-slate-100">
+                <span className={`block h-1.5 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
+              </span>
+            </span>
+
+            <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+              <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
+                {item.status}
+              </span>
+              <span className="flex items-center gap-1">
+                {!isDone && (
+                  <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                    <SmallIcon name="edit" className="h-4 w-4" />
+                  </button>
+                )}
+                <button type="button" onClick={() => onDelete(item)} className="grid h-7 w-7 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+                  <SmallIcon name="delete" className="h-4 w-4" />
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className={`hidden gap-3 md:grid md:gap-4 ${
           canAccessSubtasks
             ? "lg:grid-cols-[28px_1.35fr_100px_130px_150px_112px_72px]"
             : "lg:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_72px]"
@@ -476,7 +539,7 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
             </button>
           )}
           <div className={`flex min-w-0 items-start gap-3 ${!canAccessSubtasks ? "lg:border-r lg:border-pink-50 lg:pr-5" : ""}`}>
-            <span className={`mt-1.5 h-8 w-1 rounded-full ${statusDots[item.status] || "bg-pink-500"}`} />
+            <span className={`mt-1 h-16 w-1 shrink-0 rounded-full md:mt-1.5 md:h-8 ${accentClass}`} />
             <span className="min-w-0">
               <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
               <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
@@ -497,7 +560,7 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
               </div>
             </div>
           )}
-          <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.medium}`}>
+          <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black capitalize md:px-4 md:text-xs ${priorityStyles[item.priority] || priorityStyles.medium}`}>
             {item.priority}
           </span>
           <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
@@ -510,10 +573,10 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
               <span className={`block h-2 rounded-full ${progressColors[item.status] || "bg-pink-500"}`} style={{ width: `${progressValue}%` }} />
             </span>
           </span>
-          <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
+          <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black md:px-4 md:text-xs ${statusStyles[item.status] || getStatusTone(item.status)}`}>
             {item.status}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 justify-end lg:justify-start">
             {!isDone && (
               <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                 <SmallIcon name="edit" />
@@ -524,31 +587,32 @@ const TaskRow = ({ canAccessSubtasks, isExpanded, isFocused, item, onDelete, onE
             </button>
           </span>
         </div>
+        </>
       )}
     </article>
   );
 };
 
 const TaskGroup = ({ children, count, footer, isOpen = true, onToggle, title, tone }) => (
-  <Card className="overflow-hidden">
+  <Card className="overflow-hidden rounded-xl md:rounded-2xl">
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-pink-50/60"
+      className="flex w-full items-center gap-2 px-3 py-3 text-left transition hover:bg-pink-50/60 md:gap-3 md:px-5 md:py-4"
       aria-expanded={isOpen}
     >
-      <span className={`text-lg font-black transition-transform ${tone} ${isOpen ? "rotate-90" : ""}`}>
+      <span className={`text-base font-black transition-transform md:text-lg ${tone} ${isOpen ? "rotate-90" : ""}`}>
         {">"}
       </span>
       <h2 className={`text-sm font-black ${tone}`}>{title}</h2>
-      <span className="text-sm font-black text-slate-400">({count})</span>
+      <span className="text-xs font-black text-slate-400 md:text-sm">({count})</span>
     </button>
     {isOpen && (
       <>
-        <div className="mx-5 overflow-hidden rounded-2xl border border-pink-50 bg-white">
+        <div className="mx-3 mb-3 space-y-3 overflow-hidden rounded-xl border-0 bg-transparent md:mx-5 md:mb-0 md:space-y-0 md:rounded-2xl md:border md:border-pink-50 md:bg-white">
           {children}
         </div>
-        {footer && <div className="py-4 text-center">{footer}</div>}
+        {footer && <div className="pb-4 pt-1 text-center md:py-4">{footer}</div>}
       </>
     )}
   </Card>
@@ -571,7 +635,9 @@ const Tasks = ({
   const [focusedTaskId, setFocusedTaskId] = useState("");
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
   const [expandedGroups, setExpandedGroups] = useState({});
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState(() =>
+    isMobileViewport() ? { dueToday: true, upcoming: true, completed: true } : {}
+  );
   const currentUserId = getEntityId(user);
 
   useEffect(() => {
@@ -689,18 +755,24 @@ const Tasks = ({
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
   ];
 
-  const renderTaskRows = (items) => {
+  const renderTaskRows = (items, accentClass = "bg-pink-500") => {
     if (items.length === 0) {
       return (
-        <p className="px-4 py-5 text-center text-sm font-bold text-slate-500">
-          No tasks found.
-        </p>
+        <div className="grid min-h-24 place-items-center rounded-xl bg-white px-4 py-5 text-center md:rounded-none">
+          <div>
+            <span className="mx-auto grid h-9 w-9 place-items-center rounded-xl bg-pink-50 text-pink-400">
+              <SmallIcon name="list" className="h-5 w-5" />
+            </span>
+            <p className="mt-2 text-xs font-bold text-slate-500 md:text-sm">No tasks found.</p>
+          </div>
+        </div>
       );
     }
 
     return items.map((task) => (
       <TaskRow
         key={task.id}
+        accentClass={accentClass}
         canAccessSubtasks={isAssignedToCurrentUser(task)}
         isExpanded={expandedTaskIds.has(task.id)}
         isFocused={focusedTaskId === task.id}
@@ -741,9 +813,10 @@ const Tasks = ({
             [groupKey]: !isExpanded,
           }))
         }
-        className={`text-sm font-black ${toneClass}`}
+        className={`inline-flex items-center gap-1 text-xs font-black md:text-sm ${toneClass}`}
       >
         {isExpanded ? "Show less" : `View all ${label} (${items.length})`}
+        {!isExpanded && <SmallIcon name="chevron" className="h-3.5 w-3.5" />}
       </button>
     );
   };
@@ -858,16 +931,16 @@ const Tasks = ({
   };
 
   return (
-        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-          <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-4 bg-[#f8f9fd] px-3 py-4 text-[#111936] md:-mx-6 md:space-y-5 md:px-6 md:py-5 lg:-mx-8 lg:px-8">
+          <header className="flex items-center justify-between gap-3 md:flex-wrap md:gap-4">
             <div>
               <h1
-                className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+                className="text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-4xl"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Tasks
               </h1>
-              <p className="mt-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              <p className="mt-2 hidden text-sm font-medium text-neutral-600 dark:text-neutral-400 md:block">
                 Assign and manage your tasks efficiently.
               </p>
             </div>
@@ -876,50 +949,57 @@ const Tasks = ({
               <button
                 type="button"
                 onClick={handleAddTask}
-                className="flex h-11 items-center gap-2 rounded-xl bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-5 text-sm font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
+                className="flex h-10 items-center gap-1.5 rounded-xl bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-11 md:gap-2 md:px-5 md:text-sm"
               >
-                <SmallIcon name="plus" className="h-5 w-5" />
-                <span>Add Task</span>
+                <SmallIcon name="plus" className="h-4 w-4 md:h-5 md:w-5" />
+                <span>Create Task</span>
               </button>
             </div>
           </header>
 
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-5 gap-2 md:gap-5 xl:grid-cols-5">
             {taskStats.map((item) => (
-              <Card key={item.label} className="p-5">
-                <div className="flex items-center gap-4">
-                  <span className={`grid h-16 w-16 place-items-center rounded-2xl ring-1 ${toneStyles[item.tone]}`}>
-                    <ImageIcon src={item.icon} className="h-9 w-9" />
+              <Card key={item.label} className="min-w-0 p-2 md:p-5">
+                <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-4 md:text-left">
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
+                    <ImageIcon src={item.icon} className="h-5 w-5 md:h-9 md:w-9" />
                   </span>
-                  <div>
-                    <p className="text-4xl font-black text-[#10142d]">{item.value}</p>
-                    <p className="mt-1 text-sm font-black text-slate-600">{item.label}</p>
+                  <div className="min-w-0">
+                    <p className="text-base font-black leading-none text-[#10142d] md:text-4xl">{item.value}</p>
+                    <p className="mt-1 truncate text-[9px] font-black text-slate-600 md:text-sm">{item.label}</p>
                   </div>
                 </div>
               </Card>
             ))}
           </div>
 
-          <Card className="p-5">
-            <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
-              <label className="relative block">
-                <span className="sr-only">Search tasks</span>
-                <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search tasks..."
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
-                />
-              </label>
-              <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
-              <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
-              <SelectControl label="Sort by" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
+          <Card className="p-3 md:p-5">
+            <div className="grid gap-3 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
+              <div className="grid grid-cols-[1fr_44px] gap-2 xl:contents">
+                <label className="relative block">
+                  <span className="sr-only">Search tasks</span>
+                  <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search tasks..."
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
+                  />
+                </label>
+                <span className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 xl:hidden">
+                  <SmallIcon name="filter" className="h-5 w-5" />
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 xl:contents">
+                <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
+                <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
+                <SelectControl label="Sort By" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
+              </div>
             </div>
           </Card>
 
-          <section className="space-y-5">
+          <section className="space-y-3 md:space-y-5">
             {errorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
                 {errorMessage}
@@ -940,7 +1020,7 @@ const Tasks = ({
                   title="My Tasks"
                   tone="text-pink-600"
                 >
-                  {renderTaskRows(getGroupItems("myTasks", myTasks))}
+                  {renderTaskRows(getGroupItems("myTasks", myTasks), "bg-pink-500")}
                 </TaskGroup>
 
                 <TaskGroup
@@ -951,7 +1031,7 @@ const Tasks = ({
                   title="Overdue"
                   tone="text-rose-500"
                 >
-                  {renderTaskRows(getGroupItems("overdue", overdueTasks))}
+                  {renderTaskRows(getGroupItems("overdue", overdueTasks), "bg-rose-500")}
                 </TaskGroup>
 
                 <TaskGroup
@@ -962,7 +1042,7 @@ const Tasks = ({
                   title="Due Today"
                   tone="text-orange-500"
                 >
-                  {renderTaskRows(getGroupItems("dueToday", dueTodayTasks))}
+                  {renderTaskRows(getGroupItems("dueToday", dueTodayTasks), "bg-orange-500")}
                 </TaskGroup>
 
                 <TaskGroup
@@ -971,9 +1051,9 @@ const Tasks = ({
                   isOpen={isGroupOpen("upcoming")}
                   onToggle={() => toggleGroupOpen("upcoming")}
                   title="Upcoming"
-                  tone="text-slate-700"
+                  tone="text-blue-600"
                 >
-                  {renderTaskRows(getGroupItems("upcoming", upcomingTasks))}
+                  {renderTaskRows(getGroupItems("upcoming", upcomingTasks), "bg-blue-500")}
                 </TaskGroup>
 
                 <TaskGroup
@@ -984,7 +1064,7 @@ const Tasks = ({
                   title="Completed"
                   tone="text-emerald-600"
                 >
-                  {renderTaskRows(getGroupItems("completed", completedTasks))}
+                  {renderTaskRows(getGroupItems("completed", completedTasks), "bg-emerald-500")}
                 </TaskGroup>
               </>
             )}
