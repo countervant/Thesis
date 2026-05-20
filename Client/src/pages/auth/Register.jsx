@@ -1,7 +1,6 @@
 import React from 'react'
 import Welcome from '../../components/auth/Welcome.jsx';
 import RegisterPage from '../../components/auth/RegisterPage.jsx';
-import AuthThemeToggle from '../../components/auth/AuthThemeToggle.jsx';
 const Register = () => {
   return (
     <>
@@ -14,8 +13,6 @@ const Register = () => {
     <RegisterPage order='0' order1='0' />
     
     </div>
-    <AuthThemeToggle />
-    
     </>
   )
 }

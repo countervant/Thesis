@@ -70,11 +70,6 @@ const ForgotPasswordcom = () => {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-500">Email</label>
             <div className="relative">
-              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-pink-500">
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-                  <path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-                </svg>
-              </span>
             <input
               type="email"
               name="username"
@@ -83,7 +78,7 @@ const ForgotPasswordcom = () => {
               onChange={handleEmailChange}
               disabled={loading}
               autoComplete="username"
-              className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
+              className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
               required
             />
             </div>

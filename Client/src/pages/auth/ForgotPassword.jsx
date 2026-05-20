@@ -1,7 +1,6 @@
 import React from 'react'
 import Welcome from '../../components/auth/Welcome.jsx'
 import ForgotPasswordcom from '../../components/auth/ForgotPasswordcom.jsx'
-import AuthThemeToggle from '../../components/auth/AuthThemeToggle.jsx'
 const ForgotPassword = () => {
   
   return (
@@ -10,7 +9,6 @@ const ForgotPassword = () => {
    <Welcome order="1" order1="1" text="Reset Password" />
    <ForgotPasswordcom />
     </div>
-   <AuthThemeToggle />
    </>
   )
 }

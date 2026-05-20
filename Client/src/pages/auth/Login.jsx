@@ -1,6 +1,5 @@
 import LoginPage from "../../components/auth/LoginPage.jsx";
 import Welcome from "../../components/auth/Welcome.jsx";
-import AuthThemeToggle from "../../components/auth/AuthThemeToggle.jsx";
 const Login = () => {
 
 
@@ -10,7 +9,6 @@ const Login = () => {
         <Welcome order='1' order1='1' text = 'Welcome to' mobileAuthHero />
         <LoginPage order='2' order1='2' />
       </div>
-      <AuthThemeToggle />
     </>
   );
 };

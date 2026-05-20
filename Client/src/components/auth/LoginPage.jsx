@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
+import mobileLogo from "../../assets/CLIENTRA2.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import AuthenticationHelper from "./AuthenticationHelper.jsx";
@@ -141,11 +142,14 @@ const LoginPage = ({ order, order1 }) => {
           autoComplete="off"
         >
           <div className="mb-5 flex flex-col items-center sm:mb-10">
-            <img
-              src={logo}
-              alt="CLIENTRA"
-              className="h-20 w-20 object-contain sm:h-40 sm:w-40 md:h-44 md:w-44"
-            />
+            <picture>
+              <source media="(min-width: 768px)" srcSet={logo} />
+              <img
+                src={mobileLogo}
+                alt="CLIENTRA"
+                className="h-14 w-14 object-contain sm:h-24 sm:w-24 md:h-44 md:w-44"
+              />
+            </picture>
             <h2
               className="mt-1 text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl md:mt-0 dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
@@ -167,16 +171,11 @@ const LoginPage = ({ order, order1 }) => {
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-500">Email</label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-pink-500">
-                  <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-                    <path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-                  </svg>
-                </span>
               <input
                 ref={emailInputRef}
                 type="email"
                 name="username"
-                placeholder="Enter your email"
+                placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
                 onFocus={() => {
@@ -184,7 +183,7 @@ const LoginPage = ({ order, order1 }) => {
                 }}
                 disabled={loading}
                 autoComplete="username"
-                className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
+                className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
                 required
               />
               </div>
@@ -196,16 +195,11 @@ const LoginPage = ({ order, order1 }) => {
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-500">Password</label>
               <div className="relative flex h-12 items-center rounded-lg border border-slate-200 bg-white dark:border-white/40 dark:bg-[#1f2937]">
-                <span className="pointer-events-none absolute left-5 text-pink-500">
-                  <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-                    <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-                  </svg>
-                </span>
               <input
                 ref={passwordInputRef}
                 type={showPassword ? "text" : "password"}
                 name="password"
-                placeholder="Enter your password"
+                placeholder="Password"
                 value={password}
                 onChange={handlePasswordChange}
                 onFocus={() => {
@@ -213,7 +207,7 @@ const LoginPage = ({ order, order1 }) => {
                 }}
                 disabled={loading}
                 autoComplete="current-password"
-                className="login-autofill-fix min-w-0 flex-1 border-0 bg-transparent pl-14 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
+                className="login-autofill-fix min-w-0 flex-1 border-0 bg-transparent pl-4 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
                 required
               />
               <button

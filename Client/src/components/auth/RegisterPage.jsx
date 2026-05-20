@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
+import mobileLogo from "../../assets/CLIENTRA2.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
 import CountrySelect from "../CountrySelect.jsx";
@@ -59,7 +60,7 @@ const mobileFieldWrap = "space-y-2";
 const mobileInputBox =
   "relative flex h-12 items-center rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition focus-within:border-pink-300 focus-within:ring-2 focus-within:ring-pink-100 dark:border-white/40 dark:bg-[#1f2937]";
 const mobileInput =
-  "w-full border-none bg-transparent pl-11 pr-3 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85";
+  "w-full border-none bg-transparent px-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85";
 
 const RegisterPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -222,11 +223,14 @@ const RegisterPage = ({ order, order1 }) => {
           data-form-type="other"
         >
           <div className="flex flex-col items-center">
-            <img
-              src={logo}
-              alt="CLIENTRA"
-              className="h-20 w-20 object-contain sm:h-40 sm:w-40 md:h-44 md:w-44"
-            />
+            <picture>
+              <source media="(min-width: 768px)" srcSet={logo} />
+              <img
+                src={mobileLogo}
+                alt="CLIENTRA"
+                className="h-14 w-14 object-contain sm:h-24 sm:w-24 md:h-44 md:w-44"
+              />
+            </picture>
             <h2
               className="mb-1 text-2xl font-bold uppercase tracking-wide sm:mb-10 sm:text-3xl dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
@@ -262,7 +266,6 @@ const RegisterPage = ({ order, order1 }) => {
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">First Name</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="person" /></span>
               <input
                 type="text"
                 name={fieldNames.firstName}
@@ -281,7 +284,6 @@ const RegisterPage = ({ order, order1 }) => {
             <div className={mobileFieldWrap}>
               <label className="block whitespace-nowrap text-[11px] font-medium text-slate-500 md:text-xs">Middle Initial (Optional)</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="text" /></span>
               <input
                 type="text"
                 name={fieldNames.middleInitial}
@@ -299,7 +301,6 @@ const RegisterPage = ({ order, order1 }) => {
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">Last Name</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="person" /></span>
               <input
                 type="text"
                 name={fieldNames.lastName}
@@ -320,7 +321,6 @@ const RegisterPage = ({ order, order1 }) => {
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">Email</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="mail" /></span>
               <input
                 type="text"
                 name={fieldNames.email}
@@ -343,7 +343,6 @@ const RegisterPage = ({ order, order1 }) => {
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">Company Name</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="briefcase" /></span>
               <input
                 type="text"
                 name={fieldNames.companyName}
@@ -362,9 +361,8 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.2fr] md:gap-6">
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">Search country</label>
+              <label className="block text-xs font-medium text-slate-500">Country</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 z-10 text-pink-500"><RegisterIcon name="globe" /></span>
               <CountrySelect
                 value={country}
                 onChange={handleCountryChange}
@@ -378,7 +376,6 @@ const RegisterPage = ({ order, order1 }) => {
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">Phone</label>
               <div className={mobileInputBox}>
-                <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="phone" /></span>
               <input
                 type="tel"
                 name={fieldNames.phone}
@@ -405,7 +402,6 @@ const RegisterPage = ({ order, order1 }) => {
           <div className={mobileFieldWrap}>
             <label className="block text-xs font-medium text-slate-500">Password</label>
             <div className={mobileInputBox}>
-              <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="lock" /></span>
             <input
               type="text"
               name={fieldNames.password}
@@ -436,7 +432,6 @@ const RegisterPage = ({ order, order1 }) => {
           <div className={mobileFieldWrap}>
             <label className="block text-xs font-medium text-slate-500">Confirm Password</label>
             <div className={mobileInputBox}>
-              <span className="pointer-events-none absolute left-3 text-pink-500"><RegisterIcon name="lock" /></span>
             <input
               type="text"
               name={fieldNames.confirmPassword}
