@@ -25,6 +25,7 @@ const LoginPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
   const hasUserInteractedRef = useRef(false);
@@ -37,6 +38,7 @@ const LoginPage = ({ order, order1 }) => {
     setEmailError("");
     setPassword("");
     setShowPassword(false);
+    setHasSubmitted(false);
   }, []);
 
   useEffect(() => {
@@ -67,7 +69,7 @@ const LoginPage = ({ order, order1 }) => {
     hasUserInteractedRef.current = true;
     const value = e.target.value;
     setEmail(value);
-    setEmailError(validateEmail(value));
+    setEmailError(hasSubmitted ? validateEmail(value) : "");
   };
 
   const handlePasswordChange = (e) => {
@@ -78,6 +80,7 @@ const LoginPage = ({ order, order1 }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setHasSubmitted(true);
 
     const emailValidation = validateEmail(email);
     setEmailError(emailValidation);
@@ -129,8 +132,6 @@ const LoginPage = ({ order, order1 }) => {
     }
   };
 
-  const isEmailInvalid = !email || !!emailError;
-
   return (
     <>
       <div
@@ -138,6 +139,7 @@ const LoginPage = ({ order, order1 }) => {
       >
         <form
           onSubmit={handleSubmit}
+          noValidate
           className="min-h-[500px] w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
         >
@@ -151,7 +153,7 @@ const LoginPage = ({ order, order1 }) => {
               />
             </picture>
             <h2
-              className="mt-1 text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl md:mt-0 dark:text-white"
+              className="mt-4 text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:mt-5 sm:text-3xl md:mt-0 dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
             >
               LOG IN
@@ -175,7 +177,7 @@ const LoginPage = ({ order, order1 }) => {
                 ref={emailInputRef}
                 type="email"
                 name="username"
-                placeholder="Email"
+                placeholder="Enter your email"
                 value={email}
                 onChange={handleEmailChange}
                 onFocus={() => {
@@ -199,7 +201,7 @@ const LoginPage = ({ order, order1 }) => {
                 ref={passwordInputRef}
                 type={showPassword ? "text" : "password"}
                 name="password"
-                placeholder="Password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={handlePasswordChange}
                 onFocus={() => {
@@ -229,7 +231,7 @@ const LoginPage = ({ order, order1 }) => {
 
           <button
             type="submit"
-            disabled={loading || isEmailInvalid}
+            disabled={loading}
             className="mt-6 w-full rounded-lg bg-linear-to-r from-pink-500 to-purple-600 py-3 text-base font-bold text-white shadow-lg transition-all duration-200 hover:from-pink-600 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-8 md:text-lg dark:shadow-[0_14px_34px_rgba(219,39,119,0.34)] dark:hover:brightness-110"
           >
             {loading ? "Signing in..." : "Sign In"}

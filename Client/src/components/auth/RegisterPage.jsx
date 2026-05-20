@@ -232,7 +232,7 @@ const RegisterPage = ({ order, order1 }) => {
               />
             </picture>
             <h2
-              className="mb-1 text-2xl font-bold uppercase tracking-wide sm:mb-10 sm:text-3xl dark:text-white"
+              className="mb-1 mt-4 text-2xl font-bold uppercase tracking-wide sm:mb-10 sm:mt-5 sm:text-3xl md:mt-0 dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
             >
               Create Account
