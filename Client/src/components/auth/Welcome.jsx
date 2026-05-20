@@ -11,10 +11,10 @@ const Welcome = ({ order, order1, text, className = "", mobileAuthHero = false }
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         <div className="absolute inset-0 bg-[rgba(224,58,175,0.7)]" />
-        <div
+          <div
           className={`relative z-10 flex h-full flex-col px-6 sm:px-10 md:px-12 ${
             mobileAuthHero
-              ? "justify-start space-y-4 pt-20 pb-24 md:justify-center md:space-y-8 md:py-0"
+              ? "justify-start space-y-3 pt-10 pb-28 md:justify-center md:space-y-8 md:py-0"
               : "justify-center space-y-6 py-10 sm:space-y-8 md:py-0"
           }`}
         >

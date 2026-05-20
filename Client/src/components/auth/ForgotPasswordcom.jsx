@@ -44,33 +44,49 @@ const ForgotPasswordcom = () => {
 
   return (
     <>
-      <div className="w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0">
-        <img
-          src={ForgotPasswordkey}
-          alt="Forgot Password Key"
-          className="w-32 h-32"
-        />
-        <h1
-          className="text-2xl sm:text-3xl font-bold tracking-wide uppercase mt-10"
-          style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
-        >
-          Forgot Password?
-        </h1>
-        <h2>Enter Your Gmail so we can reset your password</h2>
-
+      <div className="relative z-20 flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 px-3 py-8 md:min-h-screen md:w-1/2 md:px-12 md:py-0 dark:bg-[#111111]">
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8 mt-10"
+          className="w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          autoComplete="off"
         >
-          <div className="border-b border-black mb-2">
+          <div className="mb-5 flex flex-col items-center sm:mb-10">
+            <img
+              src={ForgotPasswordkey}
+              alt="Forgot Password Key"
+              className="h-20 w-20 object-contain sm:h-32 sm:w-32 md:h-36 md:w-36"
+            />
+            <h1
+              className="mt-2 text-center text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl dark:text-white"
+              style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
+            >
+              Forgot Password?
+            </h1>
+            <p className="mt-2 text-center text-sm font-medium text-slate-500 dark:text-white/80">
+              Enter your email so we can send a reset code.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-500">Email</label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-pink-500">
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                  <path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                </svg>
+              </span>
             <input
               type="email"
-              placeholder="Email"
+              name="username"
+              placeholder="Enter your email"
               value={email}
               onChange={handleEmailChange}
-              className="w-full bg-transparent border-none outline-none pb-2 text-gray-800 placeholder-gray-400"
+              disabled={loading}
+              autoComplete="username"
+              className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
               required
             />
+            </div>
           </div>
           {emailError && <p className="text-sm text-red-500">{emailError}</p>}
           {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
@@ -84,15 +100,16 @@ const ForgotPasswordcom = () => {
           >
             {loading ? "Sending..." : "Send Verification Code"}
           </button>
-        </form>
 
-        <div className="w-100 max-w-sm sm:max-w-md space-y-6 sm:space-y-8 mt-5">
-          <AuthenticationHelper
-            link="/"
-            Label="Back to Login"
-            Label1=""
-          />
-        </div>
+          <div className="pt-1 md:pt-0">
+            <AuthenticationHelper
+              link="/"
+              Label="Back to Login"
+              Label1=""
+              mobileInline
+            />
+          </div>
+        </form>
       </div>
     </>
   );

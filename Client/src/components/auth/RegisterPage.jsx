@@ -190,7 +190,7 @@ const RegisterPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`order-${order} md:order-${order1} relative z-20 -mt-16 flex w-full flex-col items-center justify-start bg-transparent px-4 pb-8 pt-0 md:mt-0 md:w-1/2 md:justify-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
+        className={`order-${order} md:order-${order1} relative z-20 -mt-16 flex w-full flex-col items-center justify-start bg-transparent px-3 pb-8 pt-0 md:mt-0 md:w-1/2 md:justify-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -217,7 +217,7 @@ const RegisterPage = ({ order, order1 }) => {
 
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-md space-y-5 rounded-[2.25rem] border border-transparent bg-white px-5 py-7 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:max-w-2xl md:-translate-y-4 md:bg-transparent md:px-10 md:py-7 md:shadow-none dark:bg-[#141414] dark:md:border-pink-200/90 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-lg sm:space-y-8 md:max-w-2xl md:-translate-y-4 md:bg-transparent md:px-10 md:py-7 md:shadow-none dark:bg-[#141414] dark:md:border-pink-200/90 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
           data-form-type="other"
         >
@@ -258,7 +258,7 @@ const RegisterPage = ({ order, order1 }) => {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">First Name</label>
               <div className={mobileInputBox}>
@@ -316,7 +316,7 @@ const RegisterPage = ({ order, order1 }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">Email</label>
               <div className={mobileInputBox}>
@@ -360,7 +360,7 @@ const RegisterPage = ({ order, order1 }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-[1fr_1.2fr] md:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.2fr] md:gap-6">
             <div className={mobileFieldWrap}>
               <label className="block text-xs font-medium text-slate-500">Search country</label>
               <div className={mobileInputBox}>

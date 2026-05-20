@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import view from "../../assets/view.png";
@@ -24,6 +24,9 @@ const LoginPage = ({ order, order1 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const hasUserInteractedRef = useRef(false);
 
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -35,10 +38,40 @@ const LoginPage = ({ order, order1 }) => {
     setShowPassword(false);
   }, []);
 
+  useEffect(() => {
+    const clearBrowserPrefill = () => {
+      if (hasUserInteractedRef.current) return;
+
+      setEmail("");
+      setEmailError("");
+      setPassword("");
+
+      if (emailInputRef.current) {
+        emailInputRef.current.value = "";
+      }
+      if (passwordInputRef.current) {
+        passwordInputRef.current.value = "";
+      }
+    };
+
+    clearBrowserPrefill();
+    const timeoutIds = [50, 250, 800].map((delay) =>
+      window.setTimeout(clearBrowserPrefill, delay)
+    );
+
+    return () => timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+  }, []);
+
   const handleEmailChange = (e) => {
+    hasUserInteractedRef.current = true;
     const value = e.target.value;
     setEmail(value);
     setEmailError(validateEmail(value));
+  };
+
+  const handlePasswordChange = (e) => {
+    hasUserInteractedRef.current = true;
+    setPassword(e.target.value);
   };
 
   const handleSubmit = async (e) => {
@@ -100,21 +133,21 @@ const LoginPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`con order-${order} md:order-${order1} relative z-20 -mt-20 flex w-full items-start justify-center bg-transparent px-5 pb-8 pt-0 sm:px-10 md:mt-0 md:min-h-screen md:w-1/2 md:items-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
+        className={`con order-${order} md:order-${order1} relative z-20 -mt-20 flex w-full flex-1 flex-col items-center justify-start bg-transparent px-3 pb-5 pt-0 sm:px-10 md:mt-0 md:min-h-screen md:w-1/2 md:justify-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
       >
         <form
           onSubmit={handleSubmit}
-          className="min-h-[500px] w-full max-w-sm space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="min-h-[500px] w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="off"
         >
           <div className="mb-5 flex flex-col items-center sm:mb-10">
             <img
               src={logo}
               alt="CLIENTRA"
-              className="hidden object-contain md:block md:h-44 md:w-44"
+              className="h-20 w-20 object-contain sm:h-40 sm:w-40 md:h-44 md:w-44"
             />
             <h2
-              className="mt-0 text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl dark:text-white"
+              className="mt-1 text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl md:mt-0 dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
             >
               LOG IN
@@ -140,13 +173,18 @@ const LoginPage = ({ order, order1 }) => {
                   </svg>
                 </span>
               <input
+                ref={emailInputRef}
                 type="email"
+                name="username"
                 placeholder="Enter your email"
                 value={email}
                 onChange={handleEmailChange}
+                onFocus={() => {
+                  hasUserInteractedRef.current = true;
+                }}
                 disabled={loading}
-                autoComplete="off"
-                className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
+                autoComplete="username"
+                className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white pl-14 pr-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
                 required
               />
               </div>
@@ -164,13 +202,18 @@ const LoginPage = ({ order, order1 }) => {
                   </svg>
                 </span>
               <input
+                ref={passwordInputRef}
                 type={showPassword ? "text" : "password"}
+                name="password"
                 placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
+                onFocus={() => {
+                  hasUserInteractedRef.current = true;
+                }}
                 disabled={loading}
                 autoComplete="current-password"
-                className="min-w-0 flex-1 border-0 bg-transparent pl-14 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
+                className="login-autofill-fix min-w-0 flex-1 border-0 bg-transparent pl-14 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
                 required
               />
               <button
@@ -212,10 +255,10 @@ const LoginPage = ({ order, order1 }) => {
               mobileInline
             />
           </div>
-          <p className="pt-1 text-center text-xs font-medium text-slate-500 md:hidden">
-            &copy; 2026 Dream Light Visual. All rights reserved.
-          </p>
         </form>
+        <p className="mt-auto pt-8 text-center text-xs font-medium text-slate-500 md:hidden">
+          &copy; 2026 Dream Light Visual. All rights reserved.
+        </p>
         <p className="absolute bottom-8 hidden text-center text-xs font-medium text-slate-500 md:block">
           &copy; 2026 Dream Light Visual. All rights reserved.
         </p>
