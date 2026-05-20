@@ -363,23 +363,20 @@ const StatCard = ({ item }) => {
   const style = statStyles[item.key] || statStyles.in_progress;
 
   return (
-  <section className={`relative flex min-h-[150px] flex-col items-start justify-between rounded-3xl border border-pink-100 bg-white px-5 py-5 md:min-h-0 md:h-24 md:flex-row md:items-center md:justify-start md:gap-4 md:rounded-2xl md:py-0 ${dashboardCardShadow}`}>
-    <span className={`grid h-16 w-16 shrink-0 place-items-center rounded-2xl md:h-14 md:w-14 ${style.tile}`}>
-      <Icon name={item.icon} className={`h-10 w-10 md:h-9 md:w-9 ${style.text}`} />
+  <section className={`relative flex min-h-[86px] flex-col items-start justify-between rounded-xl border border-pink-100 bg-white px-3 py-3 md:min-h-0 md:h-24 md:flex-row md:items-center md:justify-start md:gap-4 md:rounded-2xl md:px-5 md:py-0 ${dashboardCardShadow}`}>
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg md:h-14 md:w-14 md:rounded-2xl ${style.tile}`}>
+      <Icon name={item.icon} className={`h-6 w-6 md:h-9 md:w-9 ${style.text}`} />
     </span>
     <div className="leading-tight">
-      <p className="text-3xl font-extrabold text-[#10172a] md:text-2xl dark:text-white">{item.value}</p>
-      <p className="mt-2 text-base font-semibold text-slate-500 md:mt-1.5 md:text-xs dark:text-neutral-100">{item.label}</p>
+      <p className="text-sm font-extrabold text-[#10172a] md:text-2xl dark:text-white">{item.value}</p>
+      <p className="mt-1 text-[9px] font-semibold leading-tight text-slate-500 md:mt-1.5 md:text-xs dark:text-neutral-100">{item.label}</p>
     </div>
-    <span className={`absolute bottom-5 right-5 grid h-9 w-9 place-items-center rounded-full md:hidden ${style.tile}`}>
-      <span className={`text-2xl font-black ${style.text}`}>&rsaquo;</span>
-    </span>
   </section>
   );
 };
 
 const ProgressRing = ({ value }) => (
-  <span className="grid h-6 min-w-9 place-items-center rounded-full border-2 border-[#a8a2ff] px-1.5 text-[9px] font-semibold text-[#9b91ff]">
+  <span className="grid h-5 min-w-7 place-items-center rounded-full border border-[#a8a2ff] px-1 text-[8px] font-semibold text-[#9b91ff] md:h-6 md:min-w-9 md:border-2 md:px-1.5 md:text-[9px]">
     {value}
   </span>
 );
@@ -427,7 +424,7 @@ const MonthlyChart = ({ tasks }) => {
   );
   const visibleWeekCount = Math.max(3, Math.ceil((latestDueDayOffset + 1) / 7));
   const visibleDayCount = visibleWeekCount * 7;
-  const chartMinWidth = Math.max(660, visibleDayCount * 30);
+  const chartMinWidth = Math.max(440, visibleDayCount * 22);
   const chartWeeks = Array.from({ length: visibleWeekCount }, (_, index) => index * 7).map((dayOffset) =>
     formatWeekLabel(addDays(timelineStart, dayOffset))
   );
@@ -461,19 +458,19 @@ const MonthlyChart = ({ tasks }) => {
   const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
 
   return (
-  <section className={`overflow-hidden rounded-3xl border border-pink-100 bg-white px-5 py-6 md:rounded-2xl md:py-5 ${dashboardCardShadow}`}>
-    <div className="mb-4 flex items-center justify-between gap-4">
-      <h2 className="text-2xl font-extrabold text-[#10172a] md:text-base dark:text-white">Monthly Overview</h2>
-      <button type="button" className="hidden h-10 rounded-2xl border border-slate-200 px-4 text-sm font-black text-[#10172a] shadow-sm md:hidden">
+  <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 md:py-5 ${dashboardCardShadow}`}>
+    <div className="mb-3 flex items-center justify-between gap-4 md:mb-4">
+      <h2 className="text-sm font-extrabold text-[#10172a] md:text-base dark:text-white">Monthly Overview</h2>
+      <button type="button" className="h-8 rounded-full border border-slate-200 px-3 text-[10px] font-black text-[#10172a] shadow-sm md:h-10 md:rounded-2xl md:px-4 md:text-sm">
         This Month
       </button>
     </div>
     <div
-      className={`grid grid-cols-[178px_1fr] overflow-x-auto ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
-      style={shouldScrollRows ? { maxHeight: `${40 + chartRowsMaxHeight}px` } : undefined}
+      className={`grid grid-cols-[86px_1fr] overflow-x-auto md:grid-cols-[178px_1fr] ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
+      style={shouldScrollRows ? { maxHeight: `${32 + chartRowsMaxHeight}px` } : undefined}
     >
-      <div className="border-r border-slate-200 pr-4">
-        <p className="h-10 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-white">
+      <div className="border-r border-slate-200 pr-2 md:pr-4">
+        <p className="h-8 text-[8px] font-extrabold uppercase text-slate-500 md:h-10 md:text-[11px] dark:text-white">
           Tasks
         </p>
         {visibleTasks.map((task, index) => {
@@ -482,7 +479,7 @@ const MonthlyChart = ({ tasks }) => {
           return (
             <div
               key={task.id || task.name}
-              className="grid h-10 grid-cols-[1fr_28px_42px] items-center gap-2 text-xs text-[#10172a] dark:text-white"
+              className="grid h-7 grid-cols-[1fr_18px] items-center gap-1 text-[9px] text-[#10172a] md:h-10 md:grid-cols-[1fr_28px_42px] md:gap-2 md:text-xs dark:text-white"
             >
               <span className="flex min-w-0 items-center gap-2 font-semibold">
                 <span
@@ -496,7 +493,9 @@ const MonthlyChart = ({ tasks }) => {
               <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-black ring-1 ${priorityClass}`}>
                 {getPriorityInitial(task.priority)}
               </span>
+              <span className="hidden md:inline-grid">
               <ProgressRing value={`${task.progress ?? 0}%`} />
+              </span>
             </div>
           );
         })}
@@ -504,15 +503,15 @@ const MonthlyChart = ({ tasks }) => {
 
       <div style={{ minWidth: `${chartMinWidth}px` }}>
         <div
-          className="grid h-10 border-b border-neutral-100"
+          className="grid h-8 border-b border-neutral-100 md:h-10"
           style={{ gridTemplateColumns: `repeat(${visibleWeekCount}, minmax(0, 1fr))` }}
         >
           {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
-              <p className="text-center text-xs font-semibold text-[#10172a] dark:text-white">
+              <p className="text-center text-[8px] font-semibold text-[#10172a] md:text-xs dark:text-white">
                 {week}
               </p>
-              <div className="mt-2 grid grid-cols-7 text-center text-[10px] font-bold text-slate-500 dark:text-white">
+              <div className="mt-1 grid grid-cols-7 text-center text-[8px] font-bold text-slate-500 md:mt-2 md:text-[10px] dark:text-white">
                 {timelineDays.map((day, index) => (
                   <span key={`${week}-${day}-${index}`}>{day}</span>
                 ))}
@@ -532,12 +531,12 @@ const MonthlyChart = ({ tasks }) => {
             {visibleTasks.map((task) => (
               <div
                 key={task.id || task.name}
-                className="relative h-10 border-b border-neutral-100 last:border-b-0"
+                className="relative h-7 border-b border-neutral-100 last:border-b-0 md:h-10"
               >
                 {task.segments.map((segment, index) => (
                   <div
                     key={`${task.name}-${index}`}
-                    className={`absolute top-1/2 h-5 -translate-y-1/2 rounded-md shadow-sm ${
+                    className={`absolute top-1/2 h-3 -translate-y-1/2 rounded-sm shadow-sm md:h-5 md:rounded-md ${
                       segment.diamond ? "aspect-square rotate-45" : ""
                     }`}
                     style={{
@@ -623,15 +622,15 @@ const ExpenseChart = ({ budgetEntries }) => {
     }).format(Math.abs(Number(amount) || 0));
 
   return (
-    <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-6 md:rounded-2xl md:py-5 ${dashboardCardShadow}`}>
+    <section className={`rounded-xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 md:py-5 ${dashboardCardShadow}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-extrabold text-[#10172a] md:text-base dark:text-white">Expense Summary</h2>
+        <h2 className="text-sm font-extrabold text-[#10172a] md:text-base dark:text-white">Expense Summary</h2>
         <label className="relative">
           <span className="sr-only">Filter expense categories by month</span>
           <select
             value={activeMonth}
             onChange={(event) => setSelectedMonth(event.target.value)}
-            className="h-9 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-9 text-xs font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 dark:text-white"
+            className="h-8 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-8 text-[10px] font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 md:h-9 md:pr-9 md:text-xs dark:text-white"
           >
             {monthOptions.map((month) => (
               <option key={month} value={month}>
@@ -652,41 +651,43 @@ const ExpenseChart = ({ budgetEntries }) => {
           </svg>
         </label>
       </div>
-      <div
-        className="relative mx-auto grid h-44 w-44 place-items-center rounded-full"
-        style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
-      >
-        <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] dark:bg-neutral-950">
-          <span>
-            <span className="block text-[10px] font-semibold text-slate-500 dark:text-white">Total Expenses</span>
-            <span className="mt-1 block text-lg font-extrabold text-[#10172a] dark:text-white">
-              {formatPeso(total)}
+      <div className="grid grid-cols-[112px_1fr] items-center gap-4 md:block">
+        <div
+          className="relative mx-auto grid h-28 w-28 place-items-center rounded-full md:h-44 md:w-44"
+          style={{ background: `conic-gradient(${gradientStops.join(", ")})` }}
+        >
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] md:h-24 md:w-24 dark:bg-neutral-950">
+            <span>
+              <span className="block text-[7px] font-semibold text-slate-500 md:text-[10px] dark:text-white">Total Expenses</span>
+              <span className="mt-0.5 block text-xs font-extrabold text-[#10172a] md:mt-1 md:text-lg dark:text-white">
+                {formatPeso(total)}
+              </span>
             </span>
-          </span>
+          </div>
         </div>
-      </div>
-      <div className="mt-4 space-y-2 text-xs text-[#10172a] dark:text-white">
-      {expenseCategories.length === 0 && (
-          <span className="flex items-center gap-3">
-            <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
-            No expenses
-          </span>
-        )}
-        {expenseCategories.map((category) => (
-          <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-3">
-            <span className="flex min-w-0 items-center gap-2">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: category.color }}
-            />
-              <span className="truncate font-semibold">{category.label}</span>
+        <div className="space-y-2 text-[9px] text-[#10172a] md:mt-4 md:text-xs dark:text-white">
+        {expenseCategories.length === 0 && (
+            <span className="flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
+              No expenses
             </span>
-            <span className="font-bold">{formatPeso(category.value)}</span>
-            <span className="w-12 text-right font-bold text-slate-500 dark:text-white">
-              {total > 0 ? `${((category.value / total) * 100).toFixed(1)}%` : "0%"}
+          )}
+          {expenseCategories.map((category) => (
+            <span key={category.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 md:gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: category.color }}
+              />
+                <span className="truncate font-semibold">{category.label}</span>
+              </span>
+              <span className="font-bold">{formatPeso(category.value)}</span>
+              <span className="w-9 text-right font-bold text-slate-500 md:w-12 dark:text-white">
+                {total > 0 ? `${((category.value / total) * 100).toFixed(1)}%` : "0%"}
+              </span>
             </span>
-          </span>
-        ))}
+          ))}
+        </div>
       </div>
 
     </section>
@@ -743,32 +744,73 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
     </table>
   );
 
+  const renderMobileList = () => (
+    <div className="space-y-2 px-3 pb-3 md:hidden">
+      {employees.length === 0 && (
+        <p className="py-5 text-center text-xs font-semibold text-neutral-500 dark:text-white">
+          No employees to show.
+        </p>
+      )}
+      {employees.slice(0, compactListVisibleRows).map((employee, index) => (
+        <div key={`${title}-mobile-${index}`} className="flex items-center gap-2">
+          <Avatar name={employee.name} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[10px] font-black text-[#10172a] dark:text-white">
+              {employee.name}
+            </span>
+            <span className="mt-0.5 block truncate text-[9px] font-semibold text-slate-500 dark:text-white">
+              {employee.job}
+            </span>
+          </span>
+          {employee.date === "Available" ? (
+            <span className="rounded-full bg-green-100 px-2 py-1 text-[8px] font-bold text-green-600">
+              Available
+            </span>
+          ) : (
+            <span className="max-w-12 truncate text-[8px] font-bold text-slate-500 dark:text-white">
+              {employee.date}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <>
-      <section className={`overflow-hidden rounded-3xl border border-pink-100 bg-white md:rounded-2xl ${dashboardCardShadow}`}>
-        <div className="flex items-center justify-between gap-4 px-5 pt-4">
-          <h2 className="flex items-center gap-2 text-xl font-extrabold text-[#10172a] md:text-base dark:text-white">
+      <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white md:rounded-2xl ${dashboardCardShadow}`}>
+        <div className="flex items-center justify-between gap-2 px-3 py-3 md:gap-4 md:px-5 md:pt-4 md:pb-0">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-[11px] font-extrabold text-[#10172a] md:gap-2 md:text-base dark:text-white">
             {title}
             <span
-              className={`grid h-6 min-w-6 place-items-center rounded-full px-2 text-xs ${
+              className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[9px] md:h-6 md:min-w-6 md:px-2 md:text-xs ${
                 tone === "pink" ? "bg-pink-100 text-pink-500" : "bg-violet-100 text-violet-600"
               }`}
             >
               {employees.length}
             </span>
           </h2>
+          <button
+            type="button"
+            onClick={() => canViewAll && setIsViewingAll(true)}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[15px] font-black text-[#10172a] transition hover:bg-pink-50 md:hidden"
+            aria-label={`View ${title}`}
+          >
+            &rsaquo;
+          </button>
           {canViewAll && (
             <button
               type="button"
               onClick={() => setIsViewingAll(true)}
-              className="shrink-0 text-xs font-black text-pink-600 transition hover:text-pink-700"
+              className="hidden shrink-0 text-xs font-black text-pink-600 transition hover:text-pink-700 md:block"
             >
               View all
             </button>
           )}
         </div>
+        {renderMobileList()}
         <div
-          className={`mt-3 overflow-x-auto ${canViewAll ? "overflow-y-auto" : ""}`}
+          className={`mt-3 hidden overflow-x-auto md:block ${canViewAll ? "overflow-y-auto" : ""}`}
           style={canViewAll ? { maxHeight: `${tableMaxHeight}px` } : undefined}
         >
           {renderTable()}
@@ -1269,7 +1311,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }
 
   return (
-        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] space-y-3 bg-[#fbf9ff] px-3 py-3 dark:bg-neutral-950 md:-mx-5 md:space-y-4 md:bg-[#f8f9fd] md:px-5 md:py-4 lg:-mx-6 lg:px-6">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}
@@ -1278,7 +1320,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
           {activeTopTab === "dashboard" && (
             <>
-              <header className="pb-1">
+              <header className="hidden pb-1 md:block">
                 <p className="text-sm font-black text-[#10172a] dark:text-white">
            
                   Welcome back, {getUserName(user)}!
@@ -1291,23 +1333,23 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
                 </h1>
               </header>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-4 gap-2 md:gap-4 xl:grid-cols-4">
                 {stats.map((item) => (
                   <StatCard key={item.label} item={item} />
                 ))}
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.85fr_0.82fr]">
+              <div className="grid gap-3 md:gap-4 xl:grid-cols-[1.85fr_0.82fr]">
                 <MonthlyChart tasks={tasks} />
                 <ExpenseChart budgetEntries={budgetEntries} />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-2">
                 <EmployeeTable title="Working" employees={workingEmployees} />
                 <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-3">
+              <div className="grid gap-3 md:gap-4 xl:grid-cols-3">
                 <UpcomingEvents events={calendarEvents} />
                 <OnlineTeam members={onlineTeam} />
                 <RecentActivities
