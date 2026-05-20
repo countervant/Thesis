@@ -1440,7 +1440,7 @@ const Dashboard = () => {
           {adminContent}
         </MainBars>
         <ConfirmDialog
-          confirmLabel="Yes , log out"
+          confirmLabel="Log out"
           icon="logout"
           isOpen={isLogoutDialogOpen}
           message="Are you sure you want to log out?"
@@ -1515,7 +1515,7 @@ const Dashboard = () => {
         {regularContent}
       </MainBars>
       <ConfirmDialog
-        confirmLabel="Yes , log out"
+        confirmLabel="Log out"
         icon="logout"
         isOpen={isLogoutDialogOpen}
         message="Are you sure you want to log out?"

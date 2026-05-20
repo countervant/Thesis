@@ -1320,13 +1320,13 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
           {activeTopTab === "dashboard" && (
             <>
-              <header className="hidden pb-1 md:block">
+              <header className="pb-1">
                 <p className="text-sm font-black text-[#10172a] dark:text-white">
            
                   Welcome back, {getUserName(user)}!
                 </p>
                 <h1
-                  className="mt-1 text-3xl uppercase leading-none text-neutral-950 dark:text-white"
+                  className="mt-1 text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-3xl"
                   style={{ fontFamily: "var(--font-bruno)" }}
                 >
                   Dashboard
