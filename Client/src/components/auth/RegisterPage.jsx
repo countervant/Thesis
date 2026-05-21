@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import mobileLogo from "../../assets/CLIENTRA2.png";
@@ -58,12 +58,15 @@ const RegisterIcon = ({ name, className = "h-5 w-5" }) => {
 
 const mobileFieldWrap = "space-y-2";
 const mobileInputBox =
-  "relative flex h-12 items-center rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition focus-within:border-pink-300 focus-within:ring-2 focus-within:ring-pink-100 dark:border-white/40 dark:bg-[#1f2937]";
+  "relative flex h-12 items-center border-b-2 border-slate-300 bg-transparent transition focus-within:border-pink-400 dark:border-white/40";
 const mobileInput =
-  "w-full border-none bg-transparent px-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85";
+  "w-full border-none bg-transparent px-0 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85";
 
 const RegisterPage = ({ order, order1 }) => {
+  const formRef = useRef(null);
+  const hasUserInteractedRef = useRef(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [middleInitial, setMiddleInitial] = useState("");
   const [lastName, setLastName] = useState("");
@@ -80,7 +83,12 @@ const RegisterPage = ({ order, order1 }) => {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    sessionStorage.setItem("clientraSuppressLoginAutofillOnce", "true");
+  }, []);
+
   const handleLoginClick = () => {
+    sessionStorage.setItem("clientraSuppressLoginAutofillOnce", "true");
     const authScreen = document.querySelector("[data-auth-screen]");
     authScreen?.classList.add("auth-screen-exit-login");
 
@@ -101,15 +109,22 @@ const RegisterPage = ({ order, order1 }) => {
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
+    setShowConfirmPassword(false);
   }, []);
 
   const handleEmailChange = (e) => {
+    hasUserInteractedRef.current = true;
     const value = e.target.value;
     setEmail(value);
     setEmailError(validateEmail(value));
   };
 
+  const handlePreventAutofill = (event) => {
+    preventAutofill(event);
+  };
+
   const handleCountryChange = (nextCountry) => {
+    hasUserInteractedRef.current = true;
     setPhone((currentPhone) =>
       applyCountryDialCode(
         currentPhone || getCountryDialCode(nextCountry),
@@ -186,9 +201,35 @@ const RegisterPage = ({ order, order1 }) => {
   const isEmailInvalid = !email || !!emailError;
 
   useEffect(() => {
-    resetForm();
-    const timer = setTimeout(resetForm, 100);
-    return () => clearTimeout(timer);
+    const clearBrowserPrefill = () => {
+      if (hasUserInteractedRef.current) return;
+
+      resetForm();
+      formRef.current?.querySelectorAll("input").forEach((input) => {
+        input.value = "";
+      });
+    };
+
+    clearBrowserPrefill();
+    const timeoutIds = [50, 250, 800, 1500, 3000].map((delay) =>
+      window.setTimeout(clearBrowserPrefill, delay)
+    );
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        window.setTimeout(clearBrowserPrefill, 0);
+      }
+    };
+
+    window.addEventListener("pageshow", clearBrowserPrefill);
+    window.addEventListener("focus", clearBrowserPrefill);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.removeEventListener("pageshow", clearBrowserPrefill);
+      window.removeEventListener("focus", clearBrowserPrefill);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [resetForm]);
 
   useEffect(() => {
@@ -226,9 +267,10 @@ const RegisterPage = ({ order, order1 }) => {
         )}
 
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-lg sm:space-y-8 md:max-w-2xl md:-translate-y-4 md:bg-transparent md:px-10 md:py-7 md:shadow-none dark:bg-[#141414] dark:md:border-pink-200/90 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
-          autoComplete="off"
+          autoComplete="new-password"
           data-form-type="other"
         >
           <div className="flex flex-col items-center">
@@ -248,23 +290,6 @@ const RegisterPage = ({ order, order1 }) => {
             </h2>
           </div>
 
-          <input
-            type="text"
-            name="username"
-            autoComplete="username"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="hidden"
-          />
-          <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="hidden"
-          />
-
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded dark:border-red-400/60 dark:bg-red-500/10 dark:text-red-200">
               {error}
@@ -273,17 +298,19 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">First Name</label>
               <div className={mobileInputBox}>
               <input
                 type="text"
                 name={fieldNames.firstName}
                 placeholder="First name"
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => {
+                  hasUserInteractedRef.current = true;
+                  setFirstName(e.target.value);
+                }}
                 {...antiAutofillProps}
                 readOnly
-                onFocus={preventAutofill}
+                onFocus={handlePreventAutofill}
                 className={mobileInput}
                 required
               />
@@ -291,34 +318,38 @@ const RegisterPage = ({ order, order1 }) => {
             </div>
 
             <div className={mobileFieldWrap}>
-              <label className="block whitespace-nowrap text-[11px] font-medium text-slate-500 md:text-xs">Middle Initial (Optional)</label>
               <div className={mobileInputBox}>
               <input
                 type="text"
                 name={fieldNames.middleInitial}
-                placeholder="M.I."
+                placeholder="M.I. (optional)"
                 value={middleInitial}
-                onChange={(e) => setMiddleInitial(e.target.value.slice(0, 5))}
+                onChange={(e) => {
+                  hasUserInteractedRef.current = true;
+                  setMiddleInitial(e.target.value.slice(0, 5));
+                }}
                 {...antiAutofillProps}
                 readOnly
-                onFocus={preventAutofill}
+                onFocus={handlePreventAutofill}
                 className={mobileInput}
               />
               </div>
             </div>
 
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">Last Name</label>
               <div className={mobileInputBox}>
               <input
                 type="text"
                 name={fieldNames.lastName}
                 placeholder="Last name"
                 value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                onChange={(e) => {
+                  hasUserInteractedRef.current = true;
+                  setLastName(e.target.value);
+                }}
                 {...antiAutofillProps}
                 readOnly
-                onFocus={preventAutofill}
+                onFocus={handlePreventAutofill}
                 className={mobileInput}
                 required
               />
@@ -328,7 +359,6 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">Email</label>
               <div className={mobileInputBox}>
               <input
                 type="text"
@@ -339,7 +369,7 @@ const RegisterPage = ({ order, order1 }) => {
                 onChange={handleEmailChange}
                 {...antiAutofillProps}
                 readOnly
-                onFocus={preventAutofill}
+                onFocus={handlePreventAutofill}
                 className={mobileInput}
                 required
               />
@@ -350,17 +380,19 @@ const RegisterPage = ({ order, order1 }) => {
             )}
 
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">Company Name</label>
               <div className={mobileInputBox}>
               <input
                 type="text"
                 name={fieldNames.companyName}
                 placeholder="Company name"
                 value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                onChange={(e) => {
+                  hasUserInteractedRef.current = true;
+                  setCompanyName(e.target.value);
+                }}
                 {...antiAutofillProps}
                 readOnly
-                onFocus={preventAutofill}
+                onFocus={handlePreventAutofill}
                 className={mobileInput}
                 required
               />
@@ -370,8 +402,7 @@ const RegisterPage = ({ order, order1 }) => {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.2fr] md:gap-6">
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">Country</label>
-              <div className={mobileInputBox}>
+              <div className="relative flex h-12 w-[45%] items-center border-b-2 border-slate-300 bg-transparent transition focus-within:border-pink-400 dark:border-white/40 md:w-[80%]">
               <CountrySelect
                 value={country}
                 onChange={handleCountryChange}
@@ -383,24 +414,24 @@ const RegisterPage = ({ order, order1 }) => {
             </div>
 
             <div className={mobileFieldWrap}>
-              <label className="block text-xs font-medium text-slate-500">Phone</label>
               <div className={mobileInputBox}>
               <input
                 type="tel"
                 name={fieldNames.phone}
                 placeholder="Enter phone number"
                 value={phone}
-                onChange={(event) =>
+                onChange={(event) => {
+                  hasUserInteractedRef.current = true;
                   setPhone(
                     limitPhoneNumberLength(
                       event.target.value,
                       country || defaultCountry
                     )
-                  )
-                }
+                  );
+                }}
                 {...antiAutofillProps}
                 readOnly
-                onFocus={preventAutofill}
+                onFocus={handlePreventAutofill}
                 className={mobileInput}
                 required
               />
@@ -409,17 +440,19 @@ const RegisterPage = ({ order, order1 }) => {
           </div>
 
           <div className={mobileFieldWrap}>
-            <label className="block text-xs font-medium text-slate-500">Password</label>
             <div className={mobileInputBox}>
             <input
               type="text"
               name={fieldNames.password}
               placeholder="Enter your password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                hasUserInteractedRef.current = true;
+                setPassword(e.target.value);
+              }}
               {...antiAutofillProps}
               readOnly
-              onFocus={preventAutofill}
+              onFocus={handlePreventAutofill}
               style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
               className={mobileInput}
               required
@@ -427,7 +460,8 @@ const RegisterPage = ({ order, order1 }) => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="px-3 text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="pl-4 text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
@@ -439,27 +473,30 @@ const RegisterPage = ({ order, order1 }) => {
           </div>
 
           <div className={mobileFieldWrap}>
-            <label className="block text-xs font-medium text-slate-500">Confirm Password</label>
             <div className={mobileInputBox}>
             <input
               type="text"
               name={fieldNames.confirmPassword}
               placeholder="Confirm your password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                hasUserInteractedRef.current = true;
+                setConfirmPassword(e.target.value);
+              }}
               {...antiAutofillProps}
               readOnly
-              onFocus={preventAutofill}
-              style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
+              onFocus={handlePreventAutofill}
+              style={showConfirmPassword ? undefined : { WebkitTextSecurity: "disc" }}
               className={mobileInput}
               required
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="px-3 text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              className="pl-4 text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
             >
-              {showPassword ? (
+              {showConfirmPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
               ) : (
                 <img src={view} alt="Show" className="w-5 h-5 dark:invert" />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ForgotPasswordkey from "../../assets/ForgotPassword-key.png";
 import AuthenticationHelper from "./AuthenticationHelper";
@@ -7,6 +7,10 @@ import { validateEmail } from "../../utils/emailValidation.js";
 
 const ForgotPasswordcom = () => {
   const navigate = useNavigate();
+  const formRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const emailFieldNameRef = useRef(`forgot_contact_${Date.now()}`);
+  const hasUserInteractedRef = useRef(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [message, setMessage] = useState("");
@@ -14,10 +18,52 @@ const ForgotPasswordcom = () => {
   const [loading, setLoading] = useState(false);
 
   const handleEmailChange = (e) => {
+    hasUserInteractedRef.current = true;
     const value = e.target.value;
     setEmail(value);
     setEmailError(validateEmail(value));
   };
+
+  useEffect(() => {
+    sessionStorage.setItem("clientraSuppressLoginAutofillOnce", "true");
+  }, []);
+
+  useEffect(() => {
+    const clearBrowserPrefill = () => {
+      if (hasUserInteractedRef.current) return;
+
+      setEmail("");
+      setEmailError("");
+      formRef.current?.querySelectorAll("input").forEach((input) => {
+        input.value = "";
+      });
+
+      if (emailInputRef.current) {
+        emailInputRef.current.value = "";
+      }
+    };
+
+    clearBrowserPrefill();
+    const timeoutIds = [50, 250, 800, 1500, 3000].map((delay) =>
+      window.setTimeout(clearBrowserPrefill, delay)
+    );
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        window.setTimeout(clearBrowserPrefill, 0);
+      }
+    };
+
+    window.addEventListener("pageshow", clearBrowserPrefill);
+    window.addEventListener("focus", clearBrowserPrefill);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.removeEventListener("pageshow", clearBrowserPrefill);
+      window.removeEventListener("focus", clearBrowserPrefill);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,9 +92,11 @@ const ForgotPasswordcom = () => {
     <>
       <div className="relative z-20 flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 px-3 py-8 md:min-h-screen md:w-1/2 md:px-12 md:py-0 dark:bg-[#111111]">
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
-          autoComplete="off"
+          autoComplete="new-password"
+          data-form-type="other"
         >
           <div className="mb-5 flex flex-col items-center sm:mb-10">
             <img
@@ -68,16 +116,27 @@ const ForgotPasswordcom = () => {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-500">Email</label>
             <div className="relative">
             <input
+              ref={emailInputRef}
               type="email"
-              name="username"
+              name={emailFieldNameRef.current}
               placeholder="Enter your email"
               value={email}
               onChange={handleEmailChange}
+              onFocus={(event) => {
+                event.currentTarget.removeAttribute("readOnly");
+              }}
               disabled={loading}
-              autoComplete="username"
+              autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
+              data-form-type="other"
+              readOnly
               className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
               required
             />

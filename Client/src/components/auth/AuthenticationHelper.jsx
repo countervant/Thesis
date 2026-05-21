@@ -8,6 +8,9 @@ const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => 
     if (link !== "/register" && link !== "/") return;
 
     e.preventDefault();
+    if (link === "/") {
+      sessionStorage.setItem("clientraSuppressLoginAutofillOnce", "true");
+    }
     const authScreen = document.querySelector("[data-auth-screen]");
     const transitionClass =
       link === "/register" ? "auth-screen-exit-register" : "auth-screen-exit-login";

@@ -70,9 +70,31 @@ const CountrySelect = ({ className = "", onChange, value, ...props }) => {
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={isOpen}
-        className={className}
+        className={`${className} pr-9`}
         {...props}
       />
+      <button
+        type="button"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setIsOpen((currentIsOpen) => !currentIsOpen)}
+        className="absolute right-1 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center text-slate-500 transition hover:text-pink-500 dark:text-white/75 dark:hover:text-pink-300"
+        aria-label={isOpen ? "Close country options" : "Open country options"}
+      >
+        <svg
+          viewBox="0 0 20 20"
+          className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="m5 7.5 5 5 5-5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
       {isOpen && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-950">
           {options.length === 0 ? (

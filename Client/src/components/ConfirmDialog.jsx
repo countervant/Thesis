@@ -26,12 +26,12 @@ const ConfirmDialog = ({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-5 text-neutral-950 backdrop-blur-sm">
-      <section className="w-full max-w-[680px] rounded-[30px] bg-white px-7 py-10 text-center shadow-[0_28px_70px_rgba(15,23,42,0.32)] ring-1 ring-white/80 sm:rounded-[34px] sm:px-16 sm:py-16">
-        <div className="mx-auto grid h-14 w-14 place-items-center text-neutral-950 sm:h-16 sm:w-16">
+      <section className="w-full max-w-[420px] rounded-3xl bg-white px-6 py-8 text-center shadow-[0_24px_60px_rgba(15,23,42,0.28)] ring-1 ring-white/80 sm:px-8 sm:py-9">
+        <div className="mx-auto grid h-12 w-12 place-items-center text-neutral-950">
           {imageIcon ? (
-            <img src={imageIcon} alt="" className="h-14 w-14 object-contain sm:h-16 sm:w-16" />
+            <img src={imageIcon} alt="" className="h-12 w-12 object-contain" />
           ) : (
-            <svg viewBox="0 0 24 24" className="h-14 w-14 sm:h-16 sm:w-16" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="h-12 w-12" aria-hidden="true">
               <path
                 d={iconPaths[icon] || iconPaths.done}
                 fill="none"
@@ -43,21 +43,21 @@ const ConfirmDialog = ({
             </svg>
           )}
         </div>
-        <h2 className="mt-5 text-4xl font-black tracking-tight text-[#242433] sm:text-5xl">{title}</h2>
-        <p className="mt-5 text-xl font-medium text-[#686776] sm:text-2xl">{message}</p>
+        <h2 className="mt-4 text-2xl font-black tracking-tight text-[#242433] sm:text-3xl">{title}</h2>
+        <p className="mt-3 text-base font-medium text-[#686776] sm:text-lg">{message}</p>
 
-        <div className="mx-auto mt-10 grid max-w-[560px] grid-cols-2 gap-4 sm:mt-14 sm:gap-8">
+        <div className="mx-auto mt-7 grid max-w-[320px] grid-cols-2 gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="h-14 rounded-2xl border border-[#cfcfd8] bg-white text-lg font-black text-[#454451] transition hover:bg-neutral-50 sm:h-20 sm:rounded-[24px] sm:text-2xl"
+            className="h-11 rounded-xl border border-[#cfcfd8] bg-white px-4 text-sm font-black text-[#454451] transition hover:bg-neutral-50 sm:h-12 sm:text-base"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="h-14 rounded-2xl bg-linear-to-r from-[#ec3aa6] to-[#a719f5] text-lg font-black text-white shadow-[0_12px_24px_rgba(190,31,190,0.28)] transition hover:brightness-105 sm:h-20 sm:rounded-[24px] sm:text-2xl"
+            className="h-11 rounded-xl bg-linear-to-r from-[#ec3aa6] to-[#a719f5] px-4 text-sm font-black text-white shadow-[0_12px_24px_rgba(190,31,190,0.28)] transition hover:brightness-105 sm:h-12 sm:text-base"
           >
             {confirmLabel}
           </button>

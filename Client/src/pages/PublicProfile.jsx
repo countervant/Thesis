@@ -796,26 +796,21 @@ const PublicProfile = () => {
                   Profile Overview
                 </h2>
                 {[
-                  ["Posts", userPosts.length, "bg-pink-50 text-[#c72fb2]"],
+                  ["Posts", userPosts.length],
                   [
                     "Likes Received",
                     userPosts.reduce((total, post) => total + post.hearts.length, 0),
-                    "bg-rose-50 text-rose-500",
                   ],
                   [
                     "Comments",
                     userPosts.reduce((total, post) => total + post.comments.length, 0),
-                    "bg-emerald-50 text-emerald-500",
                   ],
-                ].map(([label, value, tone]) => (
+                ].map(([label, value]) => (
                   <div
                     key={label}
                     className="flex items-center justify-between border-b border-pink-50 py-2.5 last:border-b-0"
                   >
-                    <span className="flex items-center gap-3 text-sm font-semibold text-slate-600">
-                      <span className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-black ${tone}`}>
-                        {label === "Posts" ? "P" : label === "Likes Received" ? "L" : "C"}
-                      </span>
+                    <span className="text-sm font-semibold text-slate-600">
                       {label}
                     </span>
                     <span className="text-sm font-black text-[#10142d]">{value}</span>
@@ -833,7 +828,7 @@ const PublicProfile = () => {
                     onClick={() => setActiveProfileTab(tab)}
                     className={`h-12 px-5 text-sm font-black ${
                       activeProfileTab === tab
-                        ? "border-b-2 border-[#7427ff] text-[#7427ff]"
+                        ? "border-b-2 border-[#c72fb2] text-[#c72fb2]"
                         : "text-slate-500 hover:text-[#c72fb2]"
                     }`}
                   >
@@ -893,34 +888,27 @@ const PublicProfile = () => {
                 ) : (
                   <div className="grid gap-4 xl:grid-cols-2">
                     <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                      <h2 className="mb-4 text-sm font-black text-[#10142d]">
                         Personal Information
-                        <span className="text-[#8b35ff]">⌘</span>
                       </h2>
                       {[
-                        ["Full Name", getUserName(profileUser), "bg-violet-50 text-[#8b35ff]"],
-                        ["Email", profileUser.email || "No email provided", "bg-pink-50 text-[#c72fb2]"],
-                        ["Phone", profileUser.phone || "No phone provided", "bg-pink-50 text-[#c72fb2]"],
-                        ["Address", getUserCountry(profileUser) || "Manila, Philippines", "bg-violet-50 text-[#8b35ff]"],
-                        ["Birthday", "February 14, 2001", "bg-pink-50 text-[#c72fb2]"],
-                        ["Gender", "Male", "bg-violet-50 text-[#8b35ff]"],
-                      ].map(([label, value, tone]) => (
-                        <div key={label} className="grid grid-cols-[130px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0">
-                          <span className="flex items-center gap-3 text-xs font-black text-[#243154]">
-                            <span className={`grid h-7 w-7 place-items-center rounded-lg text-[11px] ${tone}`}>
-                              {label.charAt(0)}
-                            </span>
-                            {label}
-                          </span>
+                        ["Full Name", getUserName(profileUser)],
+                        ["Email", profileUser.email || "No email provided"],
+                        ["Phone", profileUser.phone || "No phone provided"],
+                        ["Address", getUserCountry(profileUser) || "Manila, Philippines"],
+                        ["Birthday", "February 14, 2001"],
+                        ["Gender", "Male"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="grid grid-cols-[92px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 sm:grid-cols-[130px_minmax(0,1fr)]">
+                          <span className="text-xs font-black text-[#243154]">{label}</span>
                           <span className="truncate text-xs font-bold text-[#10142d]">{value}</span>
                         </div>
                       ))}
                     </section>
 
                     <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                      <h2 className="mb-4 text-sm font-black text-[#10142d]">
                         Work Information
-                        <span className="text-[#8b35ff]">▣</span>
                       </h2>
                       {[
                         ["Employee ID", getEntityId(profileUser).slice(-8).toUpperCase() || "EMP-000123"],
@@ -929,13 +917,8 @@ const PublicProfile = () => {
                         ["Join Date", formatJoinedDate(profileUser.createdAt)],
                         ["Work Status", "Full-time"],
                       ].map(([label, value]) => (
-                        <div key={label} className="grid grid-cols-[140px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0">
-                          <span className="flex items-center gap-3 text-xs font-black text-[#243154]">
-                            <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-50 text-[11px] text-[#8b35ff]">
-                              {label.charAt(0)}
-                            </span>
-                            {label}
-                          </span>
+                        <div key={label} className="grid grid-cols-[98px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 sm:grid-cols-[140px_minmax(0,1fr)]">
+                          <span className="text-xs font-black text-[#243154]">{label}</span>
                           {label === "Work Status" ? (
                             <span className="w-fit rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">
                               {value}
@@ -948,9 +931,8 @@ const PublicProfile = () => {
                     </section>
 
                     <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                      <h2 className="mb-4 text-sm font-black text-[#10142d]">
                         Skills & Expertise
-                        <span className="text-[#8b35ff]">◌</span>
                       </h2>
                       <div className="flex flex-wrap gap-2.5">
                         {[
@@ -964,7 +946,7 @@ const PublicProfile = () => {
                           "Leadership",
                           "Teamwork",
                         ].map((skill) => (
-                          <span key={skill} className="rounded-full bg-violet-50 px-4 py-2 text-[11px] font-black text-[#8b35ff]">
+                          <span key={skill} className="rounded-full bg-pink-50 px-4 py-2 text-[11px] font-black text-[#c72fb2]">
                             {skill}
                           </span>
                         ))}
@@ -972,21 +954,17 @@ const PublicProfile = () => {
                     </section>
 
                     <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-                      <h2 className="mb-4 flex items-center justify-between text-sm font-black text-[#10142d]">
+                      <h2 className="mb-4 text-sm font-black text-[#10142d]">
                         Profile Statistics
-                        <span className="text-[#8b35ff]">▥</span>
                       </h2>
                       <div className="grid gap-3 sm:grid-cols-2">
                         {[
-                          ["Posts", userPosts.length, "Total posts made", "bg-violet-50 text-[#8b35ff]"],
-                          ["Likes Received", totalLikes, "Total likes received", "bg-pink-50 text-[#c72fb2]"],
-                          ["Projects", activeProjects, "Active projects", "bg-blue-50 text-blue-500"],
-                          ["Comments", totalComments, "Total comments", "bg-pink-50 text-[#c72fb2]"],
-                        ].map(([label, value, description, tone]) => (
-                          <div key={label} className="flex items-center gap-3 rounded-xl bg-linear-to-br from-violet-50 to-pink-50/70 p-3">
-                            <span className={`grid h-10 w-10 place-items-center rounded-lg text-sm font-black ${tone}`}>
-                              {label.charAt(0)}
-                            </span>
+                          ["Posts", userPosts.length, "Total posts made"],
+                          ["Likes Received", totalLikes, "Total likes received"],
+                          ["Projects", activeProjects, "Active projects"],
+                          ["Comments", totalComments, "Total comments"],
+                        ].map(([label, value, description]) => (
+                          <div key={label} className="rounded-xl bg-linear-to-br from-pink-50 to-pink-50/70 p-3">
                             <span>
                               <span className="block text-xl font-black text-[#10142d]">{value}</span>
                               <span className="block text-xs font-black text-[#10142d]">{label}</span>

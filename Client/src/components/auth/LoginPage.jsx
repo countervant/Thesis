@@ -19,6 +19,12 @@ const dashboardPathByRole = {
 const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 
 const LoginPage = ({ order, order1 }) => {
+  const formRef = useRef(null);
+  const emailFieldNameRef = useRef(`login_contact_${Date.now()}`);
+  const passwordFieldNameRef = useRef(`login_secret_${Date.now()}`);
+  const [suppressCredentialAutofill] = useState(
+    () => sessionStorage.getItem("clientraSuppressLoginAutofillOnce") === "true"
+  );
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [password, setPassword] = useState("");
@@ -43,11 +49,13 @@ const LoginPage = ({ order, order1 }) => {
 
   useEffect(() => {
     const clearBrowserPrefill = () => {
+      if (!suppressCredentialAutofill) return;
       if (hasUserInteractedRef.current) return;
 
-      setEmail("");
-      setEmailError("");
-      setPassword("");
+      resetForm();
+      formRef.current?.querySelectorAll("input").forEach((input) => {
+        input.value = "";
+      });
 
       if (emailInputRef.current) {
         emailInputRef.current.value = "";
@@ -57,13 +65,31 @@ const LoginPage = ({ order, order1 }) => {
       }
     };
 
+    if (suppressCredentialAutofill) {
+      sessionStorage.removeItem("clientraSuppressLoginAutofillOnce");
+    }
+
     clearBrowserPrefill();
-    const timeoutIds = [50, 250, 800].map((delay) =>
+    const timeoutIds = [50, 250, 800, 1500, 3000, 5000].map((delay) =>
       window.setTimeout(clearBrowserPrefill, delay)
     );
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        window.setTimeout(clearBrowserPrefill, 0);
+      }
+    };
 
-    return () => timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
-  }, []);
+    window.addEventListener("pageshow", clearBrowserPrefill);
+    window.addEventListener("focus", clearBrowserPrefill);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.removeEventListener("pageshow", clearBrowserPrefill);
+      window.removeEventListener("focus", clearBrowserPrefill);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [resetForm, suppressCredentialAutofill]);
 
   const handleEmailChange = (e) => {
     hasUserInteractedRef.current = true;
@@ -138,10 +164,12 @@ const LoginPage = ({ order, order1 }) => {
         className={`con order-${order} md:order-${order1} relative z-20 -mt-20 flex w-full flex-1 flex-col items-center justify-start bg-transparent px-3 pb-5 pt-0 sm:px-10 md:mt-0 md:min-h-screen md:w-1/2 md:justify-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
       >
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           noValidate
           className="min-h-[500px] w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-pink-200/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
-          autoComplete="off"
+          autoComplete={suppressCredentialAutofill ? "new-password" : "on"}
+          data-form-type="other"
         >
           <div className="mb-5 flex flex-col items-center sm:mb-10">
             <picture>
@@ -171,21 +199,28 @@ const LoginPage = ({ order, order1 }) => {
 
           <div className="space-y-5 sm:space-y-8">
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-500">Email</label>
               <div className="relative">
               <input
                 ref={emailInputRef}
                 type="email"
-                name="username"
-                placeholder="Enter your email"
+                name={suppressCredentialAutofill ? emailFieldNameRef.current : "username"}
+                placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
-                onFocus={() => {
+                onFocus={(event) => {
+                  event.currentTarget.removeAttribute("readOnly");
                   hasUserInteractedRef.current = true;
                 }}
                 disabled={loading}
-                autoComplete="username"
-                className="login-autofill-fix h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 md:text-base dark:border-white/40 dark:bg-[#1f2937] dark:text-white dark:placeholder:text-white/85"
+                autoComplete={suppressCredentialAutofill ? "new-password" : "username"}
+                autoCorrect={suppressCredentialAutofill ? "off" : undefined}
+                autoCapitalize={suppressCredentialAutofill ? "none" : undefined}
+                spellCheck={suppressCredentialAutofill ? "false" : undefined}
+                data-lpignore={suppressCredentialAutofill ? "true" : undefined}
+                data-1p-ignore={suppressCredentialAutofill ? "true" : undefined}
+                data-bwignore={suppressCredentialAutofill ? "true" : undefined}
+                readOnly={suppressCredentialAutofill}
+                className="login-autofill-fix h-12 w-full rounded-none border-0 border-b-2 border-slate-300 bg-transparent px-0 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:border-pink-400 focus:ring-0 md:text-base dark:border-white/40 dark:text-white dark:placeholder:text-white/85"
                 required
               />
               </div>
@@ -195,28 +230,35 @@ const LoginPage = ({ order, order1 }) => {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-500">Password</label>
-              <div className="relative flex h-12 items-center rounded-lg border border-slate-200 bg-white dark:border-white/40 dark:bg-[#1f2937]">
+              <div className="relative flex h-12 items-center border-b-2 border-slate-300 bg-transparent focus-within:border-pink-400 dark:border-white/40">
               <input
                 ref={passwordInputRef}
                 type={showPassword ? "text" : "password"}
-                name="password"
-                placeholder="Enter your password"
+                name={suppressCredentialAutofill ? passwordFieldNameRef.current : "password"}
+                placeholder="Password"
                 value={password}
                 onChange={handlePasswordChange}
-                onFocus={() => {
+                onFocus={(event) => {
+                  event.currentTarget.removeAttribute("readOnly");
                   hasUserInteractedRef.current = true;
                 }}
                 disabled={loading}
-                autoComplete="current-password"
-                className="login-autofill-fix min-w-0 flex-1 border-0 bg-transparent pl-4 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
+                autoComplete={suppressCredentialAutofill ? "new-password" : "current-password"}
+                autoCorrect={suppressCredentialAutofill ? "off" : undefined}
+                autoCapitalize={suppressCredentialAutofill ? "none" : undefined}
+                spellCheck={suppressCredentialAutofill ? "false" : undefined}
+                data-lpignore={suppressCredentialAutofill ? "true" : undefined}
+                data-1p-ignore={suppressCredentialAutofill ? "true" : undefined}
+                data-bwignore={suppressCredentialAutofill ? "true" : undefined}
+                readOnly={suppressCredentialAutofill}
+                className="login-autofill-fix min-w-0 flex-1 border-0 bg-transparent px-0 pr-2 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 md:text-base dark:text-white dark:placeholder:text-white/85"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                className="grid px-5 text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
+                className="grid pl-4 text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
