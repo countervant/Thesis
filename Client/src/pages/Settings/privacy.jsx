@@ -93,7 +93,7 @@ const SelectControl = ({ value, onChange, label }) => (
       value={value}
       onChange={onChange}
       aria-label={label}
-      className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-4 pr-9 text-sm font-semibold text-[#10142d] outline-none transition hover:border-pink-200 hover:bg-pink-50/40 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
+      className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-4 pr-9 text-sm font-semibold text-[#10142d] outline-none transition hover:border-pink-200 hover:bg-pink-50/40 focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white dark:hover:!bg-pink-500/15"
     >
       {selectOptions.map((option) => (
         <option key={option} value={option}>
@@ -177,7 +177,7 @@ const PrivacySettings = ({ user }) => {
         <button
           type="button"
           onClick={resetSettings}
-          className="h-8 min-w-[110px] rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 transition hover:bg-slate-50"
+          className="h-8 min-w-[110px] rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
         >
           Cancel
         </button>

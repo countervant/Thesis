@@ -242,7 +242,7 @@ const PostPreview = ({
         <button
           type="button"
           onClick={onToggleComments}
-          className="h-9 rounded-lg px-3 text-sm font-semibold text-neutral-700 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+          className="h-9 rounded-lg px-3 text-sm font-semibold text-neutral-700 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
         >
           {isCommentsVisible ? "Hide comments" : "View comments"}
         </button>
@@ -293,7 +293,7 @@ const PostPreview = ({
                     <button
                       type="button"
                       onClick={() => onToggleReplies(commentId)}
-                      className="h-8 rounded-md px-2 text-xs font-semibold text-neutral-600 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+                      className="h-8 rounded-md px-2 text-xs font-semibold text-neutral-600 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                     >
                       {areRepliesVisible
                         ? "Hide replies"
@@ -305,7 +305,7 @@ const PostPreview = ({
                       <button
                         type="button"
                         onClick={() => onDeleteComment(commentId)}
-                        className="h-8 rounded-md px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                        className="h-8 rounded-md px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:!bg-red-500/20 dark:hover:text-red-100"
                       >
                         Delete
                       </button>
@@ -783,7 +783,7 @@ const PublicProfile = () => {
                     <button
                       type="button"
                       onClick={() => handleNavigate("profile")}
-                      className="mt-4 h-9 w-full rounded-lg border border-[#c72fb2] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
+                      className="mt-4 h-9 w-full rounded-lg border border-[#c72fb2] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                     >
                       Edit Profile
                     </button>

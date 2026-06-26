@@ -243,7 +243,7 @@ const SecuritySettings = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setShowPasswordForm((isOpen) => !isOpen)}
-                className="h-10 rounded-lg border border-[#d86bc4] px-5 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
+                className="h-10 rounded-lg border border-[#d86bc4] px-5 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white"
               >
                 Change Password
               </button>
@@ -280,7 +280,7 @@ const SecuritySettings = ({ user }) => {
                       setPasswordForm(passwordInitialState);
                       setShowPasswordForm(false);
                     }}
-                    className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                    className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                   >
                     Cancel
                   </button>
@@ -387,7 +387,7 @@ const SecuritySettings = ({ user }) => {
           </Card>
 
           <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={cancelSettings} className="h-9 min-w-[120px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50">
+            <button type="button" onClick={cancelSettings} className="h-9 min-w-[120px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white">
               Cancel
             </button>
             <button type="button" onClick={saveSettings} className="h-9 min-w-[160px] rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(227,71,179,0.22)] transition hover:brightness-105">
@@ -459,7 +459,7 @@ const SecuritySettings = ({ user }) => {
                 </div>
               ))}
             </div>
-            <button type="button" onClick={showCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+            <button type="button" onClick={showCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
               View Backup Codes
             </button>
           </Card>

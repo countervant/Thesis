@@ -706,7 +706,7 @@ const Newsfeed = () => {
           </div>
           <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-2.5">
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600">
+              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                 <img
                   src={insertImageIcon}
                   alt=""
@@ -720,7 +720,7 @@ const Newsfeed = () => {
                   className="sr-only"
                 />
               </label>
-              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600">
+              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                   <path d="M7 3h7l4 4v14H7zM14 3v5h5M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -731,7 +731,7 @@ const Newsfeed = () => {
                 <button
                   type="button"
                   onClick={() => setIsEmojiPickerOpen((isOpen) => !isOpen)}
-                  className="flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
+                  className="flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                   aria-label="Add emoji"
                   aria-expanded={isEmojiPickerOpen}
                 >
@@ -745,7 +745,7 @@ const Newsfeed = () => {
                         key={emoji}
                         type="button"
                         onClick={() => handleInsertEmoji(emoji)}
-                        className="grid h-8 w-8 place-items-center rounded-md text-lg transition hover:bg-pink-50"
+                        className="grid h-8 w-8 place-items-center rounded-md text-lg transition hover:bg-pink-50 dark:hover:!bg-pink-500/20"
                       >
                         {emoji}
                       </button>
@@ -759,7 +759,7 @@ const Newsfeed = () => {
                 <button
                   type="button"
                   onClick={() => setPostMedia(null)}
-                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                  className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                 >
                   Remove Media
                 </button>
@@ -836,7 +836,7 @@ const Newsfeed = () => {
                           currentId === post.id ? "" : post.id
                         )
                       }
-                      className="grid h-9 w-9 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
+                      className="grid h-9 w-9 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                       aria-label="Post options"
                       aria-expanded={isPostMenuOpen}
                     >
@@ -855,7 +855,7 @@ const Newsfeed = () => {
                             setOpenPostMenuId("");
                             setPostToDelete(post);
                           }}
-                          className="block w-full px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                          className="block w-full px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:!bg-red-500/20 dark:hover:text-red-100"
                         >
                           Delete post
                         </button>
@@ -940,7 +940,7 @@ const Newsfeed = () => {
                   <button
                     type="button"
                     onClick={() => handleToggleHeart(post.id)}
-                    className={`flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black transition hover:bg-pink-50 ${hasHearted ? "text-pink-600" : "text-slate-600"}`}
+                    className={`flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2] dark:hover:text-white ${hasHearted ? "text-pink-600" : "text-slate-600 dark:text-white"}`}
                     aria-label={hasHearted ? "Remove heart" : "Heart post"}
                   >
                     <HeartIcon filled={hasHearted} />
@@ -949,7 +949,7 @@ const Newsfeed = () => {
                   <button
                     type="button"
                     onClick={() => toggleComments(post.id)}
-                    className="flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
+                    className="flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                       <path d="M5 6h14v10H9l-4 3V6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -958,7 +958,7 @@ const Newsfeed = () => {
                   </button>
                   <button
                     type="button"
-                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600"
+                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                       <path d="M20 12 4 5l3 7-3 7 16-7zM7 12h13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -1025,7 +1025,7 @@ const Newsfeed = () => {
                               <button
                                 type="button"
                                 onClick={() => toggleReplies(commentId)}
-                                className="h-7 rounded-md px-1 text-xs font-bold text-slate-500 transition hover:text-[#c72fb2]"
+                                className="h-7 rounded-md px-1 text-xs font-bold text-slate-500 transition hover:text-[#c72fb2] dark:text-white dark:hover:text-[#f7a8df]"
                               >
                                 {areRepliesVisible
                                   ? "Hide replies"
@@ -1138,13 +1138,13 @@ const Newsfeed = () => {
                     className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pr-24 text-sm font-semibold text-neutral-800 outline-none transition placeholder:text-slate-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
                   />
                   <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-3 text-slate-500">
-                    <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600" aria-label="Add emoji">
+                    <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add emoji">
                       <img src={emojiIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
-                    <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600" aria-label="Add image">
+                    <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add image">
                       <img src={insertImageIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
-                    <button type="submit" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50" aria-label="Send comment">
+                    <button type="submit" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2]" aria-label="Send comment">
                       <img src={sendIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
                   </span>
@@ -1213,7 +1213,7 @@ const Newsfeed = () => {
               <button
                 type="button"
                 onClick={() => setShowAllTeamMembers((isShowing) => !isShowing)}
-                className="mt-4 h-9 w-full rounded-xl border border-[#dc4fb2] text-xs font-bold text-[#dc4fb2] transition hover:bg-pink-50"
+                className="mt-4 h-9 w-full rounded-xl border border-[#dc4fb2] text-xs font-bold text-[#dc4fb2] transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2] dark:hover:text-white"
               >
                 {showAllTeamMembers ? "Show fewer team members" : "View all team members"}
               </button>

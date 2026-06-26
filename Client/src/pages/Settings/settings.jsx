@@ -158,11 +158,11 @@ const Settings = () => {
                       onClick={() => setActiveTab(label)}
                       className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-xs font-black transition ${
                         isActive
-                          ? "bg-pink-50 text-[#c72fb2]"
-                          : "text-[#243154] hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300"
+                          ? "bg-pink-50 text-[#c72fb2] dark:bg-[#c72fb2] dark:text-white"
+                          : "text-[#243154] hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                       }`}
                     >
-                      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#c72fb2]" : "text-[#647299]"}`} />
+                      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#c72fb2] dark:text-white" : "text-[#647299]"}`} />
                       <span>{label}</span>
                     </button>
                   );
@@ -184,7 +184,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setIsSupportOpen(true)}
-                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
+                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Contact Support
                   <span className="text-sm leading-none">&gt;</span>
@@ -353,7 +353,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setIsSupportOpen(false)}
-                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Close
                 </button>
@@ -390,7 +390,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setIsDeactivateOpen(false)}
-                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Cancel
                 </button>

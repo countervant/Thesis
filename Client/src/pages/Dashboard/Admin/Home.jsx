@@ -388,9 +388,9 @@ const getTaskProgress = (subtasks = []) => {
 };
 
 const priorityBadgeStyles = {
-  high: "bg-pink-50 text-pink-600 ring-pink-100",
-  medium: "bg-orange-50 text-orange-600 ring-orange-100",
-  low: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+  high: "border border-pink-600 bg-transparent text-pink-600",
+  medium: "border border-orange-600 bg-transparent text-orange-600",
+  low: "border border-emerald-600 bg-transparent text-emerald-600",
 };
 
 const normalizePriority = (priority) => {
@@ -490,7 +490,7 @@ const MonthlyChart = ({ tasks }) => {
                 {task.name}
                 </span>
               </span>
-              <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-black ring-1 ${priorityClass}`}>
+              <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-black ${priorityClass}`}>
                 {getPriorityInitial(task.priority)}
               </span>
               <span className="hidden md:inline-grid">
