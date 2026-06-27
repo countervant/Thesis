@@ -52,6 +52,7 @@
 .dark [class~="text-[#10142d]"],
 .dark [class~="text-[#10172a]"],
 .dark [class~="text-[#111936]"],
+.dark [class~="text-[#172033]"],
 .dark [class~="text-[#243154]"],
 .dark [class~="text-[#647299]"],
 .dark [class~="text-[black]"],
@@ -91,27 +92,27 @@
 .dark [class~="border-[#f7b7e6]"],
 .dark [class~="border-b-[#f7b7e6]"],
 .dark [class~="border-l-[#d9b8ff]"] {
-  border-color: #c72fb2 !important;
+  border-color: #DA70D6 !important;
 }
 
 .dark .ring-pink-50,
 .dark .ring-pink-100,
 .dark .ring-neutral-100,
 .dark .ring-black\/10 {
-  --tw-ring-color: rgba(199, 47, 178, 0.72) !important;
+  --tw-ring-color: rgba(218, 112, 214, 0.72) !important;
 }
 
 .dark .shadow-sm,
 .dark .shadow-lg,
 .dark .shadow-2xl,
 .dark [class*="shadow-["] {
-  box-shadow: 0 0 0 1px rgba(199, 47, 178, 0.72) !important;
+  box-shadow: 0 0 0 1px rgba(218, 112, 214, 0.72) !important;
 }
 
 .dark article,
 .dark [role="dialog"],
 .dark [role="menu"] {
-  box-shadow: 0 0 0 1px rgba(199, 47, 178, 0.72);
+  box-shadow: 0 0 0 1px rgba(218, 112, 214, 0.72);
 }
 
 .dark input,

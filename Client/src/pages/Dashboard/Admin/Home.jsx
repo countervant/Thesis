@@ -82,10 +82,26 @@ const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
 const dashboardCardShadow =
   "border-b-2 border-b-[#f7b7e6] shadow-[0_3px_4px_rgba(190,65,158,0.16),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-100/70";
 const statStyles = {
-  in_progress: { tile: "bg-[#f0e9ff]", text: "text-[#754de8]" },
-  pending: { tile: "bg-[#ffeaf5]", text: "text-[#e347a8]" },
-  review: { tile: "bg-[#fff0e5]", text: "text-[#ff8317]" },
-  done: { tile: "bg-[#eafbed]", text: "text-[#28b84c]" },
+  in_progress: {
+    tile: "bg-[#f0e9ff]",
+    text: "text-[#754de8]",
+    card: "border-[#754de8]/45 border-b-[#754de8] ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  },
+  pending: {
+    tile: "bg-[#ffeaf5]",
+    text: "text-[#e347a8]",
+    card: "border-[#e347a8]/45 border-b-[#e347a8] ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  },
+  review: {
+    tile: "bg-[#fff0e5]",
+    text: "text-[#ff8317]",
+    card: "border-[#ff8317]/45 border-b-[#ff8317] ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  },
+  done: {
+    tile: "bg-[#eafbed]",
+    text: "text-[#28b84c]",
+    card: "border-[#28b84c]/45 border-b-[#28b84c] ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  },
 };
 
 const parseCalendarDate = (value) => {
@@ -363,7 +379,7 @@ const StatCard = ({ item }) => {
   const style = statStyles[item.key] || statStyles.in_progress;
 
   return (
-  <section className={`relative flex min-h-[86px] flex-col items-start justify-between rounded-xl border border-pink-100 bg-white px-3 py-3 md:min-h-0 md:h-24 md:flex-row md:items-center md:justify-start md:gap-4 md:rounded-2xl md:px-5 md:py-0 ${dashboardCardShadow}`}>
+  <section className={`relative flex min-h-[86px] flex-col items-start justify-between rounded-xl border border-b-2 bg-white px-3 py-3 shadow-[0_3px_4px_rgba(15,23,42,0.08),0_8px_24px_rgba(15,23,42,0.04)] ring-1 md:min-h-0 md:h-24 md:flex-row md:items-center md:justify-start md:gap-4 md:rounded-2xl md:px-5 md:py-0 dark:bg-[#141414] ${style.card}`}>
     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg md:h-14 md:w-14 md:rounded-2xl ${style.tile}`}>
       <Icon name={item.icon} className={`h-6 w-6 md:h-9 md:w-9 ${style.text}`} />
     </span>

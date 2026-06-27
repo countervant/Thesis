@@ -704,7 +704,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             onClick={() => onNavigate?.("messages")}
             className={`relative grid h-10 w-10 place-items-center rounded-xl border transition hover:border-pink-200 hover:text-[#c72fb2] ${
               activePage === "messages"
-                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-pink-500/40 dark:bg-neutral-900 dark:text-[#f472d0]"
+                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-[#DA70D6]/40 dark:bg-neutral-900 dark:text-[#f472d0]"
                 : "border-slate-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             }`}
             aria-label="Messages"

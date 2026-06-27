@@ -699,8 +699,8 @@ const MessagesPanel = () => {
   });
 
   return (
-  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-slate-100 bg-white text-[#172033] dark:border-neutral-800 dark:bg-neutral-950 md:-mx-7 lg:-mx-9">
-    <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-neutral-800 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
+  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-slate-100 bg-white text-[#172033] dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
+    <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-[#DA70D6]/60 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-black leading-none">Messages</h1>
         <button
@@ -714,7 +714,7 @@ const MessagesPanel = () => {
         </button>
       </div>
 
-      <label className="mt-6 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      <label className="mt-6 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#DA70D6]/80 dark:bg-neutral-900">
         <span className="sr-only">Search inbox</span>
         <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.9" />
@@ -796,10 +796,10 @@ const MessagesPanel = () => {
             key={participantId}
             type="button"
             onClick={() => handleSelectConversation(participant)}
-            className={`relative flex w-full items-center gap-4 rounded-2xl px-3 py-4 pr-12 text-left transition ${
+            className={`relative flex w-full items-center gap-4 rounded-2xl border px-3 py-4 pr-12 text-left transition ${
               isActive
-                ? "bg-pink-50 shadow-[0_10px_28px_rgba(236,72,153,0.12)] dark:bg-neutral-900"
-                : "bg-white shadow-[0_6px_22px_rgba(15,23,42,0.06)] hover:bg-pink-50/70 dark:bg-neutral-950 dark:hover:bg-neutral-900"
+                ? "border-pink-200 bg-pink-50 shadow-[0_10px_28px_rgba(236,72,153,0.12)] dark:border-[#DA70D6] dark:bg-neutral-900"
+                : "border-pink-100 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.06)] hover:bg-pink-50/70 dark:border-[#DA70D6]/80 dark:bg-neutral-950 dark:hover:bg-neutral-900"
             }`}
           >
             <span className="relative shrink-0">
@@ -1061,7 +1061,7 @@ const MessagesPanel = () => {
                   <div
                     className={`rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
                       isMine
-                        ? "bg-pink-50 text-[#172033]"
+                        ? "bg-pink-50 text-[#172033] dark:text-white"
                         : "bg-slate-100 text-[#172033] dark:bg-neutral-800 dark:text-white"
                     }`}
                   >

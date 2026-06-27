@@ -315,7 +315,7 @@ export const NotificationSkeleton = ({ rows = 5 }) => (
 );
 
 export const AuthFormSkeleton = () => (
-  <div className="w-full max-w-sm space-y-6 bg-transparent sm:max-w-md sm:space-y-8 dark:max-w-[528px] dark:rounded-2xl dark:border dark:border-pink-200/90 dark:px-10 dark:py-12 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]">
+  <div className="w-full max-w-sm space-y-6 bg-transparent sm:max-w-md sm:space-y-8 dark:max-w-[528px] dark:rounded-2xl dark:border dark:border-[#DA70D6]/90 dark:px-10 dark:py-12 dark:shadow-[0_0_42px_rgba(219,39,119,0.22)]">
     <div className="mb-8 flex flex-col items-center sm:mb-10">
       <Skeleton className="h-32 w-32 rounded-full sm:h-40 sm:w-40 md:h-44 md:w-44" />
       <Skeleton className="mt-5 h-8 w-36" />

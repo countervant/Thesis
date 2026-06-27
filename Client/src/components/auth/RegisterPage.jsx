@@ -269,7 +269,7 @@ const RegisterPage = ({ order, order1 }) => {
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className="w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-lg sm:space-y-8 md:max-w-2xl md:-translate-y-4 md:bg-transparent md:px-10 md:py-7 md:shadow-none dark:bg-[#141414] dark:md:border-pink-200/90 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-lg sm:space-y-8 md:max-w-2xl md:-translate-y-4 md:bg-transparent md:px-10 md:py-7 md:shadow-none dark:bg-[#141414] dark:md:border-[#DA70D6]/90 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
           autoComplete="new-password"
           data-form-type="other"
         >
