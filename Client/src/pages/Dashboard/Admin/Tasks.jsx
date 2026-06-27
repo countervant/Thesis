@@ -85,11 +85,6 @@ const toneStyles = {
   rose: "bg-rose-50 text-rose-600 ring-rose-100 dark:!bg-[#1a1a1a] dark:text-rose-400 dark:ring-rose-500",
 };
 
-const iconToneStyles = {
-  pink: "[filter:brightness(0)_saturate(100%)_invert(33%)_sepia(84%)_saturate(1922%)_hue-rotate(286deg)_brightness(93%)_contrast(91%)]",
-  rose: "[filter:brightness(0)_saturate(100%)_invert(42%)_sepia(96%)_saturate(1772%)_hue-rotate(322deg)_brightness(96%)_contrast(91%)]",
-};
-
 const priorityStyles = {
   high: "border border-pink-600 bg-transparent text-pink-600",
   medium: "border border-orange-600 bg-transparent text-orange-600",
@@ -967,7 +962,7 @@ const Tasks = ({
               <Card key={item.label} className="min-w-0 p-2 md:p-5">
                 <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-4 md:text-left">
                   <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
-	                    <ImageIcon src={item.icon} className={`h-5 w-5 md:h-9 md:w-9 ${iconToneStyles[item.tone] || ""}`} />
+                    <ImageIcon src={item.icon} className="h-5 w-5 md:h-9 md:w-9" />
                   </span>
                   <div className="min-w-0">
                     <p className="text-base font-black leading-none text-[#10142d] md:text-4xl">{item.value}</p>
