@@ -148,7 +148,7 @@ const Settings = () => {
         }`}>
           <aside className="self-start rounded-2xl border border-pink-100 bg-white p-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
             <div className="flex h-full flex-col">
-              <nav className="space-y-3">
+              <nav className="space-y-1.5">
                 {menuItems.map(([label, icon]) => {
                   const isActive = label === activeTab;
                   return (
@@ -156,20 +156,20 @@ const Settings = () => {
                       key={label}
                       type="button"
                       onClick={() => setActiveTab(label)}
-                      className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-xs font-black transition ${
+                      className={`flex h-9 w-full items-center gap-3 rounded-lg px-3 text-xs font-black transition ${
                         isActive
-                          ? "bg-pink-50 text-[#c72fb2]"
-                          : "text-[#243154] hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300"
+                          ? "bg-pink-50 text-[#c72fb2] dark:bg-[#c72fb2] dark:text-white"
+                          : "text-[#243154] hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                       }`}
                     >
-                      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#c72fb2]" : "text-[#647299]"}`} />
+                      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#c72fb2] dark:text-white" : "text-[#647299]"}`} />
                       <span>{label}</span>
                     </button>
                   );
                 })}
               </nav>
 
-              <section className="mt-80 rounded-xl border border-pink-200 bg-pink-50/60 p-3 shadow-[0_4px_14px_rgba(199,47,178,0.08)]">
+              <section className="mt-4 rounded-xl border border-pink-200 bg-pink-50/60 p-3 shadow-[0_4px_14px_rgba(199,47,178,0.08)]">
                 <div className="flex items-start gap-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#c72fb2] bg-white text-sm font-black text-[#c72fb2]">
                     ?
@@ -184,7 +184,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setIsSupportOpen(true)}
-                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
+                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Contact Support
                   <span className="text-sm leading-none">&gt;</span>
@@ -264,20 +264,20 @@ const Settings = () => {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-violet-100 bg-linear-to-b from-violet-50 to-pink-50 p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+            <section className="rounded-2xl border border-violet-100 bg-linear-to-b from-violet-50 to-pink-50 p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.05)] dark:border-[#8b35ff] dark:from-[#141414] dark:to-[#141414]">
               <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-b from-[#8b35ff] to-[#b44cff] text-white shadow-[0_12px_24px_rgba(139,53,255,0.24)]">
                 <Icon name="shield" className="h-8 w-8" />
               </span>
-              <h2 className="mt-4 text-sm font-black text-[#10142d]">
+              <h2 className="mt-4 text-sm font-black text-[#10142d] dark:text-white">
                 Your security matters
               </h2>
-              <p className="mx-auto mt-2 max-w-[220px] text-xs font-semibold leading-5 text-slate-500">
+              <p className="mx-auto mt-2 max-w-[220px] text-xs font-semibold leading-5 text-slate-500 dark:text-white">
                 Keep your account secure by using a strong password and reviewing access.
               </p>
               <button
                 type="button"
                 onClick={() => setActiveTab("Security")}
-                className="mt-4 h-9 w-full rounded-lg border border-[#b678ff] bg-white text-xs font-black text-[#8b35ff] transition hover:bg-violet-50"
+                className="mt-4 h-9 w-full rounded-lg border border-[#b678ff] bg-white text-xs font-black text-[#8b35ff] transition hover:bg-violet-50 dark:bg-neutral-950 dark:text-[#b678ff] dark:hover:!bg-[#8b35ff] dark:hover:text-white"
               >
                 Go to Security
               </button>
@@ -353,7 +353,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setIsSupportOpen(false)}
-                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Close
                 </button>
@@ -390,7 +390,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setIsDeactivateOpen(false)}
-                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Cancel
                 </button>

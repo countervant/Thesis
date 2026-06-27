@@ -265,7 +265,7 @@ const EmpCalendar = () => {
             </select>
             <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
               {["Month", "Week", "Day"].map((item) => (
-                <button key={item} type="button" onClick={() => setActiveView(item)} className={`h-9 min-w-20 rounded-lg px-4 text-sm font-black ${activeView === item ? "border border-pink-200 bg-pink-50 text-pink-600" : "text-[#10142d]"}`}>
+                <button key={item} type="button" onClick={() => setActiveView(item)} className={`h-9 min-w-20 rounded-lg px-4 text-sm font-black ${activeView === item ? "border border-pink-200 bg-pink-50 text-pink-600 dark:!bg-[#c72fb2] dark:text-white" : "text-[#10142d] dark:text-white dark:hover:!bg-pink-500/15"}`}>
                   {item}
                 </button>
               ))}
@@ -338,7 +338,7 @@ const EmpCalendar = () => {
                 const dayEvents = filteredEvents.filter((event) => event.dateKey === dateKey);
 
                 return (
-                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-32 border-b border-r border-slate-200 p-3 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60" : "hover:bg-pink-50/40"} ${selected ? "bg-pink-50/70" : ""}`}>
+                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-32 border-b border-r border-slate-200 p-3 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60 dark:!bg-neutral-900" : "hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white"} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}>
                     <div className={`mb-3 text-base font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
                     <div className="space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (

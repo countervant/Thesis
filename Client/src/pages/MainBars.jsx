@@ -1130,7 +1130,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                     } ${
                       activePage === item.id
                         ? "bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]"
-                        : "text-neutral-900 hover:bg-white hover:text-[#c72fb2] dark:text-white dark:hover:bg-linear-to-b dark:hover:from-[#df4bb4] dark:hover:to-[#c72fb2] dark:hover:text-white dark:hover:shadow-[0_4px_14px_rgba(223,75,180,0.45)]"
+                        : "text-neutral-900 hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:bg-[#c72fb2] dark:hover:text-white dark:hover:shadow-none"
                     }`}
                     aria-label={item.label}
                     title={item.label}
@@ -1221,8 +1221,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 onClick={() => onNavigate?.(item.id)}
                 className={`flex min-h-[66px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-black transition ${
                   isActive
-                    ? "bg-pink-50 text-[#e11d9c]"
-                    : "text-slate-500 hover:bg-slate-50"
+                    ? "bg-pink-50 text-[#e11d9c] dark:bg-[#c72fb2] dark:text-white"
+                    : "text-slate-500 hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 }`}
               >
                 <Icon

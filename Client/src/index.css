@@ -14,14 +14,30 @@
 .dark .bg-neutral-50,
 .dark .bg-neutral-100,
 .dark .bg-gray-100,
+.dark .bg-slate-50,
+.dark .bg-slate-100,
 .dark [class~="bg-[#f1f1f1]"],
-.dark [class~="bg-[#f5f5f5]"] {
+.dark [class~="bg-[#f5f5f5]"],
+.dark [class~="bg-[#f8f9fd]"],
+.dark [class~="bg-[#fbf9ff]"] {
   background-color: #101010 !important;
 }
 
 .dark .bg-blue-50,
 .dark .bg-green-50,
-.dark .bg-pink-50 {
+.dark .bg-emerald-50,
+.dark .bg-amber-50,
+.dark .bg-orange-50,
+.dark .bg-pink-50,
+.dark .bg-pink-100,
+.dark .bg-red-50,
+.dark .bg-rose-50,
+.dark .bg-violet-50,
+.dark [class~="bg-pink-50/40"],
+.dark [class~="bg-pink-50/60"],
+.dark [class~="bg-pink-50/70"],
+.dark [class~="bg-pink-50/30"],
+.dark [class~="bg-pink-100/60"] {
   background-color: #1a1a1a !important;
 }
 
@@ -32,7 +48,15 @@
 .dark .text-gray-900,
 .dark .text-gray-800,
 .dark .text-gray-700,
-.dark .text-black {
+.dark .text-black,
+.dark [class~="text-[#10142d]"],
+.dark [class~="text-[#10172a]"],
+.dark [class~="text-[#111936]"],
+.dark [class~="text-[#243154]"],
+.dark [class~="text-[#647299]"],
+.dark [class~="text-[black]"],
+.dark .text-blue-700,
+.dark .text-blue-600 {
   color: #f5f5f5 !important;
 }
 
@@ -57,30 +81,37 @@
   border-color: #292929 !important;
 }
 
+.dark .border-pink-50,
+.dark .border-pink-100,
+.dark .border-pink-200,
+.dark .border-pink-300,
+.dark [class~="border-[#c72fb2]"],
+.dark [class~="border-[#dc4fb2]"],
+.dark [class~="border-[#d86bc4]"],
+.dark [class~="border-[#f7b7e6]"],
+.dark [class~="border-b-[#f7b7e6]"],
+.dark [class~="border-l-[#d9b8ff]"] {
+  border-color: #c72fb2 !important;
+}
+
 .dark .ring-pink-50,
 .dark .ring-pink-100,
 .dark .ring-neutral-100,
 .dark .ring-black\/10 {
-  --tw-ring-color: #292929 !important;
+  --tw-ring-color: rgba(199, 47, 178, 0.72) !important;
 }
 
 .dark .shadow-sm,
 .dark .shadow-lg,
 .dark .shadow-2xl,
 .dark [class*="shadow-["] {
-  box-shadow:
-    0 0 0 1px rgba(236, 92, 199, 0.24),
-    0 10px 30px rgba(236, 92, 199, 0.24),
-    0 8px 24px rgba(0, 0, 0, 0.34) !important;
+  box-shadow: 0 0 0 1px rgba(199, 47, 178, 0.72) !important;
 }
 
 .dark article,
 .dark [role="dialog"],
 .dark [role="menu"] {
-  box-shadow:
-    0 0 0 1px rgba(236, 92, 199, 0.22),
-    0 10px 28px rgba(236, 92, 199, 0.2),
-    0 8px 22px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 0 0 1px rgba(199, 47, 178, 0.72);
 }
 
 .dark input,

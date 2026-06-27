@@ -417,7 +417,7 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendar View</h2>
               {["Company Calendar", "Team Calendar", "Employee Calendar", "Project Calendar"].map((item) => (
-                <button key={item} type="button" onClick={() => setSelectedView(item)} className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedView === item ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
+                <button key={item} type="button" onClick={() => setSelectedView(item)} className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedView === item ? "bg-violet-50 text-violet-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-violet-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
                   <Icon name="calendar" className="h-4 w-4" /> {item}
                 </button>
               ))}
@@ -426,7 +426,7 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Teams / Departments</h2>
               {allDepartments.map(([item, color]) => (
-                <button key={item} type="button" onClick={() => setSelectedDepartment(item)} className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedDepartment === item ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-violet-50"}`}>
+                <button key={item} type="button" onClick={() => setSelectedDepartment(item)} className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedDepartment === item ? "bg-violet-50 text-violet-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-violet-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
                   {item}
                 </button>
@@ -471,7 +471,7 @@ const AdminCalendar = () => {
                 const dayEvents = monthEvents.filter((event) => event.dateKey === dateKey);
 
                 return (
-                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-28 border-b border-r border-slate-200 p-2.5 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60" : "hover:bg-pink-50/40"} ${selected ? "bg-pink-50/70" : ""}`}>
+                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-28 border-b border-r border-slate-200 p-2.5 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60 dark:!bg-neutral-900" : "hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white"} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}>
                     <div className={`mb-2 text-sm font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
                     <div className="space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (

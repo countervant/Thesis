@@ -86,7 +86,7 @@ const ProfileSettings = ({ user }) => {
       <aside>
         <section className="overflow-hidden rounded-2xl border border-pink-100 border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414]">
           <div className="relative h-20 bg-linear-to-br from-violet-200 via-pink-100 to-fuchsia-200">
-            <label className="absolute right-3 top-3 flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-white px-3 text-xs font-black text-[#c72fb2] shadow-sm transition hover:bg-pink-50">
+            <label className="absolute right-3 top-3 flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-white px-3 text-xs font-black text-[#c72fb2] shadow-sm transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:bg-[#c72fb2] dark:hover:text-white">
               <Icon name="upload" />
               Change Cover
               <input
@@ -128,7 +128,7 @@ const ProfileSettings = ({ user }) => {
               <p className="flex items-center gap-3"><Icon name="calendar" />{getJoinedDate(user)}</p>
             </div>
             <div className="mt-4">
-              <label className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c72fb2] px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+              <label className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c72fb2] px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
                 <Icon name="upload" />
                 Change Photo
                 <input
@@ -210,7 +210,7 @@ const ProfileSettings = ({ user }) => {
                 Manage your skills and expertise to showcase your strengths.
               </p>
             </div>
-            <button type="button" className="h-9 rounded-lg border border-[#c72fb2] px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+            <button type="button" className="h-9 rounded-lg border border-[#c72fb2] px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
               + Add Skill
             </button>
           </div>

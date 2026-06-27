@@ -78,17 +78,17 @@ const getStatusTone = (status) => {
 };
 
 const toneStyles = {
-  blue: "bg-blue-50 text-blue-600 ring-blue-100",
-  green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-  orange: "bg-orange-50 text-orange-600 ring-orange-100",
-  pink: "bg-pink-50 text-pink-600 ring-pink-100",
-  rose: "bg-rose-50 text-rose-600 ring-rose-100",
+  blue: "bg-blue-50 text-blue-600 ring-blue-100 dark:!bg-[#1a1a1a] dark:text-blue-400 dark:ring-blue-500",
+  green: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:!bg-[#1a1a1a] dark:text-emerald-400 dark:ring-emerald-500",
+  orange: "bg-orange-50 text-orange-600 ring-orange-100 dark:!bg-[#1a1a1a] dark:text-orange-400 dark:ring-orange-500",
+  pink: "bg-pink-50 text-pink-600 ring-pink-100 dark:!bg-[#1a1a1a] dark:text-pink-400 dark:ring-[#c72fb2]",
+  rose: "bg-rose-50 text-rose-600 ring-rose-100 dark:!bg-[#1a1a1a] dark:text-rose-400 dark:ring-rose-500",
 };
 
 const priorityStyles = {
-  high: "bg-pink-50 text-pink-600",
-  medium: "bg-orange-50 text-orange-600",
-  low: "bg-emerald-50 text-emerald-600",
+  high: "border border-pink-600 bg-transparent text-pink-600",
+  medium: "border border-orange-600 bg-transparent text-orange-600",
+  low: "border border-emerald-600 bg-transparent text-emerald-600",
 };
 
 const statusStyles = {
