@@ -30,6 +30,9 @@ const parseMongoUri = (mongoUri) => {
 const isLikelyAtlasHostname = (hostname) =>
   hostname.endsWith(".mongodb.net") || hostname.includes(".mongodb.net");
 
+const isSupportedMongoUri = (mongoUri) =>
+  mongoUri.startsWith("mongodb+srv://") || mongoUri.startsWith("mongodb://");
+
 const checkTcpConnectivity = (host, port, timeoutMS) =>
   new Promise((resolve, reject) => {
     const socket = net.createConnection({ host, port });
@@ -116,8 +119,8 @@ export const validateMongoAtlasFlow = async () => {
       throw new Error("MONGODB_URI is not set");
     }
 
-    if (!mongoUri.startsWith("mongodb+srv://")) {
-      throw new Error("MONGODB_URI must use mongodb+srv:// for MongoDB Atlas");
+    if (!isSupportedMongoUri(mongoUri)) {
+      throw new Error("MONGODB_URI must use mongodb+srv:// or mongodb:// for MongoDB Atlas");
     }
 
     parsedUri = parseMongoUri(mongoUri);
@@ -269,8 +272,8 @@ export const dbConnect = async () => {
     throw new Error("MONGODB_URI is not set");
   }
 
-  if (!mongoUri.startsWith("mongodb+srv://")) {
-    throw new Error("MONGODB_URI must use the MongoDB Atlas mongodb+srv:// URI format");
+  if (!isSupportedMongoUri(mongoUri)) {
+    throw new Error("MONGODB_URI must use the MongoDB Atlas mongodb+srv:// or mongodb:// URI format");
   }
 
   const maxRetries = numberFromEnv("MONGODB_CONNECT_RETRIES", 5);
