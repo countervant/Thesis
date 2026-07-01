@@ -80,27 +80,27 @@ const timelineTasks = [
 
 const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
 const dashboardCardShadow =
-  "border-b-2 border-b-[#f7b7e6] shadow-[0_3px_4px_rgba(190,65,158,0.16),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-100/70";
+  "border-b-2 border-b-[#86003C]/55 shadow-sm ring-1 ring-[#86003C]/20 dark:!border-b-[#86003C] dark:!ring-[#86003C]/45";
 const statStyles = {
   in_progress: {
     tile: "bg-[#f0e9ff]",
     text: "text-[#754de8]",
-    card: "border-[#754de8]/45 border-b-[#754de8] ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+    card: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
   },
   pending: {
     tile: "bg-[#ffeaf5]",
     text: "text-[#e347a8]",
-    card: "border-[#e347a8]/45 border-b-[#e347a8] ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+    card: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
   },
   review: {
     tile: "bg-[#fff0e5]",
     text: "text-[#ff8317]",
-    card: "border-[#ff8317]/45 border-b-[#ff8317] ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+    card: "!border-[#ff8317]/45 !border-b-[#ff8317] !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
   },
   done: {
     tile: "bg-[#eafbed]",
     text: "text-[#28b84c]",
-    card: "border-[#28b84c]/45 border-b-[#28b84c] ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+    card: "!border-[#28b84c]/45 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
   },
 };
 
@@ -477,7 +477,7 @@ const MonthlyChart = ({ tasks }) => {
   <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 md:py-5 ${dashboardCardShadow}`}>
     <div className="mb-3 flex items-center justify-between gap-4 md:mb-4">
       <h2 className="text-sm font-extrabold text-[#10172a] md:text-base dark:text-white">Monthly Overview</h2>
-      <button type="button" className="h-8 rounded-full border border-slate-200 px-3 text-[10px] font-black text-[#10172a] shadow-sm md:h-10 md:rounded-2xl md:px-4 md:text-sm">
+      <button type="button" className="box-border h-8 shrink-0 rounded-full border-2 border-slate-200 bg-transparent px-3 text-[10px] font-black leading-none text-[#10172a] md:h-10 md:rounded-2xl md:px-4 md:text-sm dark:border-[#e347a8] dark:text-white">
         This Month
       </button>
     </div>
@@ -646,7 +646,7 @@ const ExpenseChart = ({ budgetEntries }) => {
           <select
             value={activeMonth}
             onChange={(event) => setSelectedMonth(event.target.value)}
-            className="h-8 appearance-none rounded-full border border-slate-200 bg-white py-0 pl-3 pr-8 text-[10px] font-bold text-[#10172a] shadow-sm outline-none transition focus:border-[#df4bb4] focus:ring-2 focus:ring-pink-100 md:h-9 md:pr-9 md:text-xs dark:text-white"
+            className="box-border h-8 appearance-none rounded-full border-2 border-slate-200 bg-white py-0 pl-3 pr-8 text-[10px] font-bold text-[#10172a] outline-none transition focus:border-[#e347a8] md:h-9 md:pr-9 md:text-xs dark:border-[#e347a8] dark:text-white"
           >
             {monthOptions.map((month) => (
               <option key={month} value={month}>

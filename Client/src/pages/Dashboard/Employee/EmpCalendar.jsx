@@ -13,7 +13,16 @@ const toneStyles = {
   green: "bg-emerald-50 text-emerald-600",
   orange: "bg-orange-50 text-orange-600",
   pink: "bg-pink-50 text-pink-600",
+  red: "bg-red-50 text-red-600",
   violet: "bg-violet-50 text-violet-600",
+};
+
+const statCardStyles = {
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  red: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
+  violet: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
 };
 
 const typeStyles = {
@@ -193,7 +202,7 @@ const EmpCalendar = () => {
     { label: "Total Events", value: filteredEvents.length, sublabel: "this month", tone: "violet", icon: "calendar" },
     { label: "Upcoming", value: sortedUpcoming.length, sublabel: "this week", tone: "orange", icon: "clock" },
     { label: "Completed", value: filteredEvents.filter((event) => event.dateKey < toDateKey(today)).length, sublabel: "this week", tone: "green", icon: "check" },
-    { label: "Overdue", value: filteredEvents.filter((event) => event.type === "Deadline" && event.dateKey < toDateKey(today)).length, sublabel: "event", tone: "pink", icon: "bell" },
+    { label: "Overdue", value: filteredEvents.filter((event) => event.type === "Deadline" && event.dateKey < toDateKey(today)).length, sublabel: "event", tone: "red", icon: "bell" },
   ];
 
   const addPersonalEvent = () => {
@@ -275,7 +284,7 @@ const EmpCalendar = () => {
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((item) => (
-            <Card key={item.label} className="min-h-32 px-6 py-5">
+            <Card key={item.label} className={`min-h-32 px-6 py-5 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
               <div className="flex items-center gap-6">
                 <span className={`grid h-17 w-17 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
                   <Icon name={item.icon} className="h-9 w-9" />

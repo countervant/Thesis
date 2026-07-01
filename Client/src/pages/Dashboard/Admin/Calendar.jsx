@@ -24,6 +24,14 @@ const toneStyles = {
   violet: "bg-violet-50 text-violet-600",
 };
 
+const statCardStyles = {
+  blue: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  green: "!border-[#28b84c]/45 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  orange: "!border-[#ff8317]/45 !border-b-[#ff8317] !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  pink: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  violet: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+};
+
 const typeStyles = {
   "Company Event": "bg-violet-50 text-violet-700",
   Meeting: "bg-orange-50 text-orange-600",
@@ -397,7 +405,7 @@ const AdminCalendar = () => {
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {stats.map((item) => (
-            <Card key={item.label} className="min-h-28 px-5 py-4">
+            <Card key={item.label} className={`min-h-28 px-5 py-4 !shadow-sm dark:!shadow-none ring-1 ${statCardStyles[item.tone]}`}>
               <div className="flex items-center gap-4">
                 <span className={`grid h-14 w-14 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
                   <Icon name={item.icon} className="h-7 w-7" />

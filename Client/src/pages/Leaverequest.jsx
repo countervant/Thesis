@@ -11,14 +11,21 @@ import { getApiErrorMessage, leaveRequestAPI } from "../services/api";
 const toneStyles = {
   orange: "bg-orange-50 text-orange-500 ring-orange-100",
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-  rose: "bg-rose-50 text-rose-500 ring-rose-100",
+  rose: "bg-red-50 text-red-600 ring-red-100",
   pink: "bg-pink-50 text-pink-600 ring-pink-100",
+};
+
+const statCardStyles = {
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
 };
 
 const statusStyles = {
   Pending: "bg-orange-50 text-orange-600 ring-orange-100",
   Approved: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-  Rejected: "bg-rose-50 text-rose-600 ring-rose-100",
+  Rejected: "bg-red-50 text-red-600 ring-red-100",
 };
 
 const typeColors = {
@@ -433,9 +440,9 @@ const LeaveRequest = () => {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <Card key={card.label} className="p-4">
+          <Card key={card.label} className={`p-4 !shadow-sm dark:!shadow-none ${statCardStyles[card.tone]}`}>
             <div className="flex items-center gap-3">
-              <span className={`grid h-12 w-12 place-items-center rounded-2xl ring-1 ${toneStyles[card.tone]}`}>
+              <span className={`grid h-12 w-12 place-items-center rounded-2xl ${toneStyles[card.tone]}`}>
                 <ImageIcon src={card.icon} className="h-7 w-7" />
               </span>
               <div>

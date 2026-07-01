@@ -268,8 +268,14 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   );
 };
 
+const summaryCardStyles = {
+  income: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  expense: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
+  balance: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+};
+
 const SummaryCard = ({ icon, label, note = "This month", noteClass = "text-slate-500", value }) => (
-  <section className="flex h-28 items-center gap-5 rounded-2xl border border-pink-100 bg-white px-6 shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 dark:bg-[#141414] dark:ring-neutral-800">
+  <section className={`flex h-28 items-center gap-5 rounded-2xl border bg-white px-6 !shadow-sm ring-1 dark:bg-[#141414] dark:!shadow-none ${summaryCardStyles[icon] || summaryCardStyles.balance}`}>
     <span className="grid h-15 w-15 place-items-center rounded-2xl bg-pink-50">
       <Icon name={icon} className="h-10 w-10" />
     </span>

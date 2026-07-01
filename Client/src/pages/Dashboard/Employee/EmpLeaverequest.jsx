@@ -9,13 +9,19 @@ import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
 const toneStyles = {
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   orange: "bg-orange-50 text-orange-600 ring-orange-100",
-  rose: "bg-rose-50 text-rose-600 ring-rose-100",
+  rose: "bg-red-50 text-red-600 ring-red-100",
+};
+
+const statCardStyles = {
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
 };
 
 const statusStyles = {
   Approved: "bg-emerald-50 text-emerald-600",
   Pending: "bg-orange-50 text-orange-600",
-  Rejected: "bg-rose-50 text-rose-600",
+  Rejected: "bg-red-50 text-red-600",
 };
 
 const leaveTypeColors = {
@@ -412,9 +418,9 @@ const EmpLeaverequest = () => {
 
       <div className="grid gap-5 lg:grid-cols-3">
         {stats.map((item) => (
-          <Card key={item.label} className="p-6">
+          <Card key={item.label} className={`p-6 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
             <div className="flex items-center gap-8">
-              <span className={`grid h-20 w-20 place-items-center rounded-2xl ring-1 ${toneStyles[item.tone]}`}>
+              <span className={`grid h-20 w-20 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
                 <ImageIcon src={item.icon} className="h-11 w-11" />
               </span>
               <div>

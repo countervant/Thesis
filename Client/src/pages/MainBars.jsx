@@ -667,7 +667,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             className="grid h-11 w-11 place-items-center text-neutral-950 dark:text-white"
             aria-label="Open menu"
           >
-            <img src={menuIcon} alt="" className="h-7 w-7 object-contain" aria-hidden="true" />
+            <img src={menuIcon} alt="" className="h-7 w-7 object-contain dark:brightness-0 dark:invert" aria-hidden="true" />
           </button>
         </div>
 
@@ -1208,10 +1208,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           {children}
         </div>
       </main>
-      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 pb-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 md:hidden ${
+      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-2 pb-2 pt-1.5 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-[#86003C] dark:bg-[#1A1A1D]/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] md:hidden ${
         isSidebarExpanded ? "translate-y-full" : "translate-y-0"
       }`}>
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5">
           {mobileNavItems.map((item) => {
             const isActive = activePage === item.id || (activePage === "add-task" && item.id === "tasks");
             return (
@@ -1219,19 +1219,19 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate?.(item.id)}
-                className={`flex min-h-[66px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-black transition ${
+                className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-black transition ${
                   isActive
                     ? "bg-pink-50 text-[#e11d9c] dark:bg-[#c72fb2] dark:text-white"
-                    : "text-slate-500 hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-[#c72fb2] dark:hover:text-white"
+                    : "text-slate-500 hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 }`}
               >
                 <Icon
                   name={item.icon}
-                  className={`h-7 w-7 object-contain ${
+                  className={`h-6 w-6 object-contain dark:brightness-0 dark:invert dark:grayscale-0 dark:opacity-100 ${
                     isActive ? "" : "opacity-70 grayscale"
                   }`}
                 />
-                <span>{item.label}</span>
+                <span className="max-w-full truncate px-0.5 leading-tight">{item.label}</span>
               </button>
             );
           })}

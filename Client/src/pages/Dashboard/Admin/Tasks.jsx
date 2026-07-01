@@ -82,7 +82,15 @@ const toneStyles = {
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:!bg-[#1a1a1a] dark:text-emerald-400 dark:ring-emerald-500",
   orange: "bg-orange-50 text-orange-600 ring-orange-100 dark:!bg-[#1a1a1a] dark:text-orange-400 dark:ring-orange-500",
   pink: "bg-pink-50 text-pink-600 ring-pink-100 dark:!bg-[#1a1a1a] dark:text-pink-400 dark:ring-[#c72fb2]",
-  rose: "bg-rose-50 text-rose-600 ring-rose-100 dark:!bg-[#1a1a1a] dark:text-rose-400 dark:ring-rose-500",
+  rose: "bg-red-50 text-red-600 ring-red-100 dark:!bg-[#1a1a1a] dark:text-red-400 dark:ring-red-500",
+};
+
+const statCardStyles = {
+  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
 };
 
 const priorityStyles = {
@@ -959,9 +967,9 @@ const Tasks = ({
 
           <div className="grid grid-cols-5 gap-2 md:gap-5 xl:grid-cols-5">
             {taskStats.map((item) => (
-              <Card key={item.label} className="min-w-0 p-2 md:p-5">
+              <Card key={item.label} className={`min-w-0 p-2 !shadow-sm dark:!shadow-none md:p-5 ${statCardStyles[item.tone]}`}>
                 <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-4 md:text-left">
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
                     <ImageIcon src={item.icon} className="h-5 w-5 md:h-9 md:w-9" />
                   </span>
                   <div className="min-w-0">

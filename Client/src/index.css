@@ -20,7 +20,14 @@
 .dark [class~="bg-[#f5f5f5]"],
 .dark [class~="bg-[#f8f9fd]"],
 .dark [class~="bg-[#fbf9ff]"] {
-  background-color: #101010 !important;
+  background-color: #1A1A1D !important;
+}
+
+.dark [class~="dark:bg-[#101010]"],
+.dark [class~="dark:bg-[#141414]"],
+.dark [class~="dark:bg-neutral-900"],
+.dark [class~="dark:bg-neutral-950"] {
+  background-color: #1A1A1D !important;
 }
 
 .dark .bg-blue-50,
@@ -129,7 +136,7 @@
 }
 
 .dark option {
-  background-color: #080808;
+  background-color: #1A1A1D;
   color: #f5f5f5;
 }
 
@@ -156,7 +163,7 @@
 .dark .login-autofill-fix:-webkit-autofill:hover,
 .dark .login-autofill-fix:-webkit-autofill:focus,
 .dark .login-autofill-fix:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #141414 inset !important;
+  -webkit-box-shadow: 0 0 0 1000px #1A1A1D inset !important;
   -webkit-text-fill-color: #ffffff !important;
   caret-color: #ffffff;
 }

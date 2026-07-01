@@ -21,6 +21,13 @@ const toneStyles = {
   pink: "bg-pink-50 text-pink-600 ring-pink-100",
 };
 
+const statCardStyles = {
+  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+};
+
 const priorityStyles = {
   High: "bg-pink-50 text-pink-600",
   Low: "bg-emerald-50 text-emerald-600",
@@ -224,9 +231,9 @@ const EmpDashboard = () => {
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((item) => (
-          <Card key={item.label} className="p-5">
+          <Card key={item.label} className={`p-5 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
             <div className="flex items-center gap-4">
-              <span className={`grid h-16 w-16 place-items-center rounded-2xl ring-1 ${toneStyles[item.tone]}`}>
+              <span className={`grid h-16 w-16 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
                 <ImageIcon src={item.icon} className="h-9 w-9" />
               </span>
               <div className="min-w-0">
