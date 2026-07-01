@@ -667,7 +667,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             className="grid h-11 w-11 place-items-center text-neutral-950 dark:text-white"
             aria-label="Open menu"
           >
-            <img src={menuIcon} alt="" className="h-7 w-7 object-contain dark:brightness-0 dark:invert" aria-hidden="true" />
+            <img src={menuIcon} alt="" className="h-7 w-7 object-contain" aria-hidden="true" />
           </button>
         </div>
 
@@ -704,7 +704,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             onClick={() => onNavigate?.("messages")}
             className={`relative grid h-10 w-10 place-items-center rounded-xl border transition hover:border-pink-200 hover:text-[#c72fb2] ${
               activePage === "messages"
-                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-[#DA70D6]/40 dark:bg-neutral-900 dark:text-[#f472d0]"
+                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-pink-500/40 dark:bg-neutral-900 dark:text-[#f472d0]"
                 : "border-slate-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             }`}
             aria-label="Messages"
@@ -1001,7 +1001,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             {isAccountMenuOpen && (
               <div
                 className="absolute right-0 top-12 z-40 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2 py-2 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
-                role="menu"
+                role="menu"dark
               >
                 <button
                   type="button"
@@ -1130,7 +1130,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                     } ${
                       activePage === item.id
                         ? "bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]"
-                        : "text-neutral-900 hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:bg-[#c72fb2] dark:hover:text-white dark:hover:shadow-none"
+                        : "text-neutral-900 hover:bg-white hover:text-[#c72fb2] dark:text-white dark:hover:bg-linear-to-b dark:hover:from-[#df4bb4] dark:hover:to-[#c72fb2] dark:hover:text-white dark:hover:shadow-[0_4px_14px_rgba(223,75,180,0.45)]"
                     }`}
                     aria-label={item.label}
                     title={item.label}
@@ -1208,10 +1208,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           {children}
         </div>
       </main>
-      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-2 pb-2 pt-1.5 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-[#86003C] dark:bg-[#1A1A1D]/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] md:hidden ${
+      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 pb-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 md:hidden ${
         isSidebarExpanded ? "translate-y-full" : "translate-y-0"
       }`}>
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {mobileNavItems.map((item) => {
             const isActive = activePage === item.id || (activePage === "add-task" && item.id === "tasks");
             return (
@@ -1219,19 +1219,19 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate?.(item.id)}
-                className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-black transition ${
+                className={`flex min-h-[66px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-black transition ${
                   isActive
-                    ? "bg-pink-50 text-[#e11d9c] dark:bg-[#c72fb2] dark:text-white"
-                    : "text-slate-500 hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:bg-[#c72fb2] dark:hover:text-white"
+                    ? "bg-pink-50 text-[#e11d9c]"
+                    : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
                 <Icon
                   name={item.icon}
-                  className={`h-6 w-6 object-contain dark:brightness-0 dark:invert dark:grayscale-0 dark:opacity-100 ${
+                  className={`h-7 w-7 object-contain ${
                     isActive ? "" : "opacity-70 grayscale"
                   }`}
                 />
-                <span className="max-w-full truncate px-0.5 leading-tight">{item.label}</span>
+                <span>{item.label}</span>
               </button>
             );
           })}
