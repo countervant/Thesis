@@ -1,0 +1,212 @@
+```mermaid
+erDiagram
+    USER {
+        ObjectId _id PK
+        string role "admin | employee | client"
+        string firstName
+        string middleInitial
+        string lastName
+        string companyName
+        string email UK
+        string password
+        string avatar
+        string coverPhoto
+        string phone
+        string country
+        string position
+        boolean isActive
+        boolean isOnline
+        date lastSeen
+        string resetPasswordToken
+        date resetPasswordExpires
+        string resetPasswordOTP
+        date resetPasswordOTPExpires
+        date createdAt
+        date updatedAt
+    }
+
+    MESSAGE {
+        ObjectId _id PK
+        ObjectId sender FK
+        ObjectId recipient FK
+        string text
+        date readAt
+        date deliveredAt
+        date editedAt
+        date createdAt
+        date updatedAt
+    }
+
+    TASK {
+        ObjectId _id PK
+        string title
+        string description
+        string status "pending | in_progress | review | done"
+        string priority "low | medium | high"
+        date startDate
+        date dueDate
+        date completedAt
+        ObjectId assignedTo FK
+        ObjectId createdBy FK
+        string tags
+        date createdAt
+        date updatedAt
+    }
+
+    TASK_SUBTASK {
+        ObjectId _id PK
+        string title
+        boolean completed
+    }
+
+    TASK_COMMENT {
+        ObjectId _id PK
+        ObjectId user FK
+        string comment
+        date createdAt
+    }
+
+    TASK_ATTACHMENT {
+        ObjectId _id PK
+        string fileName
+        string fileUrl
+    }
+
+    CLIENT {
+        ObjectId _id PK
+        string companyName
+        string contactPerson
+        string email
+        string phone
+        string country
+        string service
+        boolean isActive
+        string address
+        string notes
+        ObjectId assignedEmployee FK
+        date createdAt
+        date updatedAt
+    }
+
+    BUDGET {
+        ObjectId _id PK
+        string type "income | expense"
+        string description
+        string category
+        date date
+        number amount
+        date createdAt
+        date updatedAt
+    }
+
+    LEAVE_REQUEST {
+        ObjectId _id PK
+        string requestCode UK
+        ObjectId employee FK
+        string employeeName
+        string employeeRole
+        string department
+        string leaveType "Vacation Leave | Sick Leave | Emergency Leave | Others"
+        date startDate
+        date endDate
+        number durationDays
+        string reason
+        string emergencyContact
+        string status "Pending | Approved | Rejected"
+        ObjectId reviewedBy FK
+        date reviewedAt
+        date createdAt
+        date updatedAt
+    }
+
+    LEAVE_REQUEST_COMMENT {
+        ObjectId _id PK
+        ObjectId author FK
+        string text
+        date createdAt
+        date updatedAt
+    }
+
+    CALENDAR_EVENT {
+        ObjectId _id PK
+        string title
+        string description
+        date date
+        string startTime
+        string endTime
+        string type
+        string calendar
+        string department
+        string participants
+        string color
+        string visibility "all | admin | employee"
+        ObjectId createdBy FK
+        date createdAt
+        date updatedAt
+    }
+
+    CALENDAR_DEPARTMENT {
+        ObjectId _id PK
+        string name UK
+        string color
+        ObjectId createdBy FK
+        date createdAt
+        date updatedAt
+    }
+
+    NEWSFEED_POST {
+        ObjectId _id PK
+        ObjectId author FK
+        string content
+        string mediaType "image | video | empty"
+        string mediaUrl
+        string mediaName
+        ObjectId hearts FK
+        date createdAt
+        date updatedAt
+    }
+
+    NEWSFEED_COMMENT {
+        ObjectId _id PK
+        ObjectId user FK
+        string text
+        ObjectId hearts FK
+        date createdAt
+        date updatedAt
+    }
+
+    NEWSFEED_REPLY {
+        ObjectId _id PK
+        ObjectId user FK
+        string text
+        date createdAt
+        date updatedAt
+    }
+
+    USER ||--o{ MESSAGE : sends
+    USER ||--o{ MESSAGE : receives
+
+    USER ||--o{ TASK : assigned_to
+    USER ||--o{ TASK : creates
+    TASK ||--o{ TASK_SUBTASK : embeds
+    TASK ||--o{ TASK_COMMENT : embeds
+    TASK ||--o{ TASK_ATTACHMENT : embeds
+    USER ||--o{ TASK_COMMENT : writes
+
+    USER ||--o{ CLIENT : assigned_employee
+
+    USER ||--o{ LEAVE_REQUEST : requests
+    USER ||--o{ LEAVE_REQUEST : reviews
+    LEAVE_REQUEST ||--o{ LEAVE_REQUEST_COMMENT : embeds
+    USER ||--o{ LEAVE_REQUEST_COMMENT : writes
+
+    USER ||--o{ CALENDAR_EVENT : creates
+    USER ||--o{ CALENDAR_DEPARTMENT : creates
+
+    USER ||--o{ NEWSFEED_POST : authors
+    USER }o--o{ NEWSFEED_POST : hearts
+    NEWSFEED_POST ||--o{ NEWSFEED_COMMENT : embeds
+    USER ||--o{ NEWSFEED_COMMENT : writes
+    USER }o--o{ NEWSFEED_COMMENT : hearts
+    NEWSFEED_COMMENT ||--o{ NEWSFEED_REPLY : embeds
+    USER ||--o{ NEWSFEED_REPLY : writes
