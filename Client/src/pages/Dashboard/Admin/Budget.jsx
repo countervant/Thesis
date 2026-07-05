@@ -274,9 +274,15 @@ const summaryCardStyles = {
   balance: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
 };
 
+const summaryIconStyles = {
+  income: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  expense: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  balance: "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+};
+
 const SummaryCard = ({ icon, label, note = "This month", noteClass = "text-slate-500", value }) => (
   <section className={`flex h-28 items-center gap-5 rounded-2xl border bg-white px-6 !shadow-sm ring-1 dark:bg-[#141414] dark:!shadow-none ${summaryCardStyles[icon] || summaryCardStyles.balance}`}>
-    <span className="grid h-15 w-15 place-items-center rounded-2xl bg-pink-50">
+    <span className={`grid h-15 w-15 place-items-center rounded-2xl ${summaryIconStyles[icon] || "bg-pink-50"}`}>
       <Icon name={icon} className="h-10 w-10" />
     </span>
     <div className="min-w-0 leading-tight">
