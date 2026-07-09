@@ -208,7 +208,7 @@ api.interceptors.response.use(
 // Auth API calls
 export const authAPI = {
   clearSessionCache: () => {
-    clearCache("/auth/me");
+    cache.clear();
   },
 
   login: async (email, password) => {

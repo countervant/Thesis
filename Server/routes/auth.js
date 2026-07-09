@@ -517,6 +517,19 @@ router.post("/reset-password", async (req, res) => {
 
     router.get("/assignees", protect, async (req, res) => {
       try {
+        const currentUserAssignee = {
+          _id: req.user._id,
+          firstName: req.user.firstName,
+          lastName: req.user.lastName,
+          email: req.user.email,
+          role: req.user.role,
+          isSelf: true,
+        };
+
+        if (req.user.role === "client") {
+          return res.status(200).json([currentUserAssignee]);
+        }
+
         const employees = await User.find({
           role: "employee",
           isActive: true,
@@ -527,14 +540,7 @@ router.post("/reset-password", async (req, res) => {
           .lean();
 
         res.status(200).json([
-          {
-            _id: req.user._id,
-            firstName: req.user.firstName,
-            lastName: req.user.lastName,
-            email: req.user.email,
-            role: req.user.role,
-            isSelf: true,
-          },
+          currentUserAssignee,
           ...employees,
         ]);
       } catch (error) {

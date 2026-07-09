@@ -20,6 +20,12 @@ const taskQueryForUser = (user) => {
     return {};
   }
 
+  if (user.role === "client") {
+    return {
+      createdBy: user._id,
+    };
+  }
+
   return {
     assignedTo: user._id,
   };
@@ -120,12 +126,12 @@ router.get("/", protect, async (req, res) => {
 
 router.post("/", protect, async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Only admins can create tasks" });
+    if (!["admin", "client"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only admins and clients can create tasks" });
     }
 
     const payload = normalizeTaskPayload(req.body, req.user._id, {
-      assignedTo: req.body.assignedTo,
+      assignedTo: req.user.role === "admin" ? req.body.assignedTo : req.user._id,
     });
 
     if (!payload.title) {
@@ -181,7 +187,7 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    if (req.user.role !== "admin") {
+    if (req.user.role === "employee") {
       if (task.status === "done") {
         return res.status(403).json({ message: "Completed tasks cannot be updated" });
       }
@@ -209,7 +215,7 @@ router.put("/:id", protect, async (req, res) => {
         dueDate: req.body.dueDate ?? task.dueDate,
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
-        assignedTo: req.body.assignedTo ?? task.assignedTo,
+        assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
         subtasks: req.body.subtasks ?? task.subtasks,
       },
       req.user._id,
@@ -267,8 +273,8 @@ router.put("/:id", protect, async (req, res) => {
 
 router.delete("/:id", protect, async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Only admins can delete tasks" });
+    if (!["admin", "client"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only admins and task owners can delete tasks" });
     }
 
     const task = await Task.findOneAndDelete({

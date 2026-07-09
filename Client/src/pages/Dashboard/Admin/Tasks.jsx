@@ -155,6 +155,7 @@ const normalizeTask = (task) => {
     status,
     priority: task?.priority || "medium",
     assignedTo: task?.assignedTo,
+    createdBy: task?.createdBy,
     subtasks,
     progress: getTaskProgress(subtasks),
   };
@@ -743,10 +744,15 @@ const Tasks = ({
     setCollapsedGroups({});
   }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy]);
 
-  const isAssignedToCurrentUser = (task) =>
-    Boolean(currentUserId) && getEntityId(task.assignedTo) === currentUserId;
-  const myTasks = visibleTasks.filter(isAssignedToCurrentUser);
-  const teamTasks = visibleTasks.filter((task) => !isAssignedToCurrentUser(task));
+  const isOwnedByCurrentUser = (task) => {
+    if (!currentUserId) return false;
+    if (user?.role === "client") {
+      return getEntityId(task.createdBy) === currentUserId;
+    }
+    return getEntityId(task.assignedTo) === currentUserId;
+  };
+  const myTasks = visibleTasks.filter(isOwnedByCurrentUser);
+  const teamTasks = visibleTasks.filter((task) => !isOwnedByCurrentUser(task));
   const dueTodayTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
   const overdueTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
   const upcomingTasks = teamTasks.filter((task) => {
@@ -781,7 +787,7 @@ const Tasks = ({
       <TaskRow
         key={task.id}
         accentClass={accentClass}
-        canAccessSubtasks={isAssignedToCurrentUser(task)}
+        canAccessSubtasks={isOwnedByCurrentUser(task)}
         isExpanded={expandedTaskIds.has(task.id)}
         isFocused={focusedTaskId === task.id}
         item={task}
@@ -877,7 +883,7 @@ const Tasks = ({
   };
 
   const handleToggleSubtask = async (task, subtaskIndex) => {
-    if (!isAssignedToCurrentUser(task) || task.status === "Done") {
+    if (!isOwnedByCurrentUser(task) || task.status === "Done") {
       return;
     }
 
