@@ -121,6 +121,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData, authToken) => {
     const normalizedUser = normalizeUser(userData);
+    authAPI.clearSessionCache();
     setUser(normalizedUser);
     setToken(authToken);
     persistUser(normalizedUser);

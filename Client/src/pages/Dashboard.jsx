@@ -1301,12 +1301,20 @@ const Dashboard = () => {
   const handleTaskCreated = () => {
     setTaskRefreshKey((currentKey) => currentKey + 1);
     setEditingTask(null);
-    handleAdminNavigate("tasks", { replace: true });
+    if (role === "admin") {
+      handleAdminNavigate("tasks", { replace: true });
+    } else {
+      setLocalPage("tasks");
+    }
   };
 
   const handleEditTask = (task) => {
     setEditingTask(task);
-    handleAdminNavigate("edit-task");
+    if (role === "admin") {
+      handleAdminNavigate("edit-task");
+    } else {
+      setLocalPage("edit-task");
+    }
   };
 
   const handleBudgetSaved = () => {
@@ -1463,8 +1471,21 @@ const Dashboard = () => {
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
       <Newsfeed />
-    ) : localPage === "tasks" ? (
-      <AdminTasks />
+    ) : role === "client" && ["tasks", "add-task", "edit-task"].includes(localPage) ? (
+      <>
+        <AdminTasks
+          onEditTask={handleEditTask}
+          onNavigate={setLocalPage}
+          refreshKey={taskRefreshKey}
+        />
+        {(localPage === "add-task" || localPage === "edit-task") && (
+          <AdminAddTask
+            onNavigate={setLocalPage}
+            onTaskCreated={handleTaskCreated}
+            task={localPage === "edit-task" ? editingTask : null}
+          />
+        )}
+      </>
     ) : localPage === "messages" ? (
       <MessagesPanel />
     ) : localPage === "profile" ? (
@@ -1508,7 +1529,7 @@ const Dashboard = () => {
   return (
     <>
       <MainBars
-        activePage={localPage}
+        activePage={["add-task", "edit-task"].includes(localPage) ? "tasks" : localPage}
         onLogout={handleLogout}
         onNavigate={setLocalPage}
       >
