@@ -41,6 +41,7 @@ const sideNavSections = [
   {
     title: "Management",
     items: [
+      { id: "projects", label: "My Projects", icon: "tasks" },
       { id: "tasks", label: "Tasks", icon: "tasks" },
       { id: "calendar", label: "Calendar", icon: "calendar" },
       { id: "budget", label: "Budget", icon: "budget" },
@@ -54,6 +55,22 @@ const sideNavSections = [
     items: [{ id: "settings", label: "Settings", icon: "settings" }],
   },
 ];
+
+const roleNavItems = {
+  admin: [
+    "dashboard",
+    "newsfeed",
+    "tasks",
+    "calendar",
+    "budget",
+    "client",
+    "employee",
+    "leave-request",
+    "settings",
+  ],
+  employee: ["dashboard", "newsfeed", "tasks", "calendar", "leave-request", "settings"],
+  client: ["dashboard", "projects", "newsfeed", "settings"],
+};
 
 const navIcons = {
   budget: budgetIcon,
@@ -349,21 +366,19 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const isMessagesPage = activePage === "messages";
   const navigate = useNavigate();
   const { token, user } = useAuth();
-  const visibleSideNavSections =
-    user?.role === "employee"
-      ? sideNavSections
-          .map((section) =>
-            section.title === "Management"
-              ? {
-                  ...section,
-                  items: section.items.filter((item) =>
-                    ["tasks", "calendar", "leave-request"].includes(item.id)
-                  ),
-                }
-              : section
-          )
-          .filter((section) => section.items.length > 0)
-      : sideNavSections;
+  const routeRole = window.location.pathname.split("/").filter(Boolean)[0];
+  const userRole = ["admin", "client", "employee"].includes(routeRole)
+    ? routeRole
+    : String(user?.role || "client").toLowerCase();
+  const allowedNavItems = roleNavItems[userRole] ?? roleNavItems.client;
+  const visibleSideNavSections = allowedNavItems
+    ? sideNavSections
+        .map((section) => ({
+          ...section,
+          items: section.items.filter((item) => allowedNavItems.includes(item.id)),
+        }))
+        .filter((section) => section.items.length > 0)
+    : sideNavSections;
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem(themeStorageKey) === "dark"
@@ -400,7 +415,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       !hiddenNotificationSet.has(notification.id)
   ).length;
   const mobileNavItems =
-    user?.role === "employee"
+    userRole === "employee"
       ? [
           { id: "dashboard", label: "Dashboard", icon: "dashboard" },
           { id: "tasks", label: "Tasks", icon: "tasks" },
@@ -408,6 +423,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           { id: "leave-request", label: "Leave", icon: "leave-request" },
           { id: "settings", label: "Settings", icon: "settings" },
         ]
+      : userRole === "client"
+        ? [
+            { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+            { id: "projects", label: "Projects", icon: "tasks" },
+            { id: "newsfeed", label: "Newsfeed", icon: "newsfeed" },
+            { id: "settings", label: "Settings", icon: "settings" },
+          ]
       : [
           { id: "dashboard", label: "Dashboard", icon: "dashboard" },
           { id: "tasks", label: "Tasks", icon: "tasks" },

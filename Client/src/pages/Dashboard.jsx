@@ -11,6 +11,8 @@ import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
 import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
 import AdminCalendar from "./Dashboard/Admin/Calendar.jsx";
 import LeaveRequest from "./Leaverequest.jsx";
+import ClientDashboard from "./Dashboard/Client.jsx";
+import ClientProjects from "./Dashboard/ClientProjects.jsx";
 import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
 import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
@@ -21,6 +23,7 @@ import Settings from "./Settings/settings.jsx";
 import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
+import Skeleton from "../components/Skeleton.jsx";
 import { getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const adminPages = new Set([
@@ -176,6 +179,46 @@ const SendIcon = ({ className = "h-9 w-9" }) => (
       strokeLinejoin="round"
     />
   </svg>
+);
+
+const MessageInboxSkeleton = ({ rows = 5 }) => (
+  <div className="space-y-3">
+    {Array.from({ length: rows }).map((_, index) => (
+      <div key={index} className="flex items-center gap-4 rounded-2xl border border-pink-100 bg-white px-3 py-4 pr-12 shadow-[0_6px_22px_rgba(15,23,42,0.06)] dark:border-neutral-800 dark:bg-neutral-950">
+        <Skeleton className="h-12 w-12 rounded-full" />
+        <span className="min-w-0 flex-1">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="mt-2 h-3 w-44 max-w-full" />
+        </span>
+        <Skeleton className="h-3 w-10" />
+      </div>
+    ))}
+  </div>
+);
+
+const MessageThreadSkeleton = () => (
+  <div className="space-y-4">
+    <div className="flex items-end gap-3">
+      <Skeleton className="h-9 w-9 rounded-full" />
+      <span className="max-w-[70%] rounded-[22px] bg-slate-100 px-5 py-3 dark:bg-neutral-900">
+        <Skeleton className="h-4 w-56 max-w-full" />
+        <Skeleton className="mt-2 h-3 w-16" />
+      </span>
+    </div>
+    <div className="flex justify-end">
+      <span className="max-w-[70%] rounded-[22px] bg-pink-50 px-5 py-3 dark:bg-neutral-900">
+        <Skeleton className="h-4 w-64 max-w-full" />
+        <Skeleton className="ml-auto mt-2 h-3 w-14" />
+      </span>
+    </div>
+    <div className="flex items-end gap-3">
+      <Skeleton className="h-9 w-9 rounded-full" />
+      <span className="max-w-[70%] rounded-[22px] bg-slate-100 px-5 py-3 dark:bg-neutral-900">
+        <Skeleton className="h-4 w-44 max-w-full" />
+        <Skeleton className="mt-2 h-3 w-16" />
+      </span>
+    </div>
+  </div>
 );
 
 const MessagesPanel = () => {
@@ -772,9 +815,7 @@ const MessagesPanel = () => {
 
       <div className="mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {isLoadingInbox && (
-          <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
-            Loading messages...
-          </p>
+          <MessageInboxSkeleton rows={5} />
         )}
 
         {!isLoadingInbox && conversationItems.length === 0 && (
@@ -974,9 +1015,7 @@ const MessagesPanel = () => {
       <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-5 dark:bg-neutral-950 sm:px-8">
         <div className="w-full space-y-3">
           {isLoadingThread && (
-            <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-300">
-              Loading conversation...
-            </p>
+            <MessageThreadSkeleton />
           )}
 
           {!isLoadingThread && !activeUserId && (
@@ -1253,13 +1292,16 @@ const Dashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const role = user?.role;
+  const routeRole = location.pathname.split("/").filter(Boolean)[0];
+  const role = ["admin", "client", "employee"].includes(routeRole)
+    ? routeRole
+    : String(user?.role || "client").toLowerCase();
   const requestedAdminPage = searchParams.get("page");
   const adminPage =
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const initialLocalPage = ["dashboard", "newsfeed", "messages", "profile", "settings", "tasks"].includes(
+  const initialLocalPage = ["dashboard", "projects", "newsfeed", "messages", "profile", "settings", "tasks"].includes(
     location.state?.page
   )
     ? location.state.page
@@ -1463,6 +1505,10 @@ const Dashboard = () => {
   const regularContent =
     role === "employee" && localPage === "dashboard" ? (
       <EmpDashboard />
+    ) : role === "client" && localPage === "dashboard" ? (
+      <ClientDashboard />
+    ) : role === "client" && localPage === "projects" ? (
+      <ClientProjects />
     ) : role === "employee" && localPage === "tasks" ? (
       <EmpTask />
     ) : role === "employee" && localPage === "calendar" ? (

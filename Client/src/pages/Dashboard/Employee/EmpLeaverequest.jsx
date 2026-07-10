@@ -3,6 +3,7 @@ import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
+import { SkeletonRows } from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext";
 import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
 
@@ -546,9 +547,7 @@ const EmpLeaverequest = () => {
             </thead>
             <tbody className="divide-y divide-pink-50">
               {isLoading && (
-                <tr>
-                  <td colSpan="8" className="px-3 py-8 text-center text-sm font-bold text-slate-500">Loading leave history...</td>
-                </tr>
+                <SkeletonRows rows={6} columns={8} />
               )}
               {!isLoading && filteredHistory.length === 0 && (
                 <tr>

@@ -3,7 +3,7 @@ import done from "../../../assets/done.png";
 import pending from "../../../assets/pendingrequest.png";
 import progress from "../../../assets/progress.png";
 import task from "../../../assets/task.png";
-import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
+import Skeleton from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
@@ -52,6 +52,122 @@ const Card = ({ children, className = "" }) => (
   <section className={`rounded-2xl border border-pink-100 bg-white shadow-[0_3px_4px_rgba(190,65,158,0.35)] ${className}`}>
     {children}
   </section>
+);
+
+const EmpDashboardSkeleton = () => (
+  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <header>
+      <Skeleton className="h-9 w-72" />
+      <Skeleton className="mt-3 h-4 w-80 max-w-full" />
+    </header>
+
+    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Card key={index} className="p-5 !shadow-sm dark:!shadow-none">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-16 w-16 rounded-2xl" />
+            <span className="min-w-0 flex-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="mt-2 h-9 w-12" />
+              <Skeleton className="mt-2 h-3 w-20" />
+            </span>
+          </div>
+        </Card>
+      ))}
+    </div>
+
+    <div className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-5">
+          <Skeleton className="h-6 w-28" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <div className="px-5 py-4">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="grid gap-3 border-b border-pink-50 py-4 last:border-b-0 md:grid-cols-[1.2fr_110px_130px_120px] md:items-center">
+              <span className="flex items-start gap-3">
+                <Skeleton className="mt-1.5 h-3 w-3 rounded-full" />
+                <span>
+                  <Skeleton className="h-4 w-44 max-w-full" />
+                  <Skeleton className="mt-2 h-3 w-56 max-w-full" />
+                </span>
+              </span>
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-4 w-24" />
+              <span>
+                <Skeleton className="h-3 w-8" />
+                <Skeleton className="mt-2 h-2 w-full rounded-full" />
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-5">
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <div className="px-5 pb-5">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="grid grid-cols-[84px_1fr_44px] items-center gap-4 border-b border-pink-50 py-4 last:border-b-0">
+              <span className="flex items-center gap-3">
+                <Skeleton className="h-3 w-3 rounded-full" />
+                <Skeleton className="h-3 w-10" />
+              </span>
+              <span>
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="mt-2 h-3 w-20" />
+              </span>
+              <Skeleton className="h-10 w-10 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+
+    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.25fr]">
+      <Card className="p-5">
+        <div className="mb-5 flex items-center justify-between">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+        <div className="grid gap-5 sm:grid-cols-[180px_1fr] sm:items-center">
+          <Skeleton className="h-44 w-44 rounded-full" />
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <p key={index} className="grid grid-cols-[1fr_auto] items-center gap-6">
+                <span className="flex items-center gap-3">
+                  <Skeleton className="h-3 w-3 rounded-full" />
+                  <Skeleton className="h-4 w-28" />
+                </span>
+                <Skeleton className="h-4 w-8" />
+              </p>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-5">
+          <Skeleton className="h-6 w-44" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <div className="px-5 pb-5">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="grid grid-cols-[58px_1fr_auto] items-center gap-4 border-b border-pink-50 py-4 last:border-b-0">
+              <Skeleton className="h-14 w-14 rounded-xl" />
+              <span>
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="mt-2 h-3 w-24" />
+              </span>
+              <Skeleton className="h-6 w-24 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  </div>
 );
 
 const ImageIcon = ({ src, className = "h-7 w-7" }) => (
@@ -207,7 +323,7 @@ const EmpDashboard = () => {
   ];
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    return <EmpDashboardSkeleton />;
   }
 
   return (

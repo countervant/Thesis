@@ -1,11 +1,91 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { authAPI, taskAPI } from "../../../services/api.js";
+import { authAPI, clientAPI, taskAPI } from "../../../services/api.js";
 
 const priorityOptions = [
   { label: "Low", value: "low" },
   { label: "Medium", value: "medium" },
   { label: "High", value: "high" },
+];
+
+const taskTemplates = [
+  {
+    title: "AI Image",
+    subtasks: [
+      "Gather client brief and references",
+      "Create prompt concepts",
+      "Generate initial image drafts",
+      "Select and enhance best output",
+      "Client review and revisions",
+      "Export final image",
+    ],
+  },
+  {
+    title: "AI Video",
+    subtasks: [
+      "Prepare concept and storyboard",
+      "Write scene prompts",
+      "Generate video clips",
+      "Edit clips, audio, and captions",
+      "Client review and revisions",
+      "Export final video",
+    ],
+  },
+  {
+    title: "UGC Video",
+    subtasks: [
+      "Gather product details",
+      "Write UGC script and shot list",
+      "Record raw clips",
+      "Edit video and add captions",
+      "Client review and revisions",
+      "Export final video",
+    ],
+  },
+  {
+    title: "Video Editing",
+    subtasks: [
+      "Receive and organize footage",
+      "Cut and arrange clips",
+      "Add transitions and effects",
+      "Improve audio and color",
+      "Client review and revisions",
+      "Final render and export",
+    ],
+  },
+  {
+    title: "Graphic Static Ads",
+    subtasks: [
+      "Gather ad requirements",
+      "Create design concept",
+      "Design first draft",
+      "Apply branding and ad copy",
+      "Client review and revisions",
+      "Export final ad assets",
+    ],
+  },
+  {
+    title: "Scriptwriting",
+    subtasks: [
+      "Gather topic and objective",
+      "Create script outline",
+      "Write the first draft",
+      "Review tone and clarity",
+      "Apply client revisions",
+      "Finalize script",
+    ],
+  },
+  {
+    title: "UI/UX Design",
+    subtasks: [
+      "Gather requirements",
+      "Create user flow and wireframe",
+      "Design high-fidelity screens",
+      "Build prototype",
+      "Client review and revisions",
+      "Prepare final design handoff",
+    ],
+  },
 ];
 
 const statusToApi = {
@@ -71,12 +151,34 @@ const formatAssigneeName = (assignee) => {
   return assignee.isSelf ? `${label} (Myself)` : label;
 };
 
+const normalizeClients = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.clients)) return data.clients;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
+const formatClientName = (client) => {
+  if (!client) return "";
+
+  const personName =
+    client.contactPerson ||
+    [client.firstName, client.lastName].filter(Boolean).join(" ");
+  const companyName = client.companyName || "";
+
+  if (companyName && personName) return `${companyName} - ${personName}`;
+  return companyName || personName || client.email || "Unnamed client";
+};
+
+const isRegisteredClientUser = (client) => client?.source === "user" || client?.role === "client";
+
 const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
 const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   const { user } = useAuth();
+  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const isEditing = Boolean(task?.id);
   const [formData, setFormData] = useState({
     title: "",
@@ -84,10 +186,14 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     startDate: todayInputDate(),
     dueDate: todayInputDate(),
     priority: "medium",
+    requestedBy: isAdmin ? "" : getEntityId(user),
     assignedTo: getEntityId(user),
     subtasks: [{ title: "", completed: false }],
   });
   const [assignees, setAssignees] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -128,6 +234,46 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   }, [task?.assignedTo, user]);
 
   useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadClients = async () => {
+      try {
+        const data = await clientAPI.getAll({ limit: 100 });
+        const loadedClients = normalizeClients(data);
+
+        if (isMounted) {
+          setClients(loadedClients);
+
+          setFormData((currentData) => ({
+            ...currentData,
+            requestedBy:
+              currentData.requestedBy ||
+              getEntityId(task?.requestedBy) ||
+              getEntityId(loadedClients[0]) ||
+              "",
+          }));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(
+            error.response?.data?.message || "Unable to load clients."
+          );
+        }
+      }
+    };
+
+    loadClients();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdmin, task?.requestedBy]);
+
+  useEffect(() => {
     if (!task) {
       return;
     }
@@ -138,6 +284,13 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
       dueDate: toInputDate(task.dueDate),
       priority: task.priority || "medium",
+      requestedBy:
+        getEntityId(task.requestedBy) ||
+        (task.requestedByName
+          ? "existing-client"
+          : task.createdBy?.role === "client"
+            ? getEntityId(task.createdBy)
+            : ""),
       assignedTo: getEntityId(task.assignedTo) || getEntityId(user),
       subtasks: normalizeSubtasks(task.subtasks),
     });
@@ -180,6 +333,39 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     onNavigate?.("tasks");
   };
 
+  const handleTaskTemplateSelect = (templateTitle) => {
+    const template = taskTemplates.find((item) => item.title === templateTitle);
+    if (!template) {
+      setFormData((currentData) => ({
+        ...currentData,
+        title: "",
+        subtasks: [{ title: "", completed: false }],
+      }));
+      return;
+    }
+
+    setFormData((currentData) => ({
+      ...currentData,
+      title: template.title,
+      subtasks: template.subtasks.map((title) => ({ title, completed: false })),
+    }));
+  };
+
+  const handleClientSearchChange = (value) => {
+    setClientSearch(value);
+    setIsClientPickerOpen(true);
+
+    if (!value.trim()) {
+      updateField("requestedBy", "");
+    }
+  };
+
+  const handleClientSelect = (client) => {
+    updateField("requestedBy", getEntityId(client));
+    setClientSearch(formatClientName(client));
+    setIsClientPickerOpen(false);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -213,6 +399,19 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
+    if (isAdmin && !formData.requestedBy) {
+      setErrorMessage("Please choose which client requested this task.");
+      return;
+    }
+
+    const selectedClient = safeClients.find(
+      (client) => getEntityId(client) === formData.requestedBy
+    );
+    if (isAdmin && (!selectedClient || formatClientName(selectedClient) !== clientSearch.trim())) {
+      setErrorMessage("Please select a client from the search results.");
+      return;
+    }
+
     const subtasks = formData.subtasks
       .map((subtask) => ({
         title: subtask.title.trim(),
@@ -237,6 +436,13 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
         assignedTo: formData.assignedTo,
+        requestedBy:
+          !isAdmin || isRegisteredClientUser(selectedClient)
+            ? formData.requestedBy
+            : undefined,
+        requestedByName: isAdmin
+          ? formatClientName(selectedClient)
+          : [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "",
         subtasks,
       };
 
@@ -258,6 +464,34 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   };
 
   const safeAssignees = normalizeAssignees(assignees);
+  const existingClientOption =
+    task?.requestedByName && !getEntityId(task?.requestedBy)
+      ? [{ _id: "existing-client", source: "client", contactPerson: task.requestedByName }]
+      : [];
+  const safeClients = [
+    ...existingClientOption,
+    ...normalizeClients(clients).filter((client) => getEntityId(client) !== "existing-client"),
+  ];
+  const currentClient = safeClients.find(
+    (client) => getEntityId(client) === formData.requestedBy
+  );
+  const normalizedClientSearch = clientSearch.trim().toLowerCase();
+  const selectedTemplateTitle = taskTemplates.some((template) => template.title === formData.title)
+    ? formData.title
+    : "custom";
+  const filteredClients = normalizedClientSearch
+    ? safeClients.filter((client) => {
+        const label = formatClientName(client).toLowerCase();
+        const email = String(client?.email || "").toLowerCase();
+        return label.includes(normalizedClientSearch) || email.includes(normalizedClientSearch);
+      })
+    : safeClients;
+
+  useEffect(() => {
+    if (!isClientPickerOpen) {
+      setClientSearch(formatClientName(currentClient));
+    }
+  }, [clients, currentClient, isClientPickerOpen, task?.requestedByName]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950 dark:text-white">
@@ -282,14 +516,28 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           )}
 
           <div className="space-y-1">
-            <FieldLabel>Title</FieldLabel>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(event) => updateField("title", event.target.value)}
-              placeholder="Task title..."
-              className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
-            />
+            <FieldLabel>Task Title</FieldLabel>
+            <select
+              value={selectedTemplateTitle}
+              onChange={(event) => handleTaskTemplateSelect(event.target.value)}
+              className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-200 dark:focus:ring-pink-950"
+            >
+              <option value="custom">Custom Task</option>
+              {taskTemplates.map((template) => (
+                <option key={template.title} value={template.title}>
+                  {template.title}
+                </option>
+              ))}
+            </select>
+            {selectedTemplateTitle === "custom" && (
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(event) => updateField("title", event.target.value)}
+                placeholder="Enter custom task title..."
+                className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+              />
+            )}
           </div>
 
           <div className="mt-6 space-y-1">
@@ -381,6 +629,68 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             </div>
           </div>
 
+          {isAdmin && (
+            <div className="mt-5 space-y-1">
+              <FieldLabel>Client / Requested by:</FieldLabel>
+              <div className="relative">
+                <input
+                  type="search"
+                  value={clientSearch}
+                  onChange={(event) => handleClientSearchChange(event.target.value)}
+                  onFocus={() => setIsClientPickerOpen(true)}
+                  onBlur={() => window.setTimeout(() => setIsClientPickerOpen(false), 120)}
+                  placeholder="Search client..."
+                  className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 pr-9 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+                />
+                <svg
+                  viewBox="0 0 20 20"
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#d94ab4]"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="m13 13 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+
+                {isClientPickerOpen && (
+                  <div className="absolute left-0 right-0 top-10 z-20 max-h-48 overflow-y-auto rounded-lg border border-pink-100 bg-white py-1 shadow-xl dark:border-neutral-800 dark:bg-[#111111]">
+                    {filteredClients.length === 0 ? (
+                      <p className="px-4 py-3 text-xs font-semibold text-neutral-500">
+                        No clients found.
+                      </p>
+                    ) : (
+                      filteredClients.map((client) => {
+                        const clientId = getEntityId(client);
+                        const isSelected = clientId === formData.requestedBy;
+
+                        return (
+                          <button
+                            key={clientId}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleClientSelect(client)}
+                            className={`flex w-full flex-col px-4 py-2 text-left transition hover:bg-pink-50 dark:hover:bg-neutral-900 ${
+                              isSelected ? "bg-pink-50 text-[#d94ab4] dark:bg-neutral-900" : "text-neutral-700 dark:text-neutral-300"
+                            }`}
+                          >
+                            <span className="truncate text-xs font-bold">
+                              {formatClientName(client)}
+                            </span>
+                            {client.email && (
+                              <span className="mt-0.5 truncate text-[11px] font-medium text-neutral-400">
+                                {client.email}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mt-5 space-y-1">
             <FieldLabel>Assign Task to:</FieldLabel>
             <select
@@ -403,7 +713,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             <button
               type="button"
               onClick={handleCancel}
-              className="h-10 rounded-lg border border-[#9a55ff] bg-transparent text-xs font-semibold text-neutral-700 transition hover:bg-purple-50 dark:text-neutral-300 dark:hover:bg-neutral-900"
+              className="h-10 rounded-lg border border-[#d94ab4] bg-transparent text-xs font-semibold text-neutral-700 transition hover:bg-pink-50 dark:text-neutral-300 dark:hover:bg-neutral-900"
             >
               Cancel
             </button>

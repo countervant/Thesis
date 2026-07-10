@@ -55,6 +55,12 @@ const getPersonName = (person) => {
   );
 };
 
+const getClientName = (task) => {
+  if (task?.requestedByName) return task.requestedByName;
+  if (task?.requestedBy) return getPersonName(task.requestedBy);
+  return getPersonName(task?.createdBy);
+};
+
 const formatReadableDate = (date) => {
   const inputDate = toInputDate(date);
   const parsedDate = new Date(`${inputDate}T00:00:00`);
@@ -156,6 +162,8 @@ const normalizeTask = (task) => {
     priority: task?.priority || "medium",
     assignedTo: task?.assignedTo,
     createdBy: task?.createdBy,
+    requestedBy: task?.requestedBy,
+    requestedByName: task?.requestedByName || "",
     subtasks,
     progress: getTaskProgress(subtasks),
   };
@@ -340,6 +348,9 @@ const SmallIcon = ({ name, className = "h-4 w-4" }) => {
   if (name === "board") return <svg {...props}><rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.8" /><path d="M9 5v14M15 5v14" stroke="currentColor" strokeWidth="1.8" /></svg>;
   if (name === "edit") return <svg {...props}><path d="M5 19h4l9.4-9.4a2.1 2.1 0 0 0-3-3L6 16v3zM13.8 8.2l2 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "delete") return <svg {...props}><path d="M5 7h14M10 11v5M14 11v5M8 7l1-3h6l1 3M7 7l.8 13h8.4L17 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "check") return <svg {...props}><path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "send") return <svg {...props}><path d="m20 4-8 16-2-7-6-3 16-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "upload") return <svg {...props}><path d="M12 16V5M8 9l4-4 4 4M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   return <svg {...props}><circle cx="12" cy="12" r="1.8" fill="currentColor" /><circle cx="12" cy="5" r="1.8" fill="currentColor" /><circle cx="12" cy="19" r="1.8" fill="currentColor" /></svg>;
 };
 
@@ -452,11 +463,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
           </div>
 
           <span className="flex items-center gap-1 lg:justify-end lg:pt-8">
-            {!isDone && (
-              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-                <SmallIcon name="edit" />
-              </button>
-            )}
+            <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+              <SmallIcon name="edit" />
+            </button>
             <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
               <SmallIcon name="delete" />
             </button>
@@ -516,11 +525,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                 {item.status}
               </span>
               <span className="flex items-center gap-1">
-                {!isDone && (
-                  <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-                    <SmallIcon name="edit" className="h-4 w-4" />
-                  </button>
-                )}
+                <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                  <SmallIcon name="edit" className="h-4 w-4" />
+                </button>
                 <button type="button" onClick={() => onDelete(item)} className="grid h-7 w-7 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
                   <SmallIcon name="delete" className="h-4 w-4" />
                 </button>
@@ -586,11 +593,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             {item.status}
           </span>
           <span className="flex items-center gap-1 justify-end lg:justify-start">
-            {!isDone && (
-              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-                <SmallIcon name="edit" />
-              </button>
-            )}
+            <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+              <SmallIcon name="edit" />
+            </button>
             <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
               <SmallIcon name="delete" />
             </button>
@@ -627,6 +632,155 @@ const TaskGroup = ({ children, count, footer, isOpen = true, onToggle, title, to
   </Card>
 );
 
+const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
+  const [message, setMessage] = useState(`Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`);
+  const [outputMethod, setOutputMethod] = useState("file");
+  const [link, setLink] = useState("");
+  const [file, setFile] = useState(null);
+  const [fileError, setFileError] = useState("");
+
+  const task = completion.task;
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit({
+      file: outputMethod === "file" ? file : null,
+      link,
+      message,
+      outputMethod,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Completed Task</h2>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close submit completed task">
+            x
+          </button>
+        </div>
+
+        <p className="mt-4 flex items-center gap-2 rounded-xl bg-pink-50 px-3 py-2 text-xs font-bold text-[#c72fb2]">
+          <span className="grid h-5 w-5 place-items-center rounded-full border border-[#c72fb2]">
+            <SmallIcon name="check" className="h-3.5 w-3.5" />
+          </span>
+          You are about to submit this task for client review.
+        </p>
+
+        <div className="mt-4 rounded-xl border border-pink-100 bg-white p-4 text-xs font-bold text-slate-600 dark:border-neutral-800 dark:bg-neutral-950">
+          <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
+            <span className="text-slate-400">Task</span>
+            <span className="font-black text-[#10142d] dark:text-white">{task.title}</span>
+          </p>
+          <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
+            <span className="text-slate-400">Project</span>
+            <span className="font-black text-[#10142d] dark:text-white">{task.description || task.title}</span>
+          </p>
+          <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
+            <span className="text-slate-400">Client</span>
+            <span className="font-black text-[#10142d] dark:text-white">{getClientName(task)}</span>
+          </p>
+          <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
+            <span className="text-slate-400">Due Date</span>
+            <span className="font-black text-[#10142d] dark:text-white">{formatReadableDate(task.dueDate)}</span>
+          </p>
+        </div>
+
+        <div className="mt-5 space-y-5">
+          <section>
+            <h3 className="text-sm font-black text-[#10142d] dark:text-white">1. Upload Final Output <span className="font-bold text-slate-500">(Choose one)</span></h3>
+            <div className="mt-3 overflow-hidden rounded-xl border border-pink-100 dark:border-neutral-800">
+              <div className="grid grid-cols-2 border-b border-pink-100 text-xs font-black dark:border-neutral-800">
+                <button type="button" onClick={() => setOutputMethod("file")} className={`h-10 ${outputMethod === "file" ? "border-b-2 border-[#c72fb2] text-[#c72fb2]" : "text-slate-500"}`}>
+                  Upload File
+                </button>
+                <button type="button" onClick={() => setOutputMethod("link")} className={`h-10 ${outputMethod === "link" ? "border-b-2 border-[#c72fb2] text-[#c72fb2]" : "text-slate-500"}`}>
+                  Paste Link
+                </button>
+              </div>
+              {outputMethod === "file" ? (
+                <div className="p-4">
+                  <label className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#c72fb2]/70 bg-pink-50/30 text-center transition hover:bg-pink-50">
+                    <SmallIcon name="upload" className="h-7 w-7 text-[#c72fb2]" />
+                    <span className="mt-2 text-sm font-black text-[#10142d] dark:text-white">Drag & drop your file here</span>
+                    <span className="mt-1 text-xs font-bold text-slate-500">or click to browse</span>
+                    <span className="mt-2 text-[11px] font-bold text-slate-400">Maximum file size: 10MB</span>
+                    <input
+                      type="file"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const selectedFile = event.target.files?.[0] || null;
+                        if (selectedFile && selectedFile.size > 10 * 1024 * 1024) {
+                          setFile(null);
+                          setFileError("File size must be 10MB or less.");
+                          return;
+                        }
+                        setFile(selectedFile);
+                        setFileError("");
+                      }}
+                    />
+                  </label>
+                  {fileError && <p className="mt-2 text-xs font-bold text-rose-600">{fileError}</p>}
+                  {file && (
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-pink-100 bg-white px-4 py-3 text-xs font-bold text-[#10142d] dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">
+                      <span className="inline-flex min-w-0 items-center gap-3">
+                        <SmallIcon name="upload" className="h-5 w-5 text-[#c72fb2]" />
+                        <span className="truncate">{file.name}</span>
+                      </span>
+                      <button type="button" onClick={() => { setFile(null); setFileError(""); }} className="text-slate-400 hover:text-[#c72fb2]" aria-label="Remove file">x</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4">
+                  <input
+                    type="url"
+                    value={link}
+                    onChange={(event) => setLink(event.target.value)}
+                    placeholder="https://..."
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-black text-[#10142d] dark:text-white">2. Message to Client <span className="font-bold text-slate-500">(Optional)</span></h3>
+            <label className="mt-3 block">
+              <textarea
+                maxLength={500}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                className="h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
+              />
+              <span className="mt-1 block text-right text-xs font-bold text-slate-400">{message.length}/500</span>
+            </label>
+          </section>
+
+          <p className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-xs font-bold text-[#c72fb2]">
+            What happens next? The client will be notified and can review, request revisions, or approve this task.
+          </p>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-600 transition hover:bg-slate-50">
+            Cancel
+          </button>
+          <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-8 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105">
+            <SmallIcon name="send" />
+            Submit to Client
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 const Tasks = ({
   onEditTask,
   onNavigate,
@@ -641,6 +795,7 @@ const Tasks = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Due Date");
   const [confirmAction, setConfirmAction] = useState(null);
+  const [completionDraft, setCompletionDraft] = useState(null);
   const [focusedTaskId, setFocusedTaskId] = useState("");
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -840,10 +995,6 @@ const Tasks = ({
   };
 
   const handleEditTask = (task) => {
-    if (task.status === "Done") {
-      return;
-    }
-
     onEditTask?.(task);
   };
 
@@ -900,17 +1051,42 @@ const Tasks = ({
       nextSubtasks.every((subtask) => subtask.completed);
 
     if (willCompleteTask) {
-      setConfirmAction({
-        icon: "done",
-        title: "Are you sure you are done?",
-        message: `This will mark "${task.title}" as done.`,
-        confirmLabel: "Yes, done",
-        onConfirm: () => updateTaskSubtasks(task, nextSubtasks),
-      });
+      setCompletionDraft({ task, nextSubtasks });
       return;
     }
 
     await updateTaskSubtasks(task, nextSubtasks);
+  };
+
+  const submitCompletedTask = async (output) => {
+    const draft = completionDraft;
+    if (!draft) return;
+
+    if (output.outputMethod === "file" && !output.file) {
+      setErrorMessage("Please upload a file before submitting.");
+      return;
+    }
+
+    if (output.outputMethod === "link" && !output.link.trim()) {
+      setErrorMessage("Please paste a link before submitting.");
+      return;
+    }
+
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.submitOutput(draft.task.id, {
+        ...output,
+        subtasks: draft.nextSubtasks,
+      });
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
+        )
+      );
+      setCompletionDraft(null);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
+    }
   };
 
   const handleDeleteTask = async (task) => {
@@ -1094,6 +1270,13 @@ const Tasks = ({
             onConfirm={confirmCurrentAction}
             title={confirmAction?.title}
           />
+          {completionDraft && (
+            <CompletedTaskModal
+              completion={completionDraft}
+              onClose={() => setCompletionDraft(null)}
+              onSubmit={submitCompletedTask}
+            />
+          )}
         </div>
   );
 };

@@ -48,6 +48,47 @@ const taskSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+
+        completedAt: {
+          type: Date,
+        },
+      },
+    ],
+
+    activities: [
+      {
+        type: {
+          type: String,
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted"],
+          required: true,
+        },
+
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        details: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        subtaskId: String,
+        actor: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        actorName: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
 
@@ -65,6 +106,17 @@ const taskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    requestedByName: {
+      type: String,
+      default: "",
+      trim: true,
     },
 
     comments: [
@@ -86,12 +138,74 @@ const taskSchema = new mongoose.Schema(
       },
     ],
 
+    revisionRequests: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        section: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        priority: {
+          type: String,
+          enum: ["low", "medium", "high", "urgent"],
+          default: "medium",
+        },
+
+        description: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        preferredCompletionDate: {
+          type: Date,
+        },
+
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
     attachments: [
       {
         fileName: String,
         fileUrl: String,
       },
     ],
+
+    finalOutput: {
+      submittedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      message: {
+        type: String,
+        default: "",
+      },
+      outputMethod: {
+        type: String,
+        enum: ["file", "link"],
+      },
+      fileName: String,
+      fileUrl: String,
+      link: String,
+      submittedAt: Date,
+    },
 
     tags: [String],
   },
@@ -102,6 +216,7 @@ const taskSchema = new mongoose.Schema(
 
 taskSchema.index({ assignedTo: 1, createdAt: -1 });
 taskSchema.index({ createdBy: 1, createdAt: -1 });
+taskSchema.index({ requestedBy: 1, createdAt: -1 });
 taskSchema.index({ status: 1, dueDate: 1 });
 taskSchema.index({ priority: 1, dueDate: 1 });
 taskSchema.index({ createdAt: -1 });
