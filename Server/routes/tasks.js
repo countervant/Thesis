@@ -521,6 +521,41 @@ router.post("/:id/feedback", protect, async (req, res) => {
   }
 });
 
+router.get("/:id/output/download", protect, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    }).select("finalOutput");
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (!task.finalOutput?.fileUrl) {
+      return res.status(404).json({ message: "No uploaded output is available for this task" });
+    }
+
+    const storedFileName = path.basename(task.finalOutput.fileUrl);
+    const filePath = path.join(uploadsRoot, String(task._id), storedFileName);
+    const rootPath = `${uploadsRoot}${path.sep}`;
+    if (!filePath.startsWith(rootPath)) {
+      return res.status(400).json({ message: "Invalid output file" });
+    }
+
+    try {
+      await fs.access(filePath);
+    } catch {
+      return res.status(404).json({ message: "The uploaded output file could not be found" });
+    }
+
+    return res.download(filePath, safeFileName(task.finalOutput.fileName || storedFileName));
+  } catch (error) {
+    console.error("Download task output error:", error);
+    return res.status(500).json({ message: "Unable to download task output" });
+  }
+});
+
 router.post("/:id/submit-output", protect, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
