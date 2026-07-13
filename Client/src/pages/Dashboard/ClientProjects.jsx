@@ -158,6 +158,7 @@ const normalizeProject = (task) => {
     requestedBy: task?.requestedBy,
     attachments: Array.isArray(task?.attachments) ? task.attachments : [],
     finalOutput: task?.finalOutput || null,
+    feedback: task?.feedback || null,
   };
 };
 
@@ -379,10 +380,12 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
             <Icon name="refresh" className="h-4 w-4" />
             Request Revision
           </button>
-          <button type="button" onClick={onFeedback} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
-            <Icon name="star" className="h-4 w-4" />
-            Give Feedback
-          </button>
+          {project.status === "Completed" && (
+            <button type="button" onClick={() => onFeedback(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
+              <Icon name="star" className="h-4 w-4" />
+              {project.feedback ? "Update Feedback" : "Give Feedback"}
+            </button>
+          )}
         </span>
       </header>
 
@@ -488,12 +491,73 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
               <span className="mt-1 block text-sm font-semibold text-slate-500">If you are satisfied with our work, please give your feedback to help us improve.</span>
             </span>
           </span>
-          <button type="button" onClick={onFeedback} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
+          <button type="button" onClick={() => onFeedback(project)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
             <Icon name="star" className="h-4 w-4" />
-            Give Feedback
+            {project.feedback ? "Update Feedback" : "Give Feedback"}
           </button>
         </Card>
       )}
+    </div>
+  );
+};
+
+const FeedbackModal = ({ onClose, onSubmit, project }) => {
+  const [rating, setRating] = useState(project.feedback?.rating || 0);
+  const [comment, setComment] = useState(project.feedback?.comment || "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!rating) {
+      setFormError("Please select a rating.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setFormError("");
+      await onSubmit(project, { rating, comment });
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Unable to submit feedback."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] dark:border-neutral-800 dark:bg-[#141414]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Share your feedback</h2>
+            <p className="mt-2 text-sm font-bold text-slate-500">How was the completed work on <span className="text-[#10142d] dark:text-white">{project.title}</span>?</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback form">x</button>
+        </div>
+
+        <fieldset className="mt-6">
+          <legend className="text-sm font-black text-[#10142d] dark:text-white">Your rating</legend>
+          <div className="mt-3 flex gap-2">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button key={value} type="button" onClick={() => setRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} className={`grid h-11 w-11 place-items-center rounded-lg text-xl transition ${value <= rating ? "bg-pink-50 text-[#c72fb2]" : "bg-slate-50 text-slate-300 hover:text-[#e347a8] dark:bg-neutral-900"}`}>
+                ★
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="mt-6 block text-sm font-black text-[#10142d] dark:text-white">
+          Comments <span className="font-bold text-slate-400">(optional)</span>
+          <textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={1000} rows={5} placeholder="Tell us what went well or what we can improve..." className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white" />
+          <span className="mt-1 block text-right text-xs font-bold text-slate-400">{comment.length}/1000</span>
+        </label>
+        {formError && <p className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{formError}</p>}
+        <div className="mt-5 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-10 rounded-lg px-5 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:hover:bg-neutral-900">Cancel</button>
+          <button disabled={isSubmitting} className="h-10 rounded-lg bg-[#c72fb2] px-5 text-sm font-black text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Submitting..." : "Submit Feedback"}</button>
+        </div>
+      </form>
     </div>
   );
 };
@@ -777,6 +841,8 @@ const ClientProjects = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState([]);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackProject, setFeedbackProject] = useState(null);
   const [revisionMessage, setRevisionMessage] = useState("");
   const [revisionProject, setRevisionProject] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -859,6 +925,16 @@ const ClientProjects = () => {
     }
   };
 
+  const handleSubmitFeedback = async (project, feedback) => {
+    const updatedTask = await taskAPI.submitFeedback(project.id, feedback);
+    const updatedProject = normalizeProject(updatedTask);
+    setProjects((currentProjects) => currentProjects.map((currentProject) => currentProject.id === updatedProject.id ? updatedProject : currentProject));
+    setSelectedProject((currentProject) => currentProject?.id === updatedProject.id ? updatedProject : currentProject);
+    setFeedbackProject(null);
+    setFeedbackMessage(`Thank you for your feedback on ${project.title}.`);
+    setErrorMessage("");
+  };
+
   if (isLoading) {
     return <ClientProjectsSkeleton />;
   }
@@ -868,7 +944,7 @@ const ClientProjects = () => {
       <>
         <ProjectDetails
           onBack={() => setSelectedProject(null)}
-          onFeedback={() => setRevisionMessage(`Feedback option opened for ${selectedProject.title}.`)}
+          onFeedback={setFeedbackProject}
           onRequestRevision={(project) => {
             setRevisionMessage("");
             setRevisionProject(project);
@@ -882,6 +958,7 @@ const ClientProjects = () => {
             project={revisionProject}
           />
         )}
+        {feedbackProject && <FeedbackModal onClose={() => setFeedbackProject(null)} onSubmit={handleSubmitFeedback} project={feedbackProject} />}
       </>
     );
   }
@@ -943,6 +1020,11 @@ const ClientProjects = () => {
       {revisionMessage && (
         <p className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-sm font-bold text-[#c72fb2]">
           {revisionMessage}
+        </p>
+      )}
+      {feedbackMessage && (
+        <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          {feedbackMessage}
         </p>
       )}
 

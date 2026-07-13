@@ -318,6 +318,12 @@ export const taskAPI = {
     return response.data;
   },
 
+  submitFeedback: async (id, feedback) => {
+    const response = await api.post(`/tasks/${id}/feedback`, feedback);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
   submitOutput: async (id, output) => {
     const filePayload = output.file
       ? {
