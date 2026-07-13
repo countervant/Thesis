@@ -324,6 +324,18 @@ export const taskAPI = {
     return response.data;
   },
 
+  downloadOutput: async (id, fileName = "task-output") => {
+    const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  },
+
   submitOutput: async (id, output) => {
     const filePayload = output.file
       ? {

@@ -279,7 +279,7 @@ const DetailRow = ({ label, value }) => (
   </p>
 );
 
-const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
+const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, onRequestRevision, project }) => {
   const outputItems = [
     ...(project.finalOutput?.link
       ? [{
@@ -388,6 +388,7 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
           )}
         </span>
       </header>
+      {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
 
       <Card className="p-5">
         <h1 className="text-2xl font-black">Project Overview</h1>
@@ -446,10 +447,17 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
                   <span className="block truncate text-xs font-bold text-slate-500">{output.subtitle}</span>
                   <span className="block text-xs font-bold text-slate-400">{formatDateTime(output.submittedAt)}</span>
                 </span>
-                <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                  {output.type === "link" ? "Open Link" : "Download"}
-                  <Icon name={output.type === "link" ? "external" : "download"} className="h-4 w-4" />
-                </a>
+                {output.type === "link" ? (
+                  <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                    Open Link
+                    <Icon name="external" className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <button type="button" onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                    Download
+                    <Icon name="download" className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -935,6 +943,15 @@ const ClientProjects = () => {
     setErrorMessage("");
   };
 
+  const handleDownloadOutput = async (project, output) => {
+    try {
+      setErrorMessage("");
+      await taskAPI.downloadOutput(project.id, output.title);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
+    }
+  };
+
   if (isLoading) {
     return <ClientProjectsSkeleton />;
   }
@@ -943,7 +960,9 @@ const ClientProjects = () => {
     return (
       <>
         <ProjectDetails
+          errorMessage={errorMessage}
           onBack={() => setSelectedProject(null)}
+          onDownloadOutput={handleDownloadOutput}
           onFeedback={setFeedbackProject}
           onRequestRevision={(project) => {
             setRevisionMessage("");
