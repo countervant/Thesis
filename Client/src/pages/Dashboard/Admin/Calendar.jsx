@@ -178,14 +178,18 @@ const EventListTable = ({ events, onEdit, onDelete, compact = false }) => (
           </td>
           <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.calendarClass}`}>{event.calendar}</span></td>
           <td className="px-3 py-3">
-            <div className="flex gap-2">
-              <button type="button" onClick={() => onEdit(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
-                <Icon name="edit" className="h-4 w-4" />
-              </button>
-              <button type="button" onClick={() => onDelete(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
-                <Icon name="trash" className="h-4 w-4" />
-              </button>
-            </div>
+            {event.readOnly ? (
+              <span className="text-xs font-bold text-slate-400">Managed in Tasks</span>
+            ) : (
+              <div className="flex gap-2">
+                <button type="button" onClick={() => onEdit(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
+                  <Icon name="edit" className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => onDelete(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
+                  <Icon name="trash" className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </td>
         </tr>
       ))}

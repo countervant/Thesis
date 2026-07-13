@@ -382,9 +382,13 @@ const EmpCalendar = () => {
                   {(row.participants || []).join(", ") || row.department || "My schedule"}
                 </span>
                 <span className={`rounded-full px-3 py-1 text-center text-xs font-black ${row.tagClass}`}>{row.type}</span>
-                <button type="button" onClick={() => updateEvent(row)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500" aria-label={`${row.title} options`}>
-                  <Icon name="more" className="h-5 w-5" />
-                </button>
+                {row.readOnly ? (
+                  <span className="text-xs font-bold text-slate-400">Task</span>
+                ) : (
+                  <button type="button" onClick={() => updateEvent(row)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500" aria-label={`${row.title} options`}>
+                    <Icon name="more" className="h-5 w-5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

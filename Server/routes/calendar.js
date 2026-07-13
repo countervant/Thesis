@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import CalendarDepartment from "../model/calendarDepartmentModel.js";
 import CalendarEvent from "../model/calendarEventModel.js";
+import Task from "../model/Admin/taskmodel.js";
 import { protect } from "../middleware/protectedjwt.js";
 
 const router = express.Router();
@@ -68,6 +69,38 @@ const writableEventQueryForUser = (user) => {
   return { createdBy: user._id };
 };
 
+const taskQueryForUser = (user) => {
+  if (user.role === "admin") return {};
+  if (user.role === "client") {
+    return { $or: [{ createdBy: user._id }, { requestedBy: user._id }] };
+  }
+  return {
+    $or: [
+      { assignedTo: user._id },
+      { assignees: user._id },
+      { "subtasks.assignedTo": user._id },
+    ],
+  };
+};
+
+const getTaskAssigneeNames = (task) => {
+  const people = [
+    task.assignedTo,
+    ...(Array.isArray(task.assignees) ? task.assignees : []),
+    ...(Array.isArray(task.subtasks) ? task.subtasks.map((subtask) => subtask.assignedTo) : []),
+  ].filter(Boolean);
+
+  const seen = new Set();
+  return people
+    .map((person) => {
+      const id = String(person._id || person.id || person.email || "");
+      if (!id || seen.has(id)) return "";
+      seen.add(id);
+      return [person.firstName, person.lastName].filter(Boolean).join(" ") || person.email || "";
+    })
+    .filter(Boolean);
+};
+
 router.get("/departments", protect, async (req, res) => {
   try {
     const departments = await CalendarDepartment.find({})
@@ -113,6 +146,7 @@ router.get("/", protect, async (req, res) => {
   try {
     const query = { ...eventQueryForUser(req.user) };
     const month = String(req.query.month || "").trim();
+    let taskDateQuery = {};
 
     if (month) {
       const [year, monthIndex] = month.split("-").map(Number);
@@ -120,6 +154,7 @@ router.get("/", protect, async (req, res) => {
         const from = new Date(year, monthIndex - 1, 1);
         const to = new Date(year, monthIndex, 1);
         query.date = { $gte: from, $lt: to };
+        taskDateQuery = { dueDate: { $gte: from, $lt: to } };
       }
     }
 
@@ -136,12 +171,44 @@ router.get("/", protect, async (req, res) => {
       ];
     }
 
-    const events = await CalendarEvent.find(query)
-      .sort({ date: 1, startTime: 1, createdAt: 1 })
-      .lean()
-      .maxTimeMS(8000);
+    const includeTaskDeadlines = !req.query.calendar || req.query.calendar === "Deadlines";
+    const [events, tasks] = await Promise.all([
+      CalendarEvent.find(query)
+        .sort({ date: 1, startTime: 1, createdAt: 1 })
+        .lean()
+        .maxTimeMS(8000),
+      includeTaskDeadlines
+        ? Task.find({ ...taskQueryForUser(req.user), ...taskDateQuery })
+            .select("title description dueDate assignedTo assignees subtasks.assignedTo status")
+            .populate("assignedTo", "firstName lastName email")
+            .populate("assignees", "firstName lastName email")
+            .populate("subtasks.assignedTo", "firstName lastName email")
+            .lean()
+            .maxTimeMS(8000)
+        : [],
+    ]);
 
-    res.status(200).json(events);
+    const taskDeadlineEvents = tasks
+      .filter((task) => task.dueDate)
+      .map((task) => ({
+        _id: `task-${task._id}`,
+        title: `Task deadline: ${task.title}`,
+        description: task.description || "",
+        date: task.dueDate,
+        startTime: "All Day",
+        endTime: "",
+        type: "Deadline",
+        calendar: "Deadlines",
+        department: "All Departments",
+        participants: getTaskAssigneeNames(task),
+        color: "blue",
+        readOnly: true,
+        taskId: String(task._id),
+      }));
+
+    res.status(200).json([...events, ...taskDeadlineEvents].sort((first, second) =>
+      new Date(first.date) - new Date(second.date) || String(first.startTime).localeCompare(String(second.startTime))
+    ));
   } catch (error) {
     console.error("Get calendar events error:", error);
     res.status(500).json({ message: "Unable to fetch calendar events" });
