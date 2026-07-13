@@ -579,6 +579,11 @@ export const budgetAPI = {
 export const budgetPlannerAPI = {
   get: async () => cachedGet("/budget-planner"),
 
+  getAll: async () => {
+    const data = await cachedGet("/budget-planner");
+    return Array.isArray(data?.entries) ? data.entries : [];
+  },
+
   create: async (entry) => {
     const response = await api.post("/budget-planner", entry);
     clearCache("/budget-planner");

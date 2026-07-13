@@ -37,7 +37,7 @@ const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
-const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
+const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) => {
   const isEditing = Boolean(entry?.id);
   const [formData, setFormData] = useState(emptyForm);
   const [errorMessage, setErrorMessage] = useState("");
@@ -112,9 +112,9 @@ const Addbudget = ({ entry, onBudgetSaved, onNavigate }) => {
       };
 
       if (isEditing) {
-        await budgetAPI.update(entry.id, payload);
+        await dataAPI.update(entry.id, payload);
       } else {
-        await budgetAPI.create(payload);
+        await dataAPI.create(payload);
       }
 
       onBudgetSaved?.();

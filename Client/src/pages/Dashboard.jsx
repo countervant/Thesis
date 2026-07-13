@@ -25,7 +25,7 @@ import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton.jsx";
-import { getApiErrorMessage, messageAPI } from "../services/api.js";
+import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const adminPages = new Set([
   "dashboard",
@@ -1310,6 +1310,7 @@ const Dashboard = () => {
   const [localPage, setLocalPage] = useState(initialLocalPage);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
+  const [employeeBudgetEditor, setEmployeeBudgetEditor] = useState(undefined);
   const [editingTask, setEditingTask] = useState(null);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [employeeRefreshKey, setEmployeeRefreshKey] = useState(0);
@@ -1374,6 +1375,19 @@ const Dashboard = () => {
   const handleEditBudgetEntry = (entry) => {
     setEditingBudgetEntry(entry);
     handleAdminNavigate("edit-budget");
+  };
+
+  const handleEmployeeBudgetSaved = () => {
+    setBudgetRefreshKey((currentKey) => currentKey + 1);
+    setEmployeeBudgetEditor(undefined);
+  };
+
+  const handleAddEmployeeBudgetEntry = () => {
+    setEmployeeBudgetEditor(null);
+  };
+
+  const handleEditEmployeeBudgetEntry = (entry) => {
+    setEmployeeBudgetEditor(entry);
   };
 
   const handleEmployeeSaved = () => {
@@ -1515,7 +1529,21 @@ const Dashboard = () => {
     ) : role === "employee" && localPage === "calendar" ? (
       <EmpCalendar />
     ) : role === "employee" && localPage === "budget" ? (
-      <EmpBudgetPlanner />
+      <>
+        <EmpBudgetPlanner
+          onAddEntry={handleAddEmployeeBudgetEntry}
+          onEditEntry={handleEditEmployeeBudgetEntry}
+          refreshKey={budgetRefreshKey}
+        />
+        {employeeBudgetEditor !== undefined && (
+          <AdminAddBudget
+            dataAPI={budgetPlannerAPI}
+            entry={employeeBudgetEditor}
+            onBudgetSaved={handleEmployeeBudgetSaved}
+            onNavigate={() => setEmployeeBudgetEditor(undefined)}
+          />
+        )}
+      </>
     ) : role === "employee" && localPage === "leave-request" ? (
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
