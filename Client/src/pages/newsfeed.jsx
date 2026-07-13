@@ -692,7 +692,7 @@ const Newsfeed = () => {
       {canPost && (
         <form
           onSubmit={handleCreatePost}
-          className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
+          className="overflow-visible rounded-2xl border border-pink-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
         >
           <div className="flex items-center gap-3 px-5 py-4">
             <Avatar user={user} size="h-9 w-9" />
@@ -740,7 +740,7 @@ const Newsfeed = () => {
                   <span>Emoji</span>
                 </button>
                 {isEmojiPickerOpen && (
-                  <div className="absolute left-0 top-12 z-10 grid w-44 grid-cols-5 gap-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
+                  <div className="absolute left-0 top-12 z-30 grid w-44 grid-cols-5 gap-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
                     {quickEmojis.map((emoji) => (
                       <button
                         key={emoji}
