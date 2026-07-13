@@ -5,6 +5,7 @@ import pendingrequest from "../../../assets/pendingrequest.png";
 import progress from "../../../assets/progress.png";
 import taskIcon from "../../../assets/task.png";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
+import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
 const taskStatuses = ["All", "In progress", "Pending", "In review", "Done"];
@@ -23,6 +24,7 @@ const normalizeSubtasks = (subtasks = []) => {
       id: subtask?._id || subtask?.id || "",
       title: subtask?.title || "",
       completed: Boolean(subtask?.completed),
+      assignedTo: subtask?.assignedTo || null,
     }))
     .filter((subtask) => subtask.title);
 };
@@ -173,6 +175,7 @@ const normalizeTask = (task) => {
     status,
     priority: task?.priority ? task.priority[0].toUpperCase() + task.priority.slice(1) : "Medium",
     assignedTo: task?.assignedTo,
+    assignees: task?.assignees?.length ? task.assignees : [task?.assignedTo].filter(Boolean),
     createdBy: task?.createdBy,
     requestedBy: task?.requestedBy,
     requestedByName: task?.requestedByName || "",
@@ -197,7 +200,7 @@ const FeedbackSummary = ({ feedback }) => {
   );
 };
 
-const TaskRow = ({ isExpanded, item, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
+const TaskRow = ({ currentUserId, isExpanded, item, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
   const progressSummary =
@@ -229,22 +232,38 @@ const TaskRow = ({ isExpanded, item, onToggleExpand, onToggleSubtask, onViewCale
           </button>
 
           <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
-            <p className="mb-2 text-[10px] font-black text-slate-500">Subtasks</p>
+            <p className="mb-1 text-[10px] font-black text-slate-500">Subtasks</p>
+            <p className="mb-2 text-[10px] font-bold text-slate-400">Complete each step in order.</p>
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
-                {item.subtasks.map((subtask, index) => (
-                  <label key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2 text-xs font-bold text-slate-600">
+                {item.subtasks.map((subtask, index) => {
+                  const isAssignedToCurrentUser = subtask.assignedTo
+                    ? getEntityId(subtask.assignedTo) === currentUserId
+                    : item.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
+                  const isSequenceLocked = subtask.completed
+                    ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
+                    : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed);
+                  const isLocked = isSequenceLocked || !isAssignedToCurrentUser;
+                  return (
+                  <label key={subtask.id || `${item.id}-${index}`} className={`flex min-w-0 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={!isAssignedToCurrentUser ? "This subtask is assigned to another employee" : isSequenceLocked ? "Complete the previous subtask first" : undefined}>
                     <input
                       type="checkbox"
                       checked={subtask.completed}
+                      disabled={isLocked}
                       onChange={() => onToggleSubtask(item, index)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8]"
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
                       {subtask.title}
                     </span>
+                    {subtask.assignedTo && (
+                      <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
+                        {getPersonName(subtask.assignedTo)}
+                      </span>
+                    )}
                   </label>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs font-bold text-slate-400">Ask your admin to add subtasks for this task.</p>
@@ -533,6 +552,8 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
 };
 
 const EmpTask = () => {
+  const { user } = useAuth();
+  const currentUserId = getEntityId(user);
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -625,6 +646,7 @@ const EmpTask = () => {
 
     return items.map((item) => (
       <TaskRow
+        currentUserId={currentUserId}
         isExpanded={expandedTaskIds.has(item.id)}
         key={item.id}
         item={item}
@@ -700,6 +722,20 @@ const EmpTask = () => {
 
   const handleToggleSubtask = async (task, subtaskIndex) => {
     const toggledSubtask = task.subtasks[subtaskIndex];
+    const isAssignedToCurrentUser = toggledSubtask?.assignedTo
+      ? getEntityId(toggledSubtask.assignedTo) === currentUserId
+      : task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
+    if (!isAssignedToCurrentUser) {
+      setErrorMessage("This subtask is assigned to another employee.");
+      return;
+    }
+    const isLocked = toggledSubtask?.completed
+      ? task.subtasks.slice(subtaskIndex + 1).some((subtask) => subtask.completed)
+      : task.subtasks.slice(0, subtaskIndex).some((subtask) => !subtask.completed);
+    if (isLocked) {
+      setErrorMessage("Complete the subtasks in order before moving to the next one.");
+      return;
+    }
     const nextSubtasks = task.subtasks.map((subtask, index) =>
       index === subtaskIndex
         ? { ...subtask, completed: !subtask.completed }

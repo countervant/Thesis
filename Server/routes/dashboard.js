@@ -23,6 +23,8 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
       Task.find()
         .select("-comments -attachments")
         .populate("assignedTo", userFields)
+        .populate("assignees", userFields)
+        .populate("subtasks.assignedTo", userFields)
         .populate("createdBy", userFields)
         .sort({ createdAt: -1 })
         .limit(10)
