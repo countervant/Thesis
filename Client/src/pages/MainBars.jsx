@@ -210,7 +210,11 @@ const buildTaskNotifications = (tasks, user) => {
   }
 
   return tasks
-    .filter((task) => getEntityId(task?.assignedTo) === userId)
+    .filter((task) => {
+      const taskAssignees = task?.assignees?.length ? task.assignees : [task?.assignedTo];
+      return taskAssignees.some((assignee) => getEntityId(assignee) === userId) ||
+        task?.subtasks?.some((subtask) => getEntityId(subtask?.assignedTo) === userId);
+    })
     .map((task) => ({
       id: `task-${task?._id || task?.id}`,
       icon: taskIcon,

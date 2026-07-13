@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import Task from "../model/Admin/taskmodel.js";
+import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 
@@ -38,8 +39,27 @@ const taskQueryForUser = (user) => {
   }
 
   return {
-    assignedTo: user._id,
+    $or: [
+      { assignedTo: user._id },
+      { assignees: user._id },
+      { "subtasks.assignedTo": user._id },
+    ],
   };
+};
+
+const normalizeAssigneeIds = (values, fallback) => {
+  const input = Array.isArray(values)
+    ? values.length > 0
+      ? values
+      : fallback
+        ? [fallback]
+        : []
+    : values
+      ? [values]
+      : fallback
+        ? [fallback]
+        : [];
+  return [...new Set(input.map((value) => String(value?._id || value?.id || value || "")).filter(Boolean))];
 };
 
 const normalizeSubtasks = (subtasks = []) => {
@@ -54,10 +74,67 @@ const normalizeSubtasks = (subtasks = []) => {
         ...(id ? { _id: id } : {}),
         title: String(subtask?.title || "").trim(),
         completed: Boolean(subtask?.completed),
+        ...(optionalId(subtask?.assignedTo?._id ?? subtask?.assignedTo?.id ?? subtask?.assignedTo)
+          ? { assignedTo: optionalId(subtask?.assignedTo?._id ?? subtask?.assignedTo?.id ?? subtask?.assignedTo) }
+          : {}),
         ...(completedAt && !Number.isNaN(completedAt.getTime()) ? { completedAt } : {}),
       };
     })
     .filter((subtask) => subtask.title);
+};
+
+const validateSubtaskSequence = (subtasks) => {
+  if (!subtasks.length) return "At least one subtask is required";
+
+  const firstIncompleteIndex = subtasks.findIndex((subtask) => !subtask.completed);
+  const hasCompletedTaskAfterGap =
+    firstIncompleteIndex >= 0 &&
+    subtasks.slice(firstIncompleteIndex + 1).some((subtask) => subtask.completed);
+
+  if (hasCompletedTaskAfterGap) {
+    return "Subtasks must be completed in order";
+  }
+
+  return "";
+};
+
+const allSubtasksCompleted = (subtasks) =>
+  subtasks.length > 0 && subtasks.every((subtask) => subtask.completed);
+
+const validateSubtaskAssignees = (subtasks, assignees) => {
+  const teamIds = new Set(assignees.map(String));
+  return subtasks.some(
+    (subtask) => subtask.assignedTo && !teamIds.has(String(subtask.assignedTo))
+  )
+    ? "Every subtask assignee must also be assigned to the task"
+    : "";
+};
+
+const taskAssigneeIds = (task) => normalizeAssigneeIds(task.assignees, task.assignedTo);
+
+const canEmployeeUpdateSubtask = (task, subtask, userId) => {
+  const assignedUserId = String(subtask?.assignedTo?._id || subtask?.assignedTo || "");
+  return assignedUserId
+    ? assignedUserId === String(userId)
+    : taskAssigneeIds(task).includes(String(userId));
+};
+
+const canUserSubmitTask = (task, userId) =>
+  taskAssigneeIds(task).includes(String(userId)) ||
+  task.subtasks.some(
+    (subtask) => String(subtask?.assignedTo?._id || subtask?.assignedTo || "") === String(userId)
+  );
+
+const validateEmployeeAssignees = async (assignees) => {
+  if (!assignees.length) return "Select at least one employee for this task";
+  const employeeCount = await User.countDocuments({
+    _id: { $in: assignees },
+    role: "employee",
+    isActive: true,
+  }).maxTimeMS(8000);
+  return employeeCount === assignees.length
+    ? ""
+    : "Tasks can only be assigned to active employees";
 };
 
 const getActorName = (user) =>
@@ -113,11 +190,12 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
   const startDate = body.startDate ? new Date(body.startDate) : dueDate;
   const status = body.status || "in_progress";
   const priority = body.priority || "medium";
-  const subtasks = normalizeSubtasks(body.subtasks).map((subtask) => ({
-    ...subtask,
-    completed: status === "done" ? true : subtask.completed,
-  }));
+  const subtasks = normalizeSubtasks(body.subtasks);
   const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
+  const assignees = normalizeAssigneeIds(
+    options.assignees ?? body.assignees,
+    options.assignedTo ?? body.assignedTo ?? userId
+  );
 
   return {
     title,
@@ -126,7 +204,8 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     dueDate,
     status: getStatusFromSubtasks(subtasks, fallbackStatus),
     priority: allowedPriorities.includes(priority) ? priority : "medium",
-    assignedTo: options.assignedTo ?? body.assignedTo ?? userId,
+    assignedTo: assignees[0] || userId,
+    assignees,
     requestedBy: optionalId(options.requestedBy ?? body.requestedBy),
     requestedByName: String(options.requestedByName ?? body.requestedByName ?? "").trim(),
     subtasks,
@@ -203,7 +282,10 @@ router.get("/", protect, async (req, res) => {
     if (allowedStatuses.includes(req.query.status)) query.status = req.query.status;
     if (allowedPriorities.includes(req.query.priority)) query.priority = req.query.priority;
     if (req.user.role === "admin" && req.query.assignedTo) {
-      query.assignedTo = req.query.assignedTo;
+      query.$and = [
+        ...(query.$and || []),
+        { $or: [{ assignedTo: req.query.assignedTo }, { assignees: req.query.assignedTo }] },
+      ];
     }
     if (req.query.dueFrom || req.query.dueTo) {
       query.dueDate = {};
@@ -215,6 +297,8 @@ router.get("/", protect, async (req, res) => {
       Task.find(query)
       .select("-comments")
       .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .sort({ createdAt: -1 })
@@ -240,6 +324,7 @@ router.post("/", protect, async (req, res) => {
 
     const payload = normalizeTaskPayload(req.body, req.user._id, {
       assignedTo: req.user.role === "admin" ? req.body.assignedTo : req.user._id,
+      assignees: req.user.role === "admin" ? req.body.assignees : [req.user._id],
       requestedBy: req.user.role === "admin" ? req.body.requestedBy : req.user._id,
       requestedByName:
         req.user.role === "admin"
@@ -251,8 +336,25 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Task title is required" });
     }
 
-    if (!payload.subtasks.length) {
-      return res.status(400).json({ message: "At least one subtask is required" });
+    if (req.user.role === "admin") {
+      const assigneeValidationMessage = await validateEmployeeAssignees(payload.assignees);
+      if (assigneeValidationMessage) {
+        return res.status(400).json({ message: assigneeValidationMessage });
+      }
+    }
+
+    const subtaskValidationMessage = validateSubtaskSequence(payload.subtasks);
+    if (subtaskValidationMessage) {
+      return res.status(400).json({ message: subtaskValidationMessage });
+    }
+
+    const subtaskAssigneeMessage = validateSubtaskAssignees(payload.subtasks, payload.assignees);
+    if (subtaskAssigneeMessage) {
+      return res.status(400).json({ message: subtaskAssigneeMessage });
+    }
+
+    if (req.body.status === "done" && !allSubtasksCompleted(payload.subtasks)) {
+      return res.status(400).json({ message: "Complete every subtask before completing the task" });
     }
 
     if (req.user.role === "admin" && !payload.requestedBy && !payload.requestedByName) {
@@ -290,6 +392,8 @@ router.post("/", protect, async (req, res) => {
 
     const createdTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();
@@ -314,7 +418,34 @@ router.put("/:id", protect, async (req, res) => {
 
     if (req.user.role === "employee") {
       const previousSubtasks = task.subtasks.toObject();
-      const subtasks = normalizeSubtasks(req.body.subtasks ?? task.subtasks);
+      const requestedSubtasks = normalizeSubtasks(req.body.subtasks ?? task.subtasks);
+      if (requestedSubtasks.length !== previousSubtasks.length) {
+        return res.status(403).json({ message: "Employees cannot add or remove subtasks" });
+      }
+
+      const subtasks = previousSubtasks.map((subtask, index) => {
+        const requestedSubtask = requestedSubtasks[index];
+        const completionChanged =
+          Boolean(requestedSubtask?.completed) !== Boolean(subtask.completed);
+
+        if (completionChanged && !canEmployeeUpdateSubtask(task, subtask, req.user._id)) {
+          return null;
+        }
+
+        return {
+          ...subtask,
+          completed: Boolean(requestedSubtask?.completed),
+          completedAt: requestedSubtask?.completed ? subtask.completedAt : undefined,
+        };
+      });
+
+      if (subtasks.some((subtask) => !subtask)) {
+        return res.status(403).json({ message: "You can only update subtasks assigned to you" });
+      }
+      const subtaskValidationMessage = validateSubtaskSequence(subtasks);
+      if (subtaskValidationMessage) {
+        return res.status(400).json({ message: subtaskValidationMessage });
+      }
       recordSubtaskActivities(task, previousSubtasks, subtasks, req.user);
       task.subtasks = subtasks;
       task.status = getStatusFromSubtasks(subtasks, task.status);
@@ -323,8 +454,10 @@ router.put("/:id", protect, async (req, res) => {
       await task.save();
 
       const updatedTask = await Task.findById(task._id)
-        .populate("assignedTo", "firstName lastName email role")
-        .populate("createdBy", "firstName lastName email role")
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName email role")
         .populate("requestedBy", "firstName lastName companyName email role")
         .lean();
 
@@ -340,6 +473,7 @@ router.put("/:id", protect, async (req, res) => {
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
         assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
+        assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
         requestedBy:
           req.user.role === "admin" ? req.body.requestedBy ?? task.requestedBy : task.requestedBy,
         requestedByName:
@@ -351,6 +485,7 @@ router.put("/:id", protect, async (req, res) => {
       req.user._id,
       {
         assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
+        assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
         requestedBy:
           req.user.role === "admin" ? req.body.requestedBy ?? task.requestedBy : task.requestedBy,
         requestedByName:
@@ -362,6 +497,27 @@ router.put("/:id", protect, async (req, res) => {
 
     if (!payload.title) {
       return res.status(400).json({ message: "Task title is required" });
+    }
+
+    if (req.user.role === "admin") {
+      const assigneeValidationMessage = await validateEmployeeAssignees(payload.assignees);
+      if (assigneeValidationMessage) {
+        return res.status(400).json({ message: assigneeValidationMessage });
+      }
+    }
+
+    const subtaskValidationMessage = validateSubtaskSequence(payload.subtasks);
+    if (subtaskValidationMessage) {
+      return res.status(400).json({ message: subtaskValidationMessage });
+    }
+
+    const subtaskAssigneeMessage = validateSubtaskAssignees(payload.subtasks, payload.assignees);
+    if (subtaskAssigneeMessage) {
+      return res.status(400).json({ message: subtaskAssigneeMessage });
+    }
+
+    if (req.body.status === "done" && !allSubtasksCompleted(payload.subtasks)) {
+      return res.status(400).json({ message: "Complete every subtask before completing the task" });
     }
 
     if (!payload.dueDate || Number.isNaN(payload.dueDate.getTime())) {
@@ -392,6 +548,7 @@ router.put("/:id", protect, async (req, res) => {
     task.status = payload.status;
     task.priority = payload.priority;
     task.assignedTo = payload.assignedTo;
+    task.assignees = payload.assignees;
     task.requestedBy = payload.requestedBy;
     task.requestedByName = payload.requestedByName;
     task.subtasks = payload.subtasks;
@@ -401,6 +558,8 @@ router.put("/:id", protect, async (req, res) => {
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();
@@ -457,6 +616,8 @@ router.post("/:id/revisions", protect, async (req, res) => {
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();
@@ -509,6 +670,8 @@ router.post("/:id/feedback", protect, async (req, res) => {
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .populate("feedback.user", "firstName lastName email role")
@@ -564,7 +727,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const isAssignedUser = String(task.assignedTo) === String(req.user._id);
+    const isAssignedUser = canUserSubmitTask(task, req.user._id);
     if (req.user.role !== "admin" && !isAssignedUser) {
       return res.status(403).json({ message: "Only the assigned user can submit this output" });
     }
@@ -572,11 +735,47 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     const outputMethod = req.body.outputMethod === "link" ? "link" : "file";
     const message = String(req.body.message || "").trim();
     const previousSubtasks = task.subtasks.toObject();
-    const subtasks = req.body.subtasks !== undefined
+    let subtasks = req.body.subtasks !== undefined
       ? normalizeSubtasks(req.body.subtasks)
       : task.subtasks;
     let fileOutput = {};
     let link = "";
+
+    if (req.user.role === "employee") {
+      if (subtasks.length !== previousSubtasks.length) {
+        return res.status(403).json({ message: "Employees cannot add or remove subtasks" });
+      }
+
+      const mergedSubtasks = previousSubtasks.map((subtask, index) => {
+        const requestedSubtask = subtasks[index];
+        const completionChanged =
+          Boolean(requestedSubtask?.completed) !== Boolean(subtask.completed);
+        if (completionChanged && !canEmployeeUpdateSubtask(task, subtask, req.user._id)) {
+          return null;
+        }
+        return {
+          ...subtask,
+          completed: Boolean(requestedSubtask?.completed),
+          completedAt: requestedSubtask?.completed ? subtask.completedAt : undefined,
+        };
+      });
+
+      if (mergedSubtasks.some((subtask) => !subtask)) {
+        return res.status(403).json({ message: "You can only update subtasks assigned to you" });
+      }
+      subtasks = mergedSubtasks;
+    }
+
+    const subtaskValidationMessage = validateSubtaskSequence(subtasks);
+    if (subtaskValidationMessage) {
+      return res.status(400).json({ message: subtaskValidationMessage });
+    }
+
+    if (!allSubtasksCompleted(subtasks)) {
+      return res.status(400).json({
+        message: "Complete every subtask before submitting the final output",
+      });
+    }
 
     if (outputMethod === "file") {
       if (!req.body.file?.dataUrl) {
@@ -624,6 +823,8 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();

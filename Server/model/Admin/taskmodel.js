@@ -52,6 +52,11 @@ const taskSchema = new mongoose.Schema(
         completedAt: {
           type: Date,
         },
+
+        assignedTo: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
       },
     ],
 
@@ -101,6 +106,13 @@ const taskSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
+    assignees: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -234,6 +246,8 @@ const taskSchema = new mongoose.Schema(
 );
 
 taskSchema.index({ assignedTo: 1, createdAt: -1 });
+taskSchema.index({ assignees: 1, createdAt: -1 });
+taskSchema.index({ "subtasks.assignedTo": 1, createdAt: -1 });
 taskSchema.index({ createdBy: 1, createdAt: -1 });
 taskSchema.index({ requestedBy: 1, createdAt: -1 });
 taskSchema.index({ status: 1, dueDate: 1 });

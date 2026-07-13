@@ -127,6 +127,7 @@ const normalizeSubtasks = (subtasks = []) => {
   const normalizedSubtasks = subtasks.map((subtask) => ({
     title: subtask?.title || "",
     completed: Boolean(subtask?.completed),
+    assignedTo: getEntityId(subtask?.assignedTo),
   }));
 
   return normalizedSubtasks.length > 0
@@ -187,8 +188,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     dueDate: todayInputDate(),
     priority: "medium",
     requestedBy: isAdmin ? "" : getEntityId(user),
-    assignedTo: getEntityId(user),
-    subtasks: [{ title: "", completed: false }],
+    assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
+    subtasks: [{ title: "", completed: false, assignedTo: "" }],
   });
   const [assignees, setAssignees] = useState([]);
   const [clients, setClients] = useState([]);
@@ -204,18 +205,29 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       try {
         const data = await authAPI.getAssignees();
         const loadedAssignees = normalizeAssignees(data);
+        const availableAssignees = isAdmin
+          ? loadedAssignees.filter((assignee) => assignee?.role === "employee")
+          : loadedAssignees;
 
         if (isMounted) {
-          setAssignees(loadedAssignees);
+          setAssignees(availableAssignees);
 
-          setFormData((currentData) => ({
-            ...currentData,
-            assignedTo:
-              currentData.assignedTo ||
-              getEntityId(task?.assignedTo) ||
-              getEntityId(loadedAssignees[0]) ||
-              getEntityId(user),
-          }));
+          setFormData((currentData) => {
+            const existingAssigneeIds = (task?.assignees?.length
+              ? task.assignees
+              : [task?.assignedTo]
+            ).map(getEntityId).filter(Boolean);
+
+            return {
+              ...currentData,
+              assignees:
+                currentData.assignees.length > 0
+                  ? currentData.assignees
+                  : existingAssigneeIds.length > 0
+                    ? existingAssigneeIds
+                    : [getEntityId(availableAssignees[0])].filter(Boolean),
+            };
+          });
         }
       } catch (error) {
         if (isMounted) {
@@ -231,7 +243,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     return () => {
       isMounted = false;
     };
-  }, [task?.assignedTo, user]);
+  }, [isAdmin, task?.assignedTo, task?.assignees, user]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -291,7 +303,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           : task.createdBy?.role === "client"
             ? getEntityId(task.createdBy)
             : ""),
-      assignedTo: getEntityId(task.assignedTo) || getEntityId(user),
+      assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
+        .map(getEntityId)
+        .filter(Boolean),
       subtasks: normalizeSubtasks(task.subtasks),
     });
   }, [task, user]);
@@ -303,9 +317,32 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     }));
   };
 
+  const toggleAssignee = (assigneeId) => {
+    setFormData((currentData) => {
+      const isSelected = currentData.assignees.includes(assigneeId);
+      const assignees = isSelected
+        ? currentData.assignees.filter((id) => id !== assigneeId)
+        : [...currentData.assignees, assigneeId];
+
+      return {
+        ...currentData,
+        assignees,
+        subtasks: currentData.subtasks.map((subtask) =>
+          subtask.assignedTo && !assignees.includes(subtask.assignedTo)
+            ? { ...subtask, assignedTo: "" }
+            : subtask
+        ),
+      };
+    });
+  };
+
   const updateSubtask = (index, field, value) => {
     setFormData((currentData) => ({
       ...currentData,
+      assignees:
+        field === "assignedTo" && value && !currentData.assignees.includes(value)
+          ? [...currentData.assignees, value]
+          : currentData.assignees,
       subtasks: currentData.subtasks.map((subtask, currentIndex) =>
         currentIndex === index ? { ...subtask, [field]: value } : subtask
       ),
@@ -315,7 +352,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   const addSubtask = () => {
     setFormData((currentData) => ({
       ...currentData,
-      subtasks: [...currentData.subtasks, { title: "", completed: false }],
+      subtasks: [...currentData.subtasks, { title: "", completed: false, assignedTo: "" }],
     }));
   };
 
@@ -325,7 +362,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       subtasks:
         currentData.subtasks.length > 1
           ? currentData.subtasks.filter((_, currentIndex) => currentIndex !== index)
-          : [{ title: "", completed: false }],
+          : [{ title: "", completed: false, assignedTo: "" }],
     }));
   };
 
@@ -339,7 +376,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       setFormData((currentData) => ({
         ...currentData,
         title: "",
-        subtasks: [{ title: "", completed: false }],
+        subtasks: [{ title: "", completed: false, assignedTo: "" }],
       }));
       return;
     }
@@ -347,7 +384,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     setFormData((currentData) => ({
       ...currentData,
       title: template.title,
-      subtasks: template.subtasks.map((title) => ({ title, completed: false })),
+      subtasks: template.subtasks.map((title) => ({ title, completed: false, assignedTo: "" })),
     }));
   };
 
@@ -394,8 +431,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    if (!formData.assignedTo) {
-      setErrorMessage("Please choose who this task is assigned to.");
+    if (formData.assignees.length === 0) {
+      setErrorMessage("Please choose at least one employee for this task.");
       return;
     }
 
@@ -416,6 +453,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       .map((subtask) => ({
         title: subtask.title.trim(),
         completed: Boolean(subtask.completed),
+        assignedTo: subtask.assignedTo || undefined,
       }))
       .filter((subtask) => subtask.title);
 
@@ -435,7 +473,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         dueDate: formData.dueDate,
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
-        assignedTo: formData.assignedTo,
+        assignedTo: formData.assignees[0],
+        assignees: formData.assignees,
         requestedBy:
           !isAdmin || isRegisteredClientUser(selectedClient)
             ? formData.requestedBy
@@ -553,7 +592,12 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
 
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <FieldLabel>Subtasks</FieldLabel>
+              <span>
+                <FieldLabel>Subtasks</FieldLabel>
+                <span className="ml-2 text-[10px] font-bold text-neutral-400">
+                  Employees complete these in order
+                </span>
+              </span>
               <button
                 type="button"
                 onClick={addSubtask}
@@ -564,7 +608,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             </div>
             <div className="space-y-2">
               {formData.subtasks.map((subtask, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_36px] sm:items-center">
+                <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px_36px] sm:items-center">
                   <input
                     type="text"
                     value={subtask.title}
@@ -572,6 +616,19 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                     placeholder={`Subtask ${index + 1}`}
                     className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
                   />
+                  <select
+                    value={subtask.assignedTo || ""}
+                    onChange={(event) => updateSubtask(index, "assignedTo", event.target.value)}
+                    className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-3 text-xs font-medium text-neutral-600 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300"
+                    aria-label={`Assign subtask ${index + 1}`}
+                  >
+                    <option value="">Any assigned employee</option>
+                    {safeAssignees.map((assignee) => (
+                        <option key={getEntityId(assignee)} value={getEntityId(assignee)}>
+                          {formatAssigneeName(assignee)}
+                        </option>
+                      ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => removeSubtask(index)}
@@ -693,20 +750,21 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
 
           <div className="mt-5 space-y-1">
             <FieldLabel>Assign Task to:</FieldLabel>
-            <select
-              value={formData.assignedTo}
-              onChange={(event) => updateField("assignedTo", event.target.value)}
-              className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:focus:ring-pink-950"
-            >
-              {safeAssignees.length === 0 && (
-                <option value={getEntityId(user)}>Myself</option>
-              )}
-              {safeAssignees.map((assignee) => (
-                <option key={getEntityId(assignee)} value={getEntityId(assignee)}>
-                  {formatAssigneeName(assignee)}
-                </option>
-              ))}
-            </select>
+            <p className="text-[11px] font-medium text-neutral-400">
+              Select everyone who will collaborate, then assign individual subtasks above.
+            </p>
+            <div className="mt-2 grid max-h-40 gap-2 overflow-y-auto rounded-lg border border-neutral-300 bg-white/40 p-3 dark:border-neutral-700 dark:bg-neutral-950 sm:grid-cols-2">
+              {safeAssignees.map((assignee) => {
+                const assigneeId = getEntityId(assignee);
+                const isSelected = formData.assignees.includes(assigneeId);
+                return (
+                  <label key={assigneeId} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${isSelected ? "border-pink-300 bg-pink-50 text-[#c72fb2] dark:bg-pink-950/30" : "border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-300"}`}>
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleAssignee(assigneeId)} className="h-4 w-4 accent-[#dc4fb2]" />
+                    <span className="truncate">{formatAssigneeName(assignee)}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
