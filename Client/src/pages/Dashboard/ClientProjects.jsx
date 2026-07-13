@@ -946,7 +946,19 @@ const ClientProjects = () => {
   const handleDownloadOutput = async (project, output) => {
     try {
       setErrorMessage("");
-      await taskAPI.downloadOutput(project.id, output.title);
+      const { blob, fileName } = await taskAPI.downloadOutput(project.id);
+      if (!blob?.size) {
+        throw new Error("The downloaded file is empty.");
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName || output.title || "submitted-output";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
     }
