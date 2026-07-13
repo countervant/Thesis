@@ -580,6 +580,34 @@ export const budgetAPI = {
   },
 };
 
+export const budgetPlannerAPI = {
+  get: async () => cachedGet("/budget-planner"),
+
+  create: async (entry) => {
+    const response = await api.post("/budget-planner", entry);
+    clearCache("/budget-planner");
+    return response.data;
+  },
+
+  update: async (id, entry) => {
+    const response = await api.put(`/budget-planner/${id}`, entry);
+    clearCache("/budget-planner");
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/budget-planner/${id}`);
+    clearCache("/budget-planner");
+    return response.data;
+  },
+
+  updateSettings: async (monthlyLimit) => {
+    const response = await api.put("/budget-planner/settings", { monthlyLimit });
+    clearCache("/budget-planner");
+    return response.data;
+  },
+};
+
 export const calendarAPI = {
   getAll: async (params = "") => {
     const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
