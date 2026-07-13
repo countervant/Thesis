@@ -441,6 +441,57 @@ const PublicProfile = () => {
     return () => window.removeEventListener("clientra:newsfeed-updated", handleNewsfeedUpdate);
   }, [loadProfilePosts]);
 
+  useEffect(() => {
+    const postsMissingMedia = posts.filter(
+      (post) => post.media?.type && !post.media?.url
+    );
+
+    if (postsMissingMedia.length === 0) return undefined;
+
+    let isMounted = true;
+
+    const loadMissingMedia = async () => {
+      for (const post of postsMissingMedia) {
+        try {
+          const media = await newsfeedAPI.getMedia(post.id);
+
+          if (!isMounted) return;
+
+          setPosts((currentPosts) =>
+            currentPosts.map((currentPost) =>
+              currentPost.id === post.id
+                ? {
+                    ...currentPost,
+                    media: {
+                      type: media?.type || "",
+                      url: media?.url || "",
+                      name: media?.name || "",
+                    },
+                  }
+                : currentPost
+            )
+          );
+        } catch {
+          if (!isMounted) return;
+
+          setPosts((currentPosts) =>
+            currentPosts.map((currentPost) =>
+              currentPost.id === post.id
+                ? { ...currentPost, media: { type: "", url: "", name: "" } }
+                : currentPost
+            )
+          );
+        }
+      }
+    };
+
+    loadMissingMedia();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [posts]);
+
   const { profileUser, userPosts } = useMemo(() => {
     const users = collectUsers(posts);
     const foundUser = users.get(userId) || null;

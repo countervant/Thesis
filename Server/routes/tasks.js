@@ -468,6 +468,59 @@ router.post("/:id/revisions", protect, async (req, res) => {
   }
 });
 
+router.post("/:id/feedback", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "client") {
+      return res.status(403).json({ message: "Only clients can submit feedback" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (task.status !== "done") {
+      return res.status(400).json({ message: "Feedback is available after the job is completed" });
+    }
+
+    const rating = Number(req.body.rating);
+    const comment = String(req.body.comment || "").trim();
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Please select a rating from 1 to 5" });
+    }
+    if (comment.length > 1000) {
+      return res.status(400).json({ message: "Feedback must be 1000 characters or less" });
+    }
+
+    const submittedAt = new Date();
+    task.feedback = { user: req.user._id, rating, comment, submittedAt };
+    addActivity(task, {
+      type: "feedback_submitted",
+      title: "Client submitted feedback",
+      details: `${rating}/5 rating${comment ? `: ${comment}` : ""}`,
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+    });
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("feedback.user", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Submit task feedback error:", error);
+    res.status(500).json({ message: "Unable to submit feedback" });
+  }
+});
+
 router.post("/:id/submit-output", protect, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);

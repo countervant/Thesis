@@ -166,6 +166,7 @@ const normalizeTask = (task) => {
     requestedByName: task?.requestedByName || "",
     subtasks,
     progress: getTaskProgress(subtasks),
+    feedback: task?.feedback || null,
   };
 };
 
@@ -368,6 +369,21 @@ const SelectControl = ({ label, onChange, options, value }) => (
     </select>
   </label>
 );
+
+const FeedbackSummary = ({ feedback }) => {
+  if (!feedback?.rating) return null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-black text-[#10142d]">Client feedback</span>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-600">{"★".repeat(feedback.rating)} <span className="text-slate-500">({feedback.rating}/5)</span></span>
+      </div>
+      {feedback.comment && <p className="mt-2 text-sm font-semibold text-slate-600">“{feedback.comment}”</p>}
+      {feedback.submittedAt && <p className="mt-2 text-[11px] font-bold text-slate-400">Submitted {formatReadableDate(feedback.submittedAt)}</p>}
+    </div>
+  );
+};
 
 const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
   const effectiveExpanded = canAccessSubtasks && isExpanded;
@@ -603,6 +619,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
         </div>
         </>
       )}
+      <FeedbackSummary feedback={item.feedback} />
     </article>
   );
 };

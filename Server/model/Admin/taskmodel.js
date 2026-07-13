@@ -59,7 +59,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "feedback_submitted"],
           required: true,
         },
 
@@ -204,6 +204,25 @@ const taskSchema = new mongoose.Schema(
       fileName: String,
       fileUrl: String,
       link: String,
+      submittedAt: Date,
+    },
+
+    feedback: {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      comment: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: 1000,
+      },
       submittedAt: Date,
     },
 
