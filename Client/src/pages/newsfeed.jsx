@@ -171,7 +171,8 @@ const Newsfeed = () => {
   const [isPosting, setIsPosting] = useState(false);
   const [showAllTeamMembers, setShowAllTeamMembers] = useState(false);
   const [onlineTeam, setOnlineTeam] = useState([]);
-  const canPost = user?.role === "admin" || user?.role === "client";
+  // Any authenticated account may create a newsfeed post.
+  const canPost = Boolean(user);
   const userId = getEntityId(user);
 
   useEffect(() => {
@@ -787,7 +788,7 @@ const Newsfeed = () => {
 
       {!canPost && (
         <p className="rounded-lg bg-white px-5 py-4 text-sm font-medium text-neutral-600 shadow-[0_2px_6px_rgba(219,39,119,0.18)] ring-1 ring-pink-50">
-          You can read, heart, and comment on newsfeed posts.
+          Sign in to create a newsfeed post.
         </p>
       )}
 

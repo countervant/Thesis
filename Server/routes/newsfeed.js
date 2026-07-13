@@ -5,7 +5,6 @@ import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 
 const router = express.Router();
-const postAllowedRoles = ["admin", "client"];
 const userPublicFields = "firstName lastName companyName email country role";
 const isMongoTimeoutError = (error) =>
   error?.name === "MongoNetworkTimeoutError" ||
@@ -167,10 +166,6 @@ router.get("/:id/comments", protect, async (req, res) => {
 
 router.post("/", protect, async (req, res) => {
   try {
-    if (!postAllowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Only admins and clients can post" });
-    }
-
     const content = req.body.content?.trim() || "";
     const media = req.body.media || {};
     const mediaType = ["image", "video"].includes(media.type) ? media.type : "";

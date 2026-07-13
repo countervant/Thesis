@@ -571,6 +571,8 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       outputMethod,
       fileName: fileOutput.fileName,
       fileUrl: fileOutput.fileUrl,
+      fileData: fileOutput.fileData,
+      mimeType: fileOutput.mimeType,
       link,
       submittedAt: new Date(),
     };
