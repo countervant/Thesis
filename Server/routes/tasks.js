@@ -613,7 +613,9 @@ router.get("/:id/output/download", protect, async (req, res) => {
     const task = await Task.findOne({
       _id: req.params.id,
       ...taskQueryForUser(req.user),
-    }).select("finalOutput +finalOutput.fileData");
+    }).select(
+      "finalOutput.fileName finalOutput.fileUrl finalOutput.mimeType +finalOutput.fileData attachments.fileName attachments.fileUrl"
+    );
 
     if (!task?.finalOutput?.fileUrl) {
       return res.status(404).json({ message: "Submitted output file not found" });
@@ -633,15 +635,29 @@ router.get("/:id/output/download", protect, async (req, res) => {
 
     // Files submitted before durable storage was added may still exist on the
     // current server. Restrict the fallback to this task's upload directory.
-    const legacyPath = path.join(uploadsRoot, String(task._id), path.basename(fileUrl));
-    try {
-      await fs.access(legacyPath);
-      return res.download(legacyPath, downloadName);
-    } catch {
-      return res.status(410).json({
-        message: "This older uploaded file is no longer available. Please ask the team to submit it again.",
-      });
+    const legacyFileUrls = [
+      fileUrl,
+      // A re-upload may have generated a new filename while the final-output
+      // record still references the earlier one. Use only attachments for the
+      // same displayed filename and only inside this task's directory.
+      ...task.attachments
+        .filter((attachment) => attachment.fileName === fileName)
+        .map((attachment) => attachment.fileUrl),
+    ].filter(Boolean);
+
+    for (const legacyFileUrl of legacyFileUrls) {
+      const legacyPath = path.join(uploadsRoot, String(task._id), path.basename(legacyFileUrl));
+      try {
+        await fs.access(legacyPath);
+        return res.download(legacyPath, downloadName);
+      } catch {
+        // Try the next matching attachment before reporting that it is gone.
+      }
     }
+
+    return res.status(410).json({
+      message: "This older uploaded file is no longer available. Please ask the team to submit it again.",
+    });
   } catch (error) {
     console.error("Download task output error:", error);
     return res.status(500).json({ message: "Unable to download the submitted output" });
