@@ -203,6 +203,11 @@ const taskSchema = new mongoose.Schema(
       },
       fileName: String,
       fileUrl: String,
+      fileData: {
+        type: Buffer,
+        select: false,
+      },
+      mimeType: String,
       link: String,
       submittedAt: Date,
     },

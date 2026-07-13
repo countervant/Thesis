@@ -179,6 +179,10 @@ const saveOutputFile = async (taskId, file) => {
   return {
     fileName: file.fileName || fileName,
     fileUrl: `/uploads/tasks/${taskId}/${fileName}`,
+    // Render's local disk is ephemeral. Keep the final submission in MongoDB so
+    // a restart or deploy does not leave the task pointing at a missing file.
+    fileData: buffer,
+    mimeType: match[1],
   };
 };
 
@@ -599,6 +603,46 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     res.status(error.message?.includes("File size") || error.message?.includes("Invalid file") ? 400 : 500).json({
       message: error.message || "Unable to submit output",
     });
+  }
+});
+
+router.get("/:id/output/download", protect, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    }).select("finalOutput +finalOutput.fileData");
+
+    if (!task?.finalOutput?.fileUrl) {
+      return res.status(404).json({ message: "Submitted output file not found" });
+    }
+
+    const { fileName, fileData, fileUrl, mimeType } = task.finalOutput;
+    const downloadName = safeFileName(fileName || "submitted-output");
+
+    if (fileData?.length) {
+      res.set({
+        "Content-Type": mimeType || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${downloadName}"`,
+        "Content-Length": fileData.length,
+      });
+      return res.send(fileData);
+    }
+
+    // Files submitted before durable storage was added may still exist on the
+    // current server. Restrict the fallback to this task's upload directory.
+    const legacyPath = path.join(uploadsRoot, String(task._id), path.basename(fileUrl));
+    try {
+      await fs.access(legacyPath);
+      return res.download(legacyPath, downloadName);
+    } catch {
+      return res.status(410).json({
+        message: "This older uploaded file is no longer available. Please ask the team to submit it again.",
+      });
+    }
+  } catch (error) {
+    console.error("Download task output error:", error);
+    return res.status(500).json({ message: "Unable to download the submitted output" });
   }
 });
 

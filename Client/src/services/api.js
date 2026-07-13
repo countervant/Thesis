@@ -328,6 +328,7 @@ export const taskAPI = {
     const filePayload = output.file
       ? {
           fileName: output.file.name,
+          mimeType: output.file.type,
           dataUrl: await fileToDataUrl(output.file),
         }
       : undefined;
@@ -340,6 +341,13 @@ export const taskAPI = {
     });
     clearCache("/tasks", "/dashboard");
     return response.data;
+  },
+
+  downloadOutput: async (id) => {
+    const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
+    const disposition = response.headers["content-disposition"] || "";
+    const fileName = disposition.match(/filename="?([^";]+)"?/i)?.[1] || "submitted-output";
+    return { blob: response.data, fileName };
   },
 
   delete: async (id) => {
