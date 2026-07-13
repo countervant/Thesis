@@ -102,6 +102,14 @@ export const getApiErrorMessage = (error, fallback = "Unable to load data.") => 
 
 const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
 
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
 const mergeCachedPost = (currentPost, nextPost) => ({
   ...currentPost,
   ...nextPost,
@@ -300,6 +308,30 @@ export const taskAPI = {
 
   update: async (id, task) => {
     const response = await api.put(`/tasks/${id}`, task);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  requestRevision: async (id, revision) => {
+    const response = await api.post(`/tasks/${id}/revisions`, revision);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  submitOutput: async (id, output) => {
+    const filePayload = output.file
+      ? {
+          fileName: output.file.name,
+          dataUrl: await fileToDataUrl(output.file),
+        }
+      : undefined;
+    const response = await api.post(`/tasks/${id}/submit-output`, {
+      file: filePayload,
+      link: output.link,
+      message: output.message,
+      outputMethod: output.outputMethod,
+      subtasks: output.subtasks,
+    });
     clearCache("/tasks", "/dashboard");
     return response.data;
   },

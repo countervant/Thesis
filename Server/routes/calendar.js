@@ -44,6 +44,15 @@ const normalizePayload = (body, user) => {
 const eventQueryForUser = (user) => {
   if (user.role === "admin") return {};
 
+  if (user.role === "client") {
+    return {
+      $or: [
+        { visibility: "all" },
+        { createdBy: user._id },
+      ],
+    };
+  }
+
   return {
     $or: [
       { visibility: "all" },

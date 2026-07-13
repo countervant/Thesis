@@ -6,6 +6,7 @@ import employees from "../assets/employees.png";
 import view from "../assets/view.png";
 import check from "../assets/check.png";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
+import { SkeletonRows } from "../components/Skeleton.jsx";
 import { getApiErrorMessage, leaveRequestAPI } from "../services/api";
 
 const toneStyles = {
@@ -503,9 +504,7 @@ const LeaveRequest = () => {
               </thead>
               <tbody className="divide-y divide-pink-50">
                 {isLoading && (
-                  <tr>
-                    <td colSpan="8" className="px-3 py-8 text-center font-bold text-slate-500">Loading leave requests...</td>
-                  </tr>
+                  <SkeletonRows rows={6} columns={8} />
                 )}
                 {!isLoading && requests.length === 0 && (
                   <tr>
