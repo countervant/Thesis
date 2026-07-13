@@ -17,6 +17,7 @@ import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
 import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
 import EmpTask from "./Dashboard/Employee/EmpTask.jsx";
+import EmpBudgetPlanner from "./Dashboard/Employee/EmpBudgetPlanner.jsx";
 import Newsfeed from "./newsfeed.jsx";
 import Profile from "./Profile.jsx";
 import Settings from "./Settings/settings.jsx";
@@ -1301,7 +1302,7 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const initialLocalPage = ["dashboard", "projects", "newsfeed", "messages", "profile", "settings", "tasks"].includes(
+  const initialLocalPage = ["dashboard", "projects", "newsfeed", "messages", "profile", "settings", "tasks", "calendar", "budget", "leave-request"].includes(
     location.state?.page
   )
     ? location.state.page
@@ -1513,6 +1514,8 @@ const Dashboard = () => {
       <EmpTask />
     ) : role === "employee" && localPage === "calendar" ? (
       <EmpCalendar />
+    ) : role === "employee" && localPage === "budget" ? (
+      <EmpBudgetPlanner />
     ) : role === "employee" && localPage === "leave-request" ? (
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
