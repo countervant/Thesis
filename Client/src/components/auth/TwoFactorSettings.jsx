@@ -92,7 +92,7 @@ const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
             : <button type="button" onClick={() => setEnableOpen(true)} className="h-10 shrink-0 rounded-xl bg-linear-to-r from-pink-500 to-purple-600 px-5 text-xs font-black text-white shadow-lg shadow-pink-200/40">Enable 2FA</button>
         )}
       </div>
-      {status?.enabled && <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />Email verification is active for every new login.</div>}
+      {status?.enabled && <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />Email verification is required on new devices. Verified devices are trusted for {status.trustedDeviceDays || 30} days.</div>}
       {error && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-500">
         <span>{error}</span>
         <button type="button" onClick={loadStatus} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-black text-red-600 transition hover:bg-red-100">Try again</button>

@@ -14,6 +14,7 @@ import newsfeedIcon from "../assets/newsfeed.png";
 import notificationIcon from "../assets/notification.png";
 import logoutIcon from "../assets/logout.png";
 import profileIcon from "../assets/profile.png";
+import rateIcon from "../assets/rate.png";
 import sidebarIcon from "../assets/sidebar.png";
 import settingsIcon from "../assets/settings.png";
 import taskIcon from "../assets/task.png";
@@ -36,7 +37,10 @@ const sideNavSections = [
   },
   {
     title: "Feedback",
-    items: [{ id: "newsfeed", label: "Newsfeed", icon: "newsfeed" }],
+    items: [
+      { id: "newsfeed", label: "Newsfeed", icon: "newsfeed" },
+      { id: "feedback", label: "Feedback", icon: "feedback" },
+    ],
   },
   {
     title: "Management",
@@ -60,6 +64,7 @@ const roleNavItems = {
   admin: [
     "dashboard",
     "newsfeed",
+    "feedback",
     "tasks",
     "calendar",
     "budget",
@@ -68,7 +73,7 @@ const roleNavItems = {
     "leave-request",
     "settings",
   ],
-  employee: ["dashboard", "newsfeed", "tasks", "calendar", "budget", "leave-request", "settings"],
+  employee: ["dashboard", "newsfeed", "feedback", "tasks", "calendar", "budget", "leave-request", "settings"],
   client: ["dashboard", "projects", "newsfeed", "settings"],
 };
 
@@ -78,6 +83,7 @@ const navIcons = {
   client: clientIcon,
   dashboard: dashboardIcon,
   employee: employeeIcon,
+  feedback: rateIcon,
   "leave-request": leaveRequestIcon,
   messages: messagesIcon,
   newsfeed: newsfeedIcon,
@@ -204,6 +210,22 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
 
 const buildTaskNotifications = (tasks, user) => {
   const userId = getEntityId(user);
+
+  if (user?.role === "client") {
+    return tasks.flatMap((task) =>
+      (task?.activities || [])
+        .filter((activity) => activity?.type === "feedback_replied")
+        .map((activity) => ({
+          id: `feedback-reply-${activity?._id || `${task?._id || task?.id}-${activity?.createdAt}`}`,
+          icon: messagesIcon,
+          actor: activity?.actorName ? { firstName: activity.actorName } : task?.createdBy,
+          title: activity?.title || "Admin replied to your feedback",
+          message: trimNotificationText(activity?.details, "You received a reply to your feedback"),
+          date: activity?.createdAt,
+          target: { page: "projects", taskId: task?._id || task?.id },
+        }))
+    );
+  }
 
   if (user?.role !== "employee") {
     return [];
@@ -528,7 +550,9 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         setNotificationError("");
         const [posts, tasks] = await Promise.all([
           newsfeedAPI.getActivity(),
-          user?.role === "employee" ? taskAPI.getAll() : Promise.resolve([]),
+          ["employee", "client"].includes(user?.role)
+            ? taskAPI.getAll({ limit: 100, refresh: Date.now() })
+            : Promise.resolve([]),
         ]);
 
         const nextNotifications = [

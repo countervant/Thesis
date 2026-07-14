@@ -17,6 +17,7 @@ const twoFactorApiCandidates = [
 const api = axios.create({
   baseURL: API_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -402,6 +403,18 @@ export const taskAPI = {
 
   submitFeedback: async (id, feedback) => {
     const response = await api.post(`/tasks/${id}/feedback`, feedback);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  setArchived: async (id, archived) => {
+    const response = await api.patch(`/tasks/${id}/archive`, { archived });
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  replyToFeedback: async (id, message) => {
+    const response = await api.post(`/tasks/${id}/feedback/reply`, { message });
     clearCache("/tasks", "/dashboard");
     return response.data;
   },

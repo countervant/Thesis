@@ -163,7 +163,7 @@ router.post("/forgot-password", async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select("+trustedDevices");
 
     if (!user) {
       return res.status(404).json({ message: "Email is not registered" });
@@ -276,6 +276,7 @@ router.post("/reset-password", async (req, res) => {
     }
 
     user.password = password;
+    user.trustedDevices = [];
     user.resetPasswordOTP = undefined;
     user.resetPasswordOTPExpires = undefined;
     await user.save();
@@ -373,7 +374,7 @@ router.post("/reset-password", async (req, res) => {
 
     router.put("/me", protect, async (req, res) => {
       try {
-        const user = await User.findById(req.user._id);
+        const user = await User.findById(req.user._id).select("+trustedDevices");
 
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -456,6 +457,7 @@ router.post("/reset-password", async (req, res) => {
           }
 
           user.password = password;
+          user.trustedDevices = [];
         }
 
         await user.save();
@@ -633,7 +635,7 @@ router.post("/reset-password", async (req, res) => {
         const employee = await User.findOne({
           _id: req.params.id,
           role: "employee",
-        });
+        }).select("+trustedDevices");
 
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
@@ -676,6 +678,7 @@ router.post("/reset-password", async (req, res) => {
               .json({ message: "Password must be at least 8 characters" });
           }
           employee.password = password;
+          employee.trustedDevices = [];
         }
 
         await employee.save();

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Skeleton from "../../components/Skeleton.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
+
+const notificationTargetKey = "clientraNotificationTarget";
 
 const statusFromApi = {
   pending: "Pending Revisions",
@@ -57,6 +60,7 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   if (name === "external") return <svg {...props}><path d="M14 5h5v5M19 5l-8 8M10 6H6v12h12v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "star") return <svg {...props}><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
   if (name === "send") return <svg {...props}><path d="m20 4-8 16-2-7-6-3 16-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "message") return <svg {...props}><path d="M5 5h14v11H9l-4 3V5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M8 9h8M8 12h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "upload") return <svg {...props}><path d="M12 16V5M8 9l4-4 4 4M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "dots") return <svg {...props}><path d="M12 6h.01M12 12h.01M12 18h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>;
   return <svg {...props}><path d="M5 12h14M12 5v14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
@@ -175,6 +179,8 @@ const normalizeProject = (task) => {
     attachments,
     finalOutput,
     feedback: hasSubmittedFeedback ? feedback : null,
+    archived: Boolean(task?.archived),
+    archivedAt: task?.archivedAt,
   };
 };
 
@@ -206,7 +212,8 @@ const ProjectStats = ({ projects }) => {
   );
 };
 
-const ProjectCard = ({ onFeedback, onRequestRevision, onViewDetails, project }) => {
+const ProjectCard = ({ onFeedback, onRequestRevision, onToggleArchive, onViewDetails, project }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
   const statusClass = statusStyles[project.status] || statusStyles["Pending Revisions"];
   const progressClass = progressColors[project.status] || progressColors["Pending Revisions"];
 
@@ -219,8 +226,9 @@ const ProjectCard = ({ onFeedback, onRequestRevision, onViewDetails, project }) 
               <span className="block truncate text-base font-black text-[#10142d] dark:text-white">{project.title}</span>
               <span className="mt-1 block truncate text-xs font-bold text-slate-500">{project.description}</span>
             </span>
-            <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>
-              {project.status}
+            <span className="flex shrink-0 flex-col items-end gap-1">
+              <span className={`rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>{project.status}</span>
+              {project.archived && <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500 dark:bg-neutral-800">Archived</span>}
             </span>
           </span>
 
@@ -290,14 +298,32 @@ const ProjectCard = ({ onFeedback, onRequestRevision, onViewDetails, project }) 
             Request Revision
           </button>
         )}
-        <button type="button" className="grid h-9 place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`}>
-          <Icon name="dots" className="h-5 w-5" />
-        </button>
+        <div className="relative">
+          <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-9 w-full place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`} aria-expanded={menuOpen}>
+            <Icon name="dots" className="h-5 w-5" />
+          </button>
+          {menuOpen && (
+            <div className="absolute bottom-11 right-0 z-20 w-44 rounded-xl border border-pink-100 bg-white p-1.5 shadow-[0_14px_34px_rgba(30,20,45,0.18)] dark:border-neutral-700 dark:bg-neutral-900">
+              <button type="button" onClick={() => { setMenuOpen(false); onToggleArchive(project, !project.archived); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-neutral-800">
+                <Icon name={project.archived ? "refresh" : "folder"} className="h-4 w-4" />
+                {project.archived ? "Restore Project" : "Archive Project"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {project.status === "Completed" && project.feedback && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs font-bold text-emerald-700">
-          <span className="inline-flex min-w-0 items-center gap-2"><Icon name="star" className="h-4 w-4 shrink-0" />You've submitted feedback</span>
-        </div>
+        <>
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs font-bold text-emerald-700">
+            <span className="inline-flex min-w-0 items-center gap-2"><Icon name="star" className="h-4 w-4 shrink-0" />You've submitted feedback</span>
+          </div>
+          {project.feedback.reply?.message && (
+            <div className="mt-2 rounded-lg border border-pink-100 bg-pink-50/70 px-3 py-2">
+              <p className="text-[10px] font-black uppercase tracking-wide text-[#c72fb2]">Admin replied</p>
+              <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
+            </div>
+          )}
+        </>
       )}
     </Card>
   );
@@ -310,8 +336,35 @@ const DetailRow = ({ label, value }) => (
   </p>
 );
 
+const ProjectActivityPanel = ({ children, count, onClose, title }) => (
+  <div
+    className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm"
+    onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    role="presentation"
+  >
+    <section
+      className="flex max-h-[min(760px,88vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_24px_70px_rgba(30,20,45,0.28)] dark:border-neutral-800 dark:bg-neutral-900"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-activity-panel-title"
+    >
+      <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800">
+        <div>
+          <h2 id="project-activity-panel-title" className="text-lg font-black text-[#10142d] dark:text-white">{title}</h2>
+          <p className="mt-0.5 text-xs font-bold text-slate-500">{count} {count === 1 ? "item" : "items"}</p>
+        </div>
+        <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-pink-100 text-sm font-black text-[#c72fb2] transition hover:bg-pink-50" aria-label={`Close ${title}`}>x</button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5 pr-3">
+        {children}
+      </div>
+    </section>
+  </div>
+);
+
 const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, onRequestRevision, project }) => {
-  const outputItems = [
+  const [openActivityPanel, setOpenActivityPanel] = useState(null);
+  const outputCandidates = [
     ...(project.finalOutput?.link
       ? [{
           id: "final-link",
@@ -341,6 +394,15 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
       submittedAt: project.finalOutput?.submittedAt || project.updatedAt,
     })),
   ];
+  const seenOutputs = new Set();
+  const outputItems = outputCandidates.filter((output) => {
+    const normalizedUrl = String(output.url || "").trim().replace(/\\/g, "/").toLowerCase();
+    const normalizedTitle = String(output.title || "").trim().toLowerCase();
+    const key = normalizedUrl || `${output.type}:${normalizedTitle}`;
+    if (!key || seenOutputs.has(key)) return false;
+    seenOutputs.add(key);
+    return true;
+  });
   const fallbackUpdates = [
     project.status === "Completed" && {
       id: "completed",
@@ -398,6 +460,46 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
           final: false,
         }))
       : [{ label: "No task activity yet", details: "", date: project.updatedAt, done: false, final: false }];
+  const visibleUpdates = updates.slice(0, 6);
+  const visibleTimeline = timeline.slice(0, 6);
+
+  const renderUpdates = (items) => (
+    <div className="space-y-3">
+      {items.map((update) => (
+        <div key={update.id} className="flex gap-3 rounded-xl bg-pink-50/40 p-3 dark:bg-neutral-800/70">
+          <span className={`mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full ${update.tone === "green" ? "bg-emerald-100 text-emerald-600" : update.tone === "blue" ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-[#c72fb2]"}`}>
+            <Icon name={update.tone === "green" ? "check" : update.tone === "blue" ? "file" : "upload"} className="h-4 w-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-black">{update.title}</span>
+            <span className="mt-1 block text-xs font-bold leading-5 text-slate-500">{update.text}</span>
+            <span className="mt-1 block text-xs font-bold text-slate-400">{formatDateTime(update.date)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderTimeline = (items) => (
+    <div className="space-y-0">
+      {items.map((item, index) => (
+        <div key={`${item.label}-${item.date || index}-${index}`} className="grid grid-cols-[28px_1fr] gap-3">
+          <span className="flex flex-col items-center">
+            <span className={`grid h-7 w-7 place-items-center rounded-full ${item.final ? "bg-[#c72fb2] text-white" : item.done ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+              <Icon name={item.final ? "star" : "check"} className="h-4 w-4" />
+            </span>
+            {index < items.length - 1 && <span className={`min-h-9 flex-1 w-px ${item.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
+          </span>
+          <span className="pb-4">
+            <span className="block text-sm font-black">{item.label}</span>
+            <span className="block text-xs font-bold leading-5 text-slate-500">
+              {item.details ? `${item.details} - ` : ""}{formatDateTime(item.date)}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -446,23 +548,12 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
       <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr_1fr]">
         <Card className="p-5">
           <h2 className="text-lg font-black">Latest Update</h2>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4">
             {updates.length === 0 ? (
               <p className="py-8 text-center text-sm font-bold text-slate-500">No updates yet.</p>
-            ) : updates.slice(0, 3).map((update) => (
-              <div key={update.id} className="flex gap-3 rounded-xl bg-pink-50/40 p-3">
-                <span className={`mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full ${update.tone === "green" ? "bg-emerald-100 text-emerald-600" : update.tone === "blue" ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-[#c72fb2]"}`}>
-                  <Icon name={update.tone === "green" ? "check" : update.tone === "blue" ? "file" : "upload"} className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-black">{update.title}</span>
-                  <span className="mt-1 block text-xs font-bold text-slate-500">{update.text}</span>
-                  <span className="mt-1 block text-xs font-bold text-slate-400">{formatDateTime(update.date)}</span>
-                </span>
-              </div>
-            ))}
+            ) : renderUpdates(visibleUpdates)}
           </div>
-          <button type="button" className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Updates</button>
+          {updates.length > 6 && <button type="button" onClick={() => setOpenActivityPanel("updates")} className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Updates ({updates.length})</button>}
         </Card>
 
         <Card className="p-5">
@@ -501,24 +592,9 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
         <Card className="p-5">
           <h2 className="text-lg font-black">Project Timeline</h2>
           <div className="mt-5 space-y-0">
-            {timeline.map((item, index) => (
-              <div key={`${item.label}-${index}`} className="grid grid-cols-[28px_1fr] gap-3">
-                <span className="flex flex-col items-center">
-                  <span className={`grid h-7 w-7 place-items-center rounded-full ${item.final ? "bg-[#c72fb2] text-white" : item.done ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
-                    <Icon name={item.final ? "star" : "check"} className="h-4 w-4" />
-                  </span>
-                  {index < timeline.length - 1 && <span className={`h-9 w-px ${item.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
-                </span>
-                <span className="pb-4">
-                  <span className="block text-sm font-black">{item.label}</span>
-                  <span className="block text-xs font-bold text-slate-500">
-                    {item.details ? `${item.details} - ` : ""}{formatDateTime(item.date)}
-                  </span>
-                </span>
-              </div>
-            ))}
+            {renderTimeline(visibleTimeline)}
           </div>
-          <button type="button" className="mt-2 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View Milestones</button>
+          {timeline.length > 6 && <button type="button" onClick={() => setOpenActivityPanel("milestones")} className="mt-2 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Milestones ({timeline.length})</button>}
         </Card>
       </div>
 
@@ -538,6 +614,28 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
             {project.feedback ? "Edit Feedback" : "Give Feedback"}
           </button>
         </Card>
+      )}
+      {project.feedback?.reply?.message && (
+        <Card className="border-pink-100 bg-linear-to-r from-pink-50/80 to-violet-50/70 p-5 dark:border-neutral-800 dark:from-neutral-900 dark:to-neutral-900">
+          <div className="flex items-start gap-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-linear-to-br from-pink-500 to-violet-600 text-white"><Icon name="message" className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <h2 className="text-base font-black text-[#10142d] dark:text-white">Admin Reply to Your Feedback</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
+              <p className="mt-2 text-xs font-bold text-slate-400">{getPersonName(project.feedback.reply.repliedBy, "CLIENTRA Admin")} · {formatDateTime(project.feedback.reply.repliedAt)}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+      {openActivityPanel === "updates" && (
+        <ProjectActivityPanel title="All Project Updates" count={updates.length} onClose={() => setOpenActivityPanel(null)}>
+          {renderUpdates(updates)}
+        </ProjectActivityPanel>
+      )}
+      {openActivityPanel === "milestones" && (
+        <ProjectActivityPanel title="Project Milestones" count={timeline.length} onClose={() => setOpenActivityPanel(null)}>
+          {renderTimeline(timeline)}
+        </ProjectActivityPanel>
       )}
     </div>
   );
@@ -754,18 +852,19 @@ const RatingStars = ({ label, onChange, required = false, value }) => (
     <span className="text-xs font-black text-slate-600 dark:text-slate-300">
       {label} {required && <span className="text-pink-500">*</span>}
     </span>
-    <span className="flex items-center gap-1">
+    <span className="flex items-center gap-1.5">
       {[1, 2, 3, 4, 5].map((rating) => (
         <button
           key={rating}
           type="button"
           onClick={() => onChange(rating)}
-          className={`grid h-6 w-6 place-items-center transition ${rating <= value ? "text-amber-400" : "text-slate-200 hover:text-amber-300"}`}
+          className={`flex h-9 w-7 flex-col items-center justify-center gap-0.5 rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
           aria-label={`${rating} star rating`}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
             <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           </svg>
+          <span className="text-[9px] font-black leading-none">{rating}</span>
         </button>
       ))}
     </span>
@@ -978,6 +1077,8 @@ const ClientProjects = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("Newest");
   const [statusFilter, setStatusFilter] = useState("All Status");
+  const [archiveAction, setArchiveAction] = useState(null);
+  const [noticeMessage, setNoticeMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -986,7 +1087,7 @@ const ClientProjects = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100 });
+        const data = await taskAPI.getAll({ limit: 100, refresh: Date.now() });
         if (isMounted) setProjects(data.map(normalizeProject));
       } catch (error) {
         if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load projects."));
@@ -1001,15 +1102,30 @@ const ClientProjects = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (isLoading || projects.length === 0) return;
+    try {
+      const target = JSON.parse(sessionStorage.getItem(notificationTargetKey) || "null");
+      if (target?.page !== "projects" || !target?.taskId) return;
+      const project = projects.find((item) => item.id === target.taskId);
+      if (project) {
+        setSelectedProject(project);
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    } catch {
+      sessionStorage.removeItem(notificationTargetKey);
+    }
+  }, [isLoading, projects]);
+
   const visibleProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     return projects
       .filter((project) => {
         const matchesTab =
-          activeTab === "All Projects" ||
-          activeTab === "Archived" ||
-          project.status === activeTab;
+          activeTab === "Archived"
+            ? project.archived
+            : !project.archived && (activeTab === "All Projects" || project.status === activeTab);
         const matchesStatus =
           statusFilter === "All Status" || project.status === statusFilter;
         const matchesSearch =
@@ -1033,6 +1149,26 @@ const ClientProjects = () => {
         return (parseDate(second.updatedAt) || 0) - (parseDate(first.updatedAt) || 0);
       });
   }, [activeTab, projects, searchTerm, sortBy, statusFilter]);
+  const projectsInCurrentSection = projects.filter((project) =>
+    activeTab === "Archived" ? project.archived : !project.archived
+  ).length;
+
+  const handleArchiveProject = async () => {
+    const action = archiveAction;
+    if (!action) return;
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.setArchived(action.project.id, action.archived);
+      const updatedProject = normalizeProject(updatedTask);
+      setProjects((currentProjects) => currentProjects.map((project) => project.id === updatedProject.id ? updatedProject : project));
+      setArchiveAction(null);
+      setNoticeMessage(action.archived ? "Project moved to Archived." : "Project restored to My Projects.");
+      window.setTimeout(() => setNoticeMessage(""), 4000);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, action.archived ? "Unable to archive the project." : "Unable to restore the project."));
+      setArchiveAction(null);
+    }
+  };
 
   const handleSubmitRevision = async (project, form) => {
     try {
@@ -1182,7 +1318,8 @@ const ClientProjects = () => {
           {revisionMessage}
         </p>
       )}
-      <ProjectStats projects={projects} />
+      {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
+      <ProjectStats projects={projects.filter((project) => !project.archived)} />
 
       <Card className="overflow-hidden">
         <div className="flex gap-4 overflow-x-auto border-b border-pink-50 px-5 dark:border-neutral-800">
@@ -1206,7 +1343,7 @@ const ClientProjects = () => {
             <p className="py-12 text-center text-sm font-bold text-slate-500">No projects found.</p>
           ) : (
             <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-              {visibleProjects.map((project, index) => (
+              {visibleProjects.map((project) => (
                 <ProjectCard
                   key={project.id || project.title}
                   onFeedback={(selectedProject) =>
@@ -1216,6 +1353,7 @@ const ClientProjects = () => {
                     setRevisionMessage("");
                     setRevisionProject(selectedProject);
                   }}
+                  onToggleArchive={(selectedProject, archived) => setArchiveAction({ project: selectedProject, archived })}
                   onViewDetails={setSelectedProject}
                   project={project}
                 />
@@ -1225,7 +1363,7 @@ const ClientProjects = () => {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
-          <span>Showing 1 to {visibleProjects.length} of {projects.length} projects</span>
+          <span>Showing {visibleProjects.length ? 1 : 0} to {visibleProjects.length} of {projectsInCurrentSection} projects</span>
           <span className="flex items-center gap-2">
             <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Previous page">‹</button>
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#c72fb2] text-white">1</span>
@@ -1233,6 +1371,15 @@ const ClientProjects = () => {
           </span>
         </div>
       </Card>
+      <ConfirmDialog
+        confirmLabel={archiveAction?.archived ? "Archive" : "Restore"}
+        icon="done"
+        isOpen={Boolean(archiveAction)}
+        message={archiveAction?.archived ? `Archive “${archiveAction.project.title}”? You can restore it later from the Archived tab.` : `Restore “${archiveAction?.project.title}” to My Projects?`}
+        onCancel={() => setArchiveAction(null)}
+        onConfirm={handleArchiveProject}
+        title={archiveAction?.archived ? "Archive Project" : "Restore Project"}
+      />
       {revisionProject && (
         <RevisionModal
           onClose={() => setRevisionProject(null)}

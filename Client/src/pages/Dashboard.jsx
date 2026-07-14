@@ -13,6 +13,7 @@ import AdminCalendar from "./Dashboard/Admin/Calendar.jsx";
 import LeaveRequest from "./Leaverequest.jsx";
 import ClientDashboard from "./Dashboard/Client.jsx";
 import ClientProjects from "./Dashboard/ClientProjects.jsx";
+import Feedback from "./Dashboard/Feedback.jsx";
 import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
 import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
@@ -30,6 +31,7 @@ import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/ap
 const adminPages = new Set([
   "dashboard",
   "newsfeed",
+  "feedback",
   "messages",
   "profile",
   "settings",
@@ -1314,7 +1316,7 @@ const Dashboard = () => {
       ? requestedAdminPage
       : "dashboard";
   const localPages = new Set([
-    "dashboard", "projects", "newsfeed", "messages", "profile", "settings",
+    "dashboard", "projects", "newsfeed", "feedback", "messages", "profile", "settings",
     "tasks", "add-task", "edit-task", "calendar", "budget", "leave-request",
   ]);
   const requestedLocalPage = searchParams.get("page") || location.state?.page;
@@ -1484,6 +1486,8 @@ const Dashboard = () => {
       );
     } else if (adminPage === "newsfeed") {
       adminContent = <Newsfeed />;
+    } else if (adminPage === "feedback") {
+      adminContent = <Feedback />;
     } else if (adminPage === "messages") {
       adminContent = <MessagesPanel />;
     } else if (adminPage === "profile") {
@@ -1572,6 +1576,8 @@ const Dashboard = () => {
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
       <Newsfeed />
+    ) : role === "employee" && localPage === "feedback" ? (
+      <Feedback />
     ) : role === "client" && ["tasks", "add-task", "edit-task"].includes(localPage) ? (
       <>
         <AdminTasks

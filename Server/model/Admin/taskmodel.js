@@ -76,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "feedback_submitted"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 
@@ -278,6 +278,30 @@ const taskSchema = new mongoose.Schema(
       },
       wouldRecommend: Boolean,
       submittedAt: Date,
+      reply: {
+        message: {
+          type: String,
+          default: "",
+          trim: true,
+          maxlength: 1000,
+        },
+        repliedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        repliedAt: Date,
+      },
+    },
+
+    archived: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    archivedAt: Date,
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
 
     tags: [String],

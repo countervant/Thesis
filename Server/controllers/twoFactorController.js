@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { createHmac, randomBytes } from "crypto";
 import User from "../model/userModel.js";
 import { sendTwoFactorCode } from "../utils/email.js";
 import {
@@ -12,11 +13,96 @@ import {
 } from "../utils/otp.js";
 
 const otpFields = "+twoFactorCodeHash +twoFactorExpiresAt +twoFactorAttempts +twoFactorLastSentAt +twoFactorPurpose";
+const trustedDeviceFields = "+trustedDevices";
+const TRUSTED_DEVICE_COOKIE = "clientra_trusted_device";
+const TRUSTED_DEVICE_DAYS = Math.max(1, Number(process.env.TRUSTED_DEVICE_DAYS) || 30);
+const TRUSTED_DEVICE_TTL_MS = TRUSTED_DEVICE_DAYS * 24 * 60 * 60 * 1000;
+const MAX_TRUSTED_DEVICES = 10;
 const logSecurityEvent = (event, userId, details = "") =>
   console.info(`[security] ${event} user=${userId}${details ? ` ${details}` : ""}`);
 
 const accessToken = (id) => jwt.sign({ id, type: "access" }, process.env.JWT_SECRET, { expiresIn: "30d" });
 const temporaryToken = (id) => jwt.sign({ id, type: "two-factor" }, process.env.JWT_SECRET, { expiresIn: "10m" });
+
+const hashDeviceToken = (token) =>
+  createHmac("sha256", process.env.JWT_SECRET).update(token).digest("hex");
+
+const readCookie = (req, name) => {
+  const cookies = String(req.headers?.cookie || "").split(";");
+  for (const cookie of cookies) {
+    const separator = cookie.indexOf("=");
+    if (separator < 0) continue;
+    const key = cookie.slice(0, separator).trim();
+    if (key === name) {
+      try {
+        return decodeURIComponent(cookie.slice(separator + 1).trim());
+      } catch {
+        return "";
+      }
+    }
+  }
+  return "";
+};
+
+const trustedCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/api/auth",
+  maxAge: TRUSTED_DEVICE_TTL_MS,
+});
+
+const setTrustedDeviceCookie = (res, value) =>
+  res.cookie(TRUSTED_DEVICE_COOKIE, value, trustedCookieOptions());
+
+const clearTrustedDeviceCookie = (res) =>
+  res.clearCookie(TRUSTED_DEVICE_COOKIE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/api/auth",
+  });
+
+const useTrustedDevice = (req, res, user) => {
+  const storedValue = readCookie(req, TRUSTED_DEVICE_COOKIE);
+  const separator = storedValue.indexOf(".");
+  if (separator < 1 || storedValue.slice(0, separator) !== String(user._id)) return false;
+
+  const rawToken = storedValue.slice(separator + 1);
+  if (!rawToken) return false;
+  const now = Date.now();
+  user.trustedDevices = (user.trustedDevices || []).filter(
+    (device) => device.expiresAt?.getTime() > now
+  );
+  const device = user.trustedDevices.find(
+    (entry) => entry.tokenHash === hashDeviceToken(rawToken)
+  );
+  if (!device) return false;
+
+  device.lastUsedAt = new Date(now);
+  device.expiresAt = new Date(now + TRUSTED_DEVICE_TTL_MS);
+  setTrustedDeviceCookie(res, storedValue);
+  return true;
+};
+
+const trustCurrentDevice = (res, user) => {
+  const rawToken = randomBytes(32).toString("hex");
+  const now = Date.now();
+  const activeDevices = (user.trustedDevices || [])
+    .filter((device) => device.expiresAt?.getTime() > now)
+    .sort((first, second) => (second.lastUsedAt?.getTime() || 0) - (first.lastUsedAt?.getTime() || 0))
+    .slice(0, MAX_TRUSTED_DEVICES - 1);
+  user.trustedDevices = [
+    ...activeDevices,
+    {
+      tokenHash: hashDeviceToken(rawToken),
+      createdAt: new Date(now),
+      lastUsedAt: new Date(now),
+      expiresAt: new Date(now + TRUSTED_DEVICE_TTL_MS),
+    },
+  ];
+  setTrustedDeviceCookie(res, `${user._id}.${rawToken}`);
+};
 
 const publicUser = (user) => ({
   id: user._id,
@@ -115,15 +201,23 @@ export const login = async (req, res) => {
   if (!email || !password) return res.status(400).json({ message: "Please provide email and password" });
 
   try {
-    const user = await User.findOne({ email }).select("password role email isActive twoFactorEnabled");
+    const user = await User.findOne({ email }).select(`password role email isActive twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
     if (!user || !(await user.matchPassword(password)) || user.isActive === false) {
       logSecurityEvent("login_rejected", user?._id || "unknown");
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (user.twoFactorEnabled) {
-      const otpUser = await User.findById(user._id).select(otpFields);
-      const delivery = await sendOtp(otpUser, "login");
+      if (useTrustedDevice(req, res, user)) {
+        clearOtp(user);
+        user.isOnline = true;
+        user.lastSeen = new Date();
+        await user.save({ validateModifiedOnly: true });
+        logSecurityEvent("login_succeeded", user._id, "trustedDevice=true");
+        return res.status(200).json({ ...publicUser(user), token: accessToken(user._id), trustedDevice: true });
+      }
+
+      const delivery = await sendOtp(user, "login");
       return res.status(200).json({
         requiresTwoFactor: true,
         temporaryToken: temporaryToken(user._id),
@@ -142,12 +236,13 @@ export const login = async (req, res) => {
 export const verifyLoginTwoFactor = async (req, res) => {
   try {
     const decoded = readTemporaryToken(req.body?.temporaryToken);
-    const user = await User.findById(decoded.id).select(`email role twoFactorEnabled ${otpFields}`);
+    const user = await User.findById(decoded.id).select(`email role twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
     if (!user?.twoFactorEnabled) return res.status(401).json({ message: "Invalid verification session." });
     const validationError = await validateCode(user, req.body?.code, "login");
     if (validationError) return res.status(validationError.status).json(validationError);
 
     clearOtp(user);
+    trustCurrentDevice(res, user);
     user.isOnline = true;
     user.lastSeen = new Date();
     await user.save({ validateModifiedOnly: true });
@@ -181,6 +276,7 @@ export const getTwoFactorStatus = async (req, res) => {
     required: user.role === "admin",
     method: "Email",
     maskedEmail: maskEmail(user.email),
+    trustedDeviceDays: TRUSTED_DEVICE_DAYS,
   });
 };
 
@@ -202,12 +298,13 @@ export const requestEnableTwoFactor = async (req, res) => {
 
 export const verifyEnableTwoFactor = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select(`email role twoFactorEnabled ${otpFields}`);
+    const user = await User.findById(req.user._id).select(`email role twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
     if (user.twoFactorEnabled) return res.status(409).json({ message: "Two-factor authentication is already enabled." });
     const validationError = await validateCode(user, req.body?.code, "enable");
     if (validationError) return res.status(validationError.status).json(validationError);
     user.twoFactorEnabled = true;
     clearOtp(user);
+    trustCurrentDevice(res, user);
     await user.save({ validateModifiedOnly: true });
     logSecurityEvent("2fa_enabled", user._id);
     return res.json({ message: "Two-factor authentication is now enabled.", enabled: true });
@@ -218,14 +315,16 @@ export const verifyEnableTwoFactor = async (req, res) => {
 };
 
 export const disableTwoFactor = async (req, res) => {
-  const user = await User.findById(req.user._id).select(`password role twoFactorEnabled ${otpFields}`);
+  const user = await User.findById(req.user._id).select(`password role twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
   if (user.role === "admin") return res.status(403).json({ message: "Two-factor authentication is required for Admin accounts." });
   if (!req.body?.password || !(await user.matchPassword(req.body.password))) {
     return res.status(401).json({ message: "Current password is incorrect." });
   }
   user.twoFactorEnabled = false;
+  user.trustedDevices = [];
   clearOtp(user);
   await user.save({ validateModifiedOnly: true });
+  clearTrustedDeviceCookie(res);
   logSecurityEvent("2fa_disabled", user._id);
   return res.json({ message: "Two-factor authentication has been disabled.", enabled: false });
 };

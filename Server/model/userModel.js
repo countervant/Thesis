@@ -137,6 +137,32 @@ const userSchema = new mongoose.Schema(
       enum: ["login", "enable"],
       select: false,
     },
+
+    // Trusted-device tokens are random, stored only as hashes, and expire automatically.
+    trustedDevices: {
+      type: [
+        {
+          tokenHash: {
+            type: String,
+            required: true,
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+          lastUsedAt: {
+            type: Date,
+            default: Date.now,
+          },
+          expiresAt: {
+            type: Date,
+            required: true,
+          },
+        },
+      ],
+      default: [],
+      select: false,
+    },
   },
   {
     timestamps: true,

@@ -306,8 +306,11 @@ router.get("/", protect, async (req, res) => {
       .populate("assignedTo", "firstName lastName email role")
       .populate("assignees", "firstName lastName email role")
       .populate("subtasks.assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role")
-      .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName email role")
       .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -594,6 +597,53 @@ router.put("/:id", protect, async (req, res) => {
   }
 });
 
+router.patch("/:id/archive", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "client") {
+      return res.status(403).json({ message: "Only clients can archive their projects" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+    if (!task) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const archived = req.body?.archived !== false;
+    if (Boolean(task.archived) !== archived) {
+      task.archived = archived;
+      task.archivedAt = archived ? new Date() : undefined;
+      task.archivedBy = archived ? req.user._id : undefined;
+      addActivity(task, {
+        type: archived ? "project_archived" : "project_restored",
+        title: archived ? "Project archived" : "Project restored",
+        details: archived ? "Project moved to the archive" : "Project restored to My Projects",
+        actor: req.user._id,
+        actorName: getActorName(req.user),
+      });
+      await task.save();
+    }
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Archive project error:", error);
+    res.status(500).json({ message: "Unable to update the project archive" });
+  }
+});
+
 router.post("/:id/revisions", protect, async (req, res) => {
   try {
     if (req.user.role !== "client") {
@@ -715,6 +765,63 @@ router.post("/:id/feedback", protect, async (req, res) => {
   }
 });
 
+router.post("/:id/feedback/reply", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only administrators can reply to client feedback" });
+    }
+
+    const message = String(req.body.message || "").trim();
+    if (!message) {
+      return res.status(400).json({ message: "Please enter a reply" });
+    }
+    if (message.length > 1000) {
+      return res.status(400).json({ message: "Reply must be 1000 characters or fewer" });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    if (!task.feedback?.submittedAt) {
+      return res.status(400).json({ message: "This project does not have submitted feedback yet" });
+    }
+
+    const repliedAt = new Date();
+    task.feedback.reply = {
+      message,
+      repliedBy: req.user._id,
+      repliedAt,
+    };
+    addActivity(task, {
+      type: "feedback_replied",
+      title: "Admin replied to your feedback",
+      details: message,
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+      createdAt: repliedAt,
+    });
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .select("-comments")
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Reply to feedback error:", error);
+    res.status(500).json({ message: "Unable to send feedback reply" });
+  }
+});
+
 router.get("/:id/output/download", protect, async (req, res) => {
   try {
     const task = await Task.findOne({
@@ -815,7 +922,6 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       }
 
       fileOutput = await saveOutputFile(task._id, req.body.file);
-      task.attachments.push(fileOutput);
     } else {
       link = String(req.body.link || "").trim();
       if (!link) {
