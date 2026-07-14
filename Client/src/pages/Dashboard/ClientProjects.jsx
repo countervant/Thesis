@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Skeleton from "../../components/Skeleton.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
+
+const notificationTargetKey = "clientraNotificationTarget";
 
 const statusFromApi = {
   pending: "Pending Revisions",
@@ -57,6 +60,7 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   if (name === "external") return <svg {...props}><path d="M14 5h5v5M19 5l-8 8M10 6H6v12h12v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "star") return <svg {...props}><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
   if (name === "send") return <svg {...props}><path d="m20 4-8 16-2-7-6-3 16-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "message") return <svg {...props}><path d="M5 5h14v11H9l-4 3V5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M8 9h8M8 12h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "upload") return <svg {...props}><path d="M12 16V5M8 9l4-4 4 4M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "dots") return <svg {...props}><path d="M12 6h.01M12 12h.01M12 18h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>;
   return <svg {...props}><path d="M5 12h14M12 5v14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
@@ -67,14 +71,6 @@ const getEntityId = (entity) => {
   if (typeof entity === "string") return entity;
   return entity._id || entity.id || "";
 };
-
-const getInitials = (value) =>
-  String(value || "Project")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "PR";
 
 const normalizeSubtasks = (subtasks = []) => {
   if (!Array.isArray(subtasks)) return [];
@@ -121,6 +117,13 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+  }).format(Number(value) || 0);
+
 const getPersonName = (person, fallback = "Clientra Team") => {
   if (!person || typeof person === "string") return fallback;
   return [person.firstName, person.lastName].filter(Boolean).join(" ") || person.companyName || person.email || fallback;
@@ -134,6 +137,20 @@ const getFileUrl = (fileUrl) => {
 const normalizeProject = (task) => {
   const subtasks = normalizeSubtasks(task?.subtasks);
   const status = statusFromApi[task?.status] || task?.status || "Pending Revisions";
+  const attachments = Array.isArray(task?.attachments) ? task.attachments : [];
+  const finalOutput = task?.finalOutput || null;
+  const feedback = task?.feedback;
+  const hasSubmittedFeedback = Boolean(
+    feedback?.submittedAt &&
+    Number(feedback?.overallRating) >= 1 &&
+    Number(feedback?.overallRating) <= 5
+  );
+  const uploadedFileIds = new Set(
+    [
+      ...attachments.map((file) => file?.fileUrl || file?.fileName),
+      finalOutput?.fileUrl || finalOutput?.fileName,
+    ].filter(Boolean)
+  );
 
   return {
     id: getEntityId(task),
@@ -142,7 +159,10 @@ const normalizeProject = (task) => {
     description: task?.description || "Project request",
     startDate: task?.startDate || task?.createdAt,
     dueDate: task?.dueDate,
-    files: Math.max(1, subtasks.length + 2),
+    amount: Number(task?.amount ?? task?.budget ?? 0),
+    paid: Number(task?.paid ?? 0),
+    pendingAmount: Math.max(0, Number(task?.amount ?? task?.budget ?? 0) - Number(task?.paid ?? 0)),
+    files: uploadedFileIds.size,
     priority: task?.priority || "medium",
     progress: getTaskProgress(subtasks),
     subtasks,
@@ -156,8 +176,11 @@ const normalizeProject = (task) => {
     assignedTo: task?.assignedTo,
     createdBy: task?.createdBy,
     requestedBy: task?.requestedBy,
-    attachments: Array.isArray(task?.attachments) ? task.attachments : [],
-    finalOutput: task?.finalOutput || null,
+    attachments,
+    finalOutput,
+    feedback: hasSubmittedFeedback ? feedback : null,
+    archived: Boolean(task?.archived),
+    archivedAt: task?.archivedAt,
   };
 };
 
@@ -189,24 +212,23 @@ const ProjectStats = ({ projects }) => {
   );
 };
 
-const ProjectCard = ({ onRequestRevision, onViewDetails, project, index }) => {
+const ProjectCard = ({ onFeedback, onRequestRevision, onToggleArchive, onViewDetails, project }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
   const statusClass = statusStyles[project.status] || statusStyles["Pending Revisions"];
   const progressClass = progressColors[project.status] || progressColors["Pending Revisions"];
 
   return (
     <Card className="overflow-hidden p-4">
-      <div className="flex items-start gap-4">
-        <span className={`grid h-16 w-16 shrink-0 place-items-center rounded-xl text-sm font-black text-white ${thumbnailColors[index % thumbnailColors.length]}`}>
-          {getInitials(project.title)}
-        </span>
-        <span className="min-w-0 flex-1">
+      <div>
+        <span className="min-w-0">
           <span className="flex items-start justify-between gap-3">
             <span className="min-w-0">
               <span className="block truncate text-base font-black text-[#10142d] dark:text-white">{project.title}</span>
               <span className="mt-1 block truncate text-xs font-bold text-slate-500">{project.description}</span>
             </span>
-            <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>
-              {project.status}
+            <span className="flex shrink-0 flex-col items-end gap-1">
+              <span className={`rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>{project.status}</span>
+              {project.archived && <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500 dark:bg-neutral-800">Archived</span>}
             </span>
           </span>
 
@@ -235,8 +257,10 @@ const ProjectCard = ({ onRequestRevision, onViewDetails, project, index }) => {
 
       <div className="mt-5 grid grid-cols-3 gap-3 text-xs font-bold text-slate-500">
         <span className="min-w-0">
-          <span className="block text-[10px] font-black text-slate-400">Team</span>
-          <span className="font-black text-[#10142d] dark:text-white">{project.team}</span>
+          <span className="block text-[10px] font-black text-slate-400">Developer</span>
+          <span className="block truncate font-black text-[#10142d] dark:text-white" title={getPersonName(project.assignedTo, "Unassigned")}>
+            {getPersonName(project.assignedTo, "Unassigned")}
+          </span>
         </span>
         <span className="min-w-0">
           <span className="block text-[10px] font-black text-slate-400">Revisions</span>
@@ -255,18 +279,52 @@ const ProjectCard = ({ onRequestRevision, onViewDetails, project, index }) => {
           <Icon name="eye" className="h-4 w-4" />
           View Details
         </button>
-        <button
-          type="button"
-          onClick={() => onRequestRevision(project)}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
-        >
-          <Icon name="refresh" className="h-4 w-4" />
-          Request Revision
-        </button>
-        <button type="button" className="grid h-9 place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`}>
-          <Icon name="dots" className="h-5 w-5" />
-        </button>
+        {project.status === "Completed" ? (
+          <button
+            type="button"
+            onClick={() => onFeedback(project)}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.2)] transition hover:brightness-105"
+          >
+            <Icon name="star" className="h-4 w-4" />
+            {project.feedback ? "Edit Feedback" : "Give Feedback"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onRequestRevision(project)}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
+          >
+            <Icon name="refresh" className="h-4 w-4" />
+            Request Revision
+          </button>
+        )}
+        <div className="relative">
+          <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-9 w-full place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`} aria-expanded={menuOpen}>
+            <Icon name="dots" className="h-5 w-5" />
+          </button>
+          {menuOpen && (
+            <div className="absolute bottom-11 right-0 z-20 w-44 rounded-xl border border-pink-100 bg-white p-1.5 shadow-[0_14px_34px_rgba(30,20,45,0.18)] dark:border-neutral-700 dark:bg-neutral-900">
+              <button type="button" onClick={() => { setMenuOpen(false); onToggleArchive(project, !project.archived); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-neutral-800">
+                <Icon name={project.archived ? "refresh" : "folder"} className="h-4 w-4" />
+                {project.archived ? "Restore Project" : "Archive Project"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+      {project.status === "Completed" && project.feedback && (
+        <>
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs font-bold text-emerald-700">
+            <span className="inline-flex min-w-0 items-center gap-2"><Icon name="star" className="h-4 w-4 shrink-0" />You've submitted feedback</span>
+          </div>
+          {project.feedback.reply?.message && (
+            <div className="mt-2 rounded-lg border border-pink-100 bg-pink-50/70 px-3 py-2">
+              <p className="text-[10px] font-black uppercase tracking-wide text-[#c72fb2]">Admin replied</p>
+              <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
+            </div>
+          )}
+        </>
+      )}
     </Card>
   );
 };
@@ -278,8 +336,35 @@ const DetailRow = ({ label, value }) => (
   </p>
 );
 
-const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
-  const outputItems = [
+const ProjectActivityPanel = ({ children, count, onClose, title }) => (
+  <div
+    className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm"
+    onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    role="presentation"
+  >
+    <section
+      className="flex max-h-[min(760px,88vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_24px_70px_rgba(30,20,45,0.28)] dark:border-neutral-800 dark:bg-neutral-900"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-activity-panel-title"
+    >
+      <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800">
+        <div>
+          <h2 id="project-activity-panel-title" className="text-lg font-black text-[#10142d] dark:text-white">{title}</h2>
+          <p className="mt-0.5 text-xs font-bold text-slate-500">{count} {count === 1 ? "item" : "items"}</p>
+        </div>
+        <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-pink-100 text-sm font-black text-[#c72fb2] transition hover:bg-pink-50" aria-label={`Close ${title}`}>x</button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5 pr-3">
+        {children}
+      </div>
+    </section>
+  </div>
+);
+
+const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, onRequestRevision, project }) => {
+  const [openActivityPanel, setOpenActivityPanel] = useState(null);
+  const outputCandidates = [
     ...(project.finalOutput?.link
       ? [{
           id: "final-link",
@@ -309,6 +394,15 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
       submittedAt: project.finalOutput?.submittedAt || project.updatedAt,
     })),
   ];
+  const seenOutputs = new Set();
+  const outputItems = outputCandidates.filter((output) => {
+    const normalizedUrl = String(output.url || "").trim().replace(/\\/g, "/").toLowerCase();
+    const normalizedTitle = String(output.title || "").trim().toLowerCase();
+    const key = normalizedUrl || `${output.type}:${normalizedTitle}`;
+    if (!key || seenOutputs.has(key)) return false;
+    seenOutputs.add(key);
+    return true;
+  });
   const fallbackUpdates = [
     project.status === "Completed" && {
       id: "completed",
@@ -366,6 +460,46 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
           final: false,
         }))
       : [{ label: "No task activity yet", details: "", date: project.updatedAt, done: false, final: false }];
+  const visibleUpdates = updates.slice(0, 6);
+  const visibleTimeline = timeline.slice(0, 6);
+
+  const renderUpdates = (items) => (
+    <div className="space-y-3">
+      {items.map((update) => (
+        <div key={update.id} className="flex gap-3 rounded-xl bg-pink-50/40 p-3 dark:bg-neutral-800/70">
+          <span className={`mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full ${update.tone === "green" ? "bg-emerald-100 text-emerald-600" : update.tone === "blue" ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-[#c72fb2]"}`}>
+            <Icon name={update.tone === "green" ? "check" : update.tone === "blue" ? "file" : "upload"} className="h-4 w-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-black">{update.title}</span>
+            <span className="mt-1 block text-xs font-bold leading-5 text-slate-500">{update.text}</span>
+            <span className="mt-1 block text-xs font-bold text-slate-400">{formatDateTime(update.date)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderTimeline = (items) => (
+    <div className="space-y-0">
+      {items.map((item, index) => (
+        <div key={`${item.label}-${item.date || index}-${index}`} className="grid grid-cols-[28px_1fr] gap-3">
+          <span className="flex flex-col items-center">
+            <span className={`grid h-7 w-7 place-items-center rounded-full ${item.final ? "bg-[#c72fb2] text-white" : item.done ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+              <Icon name={item.final ? "star" : "check"} className="h-4 w-4" />
+            </span>
+            {index < items.length - 1 && <span className={`min-h-9 flex-1 w-px ${item.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
+          </span>
+          <span className="pb-4">
+            <span className="block text-sm font-black">{item.label}</span>
+            <span className="block text-xs font-bold leading-5 text-slate-500">
+              {item.details ? `${item.details} - ` : ""}{formatDateTime(item.date)}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -375,16 +509,20 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
           Back to My Projects
         </button>
         <span className="flex flex-wrap gap-3">
-          <button type="button" onClick={() => onRequestRevision(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-5 text-xs font-black text-[#e347a8] transition hover:bg-pink-50">
-            <Icon name="refresh" className="h-4 w-4" />
-            Request Revision
-          </button>
-          <button type="button" onClick={onFeedback} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
-            <Icon name="star" className="h-4 w-4" />
-            Give Feedback
-          </button>
+          {project.status === "Completed" ? (
+            <button type="button" onClick={onFeedback} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
+              <Icon name="star" className="h-4 w-4" />
+              {project.feedback ? "Edit Feedback" : "Give Feedback"}
+            </button>
+          ) : (
+            <button type="button" onClick={() => onRequestRevision(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-5 text-xs font-black text-[#e347a8] transition hover:bg-pink-50">
+              <Icon name="refresh" className="h-4 w-4" />
+              Request Revision
+            </button>
+          )}
         </span>
       </header>
+      {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
 
       <Card className="p-5">
         <h1 className="text-2xl font-black">Project Overview</h1>
@@ -393,13 +531,15 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
           <div>
             <DetailRow label="Project Name" value={project.title} />
             <DetailRow label="Client" value={getPersonName(project.requestedBy, project.raw?.requestedByName || "Client")} />
-            <DetailRow label="Project Manager" value={getPersonName(project.assignedTo, "Unassigned")} />
+            <DetailRow label="Developer" value={getPersonName(project.assignedTo, "Unassigned")} />
             <DetailRow label="Start Date" value={formatDate(project.startDate)} />
           </div>
           <div className="lg:border-l lg:border-pink-100 lg:pl-10 dark:lg:border-neutral-800">
             <DetailRow label="Due Date" value={formatDate(project.dueDate)} />
             <DetailRow label="Completed Date" value={project.completedAt ? formatDate(project.completedAt) : "Not completed"} />
-            <DetailRow label="Budget" value="N/A" />
+            <DetailRow label="Amount" value={formatCurrency(project.amount)} />
+            <DetailRow label="Paid" value={formatCurrency(project.paid)} />
+            <DetailRow label="Pending" value={formatCurrency(project.pendingAmount)} />
             <DetailRow label="Last Updated" value={formatDateTime(project.updatedAt)} />
           </div>
         </div>
@@ -408,23 +548,12 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
       <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr_1fr]">
         <Card className="p-5">
           <h2 className="text-lg font-black">Latest Update</h2>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4">
             {updates.length === 0 ? (
               <p className="py-8 text-center text-sm font-bold text-slate-500">No updates yet.</p>
-            ) : updates.slice(0, 3).map((update) => (
-              <div key={update.id} className="flex gap-3 rounded-xl bg-pink-50/40 p-3">
-                <span className={`mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full ${update.tone === "green" ? "bg-emerald-100 text-emerald-600" : update.tone === "blue" ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-[#c72fb2]"}`}>
-                  <Icon name={update.tone === "green" ? "check" : update.tone === "blue" ? "file" : "upload"} className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-black">{update.title}</span>
-                  <span className="mt-1 block text-xs font-bold text-slate-500">{update.text}</span>
-                  <span className="mt-1 block text-xs font-bold text-slate-400">{formatDateTime(update.date)}</span>
-                </span>
-              </div>
-            ))}
+            ) : renderUpdates(visibleUpdates)}
           </div>
-          <button type="button" className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Updates</button>
+          {updates.length > 6 && <button type="button" onClick={() => setOpenActivityPanel("updates")} className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Updates ({updates.length})</button>}
         </Card>
 
         <Card className="p-5">
@@ -443,10 +572,17 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
                   <span className="block truncate text-xs font-bold text-slate-500">{output.subtitle}</span>
                   <span className="block text-xs font-bold text-slate-400">{formatDateTime(output.submittedAt)}</span>
                 </span>
-                <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                  {output.type === "link" ? "Open Link" : "Download"}
-                  <Icon name={output.type === "link" ? "external" : "download"} className="h-4 w-4" />
-                </a>
+                {output.type === "link" ? (
+                  <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                    Open Link
+                    <Icon name="external" className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <button type="button" onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                    Download
+                    <Icon name="download" className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -456,24 +592,9 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
         <Card className="p-5">
           <h2 className="text-lg font-black">Project Timeline</h2>
           <div className="mt-5 space-y-0">
-            {timeline.map((item, index) => (
-              <div key={`${item.label}-${index}`} className="grid grid-cols-[28px_1fr] gap-3">
-                <span className="flex flex-col items-center">
-                  <span className={`grid h-7 w-7 place-items-center rounded-full ${item.final ? "bg-[#c72fb2] text-white" : item.done ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
-                    <Icon name={item.final ? "star" : "check"} className="h-4 w-4" />
-                  </span>
-                  {index < timeline.length - 1 && <span className={`h-9 w-px ${item.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
-                </span>
-                <span className="pb-4">
-                  <span className="block text-sm font-black">{item.label}</span>
-                  <span className="block text-xs font-bold text-slate-500">
-                    {item.details ? `${item.details} - ` : ""}{formatDateTime(item.date)}
-                  </span>
-                </span>
-              </div>
-            ))}
+            {renderTimeline(visibleTimeline)}
           </div>
-          <button type="button" className="mt-2 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View Milestones</button>
+          {timeline.length > 6 && <button type="button" onClick={() => setOpenActivityPanel("milestones")} className="mt-2 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Milestones ({timeline.length})</button>}
         </Card>
       </div>
 
@@ -488,20 +609,104 @@ const ProjectDetails = ({ onBack, onFeedback, onRequestRevision, project }) => {
               <span className="mt-1 block text-sm font-semibold text-slate-500">If you are satisfied with our work, please give your feedback to help us improve.</span>
             </span>
           </span>
-          <button type="button" onClick={onFeedback} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
+          <button type="button" onClick={() => onFeedback(project)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
             <Icon name="star" className="h-4 w-4" />
-            Give Feedback
+            {project.feedback ? "Edit Feedback" : "Give Feedback"}
           </button>
         </Card>
+      )}
+      {project.feedback?.reply?.message && (
+        <Card className="border-pink-100 bg-linear-to-r from-pink-50/80 to-violet-50/70 p-5 dark:border-neutral-800 dark:from-neutral-900 dark:to-neutral-900">
+          <div className="flex items-start gap-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-linear-to-br from-pink-500 to-violet-600 text-white"><Icon name="message" className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <h2 className="text-base font-black text-[#10142d] dark:text-white">Admin Reply to Your Feedback</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
+              <p className="mt-2 text-xs font-bold text-slate-400">{getPersonName(project.feedback.reply.repliedBy, "CLIENTRA Admin")} · {formatDateTime(project.feedback.reply.repliedAt)}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+      {openActivityPanel === "updates" && (
+        <ProjectActivityPanel title="All Project Updates" count={updates.length} onClose={() => setOpenActivityPanel(null)}>
+          {renderUpdates(updates)}
+        </ProjectActivityPanel>
+      )}
+      {openActivityPanel === "milestones" && (
+        <ProjectActivityPanel title="Project Milestones" count={timeline.length} onClose={() => setOpenActivityPanel(null)}>
+          {renderTimeline(timeline)}
+        </ProjectActivityPanel>
       )}
     </div>
   );
 };
 
+const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
+  const [rating, setRating] = useState(project.feedback?.rating || 0);
+  const [comment, setComment] = useState(project.feedback?.comment || "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!rating) {
+      setFormError("Please select a rating.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setFormError("");
+      await onSubmit(project, { rating, comment });
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Unable to submit feedback."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] dark:border-neutral-800 dark:bg-[#141414]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Share your feedback</h2>
+            <p className="mt-2 text-sm font-bold text-slate-500">How was the completed work on <span className="text-[#10142d] dark:text-white">{project.title}</span>?</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback form">x</button>
+        </div>
+
+        <fieldset className="mt-6">
+          <legend className="text-sm font-black text-[#10142d] dark:text-white">Your rating</legend>
+          <div className="mt-3 flex gap-2">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button key={value} type="button" onClick={() => setRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} className={`grid h-11 w-11 place-items-center rounded-lg text-xl transition ${value <= rating ? "bg-pink-50 text-[#c72fb2]" : "bg-slate-50 text-slate-300 hover:text-[#e347a8] dark:bg-neutral-900"}`}>
+                ★
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="mt-6 block text-sm font-black text-[#10142d] dark:text-white">
+          Comments <span className="font-bold text-slate-400">(optional)</span>
+          <textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={1000} rows={5} placeholder="Tell us what went well or what we can improve..." className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white" />
+          <span className="mt-1 block text-right text-xs font-bold text-slate-400">{comment.length}/1000</span>
+        </label>
+        {formError && <p className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{formError}</p>}
+        <div className="mt-5 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-10 rounded-lg px-5 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:hover:bg-neutral-900">Cancel</button>
+          <button disabled={isSubmitting} className="h-10 rounded-lg bg-[#c72fb2] px-5 text-sm font-black text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Submitting..." : "Submit Feedback"}</button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+SimpleFeedbackModal.displayName = "SimpleFeedbackModal";
+
 const RevisionModal = ({ onClose, onSubmit, project }) => {
   const [form, setForm] = useState({
     title: "",
-    section: "",
     priority: "",
     description: "",
     dueDate: "",
@@ -542,11 +747,8 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
           </button>
         </div>
 
-        <div className="mt-6 flex items-center gap-4 rounded-xl border border-pink-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-linear-to-br from-[#10142d] to-[#c72fb2] text-sm font-black text-white">
-            {getInitials(project.title)}
-          </span>
-          <span className="min-w-0 flex-1">
+        <div className="mt-6 rounded-xl border border-pink-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+          <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
               <span className="truncate text-base font-black text-[#10142d] dark:text-white">{project.title}</span>
               <span className={`rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>{project.status}</span>
@@ -573,22 +775,6 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Section / Page <span className="text-pink-500">*</span></span>
-            <select
-              required
-              value={form.section}
-              onChange={(event) => updateField("section", event.target.value)}
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
-            >
-              <option value="">Select section or page</option>
-              <option>Homepage</option>
-              <option>About Page</option>
-              <option>Product Page</option>
-              <option>Brand Assets</option>
-              <option>Other</option>
-            </select>
-          </label>
-          <label className="block">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Priority <span className="text-pink-500">*</span></span>
             <select
               required
@@ -603,7 +789,6 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
               <option>Urgent</option>
             </select>
           </label>
-          <span className="hidden md:block" />
           <label className="block md:col-span-2">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Description of Changes <span className="text-pink-500">*</span></span>
             <textarea
@@ -661,6 +846,113 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
     </div>
   );
 };
+
+const RatingStars = ({ label, onChange, required = false, value }) => (
+  <div className="flex items-center justify-between gap-4">
+    <span className="text-xs font-black text-slate-600 dark:text-slate-300">
+      {label} {required && <span className="text-pink-500">*</span>}
+    </span>
+    <span className="flex items-center gap-1.5">
+      {[1, 2, 3, 4, 5].map((rating) => (
+        <button
+          key={rating}
+          type="button"
+          onClick={() => onChange(rating)}
+          className={`flex h-9 w-7 flex-col items-center justify-center gap-0.5 rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
+          aria-label={`${rating} star rating`}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
+            <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+          </svg>
+          <span className="text-[9px] font-black leading-none">{rating}</span>
+        </button>
+      ))}
+    </span>
+  </div>
+);
+
+const FeedbackModal = ({ onClose, onSubmit, project }) => {
+  const feedback = project.feedback || {};
+  const [form, setForm] = useState({
+    overallRating: feedback.overallRating || 0,
+    quality: feedback.quality || 0,
+    communication: feedback.communication || 0,
+    timeliness: feedback.timeliness || 0,
+    overallSatisfaction: feedback.overallSatisfaction || 0,
+    comment: feedback.comment || "",
+    wouldRecommend: feedback.wouldRecommend === false ? "no" : feedback.wouldRecommend ? "yes" : "",
+  });
+
+  const updateRating = (field, value) =>
+    setForm((currentForm) => ({ ...currentForm, [field]: value }));
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit(project, {
+      ...form,
+      wouldRecommend: form.wouldRecommend === "yes",
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Give Feedback</h2>
+            <p className="mt-2 text-sm font-bold text-slate-500">Tell us about your experience with this project.</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback">x</button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/30 p-4">
+          <p className="text-sm font-black text-[#10142d]">{project.title}</p>
+          <p className="mt-1 text-xs font-bold text-emerald-600">Completed {formatDate(project.completedAt || project.updatedAt)}</p>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <RatingStars label="Overall Rating" required value={form.overallRating} onChange={(value) => updateRating("overallRating", value)} />
+          <div className="rounded-xl border border-pink-100 p-4">
+            <p className="mb-3 text-xs font-black text-slate-600">Detailed Ratings <span className="font-bold text-slate-400">(optional)</span></p>
+            <div className="space-y-3">
+              <RatingStars label="Quality of Work" value={form.quality} onChange={(value) => updateRating("quality", value)} />
+              <RatingStars label="Communication" value={form.communication} onChange={(value) => updateRating("communication", value)} />
+              <RatingStars label="Timeliness" value={form.timeliness} onChange={(value) => updateRating("timeliness", value)} />
+              <RatingStars label="Overall Satisfaction" value={form.overallSatisfaction} onChange={(value) => updateRating("overallSatisfaction", value)} />
+            </div>
+          </div>
+          <label className="block">
+            <span className="mb-2 block text-xs font-black text-slate-600">Your Feedback</span>
+            <textarea value={form.comment} onChange={(event) => updateRating("comment", event.target.value)} maxLength={1000} rows={4} placeholder="Share your thoughts about the project..." className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100" />
+          </label>
+          <fieldset>
+            <legend className="mb-2 text-xs font-black text-slate-600">Would you recommend us?</legend>
+            <div className="flex items-center gap-5 text-xs font-bold text-slate-600">
+              <label className="inline-flex items-center gap-2"><input type="radio" name="recommend" checked={form.wouldRecommend === "yes"} onChange={() => updateRating("wouldRecommend", "yes")} className="accent-[#c72fb2]" />Yes, definitely</label>
+              <label className="inline-flex items-center gap-2"><input type="radio" name="recommend" checked={form.wouldRecommend === "no"} onChange={() => updateRating("wouldRecommend", "no")} className="accent-[#c72fb2]" />Not really</label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
+          <button type="submit" disabled={!form.overallRating} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c72fb2] text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="send" className="h-4 w-4" />Submit Feedback</button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const FeedbackSuccessModal = ({ onClose }) => (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-950/45 px-4 backdrop-blur-[2px]">
+    <section className="w-full max-w-sm rounded-2xl border border-pink-100 bg-white px-7 py-9 text-center shadow-[0_22px_60px_rgba(15,23,42,0.28)]">
+      <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-white shadow-[0_10px_22px_rgba(16,185,129,0.26)]"><Icon name="check" className="h-9 w-9" /></span>
+      <h2 className="mt-5 text-2xl font-black text-[#10142d]">Feedback Submitted!</h2>
+      <p className="mt-3 text-sm font-bold leading-6 text-slate-500">Thank you for your feedback. Your response helps us improve our service.</p>
+      <button type="button" onClick={onClose} className="mt-6 h-10 rounded-lg bg-[#c72fb2] px-9 text-sm font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.22)]">Close</button>
+    </section>
+  </div>
+);
 
 const ClientProjectsSkeleton = () => (
   <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -775,6 +1067,8 @@ const ClientProjectsSkeleton = () => (
 const ClientProjects = () => {
   const [activeTab, setActiveTab] = useState("All Projects");
   const [errorMessage, setErrorMessage] = useState("");
+  const [feedbackProject, setFeedbackProject] = useState(null);
+  const [feedbackSuccessProject, setFeedbackSuccessProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState([]);
   const [revisionMessage, setRevisionMessage] = useState("");
@@ -783,6 +1077,8 @@ const ClientProjects = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("Newest");
   const [statusFilter, setStatusFilter] = useState("All Status");
+  const [archiveAction, setArchiveAction] = useState(null);
+  const [noticeMessage, setNoticeMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -791,7 +1087,7 @@ const ClientProjects = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100 });
+        const data = await taskAPI.getAll({ limit: 100, refresh: Date.now() });
         if (isMounted) setProjects(data.map(normalizeProject));
       } catch (error) {
         if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load projects."));
@@ -806,15 +1102,30 @@ const ClientProjects = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (isLoading || projects.length === 0) return;
+    try {
+      const target = JSON.parse(sessionStorage.getItem(notificationTargetKey) || "null");
+      if (target?.page !== "projects" || !target?.taskId) return;
+      const project = projects.find((item) => item.id === target.taskId);
+      if (project) {
+        setSelectedProject(project);
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    } catch {
+      sessionStorage.removeItem(notificationTargetKey);
+    }
+  }, [isLoading, projects]);
+
   const visibleProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     return projects
       .filter((project) => {
         const matchesTab =
-          activeTab === "All Projects" ||
-          activeTab === "Archived" ||
-          project.status === activeTab;
+          activeTab === "Archived"
+            ? project.archived
+            : !project.archived && (activeTab === "All Projects" || project.status === activeTab);
         const matchesStatus =
           statusFilter === "All Status" || project.status === statusFilter;
         const matchesSearch =
@@ -838,6 +1149,26 @@ const ClientProjects = () => {
         return (parseDate(second.updatedAt) || 0) - (parseDate(first.updatedAt) || 0);
       });
   }, [activeTab, projects, searchTerm, sortBy, statusFilter]);
+  const projectsInCurrentSection = projects.filter((project) =>
+    activeTab === "Archived" ? project.archived : !project.archived
+  ).length;
+
+  const handleArchiveProject = async () => {
+    const action = archiveAction;
+    if (!action) return;
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.setArchived(action.project.id, action.archived);
+      const updatedProject = normalizeProject(updatedTask);
+      setProjects((currentProjects) => currentProjects.map((project) => project.id === updatedProject.id ? updatedProject : project));
+      setArchiveAction(null);
+      setNoticeMessage(action.archived ? "Project moved to Archived." : "Project restored to My Projects.");
+      window.setTimeout(() => setNoticeMessage(""), 4000);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, action.archived ? "Unable to archive the project." : "Unable to restore the project."));
+      setArchiveAction(null);
+    }
+  };
 
   const handleSubmitRevision = async (project, form) => {
     try {
@@ -859,6 +1190,35 @@ const ClientProjects = () => {
     }
   };
 
+  const handleDownloadOutput = async (project, output) => {
+    try {
+      setErrorMessage("");
+      await taskAPI.downloadOutput(project.id, output.title);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
+    }
+  };
+
+  const handleSubmitFeedback = async (project, form) => {
+    try {
+      const updatedTask = await taskAPI.submitFeedback(project.id, form);
+      const updatedProject = normalizeProject(updatedTask);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === updatedProject.id ? updatedProject : currentProject
+        )
+      );
+      setSelectedProject((currentProject) =>
+        currentProject?.id === updatedProject.id ? updatedProject : currentProject
+      );
+      setFeedbackProject(null);
+      setFeedbackSuccessProject(updatedProject);
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to submit feedback."));
+    }
+  };
+
   if (isLoading) {
     return <ClientProjectsSkeleton />;
   }
@@ -867,8 +1227,10 @@ const ClientProjects = () => {
     return (
       <>
         <ProjectDetails
+          errorMessage={errorMessage}
           onBack={() => setSelectedProject(null)}
-          onFeedback={() => setRevisionMessage(`Feedback option opened for ${selectedProject.title}.`)}
+          onDownloadOutput={handleDownloadOutput}
+          onFeedback={() => setFeedbackProject(selectedProject)}
           onRequestRevision={(project) => {
             setRevisionMessage("");
             setRevisionProject(project);
@@ -881,6 +1243,17 @@ const ClientProjects = () => {
             onSubmit={handleSubmitRevision}
             project={revisionProject}
           />
+        )}
+        {feedbackProject && (
+          <FeedbackModal
+            key={feedbackProject.id}
+            onClose={() => setFeedbackProject(null)}
+            onSubmit={handleSubmitFeedback}
+            project={feedbackProject}
+          />
+        )}
+        {feedbackSuccessProject && (
+          <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
         )}
       </>
     );
@@ -945,8 +1318,8 @@ const ClientProjects = () => {
           {revisionMessage}
         </p>
       )}
-
-      <ProjectStats projects={projects} />
+      {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
+      <ProjectStats projects={projects.filter((project) => !project.archived)} />
 
       <Card className="overflow-hidden">
         <div className="flex gap-4 overflow-x-auto border-b border-pink-50 px-5 dark:border-neutral-800">
@@ -970,14 +1343,17 @@ const ClientProjects = () => {
             <p className="py-12 text-center text-sm font-bold text-slate-500">No projects found.</p>
           ) : (
             <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-              {visibleProjects.map((project, index) => (
+              {visibleProjects.map((project) => (
                 <ProjectCard
                   key={project.id || project.title}
-                  index={index}
+                  onFeedback={(selectedProject) =>
+                    setFeedbackProject(selectedProject)
+                  }
                   onRequestRevision={(selectedProject) => {
                     setRevisionMessage("");
                     setRevisionProject(selectedProject);
                   }}
+                  onToggleArchive={(selectedProject, archived) => setArchiveAction({ project: selectedProject, archived })}
                   onViewDetails={setSelectedProject}
                   project={project}
                 />
@@ -987,7 +1363,7 @@ const ClientProjects = () => {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
-          <span>Showing 1 to {visibleProjects.length} of {projects.length} projects</span>
+          <span>Showing {visibleProjects.length ? 1 : 0} to {visibleProjects.length} of {projectsInCurrentSection} projects</span>
           <span className="flex items-center gap-2">
             <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Previous page">‹</button>
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#c72fb2] text-white">1</span>
@@ -995,6 +1371,15 @@ const ClientProjects = () => {
           </span>
         </div>
       </Card>
+      <ConfirmDialog
+        confirmLabel={archiveAction?.archived ? "Archive" : "Restore"}
+        icon="done"
+        isOpen={Boolean(archiveAction)}
+        message={archiveAction?.archived ? `Archive “${archiveAction.project.title}”? You can restore it later from the Archived tab.` : `Restore “${archiveAction?.project.title}” to My Projects?`}
+        onCancel={() => setArchiveAction(null)}
+        onConfirm={handleArchiveProject}
+        title={archiveAction?.archived ? "Archive Project" : "Restore Project"}
+      />
       {revisionProject && (
         <RevisionModal
           onClose={() => setRevisionProject(null)}
@@ -1002,17 +1387,19 @@ const ClientProjects = () => {
           project={revisionProject}
         />
       )}
+      {feedbackProject && (
+        <FeedbackModal
+          key={feedbackProject.id}
+          onClose={() => setFeedbackProject(null)}
+          onSubmit={handleSubmitFeedback}
+          project={feedbackProject}
+        />
+      )}
+      {feedbackSuccessProject && (
+        <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
+      )}
     </div>
   );
 };
-
-const thumbnailColors = [
-  "bg-linear-to-br from-[#111936] to-[#c72fb2]",
-  "bg-linear-to-br from-neutral-950 to-neutral-700",
-  "bg-linear-to-br from-emerald-500 to-green-700",
-  "bg-linear-to-br from-orange-400 to-pink-500",
-  "bg-linear-to-br from-blue-500 to-[#c72fb2]",
-  "bg-linear-to-br from-slate-400 to-slate-700",
-];
 
 export default ClientProjects;

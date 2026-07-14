@@ -5,7 +5,7 @@ import User from '../model/userModel.js';
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
 const authUserCache = new Map();
 const authUserFields =
-  "firstName middleInitial lastName companyName email phone country role position avatar coverPhoto isActive isOnline lastSeen createdAt updatedAt";
+  "firstName middleInitial lastName companyName email phone country role position avatar coverPhoto isActive isOnline lastSeen twoFactorEnabled createdAt updatedAt";
 
 const isDatabaseTimeout = (error) => {
   const message = String(error?.message || "").toLowerCase();
@@ -68,6 +68,9 @@ export const protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    if (decoded.type && decoded.type !== "access") {
+      return res.status(401).json({ message: 'Not authorized, full authentication required' });
+    }
     req.user = await getCachedUser(decoded.id);
 
     if (!req.user) {

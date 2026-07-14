@@ -104,6 +104,65 @@ const userSchema = new mongoose.Schema(
     resetPasswordOTPExpires: {
       type: Date,
     },
+
+    // Login/setup OTPs are always stored as keyed hashes, never as plaintext.
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+
+    twoFactorCodeHash: {
+      type: String,
+      select: false,
+    },
+
+    twoFactorExpiresAt: {
+      type: Date,
+      select: false,
+    },
+
+    twoFactorAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+
+    twoFactorLastSentAt: {
+      type: Date,
+      select: false,
+    },
+
+    twoFactorPurpose: {
+      type: String,
+      enum: ["login", "enable"],
+      select: false,
+    },
+
+    // Trusted-device tokens are random, stored only as hashes, and expire automatically.
+    trustedDevices: {
+      type: [
+        {
+          tokenHash: {
+            type: String,
+            required: true,
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+          lastUsedAt: {
+            type: Date,
+            default: Date.now,
+          },
+          expiresAt: {
+            type: Date,
+            required: true,
+          },
+        },
+      ],
+      default: [],
+      select: false,
+    },
   },
   {
     timestamps: true,

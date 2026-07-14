@@ -8,6 +8,15 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import {
+  disableTwoFactor,
+  getTwoFactorStatus,
+  login,
+  requestEnableTwoFactor,
+  resendLoginTwoFactor,
+  verifyEnableTwoFactor,
+  verifyLoginTwoFactor,
+} from "../controllers/twoFactorController.js";
 
 
 const router = express.Router();
@@ -128,55 +137,13 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  try{
-  if (!email || !password) {    
-    return res
-    .status(400)
-    .json({ message: "Please provide email and password" });
-  }
-   const normalizedEmail = email.trim().toLowerCase();
-   if (!isValidEmail(normalizedEmail)) {
-    return res.status(400).json({ message: "Enter a valid email" });
-   }
-   const loadUser = () =>
-    User.findOne({ email: normalizedEmail })
-      .select("password role email")
-      .maxTimeMS(20000);
-
-   let user;
-   try {
-    user = await loadUser();
-   } catch (error) {
-    if (!isMongoTimeoutError(error)) throw error;
-    await wait(750);
-    user = await loadUser();
-   }
-
-    if(!user || !(await user.matchPassword(password))){
-        return res.status(401).json({message: "Invalid email or password"});
-    }
-    User.findByIdAndUpdate(user._id, {
-      isOnline: true,
-      lastSeen: new Date(),
-    }).maxTimeMS(8000).catch((error) => {
-      if (!isMongoTimeoutError(error)) {
-        console.error("Login presence update error:", error);
-      }
-    });
-
-    const token = generateToken(user._id);
-    res.status(200).json({id: user._id, email: user.email, role: user.role, token});
-  } catch (error) {
-    if (isMongoTimeoutError(error)) {
-      return res.status(503).json({ message: "Login is temporarily unavailable. Please try again." });
-    }
-
-    res.status(500).json({ message: "Server error" });
-  }
-}
-);
+router.post("/login", login);
+router.post("/verify-2fa", verifyLoginTwoFactor);
+router.post("/resend-2fa", resendLoginTwoFactor);
+router.get("/2fa-status", protect, getTwoFactorStatus);
+router.post("/enable-2fa/request", protect, requestEnableTwoFactor);
+router.post("/enable-2fa/verify", protect, verifyEnableTwoFactor);
+router.post("/disable-2fa", protect, disableTwoFactor);
 
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
@@ -196,7 +163,7 @@ router.post("/forgot-password", async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select("+trustedDevices");
 
     if (!user) {
       return res.status(404).json({ message: "Email is not registered" });
@@ -309,6 +276,7 @@ router.post("/reset-password", async (req, res) => {
     }
 
     user.password = password;
+    user.trustedDevices = [];
     user.resetPasswordOTP = undefined;
     user.resetPasswordOTPExpires = undefined;
     await user.save();
@@ -406,7 +374,7 @@ router.post("/reset-password", async (req, res) => {
 
     router.put("/me", protect, async (req, res) => {
       try {
-        const user = await User.findById(req.user._id);
+        const user = await User.findById(req.user._id).select("+trustedDevices");
 
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -489,6 +457,7 @@ router.post("/reset-password", async (req, res) => {
           }
 
           user.password = password;
+          user.trustedDevices = [];
         }
 
         await user.save();
@@ -666,7 +635,7 @@ router.post("/reset-password", async (req, res) => {
         const employee = await User.findOne({
           _id: req.params.id,
           role: "employee",
-        });
+        }).select("+trustedDevices");
 
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
@@ -709,6 +678,7 @@ router.post("/reset-password", async (req, res) => {
               .json({ message: "Password must be at least 8 characters" });
           }
           employee.password = password;
+          employee.trustedDevices = [];
         }
 
         await employee.save();
@@ -754,7 +724,7 @@ router.post("/reset-password", async (req, res) => {
 
     // generate JWT token
       const generateToken = (id) => {
-       return jwt.sign({id}, process.env.JWT_SECRET, {
+       return jwt.sign({ id, type: "access" }, process.env.JWT_SECRET, {
         expiresIn: '30d',
        });
 

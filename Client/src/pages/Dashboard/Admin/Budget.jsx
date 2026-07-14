@@ -513,7 +513,7 @@ const getPercentChange = (current, previous) => {
   return `${percent >= 0 ? "+" : ""}${percent.toFixed(0)}%`;
 };
 
-const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
+const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const [budgetEntries, setBudgetEntries] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -532,7 +532,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await budgetAPI.getAll();
+        const data = await dataAPI.getAll();
 
         if (isMounted) {
           setBudgetEntries(Array.isArray(data) ? data.map(normalizeEntry) : []);
@@ -553,7 +553,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey]);
+  }, [dataAPI, refreshKey]);
 
   const monthOptions = useMemo(() => {
     const months = Array.from(
@@ -634,7 +634,7 @@ const Budget = ({ onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const deleteEntry = async (entryId) => {
     try {
       setErrorMessage("");
-      await budgetAPI.delete(entryId);
+      await dataAPI.delete(entryId);
       setBudgetEntries((currentEntries) =>
         currentEntries.filter((entry) => entry.id !== entryId)
       );

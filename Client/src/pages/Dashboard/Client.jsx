@@ -93,6 +93,13 @@ const formatDate = (value) => {
   });
 };
 
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+  }).format(Number(value) || 0);
+
 const formatRelativeTime = (value) => {
   const date = parseDate(value);
   if (!date) return "Recently";
@@ -106,6 +113,8 @@ const formatRelativeTime = (value) => {
 const normalizeTask = (task) => {
   const subtasks = normalizeSubtasks(task?.subtasks);
   const status = statusFromApi[task?.status] || task?.status || "Pending";
+  const amount = Number(task?.amount ?? task?.budget ?? 0);
+  const paid = Number(task?.paid ?? 0);
 
   return {
     id: getEntityId(task),
@@ -117,6 +126,9 @@ const normalizeTask = (task) => {
     status,
     progress: getTaskProgress(subtasks),
     updatedAt: task?.updatedAt || task?.createdAt,
+    amount,
+    paid,
+    pendingAmount: Math.max(0, amount - paid),
   };
 };
 
@@ -356,6 +368,15 @@ const ClientDashboard = () => {
     },
   ];
 
+  const invoiceSummary = tasks.reduce(
+    (summary, task) => ({
+      amount: summary.amount + task.amount,
+      paid: summary.paid + task.paid,
+      pending: summary.pending + task.pendingAmount,
+    }),
+    { amount: 0, paid: 0, pending: 0 }
+  );
+
   if (isLoading) {
     return <ClientDashboardSkeleton />;
   }
@@ -486,9 +507,21 @@ const ClientDashboard = () => {
         </Card>
 
         <Card className="overflow-hidden">
-          <SectionHeader action="View all invoices" title="Invoice Summary" />
-          <div className="px-5 py-3">
-            <p className="py-8 text-center text-sm font-bold text-slate-500">No invoices yet.</p>
+          <SectionHeader title="Invoice Summary" />
+          <div className="divide-y divide-pink-50 px-5 py-3 dark:divide-neutral-800">
+            {[
+              { label: "Total Amount", value: invoiceSummary.amount, color: "bg-blue-500" },
+              { label: "Paid", value: invoiceSummary.paid, color: "bg-emerald-500" },
+              { label: "Pending", value: invoiceSummary.pending, color: "bg-orange-500" },
+            ].map((item) => (
+              <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-4 py-4">
+                <span className="flex items-center gap-3 text-sm font-bold text-slate-600 dark:text-neutral-300">
+                  <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+                  {item.label}
+                </span>
+                <span className="text-sm font-black text-[#10142d] dark:text-white">{formatCurrency(item.value)}</span>
+              </div>
+            ))}
           </div>
         </Card>
       </div>

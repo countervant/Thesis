@@ -24,15 +24,15 @@ const normalizeUser = (userData, fallbackUser = null) => {
 
 const persistUser = (userData) => {
   try {
-    localStorage.setItem("user", JSON.stringify(userForStorage(userData)));
+    sessionStorage.setItem("user", JSON.stringify(userForStorage(userData)));
   } catch {
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
   }
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [token, setToken] = useState(sessionStorage.getItem("token") || null);
   const [loading, setLoading] = useState(true);
 
   const markOffline = useCallback(async (authToken = token) => {
@@ -48,8 +48,12 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const storedUser = localStorage.getItem("user");
-        const storedToken = localStorage.getItem("token");
+        // Authentication belongs to this browser tab only. Remove credentials
+        // left by older versions that persisted accounts across browser sessions.
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        const storedUser = sessionStorage.getItem("user");
+        const storedToken = sessionStorage.getItem("token");
 
         if (storedToken) {
           setToken(storedToken);
@@ -62,7 +66,7 @@ export const AuthProvider = ({ children }) => {
             setUser(normalizedUser);
             persistUser(normalizedUser);
           } catch {
-            localStorage.removeItem("user");
+            sessionStorage.removeItem("user");
           }
         }
 
@@ -73,8 +77,8 @@ export const AuthProvider = ({ children }) => {
             setUser(normalizedProfile);
             persistUser(normalizedProfile);
           } catch {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            sessionStorage.removeItem("token");
+            sessionStorage.removeItem("user");
             setToken(null);
             setUser(null);
           }
@@ -125,7 +129,7 @@ export const AuthProvider = ({ children }) => {
     setUser(normalizedUser);
     setToken(authToken);
     persistUser(normalizedUser);
-    localStorage.setItem("token", authToken);
+    sessionStorage.setItem("token", authToken);
   };
 
   const logout = async () => {
@@ -134,9 +138,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     authAPI.clearSessionCache();
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("clientraBackLockedAfterLogin");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
   };
 
   const updateUser = useCallback((userData) => {

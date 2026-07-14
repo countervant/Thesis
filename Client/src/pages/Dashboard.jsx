@@ -13,6 +13,7 @@ import AdminCalendar from "./Dashboard/Admin/Calendar.jsx";
 import LeaveRequest from "./Leaverequest.jsx";
 import ClientDashboard from "./Dashboard/Client.jsx";
 import ClientProjects from "./Dashboard/ClientProjects.jsx";
+import Feedback from "./Dashboard/Feedback.jsx";
 import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
 import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
@@ -29,6 +30,7 @@ import { getApiErrorMessage, messageAPI } from "../services/api.js";
 const adminPages = new Set([
   "dashboard",
   "newsfeed",
+  "feedback",
   "messages",
   "profile",
   "settings",
@@ -865,14 +867,16 @@ const MessagesPanel = () => {
                 {preview}
               </span>
             </span>
-            <span className="absolute right-12 top-4 text-[10px] font-bold text-slate-400">
-              {formatMessageTime(item.lastMessage?.createdAt) || ""}
-            </span>
-            {item.unreadCount > 0 && (
-              <span className="absolute bottom-4 right-12 grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3faf] px-1.5 text-[10px] font-bold text-white">
-                {item.unreadCount > 9 ? "9+" : item.unreadCount}
+            <span className="mr-5 flex w-11 shrink-0 flex-col items-end gap-2 self-stretch pt-1">
+              <span className="whitespace-nowrap text-[10px] font-bold text-slate-400">
+                {formatMessageTime(item.lastMessage?.createdAt) || ""}
               </span>
-            )}
+              {item.unreadCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3faf] px-1.5 text-[10px] font-bold text-white">
+                  {item.unreadCount > 9 ? "9+" : item.unreadCount}
+                </span>
+              )}
+            </span>
             <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
               <span
                 role="button"
@@ -991,7 +995,16 @@ const MessagesPanel = () => {
 
       {activeParticipant && (
         <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex">
-          <Avatar className="h-12 w-12" user={activeParticipant} />
+          <span className="relative shrink-0">
+            <Avatar className="h-12 w-12" user={activeParticipant} />
+            {(activeParticipant.isOnline || activeParticipant.online) && (
+              <span
+                className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950"
+                aria-label="Online"
+                title="Online"
+              />
+            )}
+          </span>
           <div className="min-w-0">
             <p className="truncate text-base font-black">{activeName}</p>
             <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
@@ -1046,7 +1059,7 @@ const MessagesPanel = () => {
                 </p>
               )}
               <div
-                className={`group/message flex items-end gap-3 ${isMine ? "justify-end" : ""}`}
+                className={`group/message flex items-end gap-3 ${isMine ? "justify-end" : "pl-6 sm:pl-10"}`}
               >
                 {!isMine && (
                   <Avatar className="h-9 w-9 shrink-0" user={activeParticipant} />
@@ -1098,7 +1111,7 @@ const MessagesPanel = () => {
                 )}
                 <div className={`flex max-w-[76%] flex-col ${isMine ? "items-end" : "items-start"} sm:max-w-[560px]`}>
                   <div
-                    className={`rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
+                    className={`relative mb-4 rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
                       isMine
                         ? "bg-pink-50 text-[#172033] dark:text-white"
                         : "bg-slate-100 text-[#172033] dark:bg-neutral-800 dark:text-white"
@@ -1135,8 +1148,8 @@ const MessagesPanel = () => {
                       <>
                         <p className="break-words">{message.text}</p>
                         <p
-                          className={`mt-1 text-right text-[10px] font-bold ${
-                            isMine ? "text-slate-400" : "text-slate-400 dark:text-neutral-400"
+                          className={`absolute top-full mt-1 whitespace-nowrap text-[10px] font-bold ${
+                            isMine ? "right-0 text-slate-400" : "left-0 text-slate-400 dark:text-neutral-400"
                           }`}
                         >
                           {formatMessageTime(message.createdAt)}
@@ -1301,12 +1314,12 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const initialLocalPage = ["dashboard", "projects", "newsfeed", "messages", "profile", "settings", "tasks"].includes(
-    location.state?.page
-  )
-    ? location.state.page
-    : "dashboard";
-  const [localPage, setLocalPage] = useState(initialLocalPage);
+  const localPages = new Set([
+    "dashboard", "projects", "newsfeed", "feedback", "messages", "profile", "settings",
+    "tasks", "add-task", "edit-task", "calendar", "leave-request",
+  ]);
+  const requestedLocalPage = searchParams.get("page") || location.state?.page;
+  const localPage = localPages.has(requestedLocalPage) ? requestedLocalPage : "dashboard";
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
@@ -1340,13 +1353,26 @@ const Dashboard = () => {
     setSearchParams(nextParams, { replace: options.replace === true });
   };
 
+  const handleLocalNavigate = (page, options = {}) => {
+    if (!localPages.has(page)) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (page === "dashboard") {
+      nextParams.delete("page");
+    } else {
+      nextParams.set("page", page);
+    }
+
+    setSearchParams(nextParams, { replace: options.replace === true });
+  };
+
   const handleTaskCreated = () => {
     setTaskRefreshKey((currentKey) => currentKey + 1);
     setEditingTask(null);
     if (role === "admin") {
       handleAdminNavigate("tasks", { replace: true });
     } else {
-      setLocalPage("tasks");
+      handleLocalNavigate("tasks", { replace: true });
     }
   };
 
@@ -1355,7 +1381,7 @@ const Dashboard = () => {
     if (role === "admin") {
       handleAdminNavigate("edit-task");
     } else {
-      setLocalPage("edit-task");
+      handleLocalNavigate("edit-task");
     }
   };
 
@@ -1445,6 +1471,8 @@ const Dashboard = () => {
       );
     } else if (adminPage === "newsfeed") {
       adminContent = <Newsfeed />;
+    } else if (adminPage === "feedback") {
+      adminContent = <Feedback />;
     } else if (adminPage === "messages") {
       adminContent = <MessagesPanel />;
     } else if (adminPage === "profile") {
@@ -1517,16 +1545,18 @@ const Dashboard = () => {
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
       <Newsfeed />
+    ) : role === "employee" && localPage === "feedback" ? (
+      <Feedback />
     ) : role === "client" && ["tasks", "add-task", "edit-task"].includes(localPage) ? (
       <>
         <AdminTasks
           onEditTask={handleEditTask}
-          onNavigate={setLocalPage}
+          onNavigate={handleLocalNavigate}
           refreshKey={taskRefreshKey}
         />
         {(localPage === "add-task" || localPage === "edit-task") && (
           <AdminAddTask
-            onNavigate={setLocalPage}
+            onNavigate={handleLocalNavigate}
             onTaskCreated={handleTaskCreated}
             task={localPage === "edit-task" ? editingTask : null}
           />
@@ -1577,7 +1607,7 @@ const Dashboard = () => {
       <MainBars
         activePage={["add-task", "edit-task"].includes(localPage) ? "tasks" : localPage}
         onLogout={handleLogout}
-        onNavigate={setLocalPage}
+        onNavigate={handleLocalNavigate}
       >
         {regularContent}
       </MainBars>

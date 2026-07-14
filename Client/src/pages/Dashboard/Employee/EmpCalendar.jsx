@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { calendarAPI } from "../../../services/api.js";
+import { calendarAPI, taskAPI } from "../../../services/api.js";
 
 const calendars = [
-  ["My Schedule", "accent-violet-600"],
+  ["My Schedule", "accent-pink-600"],
   ["Tasks & Deadlines", "accent-orange-500"],
   ["Meetings", "accent-blue-500"],
   ["Personal", "accent-emerald-500"],
@@ -14,7 +14,7 @@ const toneStyles = {
   orange: "bg-orange-50 text-orange-600",
   pink: "bg-pink-50 text-pink-600",
   red: "bg-red-50 text-red-600",
-  violet: "bg-violet-50 text-violet-600",
+  violet: "bg-pink-50 text-pink-600",
 };
 
 const statCardStyles = {
@@ -22,17 +22,18 @@ const statCardStyles = {
   orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
   pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
   red: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-  violet: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  violet: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
 };
 
 const typeStyles = {
   "Company Event": "bg-violet-50 text-violet-700",
-  Meeting: "bg-violet-50 text-violet-700",
-  Deadline: "bg-pink-50 text-pink-700",
+  Meeting: "bg-blue-50 text-blue-700",
+  Deadline: "bg-rose-50 text-rose-700",
   Holiday: "bg-emerald-50 text-emerald-700",
-  Personal: "bg-emerald-50 text-emerald-700",
+  Personal: "bg-teal-50 text-teal-700",
   Task: "bg-orange-50 text-orange-700",
-  Review: "bg-blue-50 text-blue-700",
+  Review: "bg-indigo-50 text-indigo-700",
+  Project: "bg-amber-50 text-amber-700",
 };
 
 const eventStyles = {
@@ -41,6 +42,10 @@ const eventStyles = {
   orange: "bg-orange-50 text-orange-700",
   pink: "bg-pink-50 text-pink-700",
   violet: "bg-violet-50 text-violet-700",
+  rose: "bg-rose-50 text-rose-700",
+  teal: "bg-teal-50 text-teal-700",
+  indigo: "bg-indigo-50 text-indigo-700",
+  amber: "bg-amber-50 text-amber-700",
 };
 
 const dotStyles = {
@@ -48,7 +53,22 @@ const dotStyles = {
   emerald: "bg-emerald-500",
   orange: "bg-orange-500",
   pink: "bg-pink-500",
-  violet: "bg-violet-600",
+  violet: "bg-violet-500",
+  rose: "bg-rose-500",
+  teal: "bg-teal-500",
+  indigo: "bg-indigo-500",
+  amber: "bg-amber-500",
+};
+
+const typeTones = {
+  "Company Event": "violet",
+  Meeting: "blue",
+  Deadline: "rose",
+  Holiday: "emerald",
+  Personal: "teal",
+  Task: "orange",
+  Review: "indigo",
+  Project: "amber",
 };
 
 const getMonthOptions = (year) => Array.from({ length: 12 }, (_, index) => new Date(year, index, 1));
@@ -102,7 +122,7 @@ const getCalendarDays = (monthDate) => {
   });
 };
 
-const getTone = (event) => event.color || (event.type === "Deadline" ? "pink" : event.type === "Holiday" ? "emerald" : event.type === "Task" ? "orange" : event.type === "Review" ? "blue" : "violet");
+const getTone = (event) => typeTones[event.type] || "violet";
 
 const normalizeEvent = (event) => {
   const tone = getTone(event);
@@ -114,6 +134,30 @@ const normalizeEvent = (event) => {
     color: eventStyles[tone] || eventStyles.violet,
     dot: dotStyles[tone] || dotStyles.violet,
     tagClass: typeStyles[event.type] || typeStyles.Meeting,
+  };
+};
+
+const getEntityId = (entity) => typeof entity === "string" ? entity : entity?._id || entity?.id || "";
+
+const normalizeTaskEvent = (task) => {
+  const isProject = Boolean(task.subtasks?.length);
+  const tone = isProject ? "amber" : "orange";
+  return {
+    id: `task-${task._id || task.id}`,
+    source: "task",
+    readOnly: true,
+    title: task.title || "Untitled task / project",
+    date: task.dueDate,
+    dateKey: toDateKey(task.dueDate),
+    startTime: "All Day",
+    endTime: "",
+    time: "All Day",
+    type: isProject ? "Project" : "Task",
+    calendar: "Tasks & Deadlines",
+    participants: (task.assignees?.length ? task.assignees : [task.assignedTo]).filter(Boolean).map(getEntityId),
+    color: eventStyles[tone],
+    dot: dotStyles[tone],
+    tagClass: typeStyles[isProject ? "Project" : "Task"],
   };
 };
 
@@ -149,7 +193,7 @@ const Field = ({ label, children }) => (
 
 const eventMatchesCalendar = (event, calendarName) => {
   if (calendarName === "My Schedule") return true;
-  if (calendarName === "Tasks & Deadlines") return event.calendar === "Deadlines" || event.type === "Deadline" || event.type === "Task";
+  if (calendarName === "Tasks & Deadlines") return event.calendar === "Deadlines" || event.type === "Deadline" || event.type === "Task" || event.type === "Project";
   if (calendarName === "Company Holidays") return event.calendar === "Holidays" || event.type === "Holiday";
   return event.calendar === calendarName || event.type === calendarName;
 };
@@ -164,20 +208,31 @@ const EmpCalendar = () => {
   const [visibleCalendars, setVisibleCalendars] = useState(() => Object.fromEntries(calendars.map(([item]) => [item, true])));
   const [events, setEvents] = useState([]);
   const [eventForm, setEventForm] = useState(null);
+  const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
 
   const loadEvents = async () => {
-    const data = await calendarAPI.getAll({ month: monthKey(currentMonth) });
-    setEvents(data.map(normalizeEvent));
+    const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+    const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
+    const [calendarEvents, tasks] = await Promise.all([
+      calendarAPI.getAll({ month: monthKey(currentMonth) }),
+      taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
+    ]);
+    setEvents([...calendarEvents.map(normalizeEvent), ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent)]);
   };
 
   useEffect(() => {
     let isActive = true;
 
-    calendarAPI
-      .getAll({ month: monthKey(currentMonth) })
-      .then((data) => {
+    const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+    const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
+
+    Promise.all([
+      calendarAPI.getAll({ month: monthKey(currentMonth) }),
+      taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
+    ])
+      .then(([calendarEvents, tasks]) => {
         if (isActive) {
-          setEvents(data.map(normalizeEvent));
+          setEvents([...calendarEvents.map(normalizeEvent), ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent)]);
         }
       })
       .catch((error) => console.error("Unable to load employee calendar events", error));
@@ -343,11 +398,19 @@ const EmpCalendar = () => {
                 const dateKey = toDateKey(date);
                 const muted = !sameMonth(date, currentMonth);
                 const selected = selectedDate === dateKey;
-                const locked = dateKey < todayKey;
                 const dayEvents = filteredEvents.filter((event) => event.dateKey === dateKey);
 
                 return (
-                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-32 border-b border-r border-slate-200 p-3 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60 dark:!bg-neutral-900" : "hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white"} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}>
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(dateKey);
+                      setShowDayEventsPanel(true);
+                    }}
+                    className={`min-h-32 border-b border-r border-slate-200 p-3 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
+                    aria-label={`View events for ${date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
+                  >
                     <div className={`mb-3 text-base font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
                     <div className="space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (
@@ -382,14 +445,49 @@ const EmpCalendar = () => {
                   {(row.participants || []).join(", ") || row.department || "My schedule"}
                 </span>
                 <span className={`rounded-full px-3 py-1 text-center text-xs font-black ${row.tagClass}`}>{row.type}</span>
-                <button type="button" onClick={() => updateEvent(row)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500" aria-label={`${row.title} options`}>
-                  <Icon name="more" className="h-5 w-5" />
-                </button>
+                {row.readOnly ? <span className="text-[10px] font-black text-slate-400">SYNCED</span> : (
+                  <button type="button" onClick={() => updateEvent(row)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500" aria-label={`${row.title} options`}>
+                    <Icon name="more" className="h-5 w-5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </Card>
       </div>
+
+      {showDayEventsPanel && (
+        <Modal title={`Events for ${new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`} onClose={() => setShowDayEventsPanel(false)}>
+          <p className="mb-4 text-xs font-bold text-slate-500">{selectedEvents.length} {selectedEvents.length === 1 ? "event" : "events"}</p>
+          {selectedEvents.length ? (
+            <div className="max-h-[60vh] space-y-3 overflow-auto">
+              {selectedEvents.map((event) => (
+                <div key={event.id} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
+                  <span className={`h-3 w-3 shrink-0 rounded-full ${event.dot}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-[#10142d]">{event.title}</p>
+                    <p className="text-xs font-bold text-slate-500">{event.time || "All Day"}</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-black ${event.tagClass}`}>{event.type}</span>
+                  {!event.readOnly && (
+                    <button type="button" onClick={() => {
+                      setShowDayEventsPanel(false);
+                      updateEvent(event);
+                    }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-black text-pink-600">Edit</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid min-h-40 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
+              <div>
+                <p className="text-sm font-black text-[#10142d]">No events on this day</p>
+                <p className="mt-1 text-xs font-bold text-slate-500">There are no schedules for the selected date.</p>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {eventForm && (
         <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => setEventForm(null)}>
@@ -442,7 +540,7 @@ const EmpCalendar = () => {
               <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
                 Save Event
               </button>
             </div>

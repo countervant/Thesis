@@ -1,10 +1,23 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+// Same-origin by default. Vite proxies /api to Express in development, while the
+// production Express server already serves both the client and API together.
+const API_URL = import.meta.env.VITE_API_URL || "/api";
+const isLocalBrowser =
+  typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+const twoFactorApiCandidates = [
+  API_URL,
+  ...(isLocalBrowser
+    ? ["/api", "http://127.0.0.1:5000/api", "http://localhost:5000/api"]
+    : []),
+].filter((value, index, values) => values.indexOf(value) === index);
 
 const api = axios.create({
   baseURL: API_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -59,6 +72,38 @@ const clearCache = (...urls) => {
       }
     });
   });
+};
+
+const twoFactorRequest = async ({ method = "get", url, data }) => {
+  let lastError;
+
+  for (const baseURL of twoFactorApiCandidates) {
+    try {
+      const response = await api.request({ method, url, data, baseURL });
+      const isHtmlFallback =
+        typeof response.data === "string" &&
+        /<!doctype html|<html/i.test(response.data);
+
+      if (isHtmlFallback) {
+        lastError = new Error(`The API route was not available at ${baseURL}.`);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+      const status = error.response?.status;
+      const serverMessage = error.response?.data?.message;
+
+      // A real JSON response means Express was reached. Preserve validation,
+      // cooldown, password, and SMTP errors instead of trying another server.
+      if (serverMessage || (status && status !== 404)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error("CLIENTRA API is unavailable.");
 };
 
 const asArray = (data, label) => {
@@ -167,7 +212,7 @@ const emitNewsfeedUpdate = () => {
 // Add token to requests automatically
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -195,7 +240,12 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const requestUrl = error.config?.url || "";
-    const isLoginRequest = requestUrl.includes("/login");
+    const isLoginRequest =
+      requestUrl.includes("/login") ||
+      requestUrl.includes("/verify-2fa") ||
+      requestUrl.includes("/resend-2fa") ||
+      requestUrl.includes("/enable-2fa") ||
+      requestUrl.includes("/disable-2fa");
     console.error("[api] Request failed", {
       method: error.config?.method?.toUpperCase(),
       url: requestUrl,
@@ -205,8 +255,8 @@ api.interceptors.response.use(
     if (status === 401 && !isLoginRequest) {
       // Token expired or invalid - clear storage
       cache.clear();
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
       window.location.href = "/";
     }
     return Promise.reject(error);
@@ -261,7 +311,7 @@ export const authAPI = {
     return asArray(response.data, "online team");
   },
 
-  updatePresence: async (isOnline = true, authToken = localStorage.getItem("token")) => {
+  updatePresence: async (isOnline = true, authToken = sessionStorage.getItem("token")) => {
     if (!authToken) return null;
 
     const response = await api.patch(
@@ -286,6 +336,39 @@ export const authAPI = {
 
   resetPassword: async (email, otp, password) => {
     const response = await api.post("/auth/reset-password", { email, otp, password });
+    return response.data;
+  },
+
+  verifyTwoFactor: async (temporaryToken, code) => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/verify-2fa", data: { temporaryToken, code } });
+    clearCache("/auth/me");
+    return response.data;
+  },
+
+  resendTwoFactor: async (temporaryToken) => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/resend-2fa", data: { temporaryToken } });
+    return response.data;
+  },
+
+  getTwoFactorStatus: async () => {
+    const response = await twoFactorRequest({ url: "/auth/2fa-status" });
+    return response.data;
+  },
+
+  requestEnableTwoFactor: async (password) => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/enable-2fa/request", data: { password } });
+    return response.data;
+  },
+
+  verifyEnableTwoFactor: async (code) => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/enable-2fa/verify", data: { code } });
+    clearCache("/auth/me", "/auth/2fa-status");
+    return response.data;
+  },
+
+  disableTwoFactor: async (password) => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/disable-2fa", data: { password } });
+    clearCache("/auth/me", "/auth/2fa-status");
     return response.data;
   },
 
@@ -318,6 +401,35 @@ export const taskAPI = {
     return response.data;
   },
 
+  submitFeedback: async (id, feedback) => {
+    const response = await api.post(`/tasks/${id}/feedback`, feedback);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  setArchived: async (id, archived) => {
+    const response = await api.patch(`/tasks/${id}/archive`, { archived });
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  replyToFeedback: async (id, message) => {
+    const response = await api.post(`/tasks/${id}/feedback/reply`, { message });
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  downloadOutput: async (id, fileName = "task-output") => {
+    const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  },
   submitOutput: async (id, output) => {
     const filePayload = output.file
       ? {
@@ -331,6 +443,7 @@ export const taskAPI = {
       message: output.message,
       outputMethod: output.outputMethod,
       subtasks: output.subtasks,
+      finalize: output.finalize,
     });
     clearCache("/tasks", "/dashboard");
     return response.data;
@@ -461,7 +574,7 @@ export const messageAPI = {
   },
 
   subscribe: ({ onMessage, onError } = {}) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (!token || typeof EventSource === "undefined") {
       return () => {};
     }
@@ -558,6 +671,39 @@ export const budgetAPI = {
   delete: async (id) => {
     const response = await api.delete(`/budgets/${id}`);
     clearCache("/budgets", "/dashboard");
+    return response.data;
+  },
+};
+
+export const budgetPlannerAPI = {
+  get: async () => cachedGet("/budget-planner"),
+
+  getAll: async () => {
+    const data = await cachedGet("/budget-planner");
+    return Array.isArray(data?.entries) ? data.entries : [];
+  },
+
+  create: async (entry) => {
+    const response = await api.post("/budget-planner", entry);
+    clearCache("/budget-planner");
+    return response.data;
+  },
+
+  update: async (id, entry) => {
+    const response = await api.put(`/budget-planner/${id}`, entry);
+    clearCache("/budget-planner");
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/budget-planner/${id}`);
+    clearCache("/budget-planner");
+    return response.data;
+  },
+
+  updateSettings: async (monthlyLimit) => {
+    const response = await api.put("/budget-planner/settings", { monthlyLimit });
+    clearCache("/budget-planner");
     return response.data;
   },
 };

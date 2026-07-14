@@ -36,6 +36,18 @@ const taskSchema = new mongoose.Schema(
       required: true,
     },
 
+    amount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    paid: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
     subtasks: [
       {
         title: {
@@ -52,6 +64,11 @@ const taskSchema = new mongoose.Schema(
         completedAt: {
           type: Date,
         },
+
+        assignedTo: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
       },
     ],
 
@@ -59,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 
@@ -101,6 +118,13 @@ const taskSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
+    assignees: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -207,6 +231,79 @@ const taskSchema = new mongoose.Schema(
       submittedAt: Date,
     },
 
+    feedback: {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      submittedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      overallRating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      quality: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      communication: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      timeliness: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      overallSatisfaction: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      comment: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: 1000,
+      },
+      wouldRecommend: Boolean,
+      submittedAt: Date,
+      reply: {
+        message: {
+          type: String,
+          default: "",
+          trim: true,
+          maxlength: 1000,
+        },
+        repliedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        repliedAt: Date,
+      },
+    },
+
+    archived: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    archivedAt: Date,
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
     tags: [String],
   },
   {
@@ -215,6 +312,8 @@ const taskSchema = new mongoose.Schema(
 );
 
 taskSchema.index({ assignedTo: 1, createdAt: -1 });
+taskSchema.index({ assignees: 1, createdAt: -1 });
+taskSchema.index({ "subtasks.assignedTo": 1, createdAt: -1 });
 taskSchema.index({ createdBy: 1, createdAt: -1 });
 taskSchema.index({ requestedBy: 1, createdAt: -1 });
 taskSchema.index({ status: 1, dueDate: 1 });
