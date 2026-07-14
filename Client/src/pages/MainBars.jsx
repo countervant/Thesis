@@ -73,7 +73,7 @@ const roleNavItems = {
     "leave-request",
     "settings",
   ],
-  employee: ["dashboard", "newsfeed", "feedback", "tasks", "calendar", "budget", "leave-request", "settings"],
+  employee: ["dashboard", "newsfeed", "feedback", "tasks", "calendar", "leave-request", "settings"],
   client: ["dashboard", "projects", "newsfeed", "settings"],
 };
 
@@ -446,7 +446,6 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           { id: "dashboard", label: "Dashboard", icon: "dashboard" },
           { id: "tasks", label: "Tasks", icon: "tasks" },
           { id: "calendar", label: "Calendar", icon: "calendar" },
-          { id: "budget", label: "Budget", icon: "budget" },
           { id: "leave-request", label: "Leave", icon: "leave-request" },
           { id: "settings", label: "Settings", icon: "settings" },
         ]

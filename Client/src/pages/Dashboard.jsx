@@ -18,7 +18,6 @@ import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
 import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
 import EmpTask from "./Dashboard/Employee/EmpTask.jsx";
-import EmpBudgetPlanner from "./Dashboard/Employee/EmpBudgetPlanner.jsx";
 import Newsfeed from "./newsfeed.jsx";
 import Profile from "./Profile.jsx";
 import Settings from "./Settings/settings.jsx";
@@ -26,7 +25,7 @@ import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton.jsx";
-import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
+import { getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const adminPages = new Set([
   "dashboard",
@@ -1317,13 +1316,12 @@ const Dashboard = () => {
       : "dashboard";
   const localPages = new Set([
     "dashboard", "projects", "newsfeed", "feedback", "messages", "profile", "settings",
-    "tasks", "add-task", "edit-task", "calendar", "budget", "leave-request",
+    "tasks", "add-task", "edit-task", "calendar", "leave-request",
   ]);
   const requestedLocalPage = searchParams.get("page") || location.state?.page;
   const localPage = localPages.has(requestedLocalPage) ? requestedLocalPage : "dashboard";
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
-  const [employeeBudgetEditor, setEmployeeBudgetEditor] = useState(undefined);
   const [editingTask, setEditingTask] = useState(null);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [employeeRefreshKey, setEmployeeRefreshKey] = useState(0);
@@ -1401,19 +1399,6 @@ const Dashboard = () => {
   const handleEditBudgetEntry = (entry) => {
     setEditingBudgetEntry(entry);
     handleAdminNavigate("edit-budget");
-  };
-
-  const handleEmployeeBudgetSaved = () => {
-    setBudgetRefreshKey((currentKey) => currentKey + 1);
-    setEmployeeBudgetEditor(undefined);
-  };
-
-  const handleAddEmployeeBudgetEntry = () => {
-    setEmployeeBudgetEditor(null);
-  };
-
-  const handleEditEmployeeBudgetEntry = (entry) => {
-    setEmployeeBudgetEditor(entry);
   };
 
   const handleEmployeeSaved = () => {
@@ -1556,22 +1541,6 @@ const Dashboard = () => {
       <EmpTask />
     ) : role === "employee" && localPage === "calendar" ? (
       <EmpCalendar />
-    ) : role === "employee" && localPage === "budget" ? (
-      <>
-        <EmpBudgetPlanner
-          onAddEntry={handleAddEmployeeBudgetEntry}
-          onEditEntry={handleEditEmployeeBudgetEntry}
-          refreshKey={budgetRefreshKey}
-        />
-        {employeeBudgetEditor !== undefined && (
-          <AdminAddBudget
-            dataAPI={budgetPlannerAPI}
-            entry={employeeBudgetEditor}
-            onBudgetSaved={handleEmployeeBudgetSaved}
-            onNavigate={() => setEmployeeBudgetEditor(undefined)}
-          />
-        )}
-      </>
     ) : role === "employee" && localPage === "leave-request" ? (
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (

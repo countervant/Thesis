@@ -8,7 +8,6 @@ import cors from "cors";
 import { dbConnect, isDbConnected } from "./config/dbConnect.js";
 import auth from "./routes/auth.js";
 import budgets from "./routes/budgets.js";
-import budgetPlanner from "./routes/budgetPlanner.js";
 import clients from "./routes/clients.js";
 import calendar from "./routes/calendar.js";
 import leaveRequests from "./routes/leaveRequests.js";
@@ -160,7 +159,6 @@ app.use("/api/auth", auth);
 // Back-compat / alternate base path (some clients call this as /api/user/*)
 app.use("/api/user", auth);
 app.use("/api/budgets", budgets);
-app.use("/api/budget-planner", budgetPlanner);
 app.use("/api/clients", clients);
 app.use("/api/calendar", calendar);
 app.use("/api/leave-requests", leaveRequests);
