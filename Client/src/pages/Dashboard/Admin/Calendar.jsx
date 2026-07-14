@@ -2,18 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { calendarAPI } from "../../../services/api.js";
 
 const baseDepartments = [
-  ["All Departments", "bg-violet-600"],
+  ["All Departments", "bg-pink-600"],
 ];
 
-const departmentColors = ["bg-violet-600", "bg-blue-500", "bg-orange-500", "bg-pink-500", "bg-emerald-500", "bg-pink-400"];
+const departmentColors = ["bg-pink-600", "bg-blue-500", "bg-orange-500", "bg-pink-500", "bg-emerald-500", "bg-pink-400"];
 
 const calendarChecks = [
-  ["Company Events", "bg-violet-600"],
+  ["Company Events", "bg-pink-600"],
   ["Meetings", "bg-orange-500"],
   ["Deadlines", "bg-blue-500"],
   ["Leaves", "bg-pink-500"],
   ["Holidays", "bg-emerald-500"],
-  ["Birthdays", "bg-violet-500"],
+  ["Birthdays", "bg-pink-500"],
 ];
 
 const toneStyles = {
@@ -21,33 +21,33 @@ const toneStyles = {
   green: "bg-emerald-50 text-emerald-600",
   orange: "bg-orange-50 text-orange-600",
   pink: "bg-pink-50 text-pink-600",
-  violet: "bg-violet-50 text-violet-600",
+  violet: "bg-pink-50 text-pink-600",
 };
 
 const statCardStyles = {
-  blue: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  blue: "!border-[#3b82f6]/45 !border-b-[#3b82f6] !ring-[#3b82f6]/20 dark:!border-[#3b82f6] dark:!border-b-[#3b82f6] dark:!ring-[#3b82f6]/45",
   green: "!border-[#28b84c]/45 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
   orange: "!border-[#ff8317]/45 !border-b-[#ff8317] !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
   pink: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
-  violet: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  violet: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
 };
 
 const typeStyles = {
-  "Company Event": "bg-violet-50 text-violet-700",
+  "Company Event": "bg-pink-50 text-pink-700",
   Meeting: "bg-orange-50 text-orange-600",
-  Deadline: "bg-violet-50 text-violet-700",
+  Deadline: "bg-pink-50 text-pink-700",
   Leave: "bg-pink-50 text-pink-700",
   Holiday: "bg-emerald-50 text-emerald-700",
-  Birthday: "bg-violet-50 text-violet-700",
+  Birthday: "bg-pink-50 text-pink-700",
 };
 
 const calendarStyles = {
-  "Company Events": "bg-violet-50 text-violet-700",
+  "Company Events": "bg-pink-50 text-pink-700",
   Meetings: "bg-orange-50 text-orange-600",
   Deadlines: "bg-blue-50 text-blue-700",
   Leaves: "bg-pink-50 text-pink-700",
   Holidays: "bg-emerald-50 text-emerald-700",
-  Birthdays: "bg-violet-50 text-violet-700",
+  Birthdays: "bg-pink-50 text-pink-700",
 };
 
 const dotStyles = {
@@ -55,7 +55,7 @@ const dotStyles = {
   emerald: "bg-emerald-500",
   orange: "bg-orange-500",
   pink: "bg-pink-500",
-  violet: "bg-violet-600",
+  violet: "bg-pink-600",
 };
 
 const getMonthOptions = (year) => Array.from({ length: 12 }, (_, index) => new Date(year, index, 1));
@@ -211,7 +211,7 @@ const AdminCalendar = () => {
 
   const allDepartments = [
     ...baseDepartments,
-    ...departments.map((department) => [department.name, department.color || "bg-violet-600"]),
+    ...departments.map((department) => [department.name, department.color || "bg-pink-600"]),
   ];
 
   const loadEvents = async () => {
@@ -348,7 +348,7 @@ const AdminCalendar = () => {
   };
 
   const addDepartment = () => {
-    setDepartmentForm({ name: "", color: "bg-violet-600" });
+    setDepartmentForm({ name: "", color: "bg-pink-600" });
   };
 
   const saveDepartment = async (event) => {
@@ -399,7 +399,7 @@ const AdminCalendar = () => {
             <select value={selectedDepartment} onChange={(event) => setSelectedDepartment(event.target.value)} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm outline-none">
               {allDepartments.map(([department]) => <option key={department}>{department}</option>)}
             </select>
-            <button type="button" onClick={addEvent} className="flex h-9 items-center gap-2 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
+            <button type="button" onClick={addEvent} className="flex h-9 items-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
           </div>
         </header>
 
@@ -425,7 +425,7 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendar View</h2>
               {["Company Calendar", "Team Calendar", "Employee Calendar", "Project Calendar"].map((item) => (
-                <button key={item} type="button" onClick={() => setSelectedView(item)} className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedView === item ? "bg-violet-50 text-violet-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-violet-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
+                <button key={item} type="button" onClick={() => setSelectedView(item)} className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedView === item ? "bg-pink-50 text-pink-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-pink-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
                   <Icon name="calendar" className="h-4 w-4" /> {item}
                 </button>
               ))}
@@ -434,7 +434,7 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Teams / Departments</h2>
               {allDepartments.map(([item, color]) => (
-                <button key={item} type="button" onClick={() => setSelectedDepartment(item)} className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedDepartment === item ? "bg-violet-50 text-violet-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-violet-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
+                <button key={item} type="button" onClick={() => setSelectedDepartment(item)} className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedDepartment === item ? "bg-pink-50 text-pink-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-pink-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
                   {item}
                 </button>
@@ -501,7 +501,7 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-black">Upcoming Events</h2>
-                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="text-xs font-black text-violet-700">{showAllUpcoming ? "This week" : "View all"}</button>
+                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="text-xs font-black text-pink-700">{showAllUpcoming ? "This week" : "View all"}</button>
               </div>
               {upcomingEvents.map((event) => (
                 <div key={event.id} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
@@ -548,7 +548,7 @@ const AdminCalendar = () => {
               <EventListTable events={sortedMonthEvents} onEdit={editEvent} onDelete={setDeleteTarget} />
             </div>
             <div className="pt-3 text-center">
-              <button type="button" onClick={() => setShowAllEventsPanel(true)} className="text-base font-black text-violet-700">View all events</button>
+              <button type="button" onClick={() => setShowAllEventsPanel(true)} className="text-base font-black text-pink-700">View all events</button>
             </div>
           </div>
         </Card>
@@ -652,7 +652,7 @@ const AdminCalendar = () => {
                   onChange={(event) => setEventForm((form) => ({ ...form, color: event.target.value }))}
                   className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
                 >
-                  {["orange", "blue", "pink", "emerald", "violet"].map((item) => <option key={item}>{item}</option>)}
+                {["orange", "blue", "pink", "emerald"].map((item) => <option key={item}>{item}</option>)}
                 </select>
               </Field>
             </div>
@@ -668,7 +668,7 @@ const AdminCalendar = () => {
               <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
                 Save Event
               </button>
             </div>
@@ -700,7 +700,7 @@ const AdminCalendar = () => {
               <button type="button" onClick={() => setDepartmentForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
                 Add Department
               </button>
             </div>

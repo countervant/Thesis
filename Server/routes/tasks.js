@@ -190,7 +190,12 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
   const startDate = body.startDate ? new Date(body.startDate) : dueDate;
   const status = body.status || "in_progress";
   const priority = body.priority || "medium";
-  const subtasks = normalizeSubtasks(body.subtasks);
+  const amount = Number(body.amount ?? body.budget ?? 0);
+  const paid = Number(body.paid ?? 0);
+  const subtasks = normalizeSubtasks(body.subtasks).map((subtask) => ({
+    ...subtask,
+    completed: status === "done" ? true : subtask.completed,
+  }));
   const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
   const assignees = normalizeAssigneeIds(
     options.assignees ?? body.assignees,
@@ -204,6 +209,8 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     dueDate,
     status: getStatusFromSubtasks(subtasks, fallbackStatus),
     priority: allowedPriorities.includes(priority) ? priority : "medium",
+    amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
+    paid: Number.isFinite(paid) && paid >= 0 ? paid : 0,
     assignedTo: assignees[0] || userId,
     assignees,
     requestedBy: optionalId(options.requestedBy ?? body.requestedBy),
@@ -357,6 +364,14 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Complete every subtask before completing the task" });
     }
 
+    if (payload.paid > payload.amount) {
+      return res.status(400).json({ message: "Paid amount cannot be greater than the total amount" });
+    }
+
+    if (!payload.subtasks.length) {
+      return res.status(400).json({ message: "At least one subtask is required" });
+    }
+
     if (req.user.role === "admin" && !payload.requestedBy && !payload.requestedByName) {
       return res.status(400).json({ message: "Please choose which client requested this task" });
     }
@@ -472,6 +487,8 @@ router.put("/:id", protect, async (req, res) => {
         dueDate: req.body.dueDate ?? task.dueDate,
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
+        amount: req.body.amount ?? task.amount ?? task.budget,
+        paid: req.body.paid ?? task.paid,
         assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
         assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
         requestedBy:
@@ -520,6 +537,10 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(400).json({ message: "Complete every subtask before completing the task" });
     }
 
+    if (payload.paid > payload.amount) {
+      return res.status(400).json({ message: "Paid amount cannot be greater than the total amount" });
+    }
+
     if (!payload.dueDate || Number.isNaN(payload.dueDate.getTime())) {
       return res.status(400).json({ message: "Valid due date is required" });
     }
@@ -547,6 +568,8 @@ router.put("/:id", protect, async (req, res) => {
     task.dueDate = payload.dueDate;
     task.status = payload.status;
     task.priority = payload.priority;
+    task.amount = payload.amount;
+    task.paid = payload.paid;
     task.assignedTo = payload.assignedTo;
     task.assignees = payload.assignees;
     task.requestedBy = payload.requestedBy;
@@ -589,10 +612,6 @@ router.post("/:id/revisions", protect, async (req, res) => {
     const payload = normalizeRevisionPayload(req.body);
     if (!payload.title) {
       return res.status(400).json({ message: "Revision title is required" });
-    }
-
-    if (!payload.section) {
-      return res.status(400).json({ message: "Section or page is required" });
     }
 
     if (!payload.description) {
@@ -645,24 +664,35 @@ router.post("/:id/feedback", protect, async (req, res) => {
     }
 
     if (task.status !== "done") {
-      return res.status(400).json({ message: "Feedback is available after the job is completed" });
+      return res.status(400).json({ message: "Feedback is available after the project is completed" });
     }
 
-    const rating = Number(req.body.rating);
-    const comment = String(req.body.comment || "").trim();
+    const rating = Number(req.body.overallRating);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Please select a rating from 1 to 5" });
-    }
-    if (comment.length > 1000) {
-      return res.status(400).json({ message: "Feedback must be 1000 characters or less" });
+      return res.status(400).json({ message: "Please select an overall rating" });
     }
 
-    const submittedAt = new Date();
-    task.feedback = { user: req.user._id, rating, comment, submittedAt };
+    const optionalRating = (value) => {
+      const parsed = Number(value);
+      return Number.isInteger(parsed) && parsed >= 1 && parsed <= 5 ? parsed : undefined;
+    };
+
+    task.feedback = {
+      submittedBy: req.user._id,
+      overallRating: rating,
+      quality: optionalRating(req.body.quality),
+      communication: optionalRating(req.body.communication),
+      timeliness: optionalRating(req.body.timeliness),
+      overallSatisfaction: optionalRating(req.body.overallSatisfaction),
+      comment: String(req.body.comment || "").trim().slice(0, 1000),
+      wouldRecommend: req.body.wouldRecommend === true,
+      submittedAt: new Date(),
+    };
+
     addActivity(task, {
       type: "feedback_submitted",
       title: "Client submitted feedback",
-      details: `${rating}/5 rating${comment ? `: ${comment}` : ""}`,
+      details: `${rating}/5 rating${task.feedback.comment ? `: ${task.feedback.comment}` : ""}`,
       actor: req.user._id,
       actorName: getActorName(req.user),
     });
@@ -675,6 +705,7 @@ router.post("/:id/feedback", protect, async (req, res) => {
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .populate("feedback.user", "firstName lastName email role")
+      .populate("feedback.submittedBy", "firstName lastName email role")
       .lean();
 
     res.status(200).json(updatedTask);
@@ -733,6 +764,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     }
 
     const outputMethod = req.body.outputMethod === "link" ? "link" : "file";
+    const finalize = req.body.finalize !== false;
     const message = String(req.body.message || "").trim();
     const previousSubtasks = task.subtasks.toObject();
     let subtasks = req.body.subtasks !== undefined
@@ -793,8 +825,8 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     recordSubtaskActivities(task, previousSubtasks, subtasks, req.user);
     task.subtasks = subtasks;
-    task.status = "done";
-    task.completedAt = task.completedAt || new Date();
+    task.status = finalize ? "done" : "review";
+    task.completedAt = finalize ? task.completedAt || new Date() : undefined;
     task.finalOutput = {
       submittedBy: req.user._id,
       message,
@@ -806,7 +838,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     };
     addActivity(task, {
       type: "output_submitted",
-      title: "Final output submitted for client review",
+      title: finalize ? "Final output submitted" : "Output submitted for client review",
       details: message || "Project output was submitted",
       actor: req.user._id,
       actorName: getActorName(req.user),

@@ -14,7 +14,67 @@ import { getCountryFlag } from "../utils/countries.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 
-const quickEmojis = ["😀", "😂", "😍", "🔥", "👏", "💜", "👍", "🎉", "🥹", "💯"];
+const emojiCategories = [
+  {
+    label: "Smileys",
+    icon: "\u{1F600}",
+    emojis: ["\u{1F600}", "\u{1F603}", "\u{1F604}", "\u{1F601}", "\u{1F606}", "\u{1F605}", "\u{1F602}", "\u{1F923}", "\u{1F642}", "\u{1F643}", "\u{1F609}", "\u{1F60A}", "\u{1F60D}", "\u{1F618}", "\u{1F61C}", "\u{1F914}", "\u{1F62D}", "\u{1F621}", "\u{1F60E}", "\u{1F92D}", "\u{1F979}", "\u{1F973}", "\u{1F910}", "\u{1F634}"],
+  },
+  {
+    label: "Reactions",
+    icon: "\u{1F44D}",
+    emojis: ["\u{1F44D}", "\u{1F44E}", "\u{1F44F}", "\u{1F64C}", "\u{1F64F}", "\u{1F44B}", "\u{1F44C}", "\u{1F91D}", "\u{1F4AA}", "\u{1F525}", "\u{1F4AF}", "\u{2728}", "\u{1F31F}", "\u{1F389}", "\u{1F680}", "\u{1F4AF}", "\u{1F525}", "\u{1F3C6}", "\u{1F4A5}", "\u{1F4AF}", "\u{1F91E}", "\u{1F929}", "\u{1F92F}", "\u{1F4AA}"],
+  },
+  {
+    label: "Hearts",
+    icon: "\u{2764}\u{FE0F}",
+    emojis: ["\u{2764}\u{FE0F}", "\u{1F499}", "\u{1F49A}", "\u{1F49B}", "\u{1F9E1}", "\u{1F5A4}", "\u{1F90D}", "\u{1F90E}", "\u{1F494}", "\u{1F495}", "\u{1F496}", "\u{1F497}", "\u{1F498}", "\u{1F49D}", "\u{1F49E}", "\u{1F493}", "\u{1F49F}", "\u{2763}\u{FE0F}", "\u{1F48B}", "\u{1F970}", "\u{1F60D}", "\u{1F618}", "\u{1F917}", "\u{1F49C}"],
+  },
+  {
+    label: "Objects",
+    icon: "\u{1F4A1}",
+    emojis: ["\u{1F4A1}", "\u{1F4CC}", "\u{1F4CE}", "\u{1F4F7}", "\u{1F4BB}", "\u{1F4F1}", "\u{1F4AC}", "\u{1F4E2}", "\u{1F4E3}", "\u{1F381}", "\u{1F3A8}", "\u{1F3B5}", "\u{1F3AC}", "\u{1F4DA}", "\u{2705}", "\u{26A0}\u{FE0F}", "\u{1F4C5}", "\u{23F0}", "\u{1F4B0}", "\u{1F4C8}", "\u{1F4C9}", "\u{1F30D}", "\u{2600}\u{FE0F}", "\u{1F31C}"],
+  },
+];
+
+const EmojiPicker = ({ onSelect }) => {
+  const [activeCategory, setActiveCategory] = useState(emojiCategories[0].label);
+  const category = emojiCategories.find((item) => item.label === activeCategory) || emojiCategories[0];
+
+  return (
+    <div className="w-72 rounded-xl border border-pink-100 bg-white p-2 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="mb-2 flex items-center gap-1 border-b border-pink-50 pb-2 dark:border-neutral-800">
+        {emojiCategories.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => setActiveCategory(item.label)}
+            className={`grid h-8 w-8 place-items-center rounded-lg text-base transition ${
+              activeCategory === item.label ? "bg-pink-50 ring-1 ring-pink-200" : "hover:bg-pink-50"
+            }`}
+            aria-label={item.label}
+            title={item.label}
+          >
+            {item.icon}
+          </button>
+        ))}
+      </div>
+      <div className="grid max-h-44 grid-cols-8 gap-1 overflow-y-auto pr-1">
+        {category.emojis.map((emoji, index) => (
+          <button
+            key={`${emoji}-${index}`}
+            type="button"
+            onClick={() => onSelect(emoji)}
+            className="grid h-8 w-8 place-items-center rounded-md text-lg transition hover:bg-pink-50 dark:hover:bg-pink-500/20"
+            aria-label={`Add ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const getEntityId = (entity) => {
   if (!entity) return "";
@@ -163,6 +223,7 @@ const Newsfeed = () => {
   const [visibleReplies, setVisibleReplies] = useState({});
   const [openPostMenuId, setOpenPostMenuId] = useState("");
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [emojiPickerTarget, setEmojiPickerTarget] = useState("");
   const [postToDelete, setPostToDelete] = useState(null);
   const [commentToDelete, setCommentToDelete] = useState(null);
   const [focusedTarget, setFocusedTarget] = useState(null);
@@ -430,6 +491,28 @@ const Newsfeed = () => {
   const handleInsertEmoji = (emoji) => {
     setPostContent((currentContent) => `${currentContent}${emoji}`.slice(0, 1200));
     setIsEmojiPickerOpen(false);
+  };
+
+  const handleInsertCommentEmoji = (postId, emoji) => {
+    setCommentDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [postId]: `${currentDrafts[postId] || ""}${emoji}`.slice(0, 500),
+    }));
+    setEmojiPickerTarget("");
+  };
+
+  const handleInsertReplyEmoji = (commentId, emoji) => {
+    setReplyDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [commentId]: `${currentDrafts[commentId] || ""}${emoji}`.slice(0, 500),
+    }));
+    setEmojiPickerTarget("");
+  };
+
+  const toggleEmojiPicker = (target) => {
+    setEmojiPickerTarget((currentTarget) =>
+      currentTarget === target ? "" : target
+    );
   };
 
   const handleCreatePost = async (event) => {
@@ -720,13 +803,6 @@ const Newsfeed = () => {
                   className="sr-only"
                 />
               </label>
-              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-                  <path d="M7 3h7l4 4v14H7zM14 3v5h5M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>File</span>
-                <input type="file" onChange={handleMediaChange} className="sr-only" />
-              </label>
               <div className="relative">
                 <button
                   type="button"
@@ -739,17 +815,8 @@ const Newsfeed = () => {
                   <span>Emoji</span>
                 </button>
                 {isEmojiPickerOpen && (
-                  <div className="absolute left-0 top-12 z-10 grid w-44 grid-cols-5 gap-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
-                    {quickEmojis.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => handleInsertEmoji(emoji)}
-                        className="grid h-8 w-8 place-items-center rounded-md text-lg transition hover:bg-pink-50 dark:hover:!bg-pink-500/20"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
+                  <div className="absolute bottom-10 left-0 z-20">
+                    <EmojiPicker onSelect={handleInsertEmoji} />
                   </div>
                 )}
               </div>
@@ -1097,16 +1164,31 @@ const Newsfeed = () => {
                               className="ml-11 flex gap-3"
                             >
                               <Avatar user={user} size="h-7 w-7" />
-                              <input
-                                type="text"
-                                value={replyDrafts[commentId] || ""}
-                                onChange={(event) =>
-                                  handleReplyChange(commentId, event.target.value)
-                                }
-                                placeholder="Reply to this comment..."
-                                maxLength={500}
-                                className="h-9 flex-1 rounded-lg border border-neutral-300 bg-transparent px-3 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
-                              />
+                              <div className="relative flex-1">
+                                <input
+                                  type="text"
+                                  value={replyDrafts[commentId] || ""}
+                                  onChange={(event) =>
+                                    handleReplyChange(commentId, event.target.value)
+                                  }
+                                  placeholder="Reply to this comment..."
+                                  maxLength={500}
+                                  className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-3 pr-10 text-sm font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleEmojiPicker(`reply:${commentId}`)}
+                                  className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full transition hover:bg-pink-50"
+                                  aria-label="Add emoji to reply"
+                                >
+                                  <img src={emojiIcon} alt="" className="h-4 w-4 object-contain" />
+                                </button>
+                                {emojiPickerTarget === `reply:${commentId}` && (
+                                  <div className="absolute bottom-10 right-0 z-20">
+                                    <EmojiPicker onSelect={(emoji) => handleInsertReplyEmoji(commentId, emoji)} />
+                                  </div>
+                                )}
+                              </div>
                               <button
                                 type="submit"
                                 className="h-9 rounded-lg bg-[#dc4fb2] px-3 text-xs font-semibold text-white transition hover:brightness-105"
@@ -1138,9 +1220,19 @@ const Newsfeed = () => {
                     className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pr-24 text-sm font-semibold text-neutral-800 outline-none transition placeholder:text-slate-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
                   />
                   <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-3 text-slate-500">
-                    <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add emoji">
+                    <button
+                      type="button"
+                      onClick={() => toggleEmojiPicker(`comment:${post.id}`)}
+                      className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                      aria-label="Add emoji to comment"
+                    >
                       <img src={emojiIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
+                    {emojiPickerTarget === `comment:${post.id}` && (
+                      <span className="absolute bottom-9 right-0 z-20">
+                        <EmojiPicker onSelect={(emoji) => handleInsertCommentEmoji(post.id, emoji)} />
+                      </span>
+                    )}
                     <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add image">
                       <img src={insertImageIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>

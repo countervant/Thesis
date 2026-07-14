@@ -68,14 +68,6 @@ const getEntityId = (entity) => {
   return entity._id || entity.id || "";
 };
 
-const getInitials = (value) =>
-  String(value || "Project")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "PR";
-
 const normalizeSubtasks = (subtasks = []) => {
   if (!Array.isArray(subtasks)) return [];
   return subtasks
@@ -121,6 +113,13 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+  }).format(Number(value) || 0);
+
 const getPersonName = (person, fallback = "Clientra Team") => {
   if (!person || typeof person === "string") return fallback;
   return [person.firstName, person.lastName].filter(Boolean).join(" ") || person.companyName || person.email || fallback;
@@ -134,6 +133,20 @@ const getFileUrl = (fileUrl) => {
 const normalizeProject = (task) => {
   const subtasks = normalizeSubtasks(task?.subtasks);
   const status = statusFromApi[task?.status] || task?.status || "Pending Revisions";
+  const attachments = Array.isArray(task?.attachments) ? task.attachments : [];
+  const finalOutput = task?.finalOutput || null;
+  const feedback = task?.feedback;
+  const hasSubmittedFeedback = Boolean(
+    feedback?.submittedAt &&
+    Number(feedback?.overallRating) >= 1 &&
+    Number(feedback?.overallRating) <= 5
+  );
+  const uploadedFileIds = new Set(
+    [
+      ...attachments.map((file) => file?.fileUrl || file?.fileName),
+      finalOutput?.fileUrl || finalOutput?.fileName,
+    ].filter(Boolean)
+  );
 
   return {
     id: getEntityId(task),
@@ -142,7 +155,10 @@ const normalizeProject = (task) => {
     description: task?.description || "Project request",
     startDate: task?.startDate || task?.createdAt,
     dueDate: task?.dueDate,
-    files: Math.max(1, subtasks.length + 2),
+    amount: Number(task?.amount ?? task?.budget ?? 0),
+    paid: Number(task?.paid ?? 0),
+    pendingAmount: Math.max(0, Number(task?.amount ?? task?.budget ?? 0) - Number(task?.paid ?? 0)),
+    files: uploadedFileIds.size,
     priority: task?.priority || "medium",
     progress: getTaskProgress(subtasks),
     subtasks,
@@ -156,9 +172,9 @@ const normalizeProject = (task) => {
     assignedTo: task?.assignedTo,
     createdBy: task?.createdBy,
     requestedBy: task?.requestedBy,
-    attachments: Array.isArray(task?.attachments) ? task.attachments : [],
-    finalOutput: task?.finalOutput || null,
-    feedback: task?.feedback || null,
+    attachments,
+    finalOutput,
+    feedback: hasSubmittedFeedback ? feedback : null,
   };
 };
 
@@ -190,17 +206,14 @@ const ProjectStats = ({ projects }) => {
   );
 };
 
-const ProjectCard = ({ onRequestRevision, onViewDetails, project, index }) => {
+const ProjectCard = ({ onFeedback, onRequestRevision, onViewDetails, project }) => {
   const statusClass = statusStyles[project.status] || statusStyles["Pending Revisions"];
   const progressClass = progressColors[project.status] || progressColors["Pending Revisions"];
 
   return (
     <Card className="overflow-hidden p-4">
-      <div className="flex items-start gap-4">
-        <span className={`grid h-16 w-16 shrink-0 place-items-center rounded-xl text-sm font-black text-white ${thumbnailColors[index % thumbnailColors.length]}`}>
-          {getInitials(project.title)}
-        </span>
-        <span className="min-w-0 flex-1">
+      <div>
+        <span className="min-w-0">
           <span className="flex items-start justify-between gap-3">
             <span className="min-w-0">
               <span className="block truncate text-base font-black text-[#10142d] dark:text-white">{project.title}</span>
@@ -236,8 +249,10 @@ const ProjectCard = ({ onRequestRevision, onViewDetails, project, index }) => {
 
       <div className="mt-5 grid grid-cols-3 gap-3 text-xs font-bold text-slate-500">
         <span className="min-w-0">
-          <span className="block text-[10px] font-black text-slate-400">Team</span>
-          <span className="font-black text-[#10142d] dark:text-white">{project.team}</span>
+          <span className="block text-[10px] font-black text-slate-400">Developer</span>
+          <span className="block truncate font-black text-[#10142d] dark:text-white" title={getPersonName(project.assignedTo, "Unassigned")}>
+            {getPersonName(project.assignedTo, "Unassigned")}
+          </span>
         </span>
         <span className="min-w-0">
           <span className="block text-[10px] font-black text-slate-400">Revisions</span>
@@ -256,18 +271,34 @@ const ProjectCard = ({ onRequestRevision, onViewDetails, project, index }) => {
           <Icon name="eye" className="h-4 w-4" />
           View Details
         </button>
-        <button
-          type="button"
-          onClick={() => onRequestRevision(project)}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
-        >
-          <Icon name="refresh" className="h-4 w-4" />
-          Request Revision
-        </button>
+        {project.status === "Completed" ? (
+          <button
+            type="button"
+            onClick={() => onFeedback(project)}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.2)] transition hover:brightness-105"
+          >
+            <Icon name="star" className="h-4 w-4" />
+            {project.feedback ? "Edit Feedback" : "Give Feedback"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onRequestRevision(project)}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
+          >
+            <Icon name="refresh" className="h-4 w-4" />
+            Request Revision
+          </button>
+        )}
         <button type="button" className="grid h-9 place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`}>
           <Icon name="dots" className="h-5 w-5" />
         </button>
       </div>
+      {project.status === "Completed" && project.feedback && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs font-bold text-emerald-700">
+          <span className="inline-flex min-w-0 items-center gap-2"><Icon name="star" className="h-4 w-4 shrink-0" />You've submitted feedback</span>
+        </div>
+      )}
     </Card>
   );
 };
@@ -376,14 +407,15 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
           Back to My Projects
         </button>
         <span className="flex flex-wrap gap-3">
-          <button type="button" onClick={() => onRequestRevision(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-5 text-xs font-black text-[#e347a8] transition hover:bg-pink-50">
-            <Icon name="refresh" className="h-4 w-4" />
-            Request Revision
-          </button>
-          {project.status === "Completed" && (
-            <button type="button" onClick={() => onFeedback(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
+          {project.status === "Completed" ? (
+            <button type="button" onClick={onFeedback} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
               <Icon name="star" className="h-4 w-4" />
-              {project.feedback ? "Update Feedback" : "Give Feedback"}
+              {project.feedback ? "Edit Feedback" : "Give Feedback"}
+            </button>
+          ) : (
+            <button type="button" onClick={() => onRequestRevision(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-5 text-xs font-black text-[#e347a8] transition hover:bg-pink-50">
+              <Icon name="refresh" className="h-4 w-4" />
+              Request Revision
             </button>
           )}
         </span>
@@ -397,13 +429,15 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
           <div>
             <DetailRow label="Project Name" value={project.title} />
             <DetailRow label="Client" value={getPersonName(project.requestedBy, project.raw?.requestedByName || "Client")} />
-            <DetailRow label="Project Manager" value={getPersonName(project.assignedTo, "Unassigned")} />
+            <DetailRow label="Developer" value={getPersonName(project.assignedTo, "Unassigned")} />
             <DetailRow label="Start Date" value={formatDate(project.startDate)} />
           </div>
           <div className="lg:border-l lg:border-pink-100 lg:pl-10 dark:lg:border-neutral-800">
             <DetailRow label="Due Date" value={formatDate(project.dueDate)} />
             <DetailRow label="Completed Date" value={project.completedAt ? formatDate(project.completedAt) : "Not completed"} />
-            <DetailRow label="Budget" value="N/A" />
+            <DetailRow label="Amount" value={formatCurrency(project.amount)} />
+            <DetailRow label="Paid" value={formatCurrency(project.paid)} />
+            <DetailRow label="Pending" value={formatCurrency(project.pendingAmount)} />
             <DetailRow label="Last Updated" value={formatDateTime(project.updatedAt)} />
           </div>
         </div>
@@ -501,7 +535,7 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
           </span>
           <button type="button" onClick={() => onFeedback(project)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
             <Icon name="star" className="h-4 w-4" />
-            {project.feedback ? "Update Feedback" : "Give Feedback"}
+            {project.feedback ? "Edit Feedback" : "Give Feedback"}
           </button>
         </Card>
       )}
@@ -509,7 +543,7 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
   );
 };
 
-const FeedbackModal = ({ onClose, onSubmit, project }) => {
+const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
   const [rating, setRating] = useState(project.feedback?.rating || 0);
   const [comment, setComment] = useState(project.feedback?.comment || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -570,10 +604,11 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
   );
 };
 
+SimpleFeedbackModal.displayName = "SimpleFeedbackModal";
+
 const RevisionModal = ({ onClose, onSubmit, project }) => {
   const [form, setForm] = useState({
     title: "",
-    section: "",
     priority: "",
     description: "",
     dueDate: "",
@@ -614,11 +649,8 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
           </button>
         </div>
 
-        <div className="mt-6 flex items-center gap-4 rounded-xl border border-pink-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-linear-to-br from-[#10142d] to-[#c72fb2] text-sm font-black text-white">
-            {getInitials(project.title)}
-          </span>
-          <span className="min-w-0 flex-1">
+        <div className="mt-6 rounded-xl border border-pink-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+          <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
               <span className="truncate text-base font-black text-[#10142d] dark:text-white">{project.title}</span>
               <span className={`rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>{project.status}</span>
@@ -645,22 +677,6 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Section / Page <span className="text-pink-500">*</span></span>
-            <select
-              required
-              value={form.section}
-              onChange={(event) => updateField("section", event.target.value)}
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
-            >
-              <option value="">Select section or page</option>
-              <option>Homepage</option>
-              <option>About Page</option>
-              <option>Product Page</option>
-              <option>Brand Assets</option>
-              <option>Other</option>
-            </select>
-          </label>
-          <label className="block">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Priority <span className="text-pink-500">*</span></span>
             <select
               required
@@ -675,7 +691,6 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
               <option>Urgent</option>
             </select>
           </label>
-          <span className="hidden md:block" />
           <label className="block md:col-span-2">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Description of Changes <span className="text-pink-500">*</span></span>
             <textarea
@@ -733,6 +748,112 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
     </div>
   );
 };
+
+const RatingStars = ({ label, onChange, required = false, value }) => (
+  <div className="flex items-center justify-between gap-4">
+    <span className="text-xs font-black text-slate-600 dark:text-slate-300">
+      {label} {required && <span className="text-pink-500">*</span>}
+    </span>
+    <span className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((rating) => (
+        <button
+          key={rating}
+          type="button"
+          onClick={() => onChange(rating)}
+          className={`grid h-6 w-6 place-items-center transition ${rating <= value ? "text-amber-400" : "text-slate-200 hover:text-amber-300"}`}
+          aria-label={`${rating} star rating`}
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
+            <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+          </svg>
+        </button>
+      ))}
+    </span>
+  </div>
+);
+
+const FeedbackModal = ({ onClose, onSubmit, project }) => {
+  const feedback = project.feedback || {};
+  const [form, setForm] = useState({
+    overallRating: feedback.overallRating || 0,
+    quality: feedback.quality || 0,
+    communication: feedback.communication || 0,
+    timeliness: feedback.timeliness || 0,
+    overallSatisfaction: feedback.overallSatisfaction || 0,
+    comment: feedback.comment || "",
+    wouldRecommend: feedback.wouldRecommend === false ? "no" : feedback.wouldRecommend ? "yes" : "",
+  });
+
+  const updateRating = (field, value) =>
+    setForm((currentForm) => ({ ...currentForm, [field]: value }));
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit(project, {
+      ...form,
+      wouldRecommend: form.wouldRecommend === "yes",
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Give Feedback</h2>
+            <p className="mt-2 text-sm font-bold text-slate-500">Tell us about your experience with this project.</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback">x</button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/30 p-4">
+          <p className="text-sm font-black text-[#10142d]">{project.title}</p>
+          <p className="mt-1 text-xs font-bold text-emerald-600">Completed {formatDate(project.completedAt || project.updatedAt)}</p>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <RatingStars label="Overall Rating" required value={form.overallRating} onChange={(value) => updateRating("overallRating", value)} />
+          <div className="rounded-xl border border-pink-100 p-4">
+            <p className="mb-3 text-xs font-black text-slate-600">Detailed Ratings <span className="font-bold text-slate-400">(optional)</span></p>
+            <div className="space-y-3">
+              <RatingStars label="Quality of Work" value={form.quality} onChange={(value) => updateRating("quality", value)} />
+              <RatingStars label="Communication" value={form.communication} onChange={(value) => updateRating("communication", value)} />
+              <RatingStars label="Timeliness" value={form.timeliness} onChange={(value) => updateRating("timeliness", value)} />
+              <RatingStars label="Overall Satisfaction" value={form.overallSatisfaction} onChange={(value) => updateRating("overallSatisfaction", value)} />
+            </div>
+          </div>
+          <label className="block">
+            <span className="mb-2 block text-xs font-black text-slate-600">Your Feedback</span>
+            <textarea value={form.comment} onChange={(event) => updateRating("comment", event.target.value)} maxLength={1000} rows={4} placeholder="Share your thoughts about the project..." className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100" />
+          </label>
+          <fieldset>
+            <legend className="mb-2 text-xs font-black text-slate-600">Would you recommend us?</legend>
+            <div className="flex items-center gap-5 text-xs font-bold text-slate-600">
+              <label className="inline-flex items-center gap-2"><input type="radio" name="recommend" checked={form.wouldRecommend === "yes"} onChange={() => updateRating("wouldRecommend", "yes")} className="accent-[#c72fb2]" />Yes, definitely</label>
+              <label className="inline-flex items-center gap-2"><input type="radio" name="recommend" checked={form.wouldRecommend === "no"} onChange={() => updateRating("wouldRecommend", "no")} className="accent-[#c72fb2]" />Not really</label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
+          <button type="submit" disabled={!form.overallRating} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c72fb2] text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="send" className="h-4 w-4" />Submit Feedback</button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const FeedbackSuccessModal = ({ onClose }) => (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-950/45 px-4 backdrop-blur-[2px]">
+    <section className="w-full max-w-sm rounded-2xl border border-pink-100 bg-white px-7 py-9 text-center shadow-[0_22px_60px_rgba(15,23,42,0.28)]">
+      <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-white shadow-[0_10px_22px_rgba(16,185,129,0.26)]"><Icon name="check" className="h-9 w-9" /></span>
+      <h2 className="mt-5 text-2xl font-black text-[#10142d]">Feedback Submitted!</h2>
+      <p className="mt-3 text-sm font-bold leading-6 text-slate-500">Thank you for your feedback. Your response helps us improve our service.</p>
+      <button type="button" onClick={onClose} className="mt-6 h-10 rounded-lg bg-[#c72fb2] px-9 text-sm font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.22)]">Close</button>
+    </section>
+  </div>
+);
 
 const ClientProjectsSkeleton = () => (
   <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -847,10 +968,10 @@ const ClientProjectsSkeleton = () => (
 const ClientProjects = () => {
   const [activeTab, setActiveTab] = useState("All Projects");
   const [errorMessage, setErrorMessage] = useState("");
+  const [feedbackProject, setFeedbackProject] = useState(null);
+  const [feedbackSuccessProject, setFeedbackSuccessProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [feedbackProject, setFeedbackProject] = useState(null);
   const [revisionMessage, setRevisionMessage] = useState("");
   const [revisionProject, setRevisionProject] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -933,22 +1054,32 @@ const ClientProjects = () => {
     }
   };
 
-  const handleSubmitFeedback = async (project, feedback) => {
-    const updatedTask = await taskAPI.submitFeedback(project.id, feedback);
-    const updatedProject = normalizeProject(updatedTask);
-    setProjects((currentProjects) => currentProjects.map((currentProject) => currentProject.id === updatedProject.id ? updatedProject : currentProject));
-    setSelectedProject((currentProject) => currentProject?.id === updatedProject.id ? updatedProject : currentProject);
-    setFeedbackProject(null);
-    setFeedbackMessage(`Thank you for your feedback on ${project.title}.`);
-    setErrorMessage("");
-  };
-
   const handleDownloadOutput = async (project, output) => {
     try {
       setErrorMessage("");
       await taskAPI.downloadOutput(project.id, output.title);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
+    }
+  };
+
+  const handleSubmitFeedback = async (project, form) => {
+    try {
+      const updatedTask = await taskAPI.submitFeedback(project.id, form);
+      const updatedProject = normalizeProject(updatedTask);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === updatedProject.id ? updatedProject : currentProject
+        )
+      );
+      setSelectedProject((currentProject) =>
+        currentProject?.id === updatedProject.id ? updatedProject : currentProject
+      );
+      setFeedbackProject(null);
+      setFeedbackSuccessProject(updatedProject);
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to submit feedback."));
     }
   };
 
@@ -963,7 +1094,7 @@ const ClientProjects = () => {
           errorMessage={errorMessage}
           onBack={() => setSelectedProject(null)}
           onDownloadOutput={handleDownloadOutput}
-          onFeedback={setFeedbackProject}
+          onFeedback={() => setFeedbackProject(selectedProject)}
           onRequestRevision={(project) => {
             setRevisionMessage("");
             setRevisionProject(project);
@@ -977,7 +1108,17 @@ const ClientProjects = () => {
             project={revisionProject}
           />
         )}
-        {feedbackProject && <FeedbackModal onClose={() => setFeedbackProject(null)} onSubmit={handleSubmitFeedback} project={feedbackProject} />}
+        {feedbackProject && (
+          <FeedbackModal
+            key={feedbackProject.id}
+            onClose={() => setFeedbackProject(null)}
+            onSubmit={handleSubmitFeedback}
+            project={feedbackProject}
+          />
+        )}
+        {feedbackSuccessProject && (
+          <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
+        )}
       </>
     );
   }
@@ -1041,12 +1182,6 @@ const ClientProjects = () => {
           {revisionMessage}
         </p>
       )}
-      {feedbackMessage && (
-        <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-          {feedbackMessage}
-        </p>
-      )}
-
       <ProjectStats projects={projects} />
 
       <Card className="overflow-hidden">
@@ -1074,7 +1209,9 @@ const ClientProjects = () => {
               {visibleProjects.map((project, index) => (
                 <ProjectCard
                   key={project.id || project.title}
-                  index={index}
+                  onFeedback={(selectedProject) =>
+                    setFeedbackProject(selectedProject)
+                  }
                   onRequestRevision={(selectedProject) => {
                     setRevisionMessage("");
                     setRevisionProject(selectedProject);
@@ -1103,17 +1240,19 @@ const ClientProjects = () => {
           project={revisionProject}
         />
       )}
+      {feedbackProject && (
+        <FeedbackModal
+          key={feedbackProject.id}
+          onClose={() => setFeedbackProject(null)}
+          onSubmit={handleSubmitFeedback}
+          project={feedbackProject}
+        />
+      )}
+      {feedbackSuccessProject && (
+        <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
+      )}
     </div>
   );
 };
-
-const thumbnailColors = [
-  "bg-linear-to-br from-[#111936] to-[#c72fb2]",
-  "bg-linear-to-br from-neutral-950 to-neutral-700",
-  "bg-linear-to-br from-emerald-500 to-green-700",
-  "bg-linear-to-br from-orange-400 to-pink-500",
-  "bg-linear-to-br from-blue-500 to-[#c72fb2]",
-  "bg-linear-to-br from-slate-400 to-slate-700",
-];
 
 export default ClientProjects;

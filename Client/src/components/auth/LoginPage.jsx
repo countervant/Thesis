@@ -116,7 +116,18 @@ const LoginPage = ({ order, order1 }) => {
 
     try {
       const data = await authAPI.login(email, password);
-      localStorage.setItem("token", data.token);
+      if (data.requiresTwoFactor) {
+        const pendingTwoFactor = {
+          temporaryToken: data.temporaryToken,
+          maskedEmail: data.maskedEmail,
+          expiresAt: data.expiresAt,
+          resendAvailableAt: data.resendAvailableAt,
+        };
+        sessionStorage.setItem("clientraPending2FA", JSON.stringify(pendingTwoFactor));
+        navigate("/verify-2fa", { replace: true, state: pendingTwoFactor });
+        return;
+      }
+      sessionStorage.setItem("token", data.token);
 
       let profile = null;
       try {
@@ -135,15 +146,14 @@ const LoginPage = ({ order, order1 }) => {
         : { id: data.id, email: data.email, role };
 
       if (!role) {
-        localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
         setError("Login succeeded, but this account has no role. Please ask the admin to check the account role in the database.");
         return;
       }
 
       login(userData, data.token);
-      sessionStorage.setItem("clientraBackLockedAfterLogin", "true");
       resetForm();
-      navigate(dashboardPathByRole[role] || "/dashboard", {
+      navigate(data.twoFactorSetupRequired ? "/setup-2fa" : (dashboardPathByRole[role] || "/dashboard"), {
         replace: true,
       });
     } catch (err) {

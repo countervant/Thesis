@@ -402,7 +402,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
         className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Completed Task</h2>
+          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
           <button
             type="button"
             onClick={onClose}
@@ -633,7 +633,7 @@ const EmpTask = () => {
 
   const taskStats = [
     { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today").length, icon: pendingrequest, tone: "orange" },
+    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
     { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
@@ -742,13 +742,10 @@ const EmpTask = () => {
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const willCompleteTask =
-      isCompletingSubtask &&
-      nextSubtasks.length > 0 &&
-      nextSubtasks.every((subtask) => subtask.completed);
+    const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
 
-    if (willCompleteTask) {
-      setCompletionDraft({ task, nextSubtasks });
+    if (isCompletingSubtask && isClientReviewSubtask) {
+      setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
 
@@ -775,6 +772,7 @@ const EmpTask = () => {
       const updatedTask = await taskAPI.submitOutput(draft.task.id, {
         ...output,
         subtasks: draft.nextSubtasks,
+        finalize: draft.finalize,
       });
       setTasks((currentTasks) =>
         currentTasks.map((item) => (item.id === draft.task.id ? normalizeTask(updatedTask) : item))
@@ -830,7 +828,7 @@ const EmpTask = () => {
       </div>
 
       <Card className="p-5">
-        <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
+        <div>
           <label className="relative block">
             <span className="sr-only">Search tasks</span>
             <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -842,9 +840,6 @@ const EmpTask = () => {
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
             />
           </label>
-          <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
-          <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
-          <SelectControl label="Sort by" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (

@@ -8,7 +8,7 @@ import SecuritySettings from "./security.jsx";
 
 const menuItems = [
   ["Profile", "person"],
-  ["Security", "shield"],
+  ["Privacy & Security", "shield"],
   ["Notifications", "bell"],
   ["Privacy", "lock"],
 ];
@@ -61,13 +61,13 @@ const Settings = () => {
   const [supportForm, setSupportForm] = useState(supportInitialState);
   const [supportMessage, setSupportMessage] = useState("");
   const [deactivateReason, setDeactivateReason] = useState("");
-  const isSecurityTab = activeTab === "Security";
+  const isSecurityTab = activeTab === "Privacy & Security";
   const isNotificationTab = activeTab === "Notifications";
   const isPrivacyTab = activeTab === "Privacy";
   const usesFullContent = isSecurityTab || isNotificationTab || isPrivacyTab;
 
   const openPasswordSettings = () => {
-    setActiveTab("Security");
+    setActiveTab("Privacy & Security");
     setTimeout(() => window.dispatchEvent(new Event("clientra:open-password-settings")), 0);
   };
 
@@ -276,10 +276,10 @@ const Settings = () => {
               </p>
               <button
                 type="button"
-                onClick={() => setActiveTab("Security")}
+                onClick={() => setActiveTab("Privacy & Security")}
                 className="mt-4 h-9 w-full rounded-lg border border-[#b678ff] bg-white text-xs font-black text-[#8b35ff] transition hover:bg-violet-50 dark:bg-neutral-950 dark:text-[#b678ff] dark:hover:!bg-[#8b35ff] dark:hover:text-white"
               >
-                Go to Security
+                Go to Privacy & Security
               </button>
             </section>
           </aside>}

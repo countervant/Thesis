@@ -18,6 +18,8 @@ import Dashboard from "../pages/Dashboard.jsx";
 import Profile from "../pages/Profile.jsx";
 import PublicProfile from "../pages/PublicProfile.jsx";
 import Unauthorized from "../pages/auth/Unauthorized.jsx";
+import TwoFactorVerification from "../components/auth/TwoFactorVerification.jsx";
+import TwoFactorSetup from "../pages/auth/TwoFactorSetup.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import AppLoadingScreen from "../components/AppLoadingScreen.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
@@ -120,7 +122,17 @@ const AppRoutes = () => {
           }
         />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-2fa" element={<TwoFactorVerification />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
+
+        <Route
+          path="/setup-2fa"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <TwoFactorSetup />
+            </ProtectedRoute>
+          }
+        />
         
         {/* Protected Routes - requires authentication */}
         <Route

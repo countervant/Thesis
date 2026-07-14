@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { calendarAPI } from "../../../services/api.js";
 
 const calendars = [
-  ["My Schedule", "accent-violet-600"],
+  ["My Schedule", "accent-pink-600"],
   ["Tasks & Deadlines", "accent-orange-500"],
   ["Meetings", "accent-blue-500"],
   ["Personal", "accent-emerald-500"],
@@ -14,7 +14,7 @@ const toneStyles = {
   orange: "bg-orange-50 text-orange-600",
   pink: "bg-pink-50 text-pink-600",
   red: "bg-red-50 text-red-600",
-  violet: "bg-violet-50 text-violet-600",
+  violet: "bg-pink-50 text-pink-600",
 };
 
 const statCardStyles = {
@@ -22,12 +22,12 @@ const statCardStyles = {
   orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
   pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
   red: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-  violet: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  violet: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
 };
 
 const typeStyles = {
-  "Company Event": "bg-violet-50 text-violet-700",
-  Meeting: "bg-violet-50 text-violet-700",
+  "Company Event": "bg-pink-50 text-pink-700",
+  Meeting: "bg-pink-50 text-pink-700",
   Deadline: "bg-pink-50 text-pink-700",
   Holiday: "bg-emerald-50 text-emerald-700",
   Personal: "bg-emerald-50 text-emerald-700",
@@ -40,7 +40,7 @@ const eventStyles = {
   emerald: "bg-emerald-50 text-emerald-700",
   orange: "bg-orange-50 text-orange-700",
   pink: "bg-pink-50 text-pink-700",
-  violet: "bg-violet-50 text-violet-700",
+  violet: "bg-pink-50 text-pink-700",
 };
 
 const dotStyles = {
@@ -48,7 +48,7 @@ const dotStyles = {
   emerald: "bg-emerald-500",
   orange: "bg-orange-500",
   pink: "bg-pink-500",
-  violet: "bg-violet-600",
+  violet: "bg-pink-600",
 };
 
 const getMonthOptions = (year) => Array.from({ length: 12 }, (_, index) => new Date(year, index, 1));
@@ -442,7 +442,7 @@ const EmpCalendar = () => {
               <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
                 Save Event
               </button>
             </div>

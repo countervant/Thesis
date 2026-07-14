@@ -186,6 +186,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     description: "",
     startDate: todayInputDate(),
     dueDate: todayInputDate(),
+    amount: "",
+    paid: "0",
     priority: "medium",
     requestedBy: isAdmin ? "" : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
@@ -295,6 +297,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       description: task.description || "",
       startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
       dueDate: toInputDate(task.dueDate),
+      amount: task.amount ?? task.budget ?? "",
+      paid: task.paid ?? "0",
       priority: task.priority || "medium",
       requestedBy:
         getEntityId(task.requestedBy) ||
@@ -436,6 +440,21 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
+    if (formData.amount === "" || Number(formData.amount) < 0) {
+      setErrorMessage("Please enter a valid amount.");
+      return;
+    }
+
+    if (formData.paid === "" || Number(formData.paid) < 0) {
+      setErrorMessage("Please enter a valid paid amount.");
+      return;
+    }
+
+    if (Number(formData.paid) > Number(formData.amount)) {
+      setErrorMessage("Paid amount cannot be greater than the total amount.");
+      return;
+    }
+
     if (isAdmin && !formData.requestedBy) {
       setErrorMessage("Please choose which client requested this task.");
       return;
@@ -471,6 +490,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         description: formData.description.trim(),
         startDate: formData.startDate,
         dueDate: formData.dueDate,
+        amount: Number(formData.amount),
+        paid: Number(formData.paid),
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
         assignedTo: formData.assignees[0],
@@ -669,7 +690,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1">
               <FieldLabel>Priority</FieldLabel>
               <select
@@ -683,6 +704,33 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-1">
+              <FieldLabel>Amount (₱)</FieldLabel>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                value={formData.amount}
+                onChange={(event) => updateField("amount", event.target.value)}
+                placeholder="Enter total amount"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+              />
+            </div>
+            <div className="space-y-1">
+              <FieldLabel>Paid (₱)</FieldLabel>
+              <input
+                type="number"
+                min="0"
+                max={formData.amount || undefined}
+                step="0.01"
+                required
+                value={formData.paid}
+                onChange={(event) => updateField("paid", event.target.value)}
+                placeholder="Enter amount paid"
+                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+              />
             </div>
           </div>
 

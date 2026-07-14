@@ -36,6 +36,18 @@ const taskSchema = new mongoose.Schema(
       required: true,
     },
 
+    amount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    paid: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
     subtasks: [
       {
         title: {
@@ -229,12 +241,42 @@ const taskSchema = new mongoose.Schema(
         min: 1,
         max: 5,
       },
+      submittedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      overallRating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      quality: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      communication: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      timeliness: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      overallSatisfaction: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
       comment: {
         type: String,
         default: "",
         trim: true,
         maxlength: 1000,
       },
+      wouldRecommend: Boolean,
       submittedAt: Date,
     },
 

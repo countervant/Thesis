@@ -161,6 +161,8 @@ const normalizeTask = (task) => {
     dueDate: toDisplayDate(String(task?.dueDate || "").slice(0, 10)),
     status,
     priority: task?.priority || "medium",
+    amount: Number(task?.amount ?? task?.budget ?? 0),
+    paid: Number(task?.paid ?? 0),
     assignedTo: task?.assignedTo,
     assignees: task?.assignees?.length ? task.assignees : [task?.assignedTo].filter(Boolean),
     createdBy: task?.createdBy,
@@ -692,7 +694,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
         className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Completed Task</h2>
+          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
           <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close submit completed task">
             x
           </button>
@@ -940,7 +942,9 @@ const Tasks = ({
     }
     return task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
   };
-  const myTasks = visibleTasks.filter(isOwnedByCurrentUser);
+  const myTasks = visibleTasks.filter(
+    (task) => isOwnedByCurrentUser(task) && task.status !== "Done"
+  );
   const teamTasks = visibleTasks.filter((task) => !isOwnedByCurrentUser(task));
   const dueTodayTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
   const overdueTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
@@ -948,11 +952,11 @@ const Tasks = ({
     const dateStatus = getDateStatus(task.dueDate);
     return (dateStatus === "Week" || dateStatus === "Upcoming") && task.status !== "Done";
   });
-  const completedTasks = teamTasks.filter((task) => task.status === "Done");
+  const completedTasks = visibleTasks.filter((task) => task.status === "Done");
 
   const taskStats = [
     { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today").length, icon: pendingrequest, tone: "orange" },
+    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
     { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
@@ -1087,13 +1091,10 @@ const Tasks = ({
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const willCompleteTask =
-      isCompletingSubtask &&
-      nextSubtasks.length > 0 &&
-      nextSubtasks.every((subtask) => subtask.completed);
+    const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
 
-    if (willCompleteTask) {
-      setCompletionDraft({ task, nextSubtasks });
+    if (isCompletingSubtask && isClientReviewSubtask) {
+      setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
 
@@ -1119,6 +1120,7 @@ const Tasks = ({
       const updatedTask = await taskAPI.submitOutput(draft.task.id, {
         ...output,
         subtasks: draft.nextSubtasks,
+        finalize: draft.finalize,
       });
       setTasks((currentTasks) =>
         currentTasks.map((currentTask) =>
@@ -1206,29 +1208,17 @@ const Tasks = ({
           </div>
 
           <Card className="p-3 md:p-5">
-            <div className="grid gap-3 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
-              <div className="grid grid-cols-[1fr_44px] gap-2 xl:contents">
-                <label className="relative block">
-                  <span className="sr-only">Search tasks</span>
-                  <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search tasks..."
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
-                  />
-                </label>
-                <span className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 xl:hidden">
-                  <SmallIcon name="filter" className="h-5 w-5" />
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 xl:contents">
-                <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
-                <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
-                <SelectControl label="Sort By" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
-              </div>
-            </div>
+            <label className="relative block">
+              <span className="sr-only">Search tasks</span>
+              <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search tasks..."
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
+              />
+            </label>
           </Card>
 
           <section className="space-y-3 md:space-y-5">

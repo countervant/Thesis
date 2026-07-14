@@ -1,30 +1,6 @@
-import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AppLoadingScreen from "../AppLoadingScreen.jsx";
-
-const LoginBackGuard = ({ children }) => {
-  const location = useLocation();
-
-  useEffect(() => {
-    if (sessionStorage.getItem("clientraBackLockedAfterLogin") !== "true") {
-      return undefined;
-    }
-
-    const lockUrl = `${location.pathname}${location.search}${location.hash}`;
-    window.history.replaceState({ clientraBackLock: true }, "", lockUrl);
-    window.history.pushState({ clientraBackLock: true }, "", lockUrl);
-
-    const keepCurrentPage = () => {
-      window.history.pushState({ clientraBackLock: true }, "", lockUrl);
-    };
-
-    window.addEventListener("popstate", keepCurrentPage);
-    return () => window.removeEventListener("popstate", keepCurrentPage);
-  }, [location.hash, location.pathname, location.search]);
-
-  return children;
-};
 
 // Protected route component that checks authentication and roles
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -45,7 +21,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  return <LoginBackGuard>{children}</LoginBackGuard>;
+  if (user?.role === "admin" && user.twoFactorEnabled === false && location.pathname !== "/setup-2fa") {
+    return <Navigate to="/setup-2fa" replace />;
+  }
+
+  return children;
 };
 
 export default ProtectedRoute;
