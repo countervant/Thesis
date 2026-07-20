@@ -76,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "client_approved", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 
@@ -227,6 +227,13 @@ const taskSchema = new mongoose.Schema(
       },
       fileName: String,
       fileUrl: String,
+      previewFileName: String,
+      originalStoredName: String,
+      mimeType: String,
+      watermarked: {
+        type: Boolean,
+        default: false,
+      },
       link: String,
       submittedAt: Date,
     },

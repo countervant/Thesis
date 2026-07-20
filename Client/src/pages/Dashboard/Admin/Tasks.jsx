@@ -150,6 +150,7 @@ const normalizeTask = (task) => {
 
   return {
     id: task?._id || task?.id || "",
+    apiStatus: task?.status || "pending",
     title: task?.title || "Untitled task",
     description: task?.description || "",
     startDate: toDisplayDate(String(task?.startDate || task?.createdAt || task?.dueDate || "").slice(0, 10)),
@@ -165,6 +166,9 @@ const normalizeTask = (task) => {
     requestedByName: task?.requestedByName || "",
     subtasks,
     progress: getTaskProgress(subtasks),
+    finalOutput: task?.finalOutput || null,
+    revisionRequests: Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    clientApproved: task?.activities?.some((activity) => activity?.type === "client_approved") || false,
     feedback: task?.feedback || null,
   };
 };
@@ -369,7 +373,7 @@ const SelectControl = ({ label, onChange, options, value }) => (
   </label>
 );
 
-const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
+const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
   const effectiveExpanded = canAccessSubtasks && isExpanded;
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
@@ -417,27 +421,61 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
                 {item.subtasks.map((subtask, index) => {
-                  const isLocked = isDone || (subtask.completed
+                  const clientReviewIndex = item.subtasks.findIndex((candidate) =>
+                    /client\s+(?:review.*revision|revision)/i.test(candidate.title)
+                  );
+                  const isWaitingForClientApproval =
+                    clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
+                  const isLocked = isDone || isWaitingForClientApproval || (subtask.completed
                     ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
                     : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed));
+                  const isClientReviewSubtask = /client\s+(?:review.*revision|revision)/i.test(subtask.title);
+                  const canSubmitOutput =
+                    !isDone &&
+                    isClientReviewSubtask &&
+                    item.subtasks.slice(0, index).every((previousSubtask) => previousSubtask.completed);
+                  const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
+                  const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
+                  const isApproved = hasSubmittedOutput && item.clientApproved;
+                  const needsRevision =
+                    hasSubmittedOutput &&
+                    item.apiStatus === "pending" &&
+                    item.revisionRequests.length > 0;
                   return (
-                  <label key={subtask.id || `${item.id}-${index}`} className={`flex min-w-0 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={isLocked && !isDone ? "Complete the previous subtask first" : undefined}>
-                    <input
-                      type="checkbox"
-                      checked={subtask.completed}
-                      disabled={isLocked}
-                      onChange={() => onToggleSubtask(item, index)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
-                    />
-                    <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
-                      {subtask.title}
-                    </span>
-                    {subtask.assignedTo && (
-                      <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
-                        {getPersonName(subtask.assignedTo)}
-                      </span>
-                    )}
-                  </label>
+                    <div key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2">
+                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={isWaitingForClientApproval ? "Wait for the client to approve the review first" : isLocked && !isDone ? "Complete the previous subtask first" : undefined}>
+                        <input
+                          type="checkbox"
+                          checked={subtask.completed}
+                          disabled={isLocked}
+                          onChange={() => onToggleSubtask(item, index)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
+                          {subtask.title}
+                        </span>
+                        {subtask.assignedTo && (
+                          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
+                            {getPersonName(subtask.assignedTo)}
+                          </span>
+                        )}
+                      </label>
+                      {isClientReviewSubtask && isApproved && (
+                        <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">
+                          Approved
+                        </span>
+                      )}
+                      {isClientReviewSubtask && isUnderReview && (
+                        <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[9px] font-black text-amber-700">
+                          Under Review
+                        </span>
+                      )}
+                      {canSubmitOutput && !isUnderReview && !isApproved && (
+                        <button type="button" onClick={() => onSubmitOutput(item, index)} className="shrink-0 rounded-lg bg-[#c72fb2] px-2.5 py-1.5 text-[9px] font-black text-white transition hover:brightness-105">
+                          {needsRevision ? "Needs Revision" : "Submit Output"}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -630,6 +668,8 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   const [fileError, setFileError] = useState("");
 
   const task = completion.task;
+  const pendingAmount = Math.max(0, Number(task.amount || 0) - Number(task.paid || 0));
+  const needsPaymentProtection = Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -638,6 +678,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
       link,
       message,
       outputMethod,
+      watermark: needsPaymentProtection,
     });
   };
 
@@ -677,6 +718,17 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
             <span className="text-slate-400">Due Date</span>
             <span className="font-black text-[#10142d] dark:text-white">{formatReadableDate(task.dueDate)}</span>
+          </p>
+        </div>
+
+        <div className={`mt-4 rounded-xl border px-4 py-3 ${needsPaymentProtection ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+          <p className={`text-xs font-black ${needsPaymentProtection ? "text-amber-700" : "text-emerald-700"}`}>
+            {needsPaymentProtection ? "Watermark protection is ON" : "Watermark protection is OFF"}
+          </p>
+          <p className="mt-1 text-[11px] font-bold text-slate-600">
+            {needsPaymentProtection
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image review copies are watermarked and remain viewable/downloadable. For other file types, upload a pre-watermarked review copy.`
+              : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>
 
@@ -911,6 +963,7 @@ const Tasks = ({
         item={task}
         onDelete={requestDeleteTask}
         onEdit={handleEditTask}
+        onSubmitOutput={handleSubmitOutput}
         onToggleExpand={handleToggleExpand}
         onToggleSubtask={handleToggleSubtask}
       />
@@ -967,6 +1020,13 @@ const Tasks = ({
     }
 
     const toggledSubtask = task.subtasks[subtaskIndex];
+    const clientReviewIndex = task.subtasks.findIndex((subtask) =>
+      /client\s+(?:review.*revision|revision)/i.test(subtask.title)
+    );
+    if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
+      setErrorMessage("Wait for the client to approve the review before continuing to the final subtask.");
+      return;
+    }
     const isLocked = toggledSubtask?.completed
       ? task.subtasks.slice(subtaskIndex + 1).some((subtask) => subtask.completed)
       : task.subtasks.slice(0, subtaskIndex).some((subtask) => !subtask.completed);
@@ -988,6 +1048,19 @@ const Tasks = ({
     }
 
     await updateTaskSubtasks(task, nextSubtasks);
+  };
+
+  const handleSubmitOutput = (task, subtaskIndex) => {
+    const previousStepsCompleted = task.subtasks
+      .slice(0, subtaskIndex)
+      .every((subtask) => subtask.completed);
+
+    if (!isOwnedByCurrentUser(task) || !previousStepsCompleted || task.status === "Done") return;
+
+    const nextSubtasks = task.subtasks.map((subtask, index) =>
+      index === subtaskIndex ? { ...subtask, completed: true } : subtask
+    );
+    setCompletionDraft({ task, nextSubtasks, finalize: false });
   };
 
   const submitCompletedTask = async (output) => {

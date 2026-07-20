@@ -406,13 +406,18 @@ const PublicProfile = () => {
     try {
       if (showLoading) setIsLoading(true);
       setErrorMessage("");
-      const [data, profileData] = await Promise.all([
+      const [postsResult, profileResult] = await Promise.allSettled([
         newsfeedAPI.getAll(),
         userId ? authAPI.getPublicProfile(userId) : Promise.resolve(null),
       ]);
+      const data = postsResult.status === "fulfilled" ? postsResult.value : [];
+      const profileData = profileResult.status === "fulfilled" ? profileResult.value : null;
 
       setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
       setDirectProfileUser(profileData);
+      if (postsResult.status === "rejected" || profileResult.status === "rejected") {
+        setErrorMessage("Some profile data could not be loaded. Refresh to retry.");
+      }
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to load profile.");
     } finally {

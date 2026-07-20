@@ -1,4 +1,5 @@
 import axios from "axios";
+import clientraWatermarkLogo from "../assets/CLIENTRA2.png";
 
 // Same-origin by default. Vite proxies /api to Express in development, while the
 // production Express server already serves both the client and API together.
@@ -16,17 +17,31 @@ const twoFactorApiCandidates = [
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 15000,
+  timeout: 30000,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
+const publicAuthPaths = new Set([
+  "/auth/login",
+  "/auth/register",
+  "/auth/verify-2fa",
+  "/auth/resend-2fa",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+]);
+
+const isPublicRequest = (url = "") => publicAuthPaths.has(String(url).split("?")[0]);
+
 console.info(`[api] Base URL: ${API_URL}`);
 
 const cache = new Map();
 const CACHE_TIME = 2 * 60 * 1000;
+const MAX_GET_RETRIES = 1;
+const RETRY_DELAY_MS = 750;
+const wait = (milliseconds) => new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
 
 const cachedGet = async (url) => {
   const cached = cache.get(url);
@@ -155,6 +170,86 @@ const fileToDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+let watermarkLogoPromise;
+const loadWatermarkLogo = () => {
+  watermarkLogoPromise ??= new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Unable to load the Clientra watermark logo"));
+    image.src = clientraWatermarkLogo;
+  });
+  return watermarkLogoPromise;
+};
+
+const createWatermarkedImage = async (file) => {
+  if (!file || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) return null;
+
+  const bitmap = await createImageBitmap(file);
+  const watermarkLogo = await loadWatermarkLogo();
+  const maxDimension = 2400;
+  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const fontSize = Math.max(18, Math.round(Math.min(canvas.width, canvas.height) / 18));
+  context.save();
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate(-Math.PI / 5);
+  context.font = `900 ${fontSize}px Arial, sans-serif`;
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.fillStyle = "rgba(199, 47, 178, 0.38)";
+  context.strokeStyle = "rgba(255, 255, 255, 0.82)";
+  context.lineWidth = Math.max(2, fontSize / 18);
+  const logoSize = fontSize * 1.35;
+  const logoGap = fontSize * 0.32;
+  const wordWidth = context.measureText("CLIENTRA").width;
+  const groupWidth = logoSize + logoGap + wordWidth;
+  const spacingX = groupWidth + fontSize * 2.4;
+  const spacingY = logoSize + fontSize * 1.8;
+
+  for (let y = -canvas.height * 1.2; y <= canvas.height * 1.2; y += spacingY) {
+    for (let x = -canvas.width * 1.2; x <= canvas.width * 1.2; x += spacingX) {
+      const groupStart = x - groupWidth / 2;
+      context.globalAlpha = 0.42;
+      context.drawImage(watermarkLogo, groupStart, y - logoSize / 2, logoSize, logoSize);
+      context.globalAlpha = 1;
+      const wordX = groupStart + logoSize + logoGap;
+      context.strokeText("CLIENTRA", wordX, y);
+      context.fillText("CLIENTRA", wordX, y);
+    }
+  }
+  context.restore();
+
+  return {
+    fileName: `${String(file.name || "output").replace(/\.[^.]+$/, "")}-watermarked.jpg`,
+    dataUrl: canvas.toDataURL("image/jpeg", 0.86),
+  };
+};
+
+const dataUrlToBlob = (dataUrl) => {
+  const [header, encoded] = String(dataUrl).split(",");
+  const mimeType = header.match(/^data:([^;]+)/)?.[1] || "application/octet-stream";
+  const binary = atob(encoded || "");
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: mimeType });
+};
+
+const watermarkDownloadedImage = async (blob, fileName) => {
+  if (!blob?.type?.startsWith("image/")) return blob;
+  const sourceFile = new File([blob], fileName || "output-image", { type: blob.type });
+  const watermarked = await createWatermarkedImage(sourceFile);
+  return watermarked?.dataUrl ? dataUrlToBlob(watermarked.dataUrl) : blob;
+};
+
 const mergeCachedPost = (currentPost, nextPost) => ({
   ...currentPost,
   ...nextPost,
@@ -215,6 +310,11 @@ api.interceptors.request.use(
     const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (!isPublicRequest(config.url)) {
+      const error = new Error("Authentication is required for this request.");
+      error.code = "ERR_AUTH_REQUIRED";
+      error.config = config;
+      return Promise.reject(error);
     }
     console.debug(
       `[api] -> ${config.method?.toUpperCase() || "GET"} ${config.baseURL || ""}${config.url || ""}`
@@ -237,9 +337,33 @@ api.interceptors.response.use(
     );
     return response;
   },
-  (error) => {
+  async (error) => {
+    // A component can finish an interval/effect while logout or session expiry is
+    // unmounting the protected UI. Do not send or retry those tokenless requests.
+    if (error.code === "ERR_AUTH_REQUIRED") {
+      return Promise.reject(error);
+    }
+
     const status = error.response?.status;
     const requestUrl = error.config?.url || "";
+    const requestConfig = error.config || {};
+    const retryCount = Number(requestConfig.__retryCount || 0);
+    const isTransientFailure =
+      !status ||
+      [408, 429, 502, 503, 504].includes(status) ||
+      ["ECONNABORTED", "ETIMEDOUT", "ERR_NETWORK"].includes(error.code);
+
+    if (
+      String(requestConfig.method || "get").toLowerCase() === "get" &&
+      isTransientFailure &&
+      retryCount < MAX_GET_RETRIES
+    ) {
+      requestConfig.__retryCount = retryCount + 1;
+      console.warn(`[api] Retrying GET ${requestUrl} after a transient failure`);
+      await wait(RETRY_DELAY_MS * (retryCount + 1));
+      return api.request(requestConfig);
+    }
+
     const isLoginRequest =
       requestUrl.includes("/login") ||
       requestUrl.includes("/verify-2fa") ||
@@ -379,7 +503,12 @@ export const authAPI = {
 
 export const taskAPI = {
   getAll: async (params = "") => {
-    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    let query = params;
+    if (typeof params !== "string") {
+      const { refresh, ...queryParams } = params;
+      if (refresh) clearCache("/tasks");
+      query = new URLSearchParams(queryParams).toString();
+    }
     return asArray(await cachedGet(`/tasks${query ? `?${query}` : ""}`), "tasks");
   },
 
@@ -397,6 +526,12 @@ export const taskAPI = {
 
   requestRevision: async (id, revision) => {
     const response = await api.post(`/tasks/${id}/revisions`, revision);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  approve: async (id) => {
+    const response = await api.post(`/tasks/${id}/approve`);
     clearCache("/tasks", "/dashboard");
     return response.data;
   },
@@ -419,9 +554,12 @@ export const taskAPI = {
     return response.data;
   },
 
-  downloadOutput: async (id, fileName = "task-output") => {
+  downloadOutput: async (id, fileName = "task-output", options = {}) => {
     const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
-    const url = URL.createObjectURL(response.data);
+    const outputBlob = options.watermark
+      ? await watermarkDownloadedImage(response.data, fileName)
+      : response.data;
+    const url = URL.createObjectURL(outputBlob);
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
@@ -430,6 +568,19 @@ export const taskAPI = {
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   },
+
+  viewOutput: async (id, fileName = "task-output", options = {}) => {
+    const previewWindow = window.open("", "_blank");
+    if (previewWindow) previewWindow.opener = null;
+    const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
+    const outputBlob = options.watermark
+      ? await watermarkDownloadedImage(response.data, fileName)
+      : response.data;
+    const url = URL.createObjectURL(outputBlob);
+    if (previewWindow) previewWindow.location.href = url;
+    else window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
   submitOutput: async (id, output) => {
     const filePayload = output.file
       ? {
@@ -437,8 +588,12 @@ export const taskAPI = {
           dataUrl: await fileToDataUrl(output.file),
         }
       : undefined;
+    const watermarkedFilePayload = output.watermark && output.file
+      ? await createWatermarkedImage(output.file).catch(() => null)
+      : undefined;
     const response = await api.post(`/tasks/${id}/submit-output`, {
       file: filePayload,
+      watermarkedFile: watermarkedFilePayload,
       link: output.link,
       message: output.message,
       outputMethod: output.outputMethod,
@@ -469,7 +624,12 @@ export const newsfeedAPI = {
   },
 
   getActivity: async (params = "") => {
-    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    let query = params;
+    if (typeof params !== "string") {
+      const { refresh, ...queryParams } = params;
+      if (refresh) clearCache("/newsfeed/activity");
+      query = new URLSearchParams(queryParams).toString();
+    }
     return asArray(await cachedGet(`/newsfeed/activity${query ? `?${query}` : ""}`), "newsfeed activity");
   },
 

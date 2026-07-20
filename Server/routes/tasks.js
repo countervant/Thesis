@@ -11,6 +11,7 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsRoot = path.resolve(__dirname, "../uploads/tasks");
+const privateUploadsRoot = path.resolve(__dirname, "../private_uploads/tasks");
 
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
@@ -100,6 +101,28 @@ const validateSubtaskSequence = (subtasks) => {
 
 const allSubtasksCompleted = (subtasks) =>
   subtasks.length > 0 && subtasks.every((subtask) => subtask.completed);
+
+const isClientReviewSubtask = (subtask) =>
+  /client\s+(?:review.*revision|revision)/i.test(String(subtask?.title || ""));
+
+const isClientReviewReady = (subtasks) => {
+  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
+  return reviewIndex >= 0 && subtasks
+    .slice(0, reviewIndex + 1)
+    .every((subtask) => subtask.completed);
+};
+
+const hasClientApproval = (task) =>
+  task.activities?.some((activity) => activity.type === "client_approved");
+
+const validateClientReviewGate = (task, subtasks) => {
+  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
+  if (reviewIndex < 0 || hasClientApproval(task)) return "";
+
+  return subtasks.slice(reviewIndex + 1).some((subtask) => subtask.completed)
+    ? "Wait for the client to approve the review before completing the remaining subtasks"
+    : "";
+};
 
 const validateSubtaskAssignees = (subtasks, assignees) => {
   const teamIds = new Set(assignees.map(String));
@@ -243,7 +266,7 @@ const safeFileName = (fileName) =>
     .replace(/\s+/g, "-")
     .slice(0, 120) || "output-file";
 
-const saveOutputFile = async (taskId, file) => {
+const saveOutputFile = async (taskId, file, options = {}) => {
   const dataUrl = String(file?.dataUrl || "");
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) {
@@ -255,7 +278,8 @@ const saveOutputFile = async (taskId, file) => {
     throw new Error("File size must be 10MB or less");
   }
 
-  const taskUploadDir = path.join(uploadsRoot, String(taskId));
+  const storageRoot = options.private ? privateUploadsRoot : uploadsRoot;
+  const taskUploadDir = path.join(storageRoot, String(taskId));
   await fs.mkdir(taskUploadDir, { recursive: true });
 
   const fileName = `${randomUUID()}-${safeFileName(file.fileName)}`;
@@ -264,7 +288,9 @@ const saveOutputFile = async (taskId, file) => {
 
   return {
     fileName: file.fileName || fileName,
-    fileUrl: `/uploads/tasks/${taskId}/${fileName}`,
+    mimeType: match[1],
+    storedName: fileName,
+    fileUrl: options.private ? undefined : `/uploads/tasks/${taskId}/${fileName}`,
   };
 };
 
@@ -300,24 +326,67 @@ router.get("/", protect, async (req, res) => {
       if (req.query.dueTo) query.dueDate.$lte = new Date(req.query.dueTo);
     }
 
-    const [tasks, total] = await Promise.all([
-      Task.find(query)
-      .select("-comments")
-      .populate("assignedTo", "firstName lastName email role")
-      .populate("assignees", "firstName lastName email role")
-      .populate("subtasks.assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName companyName email role avatar")
-      .populate("requestedBy", "firstName lastName companyName email role avatar")
-      .populate("feedback.user", "firstName lastName companyName email role avatar")
-      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
-      .populate("feedback.reply.repliedBy", "firstName lastName email role")
+    const rawTasks = await Task.find(query)
+      .select([
+        "title",
+        "description",
+        "status",
+        "priority",
+        "startDate",
+        "dueDate",
+        "amount",
+        "paid",
+        "subtasks",
+        "activities",
+        "completedAt",
+        "assignedTo",
+        "assignees",
+        "createdBy",
+        "requestedBy",
+        "requestedByName",
+        "revisionRequests.user",
+        "revisionRequests.title",
+        "revisionRequests.section",
+        "revisionRequests.priority",
+        "revisionRequests.description",
+        "revisionRequests.createdAt",
+        "finalOutput.submittedBy",
+        "finalOutput.message",
+        "finalOutput.outputMethod",
+        "finalOutput.fileName",
+        "finalOutput.fileUrl",
+        "finalOutput.previewFileName",
+        "finalOutput.originalStoredName",
+        "finalOutput.mimeType",
+        "finalOutput.watermarked",
+        "finalOutput.link",
+        "finalOutput.submittedAt",
+        "feedback.user",
+        "feedback.submittedBy",
+        "feedback.overallRating",
+        "feedback.communicationRating",
+        "feedback.qualityRating",
+        "feedback.timelinessRating",
+        "feedback.comment",
+        "feedback.submittedAt",
+        "feedback.reply.message",
+        "feedback.reply.repliedBy",
+        "feedback.reply.repliedAt",
+        "attachments.fileName",
+        "attachments.fileUrl",
+        "archived",
+        "archivedAt",
+        "archivedBy",
+        "createdAt",
+        "updatedAt",
+      ].join(" "))
       .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .maxTimeMS(8000)
-      .lean(),
-      Task.countDocuments(query).maxTimeMS(8000),
-    ]);
+      .lean();
+    const tasks = rawTasks;
+    const total = skip + rawTasks.length;
 
     res.status(200).json(pagedResponse({ data: tasks, page, limit, total, key: "tasks" }));
   } catch (error) {
@@ -464,6 +533,10 @@ router.put("/:id", protect, async (req, res) => {
       if (subtaskValidationMessage) {
         return res.status(400).json({ message: subtaskValidationMessage });
       }
+      const clientReviewGateMessage = validateClientReviewGate(task, subtasks);
+      if (clientReviewGateMessage) {
+        return res.status(400).json({ message: clientReviewGateMessage });
+      }
       recordSubtaskActivities(task, previousSubtasks, subtasks, req.user);
       task.subtasks = subtasks;
       task.status = getStatusFromSubtasks(subtasks, task.status);
@@ -529,6 +602,11 @@ router.put("/:id", protect, async (req, res) => {
     const subtaskValidationMessage = validateSubtaskSequence(payload.subtasks);
     if (subtaskValidationMessage) {
       return res.status(400).json({ message: subtaskValidationMessage });
+    }
+
+    const clientReviewGateMessage = validateClientReviewGate(task, payload.subtasks);
+    if (clientReviewGateMessage) {
+      return res.status(400).json({ message: clientReviewGateMessage });
     }
 
     const subtaskAssigneeMessage = validateSubtaskAssignees(payload.subtasks, payload.assignees);
@@ -630,6 +708,7 @@ router.patch("/:id/archive", protect, async (req, res) => {
       .populate("assignedTo", "firstName lastName email role")
       .populate("assignees", "firstName lastName email role")
       .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("activities.actor", "firstName lastName companyName email role avatar")
       .populate("createdBy", "firstName lastName companyName email role avatar")
       .populate("requestedBy", "firstName lastName companyName email role avatar")
       .populate("feedback.user", "firstName lastName companyName email role avatar")
@@ -657,6 +736,12 @@ router.post("/:id/revisions", protect, async (req, res) => {
 
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (task.status !== "review" || !task.finalOutput?.submittedAt) {
+      return res.status(400).json({
+        message: "A revision can only be requested after the assigned user submits the project for client review",
+      });
     }
 
     const payload = normalizeRevisionPayload(req.body);
@@ -695,6 +780,56 @@ router.post("/:id/revisions", protect, async (req, res) => {
   } catch (error) {
     console.error("Create task revision request error:", error);
     res.status(500).json({ message: "Unable to submit revision request" });
+  }
+});
+
+router.post("/:id/approve", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "client") {
+      return res.status(403).json({ message: "Only clients can approve projects" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (task.status !== "review" || !task.finalOutput?.submittedAt) {
+      return res.status(400).json({ message: "This project is not awaiting client approval" });
+    }
+
+    const reviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
+    const hasRemainingSubtasks =
+      reviewIndex >= 0 &&
+      task.subtasks.slice(reviewIndex + 1).some((subtask) => !subtask.completed);
+    task.status = hasRemainingSubtasks ? "in_progress" : "done";
+    task.completedAt = hasRemainingSubtasks ? undefined : new Date();
+    addActivity(task, {
+      type: "client_approved",
+      title: "Client approved the project",
+      details: "Submitted output was approved",
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+    });
+
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Approve project error:", error);
+    res.status(500).json({ message: "Unable to approve the project" });
   }
 });
 
@@ -827,19 +962,31 @@ router.get("/:id/output/download", protect, async (req, res) => {
     const task = await Task.findOne({
       _id: req.params.id,
       ...taskQueryForUser(req.user),
-    }).select("finalOutput");
+    }).select("amount paid finalOutput");
 
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    if (!task.finalOutput?.fileUrl) {
+    if (!task.finalOutput?.fileName) {
       return res.status(404).json({ message: "No uploaded output is available for this task" });
     }
 
-    const storedFileName = path.basename(task.finalOutput.fileUrl);
-    const filePath = path.join(uploadsRoot, String(task._id), storedFileName);
-    const rootPath = `${uploadsRoot}${path.sep}`;
+    const fullyPaid = Number(task.amount || 0) > 0 && Number(task.paid || 0) >= Number(task.amount || 0);
+    const canAccessOriginal = req.user.role !== "client" || fullyPaid;
+    const canUseOriginal = canAccessOriginal && task.finalOutput.originalStoredName;
+    if (!canAccessOriginal && !task.finalOutput.fileUrl) {
+      return res.status(402).json({
+        message: "The original output is protected until the project is fully paid",
+      });
+    }
+
+    const selectedRoot = canUseOriginal ? privateUploadsRoot : uploadsRoot;
+    const storedFileName = canUseOriginal
+      ? path.basename(task.finalOutput.originalStoredName)
+      : path.basename(task.finalOutput.fileUrl);
+    const filePath = path.join(selectedRoot, String(task._id), storedFileName);
+    const rootPath = `${selectedRoot}${path.sep}`;
     if (!filePath.startsWith(rootPath)) {
       return res.status(400).json({ message: "Invalid output file" });
     }
@@ -850,7 +997,10 @@ router.get("/:id/output/download", protect, async (req, res) => {
       return res.status(404).json({ message: "The uploaded output file could not be found" });
     }
 
-    return res.download(filePath, safeFileName(task.finalOutput.fileName || storedFileName));
+    const downloadName = canAccessOriginal
+      ? task.finalOutput.fileName
+      : task.finalOutput.previewFileName || `watermarked-${task.finalOutput.fileName}`;
+    return res.download(filePath, safeFileName(downloadName || storedFileName));
   } catch (error) {
     console.error("Download task output error:", error);
     return res.status(500).json({ message: "Unable to download task output" });
@@ -910,9 +1060,20 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       return res.status(400).json({ message: subtaskValidationMessage });
     }
 
-    if (!allSubtasksCompleted(subtasks)) {
+    const clientReviewGateMessage = validateClientReviewGate(task, subtasks);
+    if (clientReviewGateMessage) {
+      return res.status(400).json({ message: clientReviewGateMessage });
+    }
+
+    if (finalize && !allSubtasksCompleted(subtasks)) {
       return res.status(400).json({
         message: "Complete every subtask before submitting the final output",
+      });
+    }
+
+    if (!finalize && !isClientReviewReady(subtasks)) {
+      return res.status(400).json({
+        message: "Complete the Client review and revisions step before submitting for client review",
       });
     }
 
@@ -921,7 +1082,24 @@ router.post("/:id/submit-output", protect, async (req, res) => {
         return res.status(400).json({ message: "Please upload a file before submitting" });
       }
 
-      fileOutput = await saveOutputFile(task._id, req.body.file);
+      const requiresPaymentProtection =
+        Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
+      if (requiresPaymentProtection) {
+        const originalFile = await saveOutputFile(task._id, req.body.file, { private: true });
+        const reviewFile = req.body.watermarkedFile?.dataUrl
+          ? await saveOutputFile(task._id, req.body.watermarkedFile)
+          : await saveOutputFile(task._id, req.body.file);
+        fileOutput = {
+          fileName: originalFile.fileName,
+          fileUrl: reviewFile.fileUrl,
+          previewFileName: reviewFile.fileName,
+          originalStoredName: originalFile.storedName,
+          mimeType: originalFile.mimeType,
+          watermarked: Boolean(req.body.watermarkedFile?.dataUrl),
+        };
+      } else {
+        fileOutput = await saveOutputFile(task._id, req.body.file);
+      }
     } else {
       link = String(req.body.link || "").trim();
       if (!link) {
@@ -939,6 +1117,10 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       outputMethod,
       fileName: fileOutput.fileName,
       fileUrl: fileOutput.fileUrl,
+      previewFileName: fileOutput.previewFileName,
+      originalStoredName: fileOutput.originalStoredName,
+      mimeType: fileOutput.mimeType,
+      watermarked: Boolean(fileOutput.watermarked),
       link,
       submittedAt: new Date(),
     };
