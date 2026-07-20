@@ -38,6 +38,12 @@ const statusFilters = ["All Status", "In Progress", "In Review", "Completed", "P
 const sortOptions = ["Newest", "Oldest", "Due Date", "Progress"];
 const API_ROOT = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api\/?$/, "");
 
+const todayInputDate = () => {
+  const today = new Date();
+  const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000);
+  return localToday.toISOString().slice(0, 10);
+};
+
 const Card = ({ children, className = "" }) => (
   <section className={`rounded-2xl border border-pink-100 bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800 ${className}`}>
     {children}
@@ -860,11 +866,11 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
             <span className="relative block">
               <input
                 type="date"
+                min={todayInputDate()}
                 value={form.dueDate}
                 onChange={(event) => updateField("dueDate", event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
               />
-              <Icon name="calendar" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
             </span>
             <span className="mt-2 block text-xs font-bold text-slate-500">Let us know if you have a target date in mind.</span>
           </label>

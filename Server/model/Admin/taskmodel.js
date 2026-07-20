@@ -76,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "client_approved", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "revision_started", "output_submitted", "client_approved", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 
@@ -196,6 +196,13 @@ const taskSchema = new mongoose.Schema(
 
         preferredCompletionDate: {
           type: Date,
+        },
+
+        startedAt: Date,
+
+        startedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
         },
 
         createdAt: {

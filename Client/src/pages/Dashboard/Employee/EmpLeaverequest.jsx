@@ -40,6 +40,12 @@ const defaultForm = {
   emergencyContact: "",
 };
 
+const todayInputDate = () => {
+  const today = new Date();
+  const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000);
+  return localToday.toISOString().slice(0, 10);
+};
+
 const Card = ({ children, className = "" }) => (
   <section className={`rounded-2xl border border-pink-100 bg-white shadow-[0_3px_4px_rgba(190,65,158,0.35)] ${className}`}>
     {children}
@@ -347,6 +353,11 @@ const EmpLeaverequest = () => {
       return;
     }
 
+    if (form.startDate < todayInputDate()) {
+      setErrorMessage("Start date cannot be in the past.");
+      return;
+    }
+
     if (formDuration <= 0) {
       setErrorMessage("End date must be the same as or later than the start date.");
       return;
@@ -456,11 +467,11 @@ const EmpLeaverequest = () => {
                 <span className="relative block">
                   <input
                     type="date"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                    min={todayInputDate()}
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
                     value={form.startDate}
                     onChange={(event) => updateField("startDate", event.target.value)}
                   />
-                  <SmallIcon name="calendar" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
                 </span>
               </label>
               <label className="block">
@@ -468,12 +479,11 @@ const EmpLeaverequest = () => {
                 <span className="relative block">
                   <input
                     type="date"
-                    min={form.startDate || undefined}
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                    min={form.startDate || todayInputDate()}
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
                     value={form.endDate}
                     onChange={(event) => updateField("endDate", event.target.value)}
                   />
-                  <SmallIcon name="calendar" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
                 </span>
               </label>
               <label className="block">

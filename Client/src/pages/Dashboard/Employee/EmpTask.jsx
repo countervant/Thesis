@@ -563,6 +563,51 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   );
 };
 
+const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
+  const revision = task.revisionRequests[task.revisionRequests.length - 1] || {};
+  const priority = revision.priority
+    ? revision.priority[0].toUpperCase() + revision.priority.slice(1)
+    : "Medium";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <section className="w-full max-w-2xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-rose-600">Needs Revision</span>
+            <h2 className="mt-3 text-xl font-black text-[#10142d] dark:text-white">{revision.title || "Client revision request"}</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">Review the client’s requested changes before starting.</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={isStarting} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:opacity-50" aria-label="Close revision details">x</button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/40 p-4 text-xs font-bold text-slate-600 dark:border-neutral-800 dark:bg-neutral-950">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Task</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{task.title}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Client</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{getClientName(task)}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Section / Area</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{revision.section || "Not specified"}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Priority</span><span className={`mt-1 inline-flex rounded-full px-3 py-1 text-[10px] font-black ${priority === "Urgent" || priority === "High" ? "bg-rose-100 text-rose-700" : priority === "Low" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}>{priority}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Requested On</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{formatDate(revision.createdAt)}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Preferred Completion</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{revision.preferredCompletionDate ? formatDate(revision.preferredCompletionDate) : "No preferred date"}</span></p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 p-4 dark:border-neutral-800">
+          <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Requested Changes</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{revision.description || "No additional instructions were provided."}</p>
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" onClick={onClose} disabled={isStarting} className="h-11 rounded-xl border border-slate-200 bg-white px-7 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">Close</button>
+          <button type="button" onClick={onStart} disabled={isStarting} className="inline-flex h-11 items-center justify-center rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-7 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60">
+            {isStarting ? "Starting..." : "Start Revision"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+};
+
 const EmpTask = () => {
   const { user } = useAuth();
   const currentUserId = getEntityId(user);
@@ -573,6 +618,8 @@ const EmpTask = () => {
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [completionDraft, setCompletionDraft] = useState(null);
+  const [revisionDraft, setRevisionDraft] = useState(null);
+  const [isStartingRevision, setIsStartingRevision] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
 
   useEffect(() => {
@@ -726,10 +773,39 @@ const EmpTask = () => {
 
     if (!isAssignedToCurrentUser || !previousStepsCompleted || task.status === "Done") return;
 
+    const needsRevision =
+      Boolean(task.finalOutput?.submittedAt) &&
+      task.apiStatus === "pending" &&
+      task.revisionRequests.length > 0;
+    if (needsRevision) {
+      setRevisionDraft({ task, subtaskIndex });
+      return;
+    }
+
     const nextSubtasks = task.subtasks.map((subtask, index) =>
       index === subtaskIndex ? { ...subtask, completed: true } : subtask
     );
     setCompletionDraft({ task, nextSubtasks, finalize: false });
+  };
+
+  const handleStartRevision = async () => {
+    if (!revisionDraft || isStartingRevision) return;
+
+    try {
+      setIsStartingRevision(true);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = await taskAPI.startRevision(revisionDraft.task.id);
+      setTasks((currentTasks) =>
+        currentTasks.map((item) => (item.id === revisionDraft.task.id ? normalizeTask(updatedTask) : item))
+      );
+      setRevisionDraft(null);
+      setNoticeMessage(`${revisionDraft.task.title} revision is now in progress.`);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to start revision."));
+    } finally {
+      setIsStartingRevision(false);
+    }
   };
 
   const submitCompletedTask = async (output) => {
@@ -849,6 +925,14 @@ const EmpTask = () => {
           completion={completionDraft}
           onClose={() => setCompletionDraft(null)}
           onSubmit={submitCompletedTask}
+        />
+      )}
+      {revisionDraft && (
+        <RevisionDetailsModal
+          isStarting={isStartingRevision}
+          onClose={() => setRevisionDraft(null)}
+          onStart={handleStartRevision}
+          task={revisionDraft.task}
         />
       )}
     </div>

@@ -349,7 +349,10 @@ router.get("/", protect, async (req, res) => {
         "revisionRequests.section",
         "revisionRequests.priority",
         "revisionRequests.description",
+        "revisionRequests.preferredCompletionDate",
         "revisionRequests.createdAt",
+        "revisionRequests.startedAt",
+        "revisionRequests.startedBy",
         "finalOutput.submittedBy",
         "finalOutput.message",
         "finalOutput.outputMethod",
@@ -753,6 +756,10 @@ router.post("/:id/revisions", protect, async (req, res) => {
       return res.status(400).json({ message: "Description of changes is required" });
     }
 
+    if (payload.preferredCompletionDate && isPastDate(payload.preferredCompletionDate)) {
+      return res.status(400).json({ message: "Preferred completion date cannot be in the past" });
+    }
+
     task.revisionRequests.push({
       ...payload,
       user: req.user._id,
@@ -780,6 +787,71 @@ router.post("/:id/revisions", protect, async (req, res) => {
   } catch (error) {
     console.error("Create task revision request error:", error);
     res.status(500).json({ message: "Unable to submit revision request" });
+  }
+});
+
+router.post("/:id/revisions/start", protect, async (req, res) => {
+  try {
+    if (!["admin", "employee"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only assigned team members can start revisions" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const revision = task.revisionRequests[task.revisionRequests.length - 1];
+    if (!revision || revision.startedAt || task.status !== "pending") {
+      return res.status(400).json({ message: "This task does not have a pending revision request" });
+    }
+
+    if (req.user.role === "employee" && !canUserSubmitTask(task, req.user._id)) {
+      return res.status(403).json({ message: "Only the assigned user can start this revision" });
+    }
+
+    const reviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
+    if (reviewIndex >= 0) {
+      task.subtasks.forEach((subtask, index) => {
+        if (index >= reviewIndex) {
+          subtask.completed = false;
+          subtask.completedAt = undefined;
+        }
+      });
+    }
+
+    revision.startedAt = new Date();
+    revision.startedBy = req.user._id;
+    task.status = "in_progress";
+    task.completedAt = undefined;
+    addActivity(task, {
+      type: "revision_started",
+      title: "Revision work started",
+      details: revision.title,
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+    });
+
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("revisionRequests.user", "firstName lastName companyName email role")
+      .populate("revisionRequests.startedBy", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Start task revision error:", error);
+    res.status(500).json({ message: "Unable to start revision" });
   }
 });
 

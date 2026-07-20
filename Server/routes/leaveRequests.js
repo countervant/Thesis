@@ -27,6 +27,11 @@ const leaveRequestPopulate = [
 
 const dayMs = 24 * 60 * 60 * 1000;
 
+const startOfToday = () => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+};
+
 const getDurationDays = (startDate, endDate) =>
   Math.max(1, Math.floor((endDate.getTime() - startDate.getTime()) / dayMs) + 1);
 
@@ -107,6 +112,7 @@ const validateRequestPayload = (payload) => {
   if (!payload.leaveType) return "Leave type is required";
   if (!payload.startDate || Number.isNaN(payload.startDate.getTime())) return "Valid start date is required";
   if (!payload.endDate || Number.isNaN(payload.endDate.getTime())) return "Valid end date is required";
+  if (payload.startDate < startOfToday()) return "Start date cannot be in the past";
   if (payload.startDate > payload.endDate) return "Start date cannot be after end date";
   if (!payload.reason) return "Reason is required";
   return "";

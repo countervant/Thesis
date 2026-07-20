@@ -530,6 +530,12 @@ export const taskAPI = {
     return response.data;
   },
 
+  startRevision: async (id) => {
+    const response = await api.post(`/tasks/${id}/revisions/start`);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
   approve: async (id) => {
     const response = await api.post(`/tasks/${id}/approve`);
     clearCache("/tasks", "/dashboard");
