@@ -479,22 +479,6 @@ export const authAPI = {
     return response.data;
   },
 
-  getRecoveryPhoneStatus: async () => {
-    const response = await twoFactorRequest({ url: "/auth/recovery-phone/status" });
-    return response.data;
-  },
-
-  requestRecoveryPhoneCode: async () => {
-    const response = await twoFactorRequest({ method: "post", url: "/auth/recovery-phone/request" });
-    return response.data;
-  },
-
-  verifyRecoveryPhoneCode: async (code) => {
-    const response = await twoFactorRequest({ method: "post", url: "/auth/recovery-phone/verify", data: { code } });
-    clearCache("/auth/me");
-    return response.data;
-  },
-
   requestEnableTwoFactor: async (password) => {
     const response = await twoFactorRequest({ method: "post", url: "/auth/enable-2fa/request", data: { password } });
     return response.data;

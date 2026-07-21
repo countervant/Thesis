@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
 import TwoFactorSettings from "../../components/auth/TwoFactorSettings.jsx";
-import OtpInput from "../../components/auth/OtpInput.jsx";
 
 const alertItems = [
   { id: "emailAlerts", label: "Email alerts", icon: "mail" },
@@ -92,7 +91,6 @@ const passwordInitialState = {
 
 const SecuritySettings = ({ user }) => {
   const email = user?.email || "peejong@gmail.com";
-  const phone = user?.phone || "";
   const savedSettings = useMemo(() => loadSettings(user), [user]);
   const [settings, setSettings] = useState(savedSettings);
   const [passwordForm, setPasswordForm] = useState(passwordInitialState);
@@ -101,39 +99,12 @@ const SecuritySettings = ({ user }) => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [phoneStatus, setPhoneStatus] = useState({ hasPhone: Boolean(user?.phone), verified: Boolean(user?.phoneVerifiedAt) });
-  const [isPhoneStatusLoading, setIsPhoneStatusLoading] = useState(true);
-  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
-  const [phoneCode, setPhoneCode] = useState("");
-  const [phoneVerification, setPhoneVerification] = useState(null);
-  const [phoneVerificationError, setPhoneVerificationError] = useState("");
-  const [isPhoneVerificationBusy, setIsPhoneVerificationBusy] = useState(false);
-  const [phoneCodeSecondsLeft, setPhoneCodeSecondsLeft] = useState(0);
 
   useEffect(() => {
     const openPasswordSettings = () => setShowPasswordForm(true);
     window.addEventListener("clientra:open-password-settings", openPasswordSettings);
     return () => window.removeEventListener("clientra:open-password-settings", openPasswordSettings);
   }, []);
-
-  useEffect(() => {
-    let isActive = true;
-    setIsPhoneStatusLoading(true);
-    authAPI.getRecoveryPhoneStatus()
-      .then((status) => { if (isActive) setPhoneStatus(status); })
-      .catch(() => { if (isActive) setPhoneStatus({ hasPhone: Boolean(phone), verified: false }); })
-      .finally(() => { if (isActive) setIsPhoneStatusLoading(false); });
-    return () => { isActive = false; };
-  }, [phone]);
-
-  useEffect(() => {
-    const expiresAt = phoneVerification?.expiresAt;
-    if (!expiresAt) return undefined;
-    const update = () => setPhoneCodeSecondsLeft(Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000)));
-    update();
-    const timer = window.setInterval(update, 1000);
-    return () => window.clearInterval(timer);
-  }, [phoneVerification?.expiresAt]);
 
   const persistSettings = (nextSettings) => {
     localStorage.setItem(getStorageKey(user), JSON.stringify(nextSettings));
@@ -219,48 +190,6 @@ const SecuritySettings = ({ user }) => {
     setSettings(nextSettings);
     persistSettings(nextSettings);
     setShowBackupCodes(true);
-  };
-
-  const requestPhoneVerification = async () => {
-    setIsPhoneVerificationBusy(true);
-    setPhoneVerificationError("");
-    setError("");
-    try {
-      const data = await authAPI.requestRecoveryPhoneCode();
-      setPhoneVerification(data);
-      setPhoneCode("");
-      setShowPhoneVerification(true);
-    } catch (requestError) {
-      const requestMessage = getApiErrorMessage(requestError, "Unable to send the phone verification code.");
-      setPhoneVerificationError(requestMessage);
-      setError(requestMessage);
-    } finally {
-      setIsPhoneVerificationBusy(false);
-    }
-  };
-
-  const verifyPhone = async (event) => {
-    event.preventDefault();
-    if (phoneCode.length !== 6) {
-      setPhoneVerificationError("Enter the complete 6-digit code.");
-      return;
-    }
-    setIsPhoneVerificationBusy(true);
-    setPhoneVerificationError("");
-    try {
-      const status = await authAPI.verifyRecoveryPhoneCode(phoneCode);
-      setPhoneStatus({ hasPhone: true, ...status });
-      setShowPhoneVerification(false);
-      setPhoneVerification(null);
-      setPhoneCode("");
-      setMessage("Recovery phone verified successfully.");
-      setError("");
-    } catch (verifyError) {
-      setPhoneVerificationError(getApiErrorMessage(verifyError, "Unable to verify the recovery phone."));
-      setPhoneCode("");
-    } finally {
-      setIsPhoneVerificationBusy(false);
-    }
   };
 
   const protectedText = Object.values(settings.alerts).some(Boolean)
@@ -461,18 +390,6 @@ const SecuritySettings = ({ user }) => {
                 <span className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]"><Icon name="mail" className="h-4 w-4" /></span><span><span className="block text-xs font-black text-[#10142d] dark:text-white">Recovery Email</span><span className="mt-0.5 block text-xs font-semibold text-slate-500">{email}</span></span></span>
                 <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">Verified</span>
               </div>
-              <div className="flex items-center justify-between gap-3 py-3">
-                <span className="flex min-w-0 items-center gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]"><Icon name="phone" className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-xs font-black text-[#10142d] dark:text-white">Recovery Phone</span><span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">{phoneStatus.maskedPhone || phone || "Not set"}</span></span></span>
-                {isPhoneStatusLoading ? (
-                  <span className="text-[11px] font-black text-slate-400">Checking...</span>
-                ) : phoneStatus.verified ? (
-                  <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">Verified</span>
-                ) : phoneStatus.hasPhone ? (
-                  <button type="button" disabled={isPhoneVerificationBusy} onClick={requestPhoneVerification} className="rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-600 transition hover:bg-amber-100 disabled:opacity-50">{isPhoneVerificationBusy ? "Sending..." : "Verify"}</button>
-                ) : (
-                  <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-500">Not set</span>
-                )}
-              </div>
             </div>
             <button type="button" onClick={showCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
               View Backup Codes
@@ -480,25 +397,6 @@ const SecuritySettings = ({ user }) => {
           </Card>
         </aside>
       </div>
-
-      {showPhoneVerification && (
-        <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="verify-phone-title">
-          <section className="w-full max-w-md rounded-2xl border border-pink-100 bg-white p-6 shadow-2xl dark:border-[#DA70D6]/60 dark:bg-[#141414]">
-            <button type="button" disabled={isPhoneVerificationBusy} onClick={() => setShowPhoneVerification(false)} className="ml-auto grid h-9 w-9 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 disabled:opacity-50" aria-label="Close phone verification"><Icon name="x" /></button>
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-br from-pink-500 to-purple-600 text-white"><Icon name="phone" className="h-7 w-7" /></div>
-            <h2 id="verify-phone-title" className="mt-4 text-center text-xl font-black text-[#10142d] dark:text-white">Verify Recovery Phone</h2>
-            <p className="mt-2 text-center text-sm font-medium text-slate-500">Enter the 6-digit SMS code sent to {phoneVerification?.maskedPhone || "your phone"}.</p>
-            {phoneVerification?.developmentCode && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-black text-amber-700">Development code: {phoneVerification.developmentCode}</p>}
-            <form onSubmit={verifyPhone} className="mt-5 text-center">
-              <OtpInput value={phoneCode} onChange={(next) => { setPhoneCode(next); setPhoneVerificationError(""); }} disabled={isPhoneVerificationBusy} hasError={Boolean(phoneVerificationError)} />
-              <p className="mt-3 text-xs font-bold text-slate-400">Expires in {Math.floor(phoneCodeSecondsLeft / 60)}:{String(phoneCodeSecondsLeft % 60).padStart(2, "0")}</p>
-              {phoneVerificationError && <p className="mt-3 text-sm font-bold text-red-500">{phoneVerificationError}</p>}
-              <button disabled={isPhoneVerificationBusy || phoneCode.length !== 6 || phoneCodeSecondsLeft === 0} className="mt-5 h-11 w-full rounded-xl bg-linear-to-r from-pink-500 to-purple-600 text-sm font-black text-white disabled:opacity-50">{isPhoneVerificationBusy ? "Verifying..." : "Verify Phone"}</button>
-              <button type="button" disabled={isPhoneVerificationBusy} onClick={requestPhoneVerification} className="mt-4 text-xs font-black text-[#b62ca1] disabled:opacity-50">Send a new code</button>
-            </form>
-          </section>
-        </div>
-      )}
 
       {showBackupCodes && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
