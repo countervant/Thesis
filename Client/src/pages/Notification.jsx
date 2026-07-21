@@ -174,10 +174,13 @@ const Notification = () => {
       setErrorMessage("");
 
       try {
-        const [posts, tasks] = await Promise.all([
+        const [postsResult, tasksResult] = await Promise.allSettled([
           newsfeedAPI.getActivity(),
           user?.role === "employee" ? taskAPI.getAll() : Promise.resolve([]),
         ]);
+        const posts = postsResult.status === "fulfilled" ? postsResult.value : [];
+        const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
+        const failedCount = [postsResult, tasksResult].filter((result) => result.status === "rejected").length;
 
         const nextNotifications = [
           ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], currentUserId),
@@ -186,6 +189,7 @@ const Notification = () => {
 
         if (isMounted) {
           setNotifications(nextNotifications);
+          setErrorMessage(failedCount ? "Some notifications could not be loaded. Refresh to retry." : "");
         }
       } catch (error) {
         if (isMounted) {

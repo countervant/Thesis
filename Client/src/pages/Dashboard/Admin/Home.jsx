@@ -8,7 +8,6 @@ import {
   budgetAPI,
   calendarAPI,
   clientAPI,
-  dashboardAPI,
   employeeAPI,
   getApiErrorMessage,
   newsfeedAPI,
@@ -1264,44 +1263,54 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
       try {
         setIsLoading(true);
         setLoadError("");
-        const [
-          summary,
-          allTasks,
-          allEmployees,
-          allClients,
-          allBudgetEntries,
-          newsfeedActivity,
-          onlineMembers,
-          currentMonthEvents,
-          nextMonthEvents,
-        ] = await Promise.all([
-          dashboardAPI.getSummary(),
+        const results = await Promise.allSettled([
           taskAPI.getAll({ limit: 100 }),
-          employeeAPI.getAll({ limit: 100 }).catch(() => []),
-          clientAPI.getAll({ limit: 100 }).catch(() => []),
-          budgetAPI.getAll({ limit: 100 }).catch(() => []),
-          newsfeedAPI.getActivity({ limit: 20 }).catch(() => []),
-          authAPI.getOnlineTeam().catch(() => []),
+          employeeAPI.getAll({ limit: 100 }),
+          clientAPI.getAll({ limit: 100 }),
+          budgetAPI.getAll({ limit: 100 }),
+          newsfeedAPI.getActivity({ limit: 20 }),
+          authAPI.getOnlineTeam(),
           calendarAPI.getAll({ month: getCurrentMonthKey() }),
           calendarAPI.getAll({ month: getNextMonthKey() }),
         ]);
+
+        const valueAt = (index, fallback) => results[index]?.status === "fulfilled" ? results[index].value : fallback;
+        const allTasks = valueAt(0, []);
+        const allEmployees = valueAt(1, []);
+        const allClients = valueAt(2, []);
+        const allBudgetEntries = valueAt(3, []);
+        const newsfeedActivity = valueAt(4, []);
+        const onlineMembers = valueAt(5, []);
+        const currentMonthEvents = valueAt(6, []);
+        const nextMonthEvents = valueAt(7, []);
+        const failedRequests = results.filter((result) => result.status === "rejected");
 
         if (!isMounted) {
           return;
         }
 
-        setTasks(Array.isArray(allTasks) ? allTasks : Array.isArray(summary.recentTasks) ? summary.recentTasks : []);
-        setEmployees(Array.isArray(allEmployees) ? allEmployees : Array.isArray(summary.recentEmployees) ? summary.recentEmployees : []);
-        setClients(Array.isArray(allClients) ? allClients : Array.isArray(summary.recentClients) ? summary.recentClients : []);
-        setBudgetEntries(Array.isArray(allBudgetEntries) ? allBudgetEntries : Array.isArray(summary.recentBudgetEntries) ? summary.recentBudgetEntries : []);
+        setTasks(Array.isArray(allTasks) ? allTasks : []);
+        setEmployees(Array.isArray(allEmployees) ? allEmployees : []);
+        setClients(Array.isArray(allClients) ? allClients : []);
+        setBudgetEntries(Array.isArray(allBudgetEntries) ? allBudgetEntries : []);
         setCalendarEvents([
           ...(Array.isArray(currentMonthEvents) ? currentMonthEvents : []),
           ...(Array.isArray(nextMonthEvents) ? nextMonthEvents : []),
         ]);
         setNewsfeedActivities(Array.isArray(newsfeedActivity) ? newsfeedActivity : []);
         setOnlineTeam(Array.isArray(onlineMembers) ? onlineMembers : []);
-        setTaskStatusCounts(summary.taskStatusCounts || {});
-        setLoadError("");
+        setTaskStatusCounts(
+          (Array.isArray(allTasks) ? allTasks : []).reduce((counts, task) => {
+            const status = task?.status;
+            if (status) counts[status] = (counts[status] || 0) + 1;
+            return counts;
+          }, {}),
+        );
+        setLoadError(
+          failedRequests.length
+            ? `${failedRequests.length} dashboard request${failedRequests.length === 1 ? "" : "s"} could not be loaded. Available data is shown; refresh to retry.`
+            : "",
+        );
       } catch (error) {
         if (!isMounted) {
           return;

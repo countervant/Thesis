@@ -161,6 +161,25 @@ const normalizeTaskEvent = (task) => {
   };
 };
 
+const loadCalendarSources = async (currentMonth) => {
+  const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+  const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
+  const [calendarResult, taskResult] = await Promise.allSettled([
+    calendarAPI.getAll({ month: monthKey(currentMonth) }),
+    taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
+  ]);
+  const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
+  const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];
+
+  if (calendarResult.status === "rejected") console.error("Unable to load employee calendar events", calendarResult.reason);
+  if (taskResult.status === "rejected") console.error("Unable to load employee calendar tasks", taskResult.reason);
+
+  return [
+    ...calendarEvents.map(normalizeEvent),
+    ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
+  ];
+};
+
 const emptyPersonalForm = (date) => ({
   id: "",
   title: "",
@@ -211,28 +230,16 @@ const EmpCalendar = () => {
   const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
 
   const loadEvents = async () => {
-    const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
-    const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
-    const [calendarEvents, tasks] = await Promise.all([
-      calendarAPI.getAll({ month: monthKey(currentMonth) }),
-      taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
-    ]);
-    setEvents([...calendarEvents.map(normalizeEvent), ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent)]);
+    setEvents(await loadCalendarSources(currentMonth));
   };
 
   useEffect(() => {
     let isActive = true;
 
-    const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
-    const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
-
-    Promise.all([
-      calendarAPI.getAll({ month: monthKey(currentMonth) }),
-      taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
-    ])
-      .then(([calendarEvents, tasks]) => {
+    loadCalendarSources(currentMonth)
+      .then((calendarEvents) => {
         if (isActive) {
-          setEvents([...calendarEvents.map(normalizeEvent), ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent)]);
+          setEvents(calendarEvents);
         }
       })
       .catch((error) => console.error("Unable to load employee calendar events", error));

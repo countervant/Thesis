@@ -6,6 +6,33 @@
   --font-bruno: 'Bruno Ace SC', sans-serif;
 }
 
+/* Keep browser caret browsing from drawing a text cursor over static app UI. */
+html,
+body,
+#root {
+  caret-color: transparent;
+}
+
+button,
+a,
+summary,
+[role="button"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="tab"],
+img,
+svg {
+  caret-color: transparent;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: auto;
+  user-select: text;
+}
+
 .dark {
   color-scheme: dark;
 }

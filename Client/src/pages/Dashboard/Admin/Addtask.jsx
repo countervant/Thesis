@@ -267,7 +267,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             requestedBy:
               currentData.requestedBy ||
               getEntityId(task?.requestedBy) ||
-              getEntityId(loadedClients[0]) ||
               "",
           }));
         }

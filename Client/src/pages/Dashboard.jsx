@@ -744,7 +744,7 @@ const MessagesPanel = () => {
   });
 
   return (
-  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-slate-100 bg-white text-[#172033] dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
+  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
     <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-[#DA70D6]/60 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-black leading-none">Messages</h1>
@@ -770,7 +770,7 @@ const MessagesPanel = () => {
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           placeholder="Search messages..."
-          className="min-w-0 flex-1 border-0 bg-transparent text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+          className="min-w-0 flex-1 select-text border-0 bg-transparent text-xs font-bold text-slate-700 caret-[#ff3faf] outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
         />
       </label>
 
@@ -1125,7 +1125,7 @@ const MessagesPanel = () => {
                           onChange={(event) => setEditingText(event.target.value)}
                           maxLength={1000}
                           autoFocus
-                          className="h-10 rounded-full border border-black/20 bg-white px-4 text-sm text-neutral-950 outline-none focus:ring-2 focus:ring-white/80"
+                          className="h-10 select-text rounded-full border border-black/20 bg-white px-4 text-sm text-neutral-950 caret-[#ff3faf] outline-none focus:ring-2 focus:ring-white/80"
                         />
                         <span className="flex justify-end gap-2">
                           <button
@@ -1146,7 +1146,7 @@ const MessagesPanel = () => {
                       </form>
                     ) : (
                       <>
-                        <p className="break-words">{message.text}</p>
+                        <p className="select-text break-words caret-[#ff3faf]">{message.text}</p>
                         <p
                           className={`absolute top-full mt-1 whitespace-nowrap text-[10px] font-bold ${
                             isMine ? "right-0 text-slate-400" : "left-0 text-slate-400 dark:text-neutral-400"
@@ -1196,7 +1196,7 @@ const MessagesPanel = () => {
               placeholder="Type your message..."
               maxLength={1000}
               disabled={!activeUserId || isSending}
-              className="h-10 w-full rounded-full border-0 bg-transparent px-2 pr-11 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+              className="h-10 w-full select-text rounded-full border-0 bg-transparent px-2 pr-11 text-sm font-semibold text-slate-700 caret-[#ff3faf] outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
             />
             <button
               type="button"
@@ -1249,7 +1249,7 @@ const MessagesPanel = () => {
             value={newMessageSearch}
             onChange={(event) => setNewMessageSearch(event.target.value)}
             placeholder="Search users"
-            className="mt-4 h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
+            className="mt-4 h-10 w-full select-text rounded-lg border border-neutral-300 bg-transparent px-4 text-sm caret-[#ff3faf] outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
           />
           <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
             {modalUsers.map((participant) => {
@@ -1279,7 +1279,7 @@ const MessagesPanel = () => {
             onChange={(event) => setBulkDraft(event.target.value)}
             maxLength={1000}
             placeholder="Type a message"
-            className="mt-4 h-28 w-full resize-none rounded-lg border border-neutral-300 bg-transparent p-3 text-sm outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
+            className="mt-4 h-28 w-full select-text resize-none rounded-lg border border-neutral-300 bg-transparent p-3 text-sm caret-[#ff3faf] outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
           />
           <div className="mt-4 flex justify-end gap-3">
             <button type="button" onClick={() => setIsNewMessageOpen(false)} className="h-10 rounded-lg border border-neutral-300 px-5 text-sm font-bold">

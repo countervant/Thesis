@@ -210,42 +210,77 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
 
 const buildTaskNotifications = (tasks, user) => {
   const userId = getEntityId(user);
+  const role = String(user?.role || "").toLowerCase();
+  const activityRoles = {
+    task_created: ["client"],
+    subtask_completed: ["admin", "client", "employee"],
+    subtask_reopened: ["admin", "client", "employee"],
+    revision_requested: ["admin", "employee"],
+    output_submitted: ["admin", "client", "employee"],
+    client_approved: ["admin", "employee"],
+    feedback_submitted: ["admin", "employee"],
+    feedback_replied: ["client", "employee"],
+    project_archived: ["admin", "employee"],
+    project_restored: ["admin", "employee"],
+  };
+  const activityIcons = {
+    revision_requested: rateIcon,
+    client_approved: rateIcon,
+    feedback_submitted: rateIcon,
+    feedback_replied: messagesIcon,
+    output_submitted: taskIcon,
+  };
 
-  if (user?.role === "client") {
-    return tasks.flatMap((task) =>
-      (task?.activities || [])
-        .filter((activity) => activity?.type === "feedback_replied")
-        .map((activity) => ({
-          id: `feedback-reply-${activity?._id || `${task?._id || task?.id}-${activity?.createdAt}`}`,
-          icon: messagesIcon,
+  return tasks.flatMap((task) => {
+    const taskId = task?._id || task?.id || "";
+    const taskAssignees = task?.assignees?.length ? task.assignees : [task?.assignedTo];
+    const isAssignedEmployee =
+      role !== "employee" ||
+      taskAssignees.some((assignee) => getEntityId(assignee) === userId) ||
+      task?.subtasks?.some((subtask) => getEntityId(subtask?.assignedTo) === userId);
+
+    if (!isAssignedEmployee) return [];
+
+    const notifications = (task?.activities || [])
+      .filter((activity) => {
+        const recipients = activityRoles[activity?.type] || [];
+        return recipients.includes(role) && getEntityId(activity?.actor) !== userId;
+      })
+      .map((activity) => {
+        const activityId = activity?._id || `${activity?.type}-${activity?.createdAt}`;
+        const targetPage = role === "client"
+          ? "projects"
+          : role === "admin" && activity?.type === "feedback_submitted"
+            ? "feedback"
+            : "tasks";
+        return {
+          id: `task-activity-${taskId}-${activityId}`,
+          icon: activityIcons[activity?.type] || taskIcon,
           actor: activity?.actorName ? { firstName: activity.actorName } : task?.createdBy,
-          title: activity?.title || "Admin replied to your feedback",
-          message: trimNotificationText(activity?.details, "You received a reply to your feedback"),
+          title: activity?.title || "Project updated",
+          message: trimNotificationText(
+            activity?.details,
+            `${task?.title || "Project"} was updated`
+          ),
           date: activity?.createdAt,
-          target: { page: "projects", taskId: task?._id || task?.id },
-        }))
-    );
-  }
+          target: { page: targetPage, taskId },
+        };
+      });
 
-  if (user?.role !== "employee") {
-    return [];
-  }
+    if (role === "employee") {
+      notifications.push({
+        id: `task-${taskId}`,
+        icon: taskIcon,
+        actor: task?.createdBy || user,
+        title: "New task assigned to you",
+        message: trimNotificationText(task?.title, "You have a new task"),
+        date: task?.createdAt,
+        target: { page: "tasks", taskId },
+      });
+    }
 
-  return tasks
-    .filter((task) => {
-      const taskAssignees = task?.assignees?.length ? task.assignees : [task?.assignedTo];
-      return taskAssignees.some((assignee) => getEntityId(assignee) === userId) ||
-        task?.subtasks?.some((subtask) => getEntityId(subtask?.assignedTo) === userId);
-    })
-    .map((task) => ({
-      id: `task-${task?._id || task?.id}`,
-      icon: taskIcon,
-      actor: task?.createdBy || user,
-      title: "New task assigned to you",
-      message: trimNotificationText(task?.title, "You have a new task"),
-      date: task?.createdAt,
-      target: { page: "tasks", taskId: task?._id || task?.id },
-    }));
+    return notifications;
+  });
 };
 
 const Icon = ({ name, className = "h-6 w-6" }) => {
@@ -539,20 +574,24 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   }, []);
 
   useEffect(() => {
-    if (!isNotificationOpen) return;
+    if (!token || !userId) {
+      setNotifications([]);
+      return undefined;
+    }
 
     let isMounted = true;
 
     const loadNotifications = async () => {
       try {
-        setIsNotificationLoading(true);
+        if (isNotificationOpen) setIsNotificationLoading(true);
         setNotificationError("");
-        const [posts, tasks] = await Promise.all([
-          newsfeedAPI.getActivity(),
-          ["employee", "client"].includes(user?.role)
-            ? taskAPI.getAll({ limit: 100, refresh: Date.now() })
-            : Promise.resolve([]),
+        const [postsResult, tasksResult] = await Promise.allSettled([
+          newsfeedAPI.getActivity({ refresh: Date.now() }),
+          taskAPI.getAll({ limit: 100, refresh: Date.now() }),
         ]);
+        const posts = postsResult.status === "fulfilled" ? postsResult.value : [];
+        const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
+        const failedCount = [postsResult, tasksResult].filter((result) => result.status === "rejected").length;
 
         const nextNotifications = [
           ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], userId),
@@ -563,6 +602,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           setNotifications(nextNotifications);
           setReadNotificationIds(readStoredNotificationIds(userId));
           setHiddenNotificationIds(readHiddenNotificationIds(userId));
+          setNotificationError(failedCount ? "Some notifications could not be loaded. Refresh to retry." : "");
         }
       } catch (error) {
         if (isMounted) {
@@ -578,11 +618,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     };
 
     loadNotifications();
+    const intervalId = window.setInterval(loadNotifications, 15000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
-  }, [isNotificationOpen, user, userId]);
+  }, [isNotificationOpen, token, user, userId]);
 
   const handleOpenNotification = (notification) => {
     const nextReadIds = Array.from(new Set([...readNotificationIds, notification.id]));
@@ -752,7 +794,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           <button
             type="button"
             onClick={() => onNavigate?.("messages")}
-            className={`relative grid h-10 w-10 place-items-center rounded-xl border transition hover:border-pink-200 hover:text-[#c72fb2] ${
+            className={`relative grid h-10 w-10 cursor-pointer select-none place-items-center rounded-full border caret-transparent transition hover:border-pink-200 hover:text-[#c72fb2] ${
               activePage === "messages"
                 ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-pink-500/40 dark:bg-neutral-900 dark:text-[#f472d0]"
                 : "border-slate-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
@@ -763,13 +805,14 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <img
               src={messagesIcon}
               alt=""
+              draggable="false"
               className={`h-5 w-5 object-contain ${
                 activePage === "messages" ? "top-nav-icon-active" : ""
               }`}
               aria-hidden="true"
             />
             {unreadMessageCount > 0 && (
-              <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[8px] font-bold leading-none text-white">
+              <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full border-2 border-[#f8f9fd] bg-[#dc4fb2] px-1 text-[11px] font-black leading-none text-white dark:border-neutral-950">
                 {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
               </span>
             )}
@@ -779,7 +822,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsNotificationOpen((isOpen) => !isOpen)}
-              className="relative grid h-12 w-12 place-items-center rounded-2xl border border-slate-100 bg-white text-neutral-900 shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white md:h-10 md:w-10 md:rounded-xl md:shadow-none"
+              className="relative grid h-10 w-10 cursor-pointer select-none place-items-center rounded-full border border-slate-200 bg-white text-neutral-900 caret-transparent transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               aria-label="Notifications"
               aria-expanded={isNotificationOpen}
               aria-haspopup="dialog"
@@ -788,11 +831,12 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               <img
                 src={notificationIcon}
                 alt=""
+                draggable="false"
                 className="h-5 w-5 object-contain"
                 aria-hidden="true"
               />
               {unreadCount > 0 && (
-                <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#dc4fb2] px-1 text-[8px] font-bold leading-none text-white">
+                <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full border-2 border-[#f8f9fd] bg-[#dc4fb2] px-1 text-[11px] font-black leading-none text-white dark:border-neutral-950">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
@@ -1016,7 +1060,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             <button
               type="button"
               onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
-              className="flex h-12 min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-2 text-left text-neutral-900 shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white md:h-10 md:min-w-[190px] md:rounded-xl md:border-slate-200 md:px-2.5 md:shadow-none"
+              className="flex h-12 min-w-0 cursor-pointer select-none items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-2 text-left text-neutral-900 caret-transparent shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:border-pink-200 hover:text-[#c72fb2] dark:border-neutral-800 dark:bg-neutral-900 dark:text-white md:h-10 md:min-w-[190px] md:rounded-xl md:border-slate-200 md:px-2.5 md:shadow-none"
               aria-label="Account menu"
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"

@@ -38,6 +38,12 @@ const statusFilters = ["All Status", "In Progress", "In Review", "Completed", "P
 const sortOptions = ["Newest", "Oldest", "Due Date", "Progress"];
 const API_ROOT = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api\/?$/, "");
 
+const todayInputDate = () => {
+  const today = new Date();
+  const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000);
+  return localToday.toISOString().slice(0, 10);
+};
+
 const Card = ({ children, className = "" }) => (
   <section className={`rounded-2xl border border-pink-100 bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800 ${className}`}>
     {children}
@@ -139,6 +145,9 @@ const normalizeProject = (task) => {
   const status = statusFromApi[task?.status] || task?.status || "Pending Revisions";
   const attachments = Array.isArray(task?.attachments) ? task.attachments : [];
   const finalOutput = task?.finalOutput || null;
+  const amount = Number(task?.amount ?? task?.budget ?? 0);
+  const paid = Number(task?.paid ?? 0);
+  const fullyPaid = amount > 0 && paid >= amount;
   const feedback = task?.feedback;
   const hasSubmittedFeedback = Boolean(
     feedback?.submittedAt &&
@@ -159,9 +168,11 @@ const normalizeProject = (task) => {
     description: task?.description || "Project request",
     startDate: task?.startDate || task?.createdAt,
     dueDate: task?.dueDate,
-    amount: Number(task?.amount ?? task?.budget ?? 0),
-    paid: Number(task?.paid ?? 0),
-    pendingAmount: Math.max(0, Number(task?.amount ?? task?.budget ?? 0) - Number(task?.paid ?? 0)),
+    amount,
+    paid,
+    pendingAmount: Math.max(0, amount - paid),
+    fullyPaid,
+    paymentPending: !fullyPaid,
     files: uploadedFileIds.size,
     priority: task?.priority || "medium",
     progress: getTaskProgress(subtasks),
@@ -178,6 +189,7 @@ const normalizeProject = (task) => {
     requestedBy: task?.requestedBy,
     attachments,
     finalOutput,
+    awaitingClientDecision: status === "In Review" && Boolean(finalOutput?.submittedAt),
     feedback: hasSubmittedFeedback ? feedback : null,
     archived: Boolean(task?.archived),
     archivedAt: task?.archivedAt,
@@ -212,7 +224,7 @@ const ProjectStats = ({ projects }) => {
   );
 };
 
-const ProjectCard = ({ onFeedback, onRequestRevision, onToggleArchive, onViewDetails, project }) => {
+const ProjectCard = ({ onApprove, onFeedback, onRequestRevision, onToggleArchive, onViewDetails, project }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const statusClass = statusStyles[project.status] || statusStyles["Pending Revisions"];
   const progressClass = progressColors[project.status] || progressColors["Pending Revisions"];
@@ -274,30 +286,43 @@ const ProjectCard = ({ onFeedback, onRequestRevision, onToggleArchive, onViewDet
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-[1fr_1fr_36px] gap-2">
-        <button type="button" onClick={() => onViewDetails(project)} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#c72fb2]/40 bg-pink-50/70 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-          <Icon name="eye" className="h-4 w-4" />
-          View Details
-        </button>
-        {project.status === "Completed" ? (
+      {project.status === "Completed" ? (
+        <div className="mt-5">
           <button
             type="button"
             onClick={() => onFeedback(project)}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.2)] transition hover:brightness-105"
+            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.2)] transition hover:brightness-105"
           >
             <Icon name="star" className="h-4 w-4" />
             {project.feedback ? "Edit Feedback" : "Give Feedback"}
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onRequestRevision(project)}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
-          >
-            <Icon name="refresh" className="h-4 w-4" />
-            Request Revision
-          </button>
-        )}
+        </div>
+      ) : project.awaitingClientDecision ? (
+        <div className="mt-5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onRequestRevision(project)}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
+            >
+              <Icon name="refresh" className="h-4 w-4" />
+              Request Revision
+            </button>
+            <button
+              type="button"
+              onClick={() => onApprove(project)}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 text-xs font-black text-white transition hover:bg-emerald-600"
+            >
+              <Icon name="check" className="h-4 w-4" />
+              Approve
+            </button>
+        </div>
+      ) : null}
+
+      <div className={`${project.status === "Completed" || project.awaitingClientDecision ? "mt-2" : "mt-5"} grid grid-cols-[1fr_36px] gap-2`}>
+        <button type="button" onClick={() => onViewDetails(project)} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#c72fb2]/40 bg-pink-50/70 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+          <Icon name="eye" className="h-4 w-4" />
+          View Details
+        </button>
         <div className="relative">
           <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-9 w-full place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`} aria-expanded={menuOpen}>
             <Icon name="dots" className="h-5 w-5" />
@@ -362,7 +387,7 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   </div>
 );
 
-const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, onRequestRevision, project }) => {
+const ProjectDetails = ({ errorMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onViewOutput, project }) => {
   const [openActivityPanel, setOpenActivityPanel] = useState(null);
   const outputCandidates = [
     ...(project.finalOutput?.link
@@ -375,13 +400,19 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
           submittedAt: project.finalOutput.submittedAt,
         }]
       : []),
-    ...(project.finalOutput?.fileUrl
+    ...(project.finalOutput?.fileName
       ? [{
           id: "final-file",
           title: project.finalOutput.fileName || "Submitted Output",
-          subtitle: "Final task output",
+          subtitle: project.paymentPending
+            ? project.finalOutput.watermarked
+              ? "Watermarked preview • Payment pending"
+              : "Review copy • Payment pending"
+            : "Original output • Fully paid",
           type: "file",
           url: getFileUrl(project.finalOutput.fileUrl),
+          protected: project.paymentPending,
+          watermarked: Boolean(project.finalOutput.watermarked),
           submittedAt: project.finalOutput.submittedAt,
         }]
       : []),
@@ -514,12 +545,18 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
               <Icon name="star" className="h-4 w-4" />
               {project.feedback ? "Edit Feedback" : "Give Feedback"}
             </button>
-          ) : (
-            <button type="button" onClick={() => onRequestRevision(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-5 text-xs font-black text-[#e347a8] transition hover:bg-pink-50">
-              <Icon name="refresh" className="h-4 w-4" />
-              Request Revision
-            </button>
-          )}
+          ) : project.awaitingClientDecision ? (
+            <>
+              <button type="button" onClick={() => onRequestRevision(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-5 text-xs font-black text-[#e347a8] transition hover:bg-pink-50">
+                <Icon name="refresh" className="h-4 w-4" />
+                Request Revision
+              </button>
+              <button type="button" onClick={() => onApprove(project)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 text-xs font-black text-white transition hover:bg-emerald-600">
+                <Icon name="check" className="h-4 w-4" />
+                Approve
+              </button>
+            </>
+          ) : null}
         </span>
       </header>
       {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
@@ -570,6 +607,11 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-black">{output.title}</span>
                   <span className="block truncate text-xs font-bold text-slate-500">{output.subtitle}</span>
+                  {output.protected && (
+                    <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                      {output.watermarked ? "Watermarked" : "Payment pending"}
+                    </span>
+                  )}
                   <span className="block text-xs font-bold text-slate-400">{formatDateTime(output.submittedAt)}</span>
                 </span>
                 {output.type === "link" ? (
@@ -578,10 +620,18 @@ const ProjectDetails = ({ errorMessage, onBack, onDownloadOutput, onFeedback, on
                     <Icon name="external" className="h-4 w-4" />
                   </a>
                 ) : (
-                  <button type="button" onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                    Download
-                    <Icon name="download" className="h-4 w-4" />
-                  </button>
+                  <span className="flex items-center gap-2">
+                    {output.url && (
+                      <button type="button" onClick={() => onViewOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                        View
+                        <Icon name="eye" className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                      Download
+                      <Icon name="download" className="h-4 w-4" />
+                    </button>
+                  </span>
                 )}
               </div>
             ))}
@@ -816,11 +866,11 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
             <span className="relative block">
               <input
                 type="date"
+                min={todayInputDate()}
                 value={form.dueDate}
                 onChange={(event) => updateField("dueDate", event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
               />
-              <Icon name="calendar" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
             </span>
             <span className="mt-2 block text-xs font-bold text-slate-500">Let us know if you have a target date in mind.</span>
           </label>
@@ -1066,6 +1116,7 @@ const ClientProjectsSkeleton = () => (
 
 const ClientProjects = () => {
   const [activeTab, setActiveTab] = useState("All Projects");
+  const [approveProject, setApproveProject] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [feedbackProject, setFeedbackProject] = useState(null);
   const [feedbackSuccessProject, setFeedbackSuccessProject] = useState(null);
@@ -1193,9 +1244,47 @@ const ClientProjects = () => {
   const handleDownloadOutput = async (project, output) => {
     try {
       setErrorMessage("");
-      await taskAPI.downloadOutput(project.id, output.title);
+      await taskAPI.downloadOutput(project.id, output.title, {
+        watermark: project.paymentPending && !project.finalOutput?.watermarked,
+      });
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
+    }
+  };
+
+  const handleViewOutput = async (project, output) => {
+    try {
+      setErrorMessage("");
+      await taskAPI.viewOutput(project.id, output.title, {
+        watermark: project.paymentPending && !project.finalOutput?.watermarked,
+      });
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to open the submitted output."));
+    }
+  };
+
+  const handleApproveProject = async () => {
+    const project = approveProject;
+    if (!project) return;
+
+    try {
+      setErrorMessage("");
+      const updatedTask = await taskAPI.approve(project.id);
+      const updatedProject = normalizeProject(updatedTask);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === updatedProject.id ? updatedProject : currentProject
+        )
+      );
+      setSelectedProject((currentProject) =>
+        currentProject?.id === updatedProject.id ? updatedProject : currentProject
+      );
+      setApproveProject(null);
+      setNoticeMessage(`${project.title} was approved.`);
+      window.setTimeout(() => setNoticeMessage(""), 4000);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to approve the project."));
+      setApproveProject(null);
     }
   };
 
@@ -1228,6 +1317,7 @@ const ClientProjects = () => {
       <>
         <ProjectDetails
           errorMessage={errorMessage}
+          onApprove={setApproveProject}
           onBack={() => setSelectedProject(null)}
           onDownloadOutput={handleDownloadOutput}
           onFeedback={() => setFeedbackProject(selectedProject)}
@@ -1235,6 +1325,7 @@ const ClientProjects = () => {
             setRevisionMessage("");
             setRevisionProject(project);
           }}
+          onViewOutput={handleViewOutput}
           project={selectedProject}
         />
         {revisionProject && (
@@ -1255,6 +1346,15 @@ const ClientProjects = () => {
         {feedbackSuccessProject && (
           <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
         )}
+        <ConfirmDialog
+          confirmLabel="Approve"
+          icon="done"
+          isOpen={Boolean(approveProject)}
+          message={`Approve “${approveProject?.title || "this project"}”? This will mark the submitted output as completed.`}
+          onCancel={() => setApproveProject(null)}
+          onConfirm={handleApproveProject}
+          title="Approve Project"
+        />
       </>
     );
   }
@@ -1346,6 +1446,7 @@ const ClientProjects = () => {
               {visibleProjects.map((project) => (
                 <ProjectCard
                   key={project.id || project.title}
+                  onApprove={setApproveProject}
                   onFeedback={(selectedProject) =>
                     setFeedbackProject(selectedProject)
                   }
@@ -1379,6 +1480,15 @@ const ClientProjects = () => {
         onCancel={() => setArchiveAction(null)}
         onConfirm={handleArchiveProject}
         title={archiveAction?.archived ? "Archive Project" : "Restore Project"}
+      />
+      <ConfirmDialog
+        confirmLabel="Approve"
+        icon="done"
+        isOpen={Boolean(approveProject)}
+        message={`Approve “${approveProject?.title || "this project"}”? This will mark the submitted output as completed.`}
+        onCancel={() => setApproveProject(null)}
+        onConfirm={handleApproveProject}
+        title="Approve Project"
       />
       {revisionProject && (
         <RevisionModal
