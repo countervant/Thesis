@@ -11,7 +11,7 @@ const Unauthorized = () => {
     admin: "/admin/dashboard",
   };
 
-  if (loading || (token && !user)) {
+  if (loading) {
     return <AppLoadingScreen />;
   }
 
