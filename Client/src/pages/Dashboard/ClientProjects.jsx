@@ -562,7 +562,7 @@ const ProjectDetails = ({ errorMessage, onApprove, onBack, onDownloadOutput, onF
       {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
 
       <Card className="p-5">
-        <h1 className="text-2xl font-black">Project Overview</h1>
+        <h1 className="page-title text-2xl">Project Overview</h1>
         <p className="mt-2 text-sm font-semibold text-slate-500">Here's the summary of your project.</p>
         <div className="mt-5 grid gap-6 rounded-xl border border-pink-100 p-5 lg:grid-cols-2 dark:border-neutral-800">
           <div>
@@ -1363,7 +1363,7 @@ const ClientProjects = () => {
     <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">My Projects</h1>
+          <h1 className="page-title text-3xl">My Projects</h1>
           <p className="mt-2 text-sm font-semibold text-slate-500">
             Track the progress of all your projects in one place.
           </p>

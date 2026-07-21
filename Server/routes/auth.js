@@ -6,7 +6,7 @@ import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
-import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
+import { getPhoneValidationMessage, normalizePhoneNumber } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import {
   disableTwoFactor,
@@ -17,6 +17,11 @@ import {
   verifyEnableTwoFactor,
   verifyLoginTwoFactor,
 } from "../controllers/twoFactorController.js";
+import {
+  getRecoveryPhoneStatus,
+  requestRecoveryPhoneCode,
+  verifyRecoveryPhoneCode,
+} from "../controllers/phoneVerificationController.js";
 
 
 const router = express.Router();
@@ -144,6 +149,9 @@ router.get("/2fa-status", protect, getTwoFactorStatus);
 router.post("/enable-2fa/request", protect, requestEnableTwoFactor);
 router.post("/enable-2fa/verify", protect, verifyEnableTwoFactor);
 router.post("/disable-2fa", protect, disableTwoFactor);
+router.get("/recovery-phone/status", protect, getRecoveryPhoneStatus);
+router.post("/recovery-phone/request", protect, requestRecoveryPhoneCode);
+router.post("/recovery-phone/verify", protect, verifyRecoveryPhoneCode);
 
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
@@ -389,6 +397,7 @@ router.post("/reset-password", async (req, res) => {
           phone,
           country,
           position,
+          birthday,
           avatar,
           coverPhoto,
           password,
@@ -436,10 +445,29 @@ router.post("/reset-password", async (req, res) => {
           if (phoneValidation) {
             return res.status(400).json({ message: phoneValidation });
           }
+          if (normalizePhoneNumber(phone) !== normalizePhoneNumber(user.phone)) {
+            user.phoneVerifiedAt = undefined;
+            user.phoneVerificationCodeHash = undefined;
+            user.phoneVerificationExpiresAt = undefined;
+            user.phoneVerificationAttempts = 0;
+            user.phoneVerificationLastSentAt = undefined;
+            user.phoneVerificationPendingPhone = undefined;
+          }
           user.phone = phone.trim();
         }
         if (country !== undefined) user.country = country.trim() || "Philippines";
         if (position !== undefined) user.position = position.trim();
+        if (birthday !== undefined) {
+          if (!birthday) {
+            user.birthday = undefined;
+          } else {
+            const parsedBirthday = new Date(`${birthday}T12:00:00.000Z`);
+            if (Number.isNaN(parsedBirthday.getTime()) || parsedBirthday > new Date()) {
+              return res.status(400).json({ message: "Enter a valid birthday" });
+            }
+            user.birthday = parsedBirthday;
+          }
+        }
         if (avatar !== undefined) user.avatar = avatar;
         if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
 
@@ -474,8 +502,10 @@ router.post("/reset-password", async (req, res) => {
           avatar: user.avatar,
           coverPhoto: user.coverPhoto,
           phone: user.phone,
+          phoneVerifiedAt: user.phoneVerifiedAt,
           country: user.country,
           position: user.position,
+          birthday: user.birthday,
           isActive: user.isActive,
         });
       } catch (error) {
@@ -666,6 +696,14 @@ router.post("/reset-password", async (req, res) => {
           if (phoneValidation) {
             return res.status(400).json({ message: phoneValidation });
           }
+          if (normalizePhoneNumber(phone) !== normalizePhoneNumber(employee.phone)) {
+            employee.phoneVerifiedAt = undefined;
+            employee.phoneVerificationCodeHash = undefined;
+            employee.phoneVerificationExpiresAt = undefined;
+            employee.phoneVerificationAttempts = 0;
+            employee.phoneVerificationLastSentAt = undefined;
+            employee.phoneVerificationPendingPhone = undefined;
+          }
           employee.phone = phone.trim();
         }
         if (country !== undefined) employee.country = country.trim() || "Philippines";
@@ -689,6 +727,7 @@ router.post("/reset-password", async (req, res) => {
           lastName: employee.lastName,
           email: employee.email,
           phone: employee.phone,
+          phoneVerifiedAt: employee.phoneVerifiedAt,
           country: employee.country,
           position: employee.position,
           role: employee.role,

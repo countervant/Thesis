@@ -7,6 +7,7 @@ const calendars = [
   ["Meetings", "accent-blue-500"],
   ["Personal", "accent-emerald-500"],
   ["Company Holidays", "accent-pink-500"],
+  ["Birthdays", "accent-cyan-500"],
 ];
 
 const toneStyles = {
@@ -30,6 +31,7 @@ const typeStyles = {
   Meeting: "bg-blue-50 text-blue-700",
   Deadline: "bg-rose-50 text-rose-700",
   Holiday: "bg-emerald-50 text-emerald-700",
+  Birthday: "bg-cyan-50 text-cyan-700",
   Personal: "bg-teal-50 text-teal-700",
   Task: "bg-orange-50 text-orange-700",
   Review: "bg-indigo-50 text-indigo-700",
@@ -46,6 +48,7 @@ const eventStyles = {
   teal: "bg-teal-50 text-teal-700",
   indigo: "bg-indigo-50 text-indigo-700",
   amber: "bg-amber-50 text-amber-700",
+  cyan: "bg-cyan-50 text-cyan-700",
 };
 
 const dotStyles = {
@@ -58,6 +61,7 @@ const dotStyles = {
   teal: "bg-teal-500",
   indigo: "bg-indigo-500",
   amber: "bg-amber-500",
+  cyan: "bg-cyan-500",
 };
 
 const typeTones = {
@@ -65,6 +69,7 @@ const typeTones = {
   Meeting: "blue",
   Deadline: "rose",
   Holiday: "emerald",
+  Birthday: "cyan",
   Personal: "teal",
   Task: "orange",
   Review: "indigo",

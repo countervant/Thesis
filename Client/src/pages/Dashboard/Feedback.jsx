@@ -11,19 +11,23 @@ import {
   SlidersHorizontal,
   Smile,
   Star,
+  Trash2,
   X,
 } from "lucide-react";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../components/InitialsAvatar.jsx";
 
 const ratingColors = ["#7c3aed", "#a855f7", "#ec4899", "#fb923c", "#94a3b8"];
 const pageSize = 6;
 
-const getPersonName = (person) => {
+const getPersonName = (person, fallback = "CLIENTRA Client") => {
   const fullName = [person?.firstName, person?.lastName].filter(Boolean).join(" ");
-  return person?.companyName || fullName || person?.email || "CLIENTRA Client";
+  return fullName || person?.contactPerson || person?.name || person?.companyName || person?.email || fallback;
 };
+
+const isPersonRecord = (value) => Boolean(value && typeof value === "object");
 
 const toDate = (value) => {
   const date = new Date(value);
@@ -273,6 +277,9 @@ const Feedback = () => {
   const [page, setPage] = useState(1);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [replyTarget, setReplyTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
 
   useEffect(() => {
@@ -296,19 +303,20 @@ const Feedback = () => {
   const feedback = useMemo(() => tasks.flatMap((task) => {
     const entry = task?.feedback;
     const rating = Number(entry?.overallRating || entry?.rating);
-    if (!entry?.submittedAt || rating < 1 || rating > 5) return [];
-    const client = task.requestedBy || task.createdBy || entry.submittedBy || entry.user;
+    if (!entry?.submittedAt || !Number.isFinite(rating) || rating < 1 || rating > 5) return [];
+    const client = [entry.submittedBy, entry.user, task.requestedBy, task.createdBy].find(isPersonRecord) || null;
+    const clientName = getPersonName(client, task.requestedByName || "CLIENTRA Client");
     return [{
       id: task._id || task.id,
       project: task.title || "Untitled Project",
       client,
-      clientName: getPersonName(client),
+      clientName,
       clientEmail: client?.email || "",
       rating,
       comment: entry.comment || "",
-      quality: entry.quality,
-      communication: entry.communication,
-      timeliness: entry.timeliness,
+      quality: entry.quality || entry.qualityRating,
+      communication: entry.communication || entry.communicationRating,
+      timeliness: entry.timeliness || entry.timelinessRating,
       satisfaction: entry.overallSatisfaction,
       submittedAt: entry.submittedAt,
       reply: entry.reply || null,
@@ -342,6 +350,7 @@ const Feedback = () => {
 
   useEffect(() => setPage(1), [projectFilter, ratingFilter, search, sortBy]);
   const totalPages = Math.max(1, Math.ceil(filteredFeedback.length / pageSize));
+  useEffect(() => setPage((currentPage) => Math.min(currentPage, totalPages)), [totalPages]);
   const visibleFeedback = filteredFeedback.slice((page - 1) * pageSize, page * pageSize);
 
   const resetFilters = () => {
@@ -359,10 +368,36 @@ const Feedback = () => {
     window.setTimeout(() => setNoticeMessage(""), 4500);
   };
 
+  const handleDeleteFeedback = async () => {
+    if (!deleteTarget || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+      setDeleteError("");
+      const updatedTask = await taskAPI.deleteFeedback(deleteTarget.id);
+      const updatedId = updatedTask?._id || updatedTask?.id;
+      setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
+      setSelectedFeedback((current) => current?.id === deleteTarget.id ? null : current);
+      setDeleteTarget(null);
+      setNoticeMessage("Feedback deleted successfully.");
+      window.setTimeout(() => setNoticeMessage(""), 4500);
+    } catch (error) {
+      setDeleteError(getApiErrorMessage(error, "Unable to delete feedback."));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (isDeleting) return;
+    setDeleteTarget(null);
+    setDeleteError("");
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1540px] space-y-5 pb-8">
       <header>
-        <h1 className="text-2xl font-black text-[#10142d] dark:text-white md:text-3xl">Client Feedback</h1>
+        <h1 className="page-title text-2xl text-[#10142d] dark:text-white md:text-3xl">Client Feedback</h1>
         <p className="mt-1 text-sm font-semibold text-slate-500">Monitor client satisfaction, reviews, and project experiences.</p>
       </header>
 
@@ -412,6 +447,7 @@ const Feedback = () => {
                 <div className="flex gap-2 md:justify-end">
                   {user?.role === "admin" && <button type="button" onClick={() => setReplyTarget(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"><Mail className="h-3.5 w-3.5" />{item.reply?.message ? "Edit Reply" : "Reply"}</button>}
                   <button type="button" onClick={() => setSelectedFeedback(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-pink-200 px-3 text-xs font-black text-pink-600 transition hover:bg-pink-50"><Eye className="h-3.5 w-3.5" />View</button>
+                  {user?.role === "admin" && <button type="button" onClick={() => { setDeleteError(""); setDeleteTarget(item); }} className="grid h-9 w-9 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50" aria-label={`Delete feedback from ${item.clientName}`}><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
               </article>
             ))}
@@ -432,6 +468,18 @@ const Feedback = () => {
       </div>
       <FeedbackDetails item={selectedFeedback} onClose={() => setSelectedFeedback(null)} />
       <ReplyModal item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />
+      <ConfirmDialog
+        confirmLabel="Yes, delete"
+        confirmingLabel="Deleting..."
+        errorMessage={deleteError}
+        icon="delete"
+        isConfirming={isDeleting}
+        isOpen={Boolean(deleteTarget)}
+        message="Are you sure you want to delete this feedback?"
+        onCancel={closeDeleteModal}
+        onConfirm={handleDeleteFeedback}
+        title="Delete Feedback"
+      />
     </div>
   );
 };

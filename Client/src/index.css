@@ -6,6 +6,12 @@
   --font-bruno: 'Bruno Ace SC', sans-serif;
 }
 
+.page-title {
+  font-family: var(--font-bruno);
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
 /* Keep browser caret browsing from drawing a text cursor over static app UI. */
 html,
 body,

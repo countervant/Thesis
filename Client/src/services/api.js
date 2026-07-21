@@ -479,6 +479,22 @@ export const authAPI = {
     return response.data;
   },
 
+  getRecoveryPhoneStatus: async () => {
+    const response = await twoFactorRequest({ url: "/auth/recovery-phone/status" });
+    return response.data;
+  },
+
+  requestRecoveryPhoneCode: async () => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/recovery-phone/request" });
+    return response.data;
+  },
+
+  verifyRecoveryPhoneCode: async (code) => {
+    const response = await twoFactorRequest({ method: "post", url: "/auth/recovery-phone/verify", data: { code } });
+    clearCache("/auth/me");
+    return response.data;
+  },
+
   requestEnableTwoFactor: async (password) => {
     const response = await twoFactorRequest({ method: "post", url: "/auth/enable-2fa/request", data: { password } });
     return response.data;
@@ -544,6 +560,12 @@ export const taskAPI = {
 
   submitFeedback: async (id, feedback) => {
     const response = await api.post(`/tasks/${id}/feedback`, feedback);
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
+  deleteFeedback: async (id) => {
+    const response = await api.delete(`/tasks/${id}/feedback`);
     clearCache("/tasks", "/dashboard");
     return response.data;
   },
