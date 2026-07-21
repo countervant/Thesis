@@ -47,6 +47,16 @@ export const normalizePhoneNumber = (phone = "") =>
     .replace(/\s*(?:ext\.?|extension|x)\s*\d+\s*$/i, "")
     .replace(/[^\d+]/g, "");
 
+export const toE164PhoneNumber = (phone = "", country = "Philippines") => {
+  const normalizedPhone = normalizePhoneNumber(phone);
+  if (!normalizedPhone) return "";
+  if (normalizedPhone.startsWith("+")) return normalizedPhone;
+
+  const rule = getPhoneRule(country);
+  const nationalNumber = normalizedPhone.replace(/^0+/, "");
+  return `+${rule.dialCode}${nationalNumber}`;
+};
+
 export const getPhoneValidationMessage = (phone = "", country = "Philippines") => {
   const trimmedPhone = String(phone).trim();
   const rule = getPhoneRule(country);

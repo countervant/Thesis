@@ -747,7 +747,7 @@ const MessagesPanel = () => {
   <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
     <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-[#DA70D6]/60 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-black leading-none">Messages</h1>
+        <h1 className="page-title text-2xl leading-none">Messages</h1>
         <button
           type="button"
           onClick={handleStartNewMessage}
@@ -951,7 +951,7 @@ const MessagesPanel = () => {
     <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950">
       <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
         <div className="min-w-0">
-          <h1 className="text-2xl font-black leading-none">Messages</h1>
+          <h1 className="page-title text-2xl leading-none">Messages</h1>
           {activeName && (
             <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-neutral-300">
               {activeName}

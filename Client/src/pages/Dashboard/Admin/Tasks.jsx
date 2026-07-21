@@ -847,7 +847,7 @@ const Tasks = ({
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll();
+        const data = await taskAPI.getAll({ refresh: true });
         if (isMounted) {
           setTasks(normalizeTasks(data).map(normalizeTask));
         }

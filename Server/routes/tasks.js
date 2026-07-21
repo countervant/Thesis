@@ -365,12 +365,18 @@ router.get("/", protect, async (req, res) => {
         "finalOutput.link",
         "finalOutput.submittedAt",
         "feedback.user",
+        "feedback.rating",
         "feedback.submittedBy",
         "feedback.overallRating",
+        "feedback.communication",
         "feedback.communicationRating",
+        "feedback.quality",
         "feedback.qualityRating",
+        "feedback.timeliness",
         "feedback.timelinessRating",
+        "feedback.overallSatisfaction",
         "feedback.comment",
+        "feedback.wouldRecommend",
         "feedback.submittedAt",
         "feedback.reply.message",
         "feedback.reply.repliedBy",
@@ -383,6 +389,14 @@ router.get("/", protect, async (req, res) => {
         "createdAt",
         "updatedAt",
       ].join(" "))
+      .populate("assignedTo", "firstName lastName email role avatar")
+      .populate("assignees", "firstName lastName email role avatar")
+      .populate("subtasks.assignedTo", "firstName lastName email role avatar")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName companyName email role avatar")
       .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -969,6 +983,42 @@ router.post("/:id/feedback", protect, async (req, res) => {
   } catch (error) {
     console.error("Submit task feedback error:", error);
     res.status(500).json({ message: "Unable to submit feedback" });
+  }
+});
+
+router.delete("/:id/feedback", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only administrators can delete client feedback" });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    if (!task.feedback?.submittedAt) {
+      return res.status(404).json({ message: "This project does not have submitted feedback" });
+    }
+
+    task.set("feedback", undefined);
+    task.activities = task.activities.filter(
+      (activity) => !["feedback_submitted", "feedback_replied"].includes(activity.type)
+    );
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .select("-comments")
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Delete task feedback error:", error);
+    res.status(500).json({ message: "Unable to delete feedback" });
   }
 });
 

@@ -13,7 +13,10 @@ const imageIcons = {
 const ConfirmDialog = ({
   cancelLabel = "Cancel",
   confirmLabel = "Confirm",
+  confirmingLabel = "Please wait...",
+  errorMessage = "",
   icon = "logout",
+  isConfirming = false,
   isOpen,
   message,
   onCancel,
@@ -45,21 +48,24 @@ const ConfirmDialog = ({
         </div>
         <h2 className="mt-4 text-2xl font-black tracking-tight text-[#242433] sm:text-3xl">{title}</h2>
         <p className="mt-3 text-base font-medium text-[#686776] sm:text-lg">{message}</p>
+        {errorMessage && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600">{errorMessage}</p>}
 
         <div className="mx-auto mt-7 grid max-w-[320px] grid-cols-2 gap-3">
           <button
             type="button"
+            disabled={isConfirming}
             onClick={onCancel}
-            className="h-11 rounded-xl border border-[#cfcfd8] bg-white px-4 text-sm font-black text-[#454451] transition hover:bg-neutral-50 sm:h-12 sm:text-base"
+            className="h-11 rounded-xl border border-[#cfcfd8] bg-white px-4 text-sm font-black text-[#454451] transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:text-base"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
+            disabled={isConfirming}
             onClick={onConfirm}
-            className="h-11 rounded-xl bg-linear-to-r from-[#ec3aa6] to-[#a719f5] px-4 text-sm font-black text-white shadow-[0_12px_24px_rgba(190,31,190,0.28)] transition hover:brightness-105 sm:h-12 sm:text-base"
+            className="h-11 rounded-xl bg-linear-to-r from-[#ec3aa6] to-[#a719f5] px-4 text-sm font-black text-white shadow-[0_12px_24px_rgba(190,31,190,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-base"
           >
-            {confirmLabel}
+            {isConfirming ? confirmingLabel : confirmLabel}
           </button>
         </div>
       </section>

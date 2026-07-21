@@ -92,6 +92,8 @@ const typeCalendars = {
   Project: "Tasks & Projects",
 };
 
+const getCalendarForType = (type, fallback = "Meetings") => typeCalendars[type] || fallback;
+
 const getMonthOptions = (year) => Array.from({ length: 12 }, (_, index) => new Date(year, index, 1));
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -150,11 +152,13 @@ const getEntityId = (entity) => typeof entity === "string" ? entity : entity?._i
 const getPersonName = (person) => [person?.firstName, person?.lastName].filter(Boolean).join(" ") || person?.email || "Employee";
 
 const normalizeEvent = (event) => {
-  const tone = calendarTones[event.calendar] || typeTones[event.type] || "orange";
-  const visualClass = calendarStyles[event.calendar] || typeStyles[event.type] || typeStyles.Meeting;
+  const calendar = getCalendarForType(event.type, event.calendar || "Meetings");
+  const tone = calendarTones[calendar] || typeTones[event.type] || "orange";
+  const visualClass = calendarStyles[calendar] || typeStyles[event.type] || typeStyles.Meeting;
 
   return {
     ...event,
+    calendar,
     id: event._id || event.id,
     dateKey: toDateKey(event.date),
     time: event.startTime === "All Day" ? "All Day" : [event.startTime, event.endTime].filter(Boolean).join(" - "),
@@ -423,7 +427,7 @@ const AdminCalendar = () => {
       startTime: event.startTime || "",
       endTime: event.endTime || "",
       type: event.type || "Meeting",
-      calendar: event.calendar || "Meetings",
+      calendar: getCalendarForType(event.type || "Meeting", event.calendar || "Meetings"),
       participants: (event.participants || []).map(getEntityId).filter(Boolean),
       visibility: event.visibility || "all",
     });
@@ -437,7 +441,7 @@ const AdminCalendar = () => {
       startTime: eventForm.startTime,
       endTime: eventForm.endTime,
       type: eventForm.type,
-      calendar: eventForm.calendar,
+      calendar: getCalendarForType(eventForm.type),
       participants: eventForm.participants,
       visibility: eventForm.visibility,
     };
@@ -746,24 +750,17 @@ const AdminCalendar = () => {
                   placeholder="10:00 AM"
                 />
               </Field>
-              <Field label="Type">
-                <select
-                  value={eventForm.type}
-                  onChange={(event) => setEventForm((form) => ({ ...form, type: event.target.value, calendar: typeCalendars[event.target.value] }))}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                >
-                  {["Meeting", "Deadline", "Leave", "Holiday", "Company Event", "Birthday", "Task", "Project"].map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </Field>
-              <Field label="Calendar">
-                <select
-                  value={eventForm.calendar}
-                  onChange={(event) => setEventForm((form) => ({ ...form, calendar: event.target.value }))}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                >
-                  {calendarChecks.map(([item]) => <option key={item}>{item}</option>)}
-                </select>
-              </Field>
+              <div className="md:col-span-2">
+                <Field label="Type">
+                  <select
+                    value={eventForm.type}
+                    onChange={(event) => setEventForm((form) => ({ ...form, type: event.target.value, calendar: typeCalendars[event.target.value] }))}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                  >
+                    {["Meeting", "Deadline", "Leave", "Holiday", "Company Event", "Task", "Project"].map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                </Field>
+              </div>
             </div>
             <Field label="Participants / Assignees">
               <EmployeeMultiSelect employees={employees} selected={eventForm.participants} onChange={(participants) => setEventForm((form) => ({ ...form, participants }))} />

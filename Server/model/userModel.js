@@ -63,6 +63,36 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    phoneVerifiedAt: {
+      type: Date,
+    },
+
+    phoneVerificationCodeHash: {
+      type: String,
+      select: false,
+    },
+
+    phoneVerificationExpiresAt: {
+      type: Date,
+      select: false,
+    },
+
+    phoneVerificationAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+
+    phoneVerificationLastSentAt: {
+      type: Date,
+      select: false,
+    },
+
+    phoneVerificationPendingPhone: {
+      type: String,
+      select: false,
+    },
+
     country: {
       type: String,
       default: "Philippines",
@@ -73,6 +103,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
       trim: true,
+    },
+
+    birthday: {
+      type: Date,
     },
 
     isActive: {
