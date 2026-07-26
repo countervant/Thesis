@@ -184,6 +184,10 @@ if (isProduction) {
     );
 
     app.get(/^(?!\/api).*/, (req, res) => {
+      // index.html points at hashed build assets. Never cache it across
+      // deployments or an older page can request bundles that no longer exist
+      // and leave the browser on the static preload screen forever.
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       res.sendFile(path.join(clientDistPath, "index.html"));
     });
   } else {

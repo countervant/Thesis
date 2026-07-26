@@ -45,9 +45,9 @@ const RoleDashboardRedirect = () => {
 };
 
 const AuthPageRoute = ({ children }) => {
-  const { isAuthenticated, loading, token, user } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
-  if (loading || (token && !user)) {
+  if (loading) {
     return <AppLoadingScreen />;
   }
 
