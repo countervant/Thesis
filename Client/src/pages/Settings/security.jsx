@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
+import TwoFactorSettings from "../../components/auth/TwoFactorSettings.jsx";
 
 const alertItems = [
   { id: "emailAlerts", label: "Email alerts", icon: "mail" },
@@ -8,9 +9,6 @@ const alertItems = [
 ];
 
 const defaultSettings = {
-  twoFactorEnabled: true,
-  authenticatorConfigured: true,
-  smsBackupEnabled: false,
   alerts: {
     emailAlerts: true,
     newDeviceAlerts: true,
@@ -93,7 +91,6 @@ const passwordInitialState = {
 
 const SecuritySettings = ({ user }) => {
   const email = user?.email || "peejong@gmail.com";
-  const phone = user?.phone || "+63 231 321 3123";
   const savedSettings = useMemo(() => loadSettings(user), [user]);
   const [settings, setSettings] = useState(savedSettings);
   const [passwordForm, setPasswordForm] = useState(passwordInitialState);
@@ -195,8 +192,7 @@ const SecuritySettings = ({ user }) => {
     setShowBackupCodes(true);
   };
 
-  const statusText = settings.twoFactorEnabled ? "Enabled" : "Disabled";
-  const protectedText = settings.twoFactorEnabled && Object.values(settings.alerts).some(Boolean)
+  const protectedText = Object.values(settings.alerts).some(Boolean)
     ? "Your account is secure"
     : "Security needs review";
 
@@ -289,58 +285,7 @@ const SecuritySettings = ({ user }) => {
             )}
           </Card>
 
-          <Card>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <span className="grid h-14 w-14 place-items-center rounded-full bg-pink-50 text-[#c72fb2]">
-                  <Icon name="shield" className="h-7 w-7" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-black text-[#10142d] dark:text-white">Two-Factor Authentication (2FA)</h3>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Add an extra layer of security to your account.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Toggle
-                  enabled={settings.twoFactorEnabled}
-                  onClick={() => updateSettings((currentSettings) => ({ ...currentSettings, twoFactorEnabled: !currentSettings.twoFactorEnabled }))}
-                  label="Toggle two-factor authentication"
-                />
-                <span className={`rounded-md px-3 py-1.5 text-xs font-black ${
-                  settings.twoFactorEnabled ? "bg-emerald-50 text-emerald-500" : "bg-slate-100 text-slate-500"
-                }`}>
-                  {statusText}
-                </span>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {[
-                ["authenticatorConfigured", "Authenticator App", "Use an authenticator app like Google Authenticator or Authy.", settings.authenticatorConfigured ? "Configured" : "Set up", "phone"],
-                ["smsBackupEnabled", "SMS Backup", "Receive verification codes via SMS as backup.", settings.smsBackupEnabled ? "Configured" : "Set up", "message"],
-              ].map(([field, title, description, action, icon]) => (
-                <div key={field} className="rounded-xl border border-pink-100 p-4">
-                  <div className="flex items-start gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-pink-50 text-[#c72fb2]">
-                      <Icon name={icon} />
-                    </span>
-                    <div>
-                      <h4 className="text-sm font-black text-[#10142d] dark:text-white">{title}</h4>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{description}</p>
-                      <button
-                        type="button"
-                        onClick={() => updateSettings((currentSettings) => ({ ...currentSettings, [field]: !currentSettings[field] }))}
-                        className="mt-3 h-8 rounded-lg bg-pink-50 px-4 text-xs font-black text-[#c72fb2]"
-                      >
-                        {action}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <TwoFactorSettings />
 
           <Card>
             <div className="flex items-center gap-4">
@@ -441,23 +386,10 @@ const SecuritySettings = ({ user }) => {
             </h3>
             <p className="mt-2 text-sm font-semibold text-slate-500">Manage your recovery options.</p>
             <div className="mt-4 divide-y divide-pink-50">
-              {[
-                ["Recovery Email", email, "mail"],
-                ["Recovery Phone", phone, "phone"],
-              ].map(([label, value, icon]) => (
-                <div key={label} className="flex items-center justify-between gap-3 py-3">
-                  <span className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
-                      <Icon name={icon} className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className="block text-xs font-black text-[#10142d] dark:text-white">{label}</span>
-                      <span className="mt-0.5 block text-xs font-semibold text-slate-500">{value}</span>
-                    </span>
-                  </span>
-                  <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">Verified</span>
-                </div>
-              ))}
+              <div className="flex items-center justify-between gap-3 py-3">
+                <span className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]"><Icon name="mail" className="h-4 w-4" /></span><span><span className="block text-xs font-black text-[#10142d] dark:text-white">Recovery Email</span><span className="mt-0.5 block text-xs font-semibold text-slate-500">{email}</span></span></span>
+                <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">Verified</span>
+              </div>
             </div>
             <button type="button" onClick={showCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
               View Backup Codes

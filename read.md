@@ -35,11 +35,19 @@ CORS_ORIGINS=https://your-client-domain.example
 VITE_API_URL=https://your-api-domain.example/api
 ```
 
-Forgot-password email is optional and needs:
+Password reset and email two-factor authentication need a Gmail account with an
+app password:
 
 ```bash
 GMAIL_USER=
 GMAIL_PASS=
+```
+
+OTP hashes use `JWT_SECRET` as the key by default. For independent key rotation,
+set a separate long random value:
+
+```bash
+OTP_HASH_SECRET=<long random secret>
 ```
 
 Database diagnostics are disabled in production unless explicitly enabled with

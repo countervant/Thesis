@@ -330,7 +330,7 @@ const EmpDashboard = () => {
     <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-[#10142d]">
+          <h1 className="page-title text-3xl text-[#10142d]">
             Good morning, {firstName}!
           </h1>
           <p className="mt-2 text-sm font-semibold text-slate-500">

@@ -11,6 +11,7 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsRoot = path.resolve(__dirname, "../uploads/tasks");
+const privateUploadsRoot = path.resolve(__dirname, "../private_uploads/tasks");
 
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
@@ -101,6 +102,28 @@ const validateSubtaskSequence = (subtasks) => {
 const allSubtasksCompleted = (subtasks) =>
   subtasks.length > 0 && subtasks.every((subtask) => subtask.completed);
 
+const isClientReviewSubtask = (subtask) =>
+  /client\s+(?:review.*revision|revision)/i.test(String(subtask?.title || ""));
+
+const isClientReviewReady = (subtasks) => {
+  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
+  return reviewIndex >= 0 && subtasks
+    .slice(0, reviewIndex + 1)
+    .every((subtask) => subtask.completed);
+};
+
+const hasClientApproval = (task) =>
+  task.activities?.some((activity) => activity.type === "client_approved");
+
+const validateClientReviewGate = (task, subtasks) => {
+  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
+  if (reviewIndex < 0 || hasClientApproval(task)) return "";
+
+  return subtasks.slice(reviewIndex + 1).some((subtask) => subtask.completed)
+    ? "Wait for the client to approve the review before completing the remaining subtasks"
+    : "";
+};
+
 const validateSubtaskAssignees = (subtasks, assignees) => {
   const teamIds = new Set(assignees.map(String));
   return subtasks.some(
@@ -190,7 +213,12 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
   const startDate = body.startDate ? new Date(body.startDate) : dueDate;
   const status = body.status || "in_progress";
   const priority = body.priority || "medium";
-  const subtasks = normalizeSubtasks(body.subtasks);
+  const amount = Number(body.amount ?? body.budget ?? 0);
+  const paid = Number(body.paid ?? 0);
+  const subtasks = normalizeSubtasks(body.subtasks).map((subtask) => ({
+    ...subtask,
+    completed: status === "done" ? true : subtask.completed,
+  }));
   const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
   const assignees = normalizeAssigneeIds(
     options.assignees ?? body.assignees,
@@ -204,6 +232,8 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     dueDate,
     status: getStatusFromSubtasks(subtasks, fallbackStatus),
     priority: allowedPriorities.includes(priority) ? priority : "medium",
+    amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
+    paid: Number.isFinite(paid) && paid >= 0 ? paid : 0,
     assignedTo: assignees[0] || userId,
     assignees,
     requestedBy: optionalId(options.requestedBy ?? body.requestedBy),
@@ -236,7 +266,7 @@ const safeFileName = (fileName) =>
     .replace(/\s+/g, "-")
     .slice(0, 120) || "output-file";
 
-const saveOutputFile = async (taskId, file) => {
+const saveOutputFile = async (taskId, file, options = {}) => {
   const dataUrl = String(file?.dataUrl || "");
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) {
@@ -248,7 +278,8 @@ const saveOutputFile = async (taskId, file) => {
     throw new Error("File size must be 10MB or less");
   }
 
-  const taskUploadDir = path.join(uploadsRoot, String(taskId));
+  const storageRoot = options.private ? privateUploadsRoot : uploadsRoot;
+  const taskUploadDir = path.join(storageRoot, String(taskId));
   await fs.mkdir(taskUploadDir, { recursive: true });
 
   const fileName = `${randomUUID()}-${safeFileName(file.fileName)}`;
@@ -257,11 +288,9 @@ const saveOutputFile = async (taskId, file) => {
 
   return {
     fileName: file.fileName || fileName,
-    fileUrl: `/uploads/tasks/${taskId}/${fileName}`,
-    // Render's local disk is ephemeral. Keep the final submission in MongoDB so
-    // a restart or deploy does not leave the task pointing at a missing file.
-    fileData: buffer,
     mimeType: match[1],
+    storedName: fileName,
+    fileUrl: options.private ? undefined : `/uploads/tasks/${taskId}/${fileName}`,
   };
 };
 
@@ -297,21 +326,84 @@ router.get("/", protect, async (req, res) => {
       if (req.query.dueTo) query.dueDate.$lte = new Date(req.query.dueTo);
     }
 
-    const [tasks, total] = await Promise.all([
-      Task.find(query)
-      .select("-comments")
-      .populate("assignedTo", "firstName lastName email role")
-      .populate("assignees", "firstName lastName email role")
-      .populate("subtasks.assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role")
-      .populate("requestedBy", "firstName lastName companyName email role")
+    const rawTasks = await Task.find(query)
+      .select([
+        "title",
+        "description",
+        "status",
+        "priority",
+        "startDate",
+        "dueDate",
+        "amount",
+        "paid",
+        "subtasks",
+        "activities",
+        "completedAt",
+        "assignedTo",
+        "assignees",
+        "createdBy",
+        "requestedBy",
+        "requestedByName",
+        "revisionRequests.user",
+        "revisionRequests.title",
+        "revisionRequests.section",
+        "revisionRequests.priority",
+        "revisionRequests.description",
+        "revisionRequests.preferredCompletionDate",
+        "revisionRequests.createdAt",
+        "revisionRequests.startedAt",
+        "revisionRequests.startedBy",
+        "finalOutput.submittedBy",
+        "finalOutput.message",
+        "finalOutput.outputMethod",
+        "finalOutput.fileName",
+        "finalOutput.fileUrl",
+        "finalOutput.previewFileName",
+        "finalOutput.originalStoredName",
+        "finalOutput.mimeType",
+        "finalOutput.watermarked",
+        "finalOutput.link",
+        "finalOutput.submittedAt",
+        "feedback.user",
+        "feedback.rating",
+        "feedback.submittedBy",
+        "feedback.overallRating",
+        "feedback.communication",
+        "feedback.communicationRating",
+        "feedback.quality",
+        "feedback.qualityRating",
+        "feedback.timeliness",
+        "feedback.timelinessRating",
+        "feedback.overallSatisfaction",
+        "feedback.comment",
+        "feedback.wouldRecommend",
+        "feedback.submittedAt",
+        "feedback.reply.message",
+        "feedback.reply.repliedBy",
+        "feedback.reply.repliedAt",
+        "attachments.fileName",
+        "attachments.fileUrl",
+        "archived",
+        "archivedAt",
+        "archivedBy",
+        "createdAt",
+        "updatedAt",
+      ].join(" "))
+      .populate("assignedTo", "firstName lastName email role avatar")
+      .populate("assignees", "firstName lastName email role avatar")
+      .populate("subtasks.assignedTo", "firstName lastName email role avatar")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName companyName email role avatar")
       .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .maxTimeMS(8000)
-      .lean(),
-      Task.countDocuments(query).maxTimeMS(8000),
-    ]);
+      .lean();
+    const tasks = rawTasks;
+    const total = skip + rawTasks.length;
 
     res.status(200).json(pagedResponse({ data: tasks, page, limit, total, key: "tasks" }));
   } catch (error) {
@@ -359,6 +451,14 @@ router.post("/", protect, async (req, res) => {
 
     if (req.body.status === "done" && !allSubtasksCompleted(payload.subtasks)) {
       return res.status(400).json({ message: "Complete every subtask before completing the task" });
+    }
+
+    if (payload.paid > payload.amount) {
+      return res.status(400).json({ message: "Paid amount cannot be greater than the total amount" });
+    }
+
+    if (!payload.subtasks.length) {
+      return res.status(400).json({ message: "At least one subtask is required" });
     }
 
     if (req.user.role === "admin" && !payload.requestedBy && !payload.requestedByName) {
@@ -450,6 +550,10 @@ router.put("/:id", protect, async (req, res) => {
       if (subtaskValidationMessage) {
         return res.status(400).json({ message: subtaskValidationMessage });
       }
+      const clientReviewGateMessage = validateClientReviewGate(task, subtasks);
+      if (clientReviewGateMessage) {
+        return res.status(400).json({ message: clientReviewGateMessage });
+      }
       recordSubtaskActivities(task, previousSubtasks, subtasks, req.user);
       task.subtasks = subtasks;
       task.status = getStatusFromSubtasks(subtasks, task.status);
@@ -476,6 +580,8 @@ router.put("/:id", protect, async (req, res) => {
         dueDate: req.body.dueDate ?? task.dueDate,
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
+        amount: req.body.amount ?? task.amount ?? task.budget,
+        paid: req.body.paid ?? task.paid,
         assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
         assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
         requestedBy:
@@ -515,6 +621,11 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(400).json({ message: subtaskValidationMessage });
     }
 
+    const clientReviewGateMessage = validateClientReviewGate(task, payload.subtasks);
+    if (clientReviewGateMessage) {
+      return res.status(400).json({ message: clientReviewGateMessage });
+    }
+
     const subtaskAssigneeMessage = validateSubtaskAssignees(payload.subtasks, payload.assignees);
     if (subtaskAssigneeMessage) {
       return res.status(400).json({ message: subtaskAssigneeMessage });
@@ -522,6 +633,10 @@ router.put("/:id", protect, async (req, res) => {
 
     if (req.body.status === "done" && !allSubtasksCompleted(payload.subtasks)) {
       return res.status(400).json({ message: "Complete every subtask before completing the task" });
+    }
+
+    if (payload.paid > payload.amount) {
+      return res.status(400).json({ message: "Paid amount cannot be greater than the total amount" });
     }
 
     if (!payload.dueDate || Number.isNaN(payload.dueDate.getTime())) {
@@ -551,6 +666,8 @@ router.put("/:id", protect, async (req, res) => {
     task.dueDate = payload.dueDate;
     task.status = payload.status;
     task.priority = payload.priority;
+    task.amount = payload.amount;
+    task.paid = payload.paid;
     task.assignedTo = payload.assignedTo;
     task.assignees = payload.assignees;
     task.requestedBy = payload.requestedBy;
@@ -575,6 +692,54 @@ router.put("/:id", protect, async (req, res) => {
   }
 });
 
+router.patch("/:id/archive", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "client") {
+      return res.status(403).json({ message: "Only clients can archive their projects" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+    if (!task) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const archived = req.body?.archived !== false;
+    if (Boolean(task.archived) !== archived) {
+      task.archived = archived;
+      task.archivedAt = archived ? new Date() : undefined;
+      task.archivedBy = archived ? req.user._id : undefined;
+      addActivity(task, {
+        type: archived ? "project_archived" : "project_restored",
+        title: archived ? "Project archived" : "Project restored",
+        details: archived ? "Project moved to the archive" : "Project restored to My Projects",
+        actor: req.user._id,
+        actorName: getActorName(req.user),
+      });
+      await task.save();
+    }
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("activities.actor", "firstName lastName companyName email role avatar")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Archive project error:", error);
+    res.status(500).json({ message: "Unable to update the project archive" });
+  }
+});
+
 router.post("/:id/revisions", protect, async (req, res) => {
   try {
     if (req.user.role !== "client") {
@@ -590,17 +755,23 @@ router.post("/:id/revisions", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
+    if (task.status !== "review" || !task.finalOutput?.submittedAt) {
+      return res.status(400).json({
+        message: "A revision can only be requested after the assigned user submits the project for client review",
+      });
+    }
+
     const payload = normalizeRevisionPayload(req.body);
     if (!payload.title) {
       return res.status(400).json({ message: "Revision title is required" });
     }
 
-    if (!payload.section) {
-      return res.status(400).json({ message: "Section or page is required" });
-    }
-
     if (!payload.description) {
       return res.status(400).json({ message: "Description of changes is required" });
+    }
+
+    if (payload.preferredCompletionDate && isPastDate(payload.preferredCompletionDate)) {
+      return res.status(400).json({ message: "Preferred completion date cannot be in the past" });
     }
 
     task.revisionRequests.push({
@@ -633,6 +804,121 @@ router.post("/:id/revisions", protect, async (req, res) => {
   }
 });
 
+router.post("/:id/revisions/start", protect, async (req, res) => {
+  try {
+    if (!["admin", "employee"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Only assigned team members can start revisions" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const revision = task.revisionRequests[task.revisionRequests.length - 1];
+    if (!revision || revision.startedAt || task.status !== "pending") {
+      return res.status(400).json({ message: "This task does not have a pending revision request" });
+    }
+
+    if (req.user.role === "employee" && !canUserSubmitTask(task, req.user._id)) {
+      return res.status(403).json({ message: "Only the assigned user can start this revision" });
+    }
+
+    const reviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
+    if (reviewIndex >= 0) {
+      task.subtasks.forEach((subtask, index) => {
+        if (index >= reviewIndex) {
+          subtask.completed = false;
+          subtask.completedAt = undefined;
+        }
+      });
+    }
+
+    revision.startedAt = new Date();
+    revision.startedBy = req.user._id;
+    task.status = "in_progress";
+    task.completedAt = undefined;
+    addActivity(task, {
+      type: "revision_started",
+      title: "Revision work started",
+      details: revision.title,
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+    });
+
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("revisionRequests.user", "firstName lastName companyName email role")
+      .populate("revisionRequests.startedBy", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Start task revision error:", error);
+    res.status(500).json({ message: "Unable to start revision" });
+  }
+});
+
+router.post("/:id/approve", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "client") {
+      return res.status(403).json({ message: "Only clients can approve projects" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (task.status !== "review" || !task.finalOutput?.submittedAt) {
+      return res.status(400).json({ message: "This project is not awaiting client approval" });
+    }
+
+    const reviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
+    const hasRemainingSubtasks =
+      reviewIndex >= 0 &&
+      task.subtasks.slice(reviewIndex + 1).some((subtask) => !subtask.completed);
+    task.status = hasRemainingSubtasks ? "in_progress" : "done";
+    task.completedAt = hasRemainingSubtasks ? undefined : new Date();
+    addActivity(task, {
+      type: "client_approved",
+      title: "Client approved the project",
+      details: "Submitted output was approved",
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+    });
+
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Approve project error:", error);
+    res.status(500).json({ message: "Unable to approve the project" });
+  }
+});
+
 router.post("/:id/feedback", protect, async (req, res) => {
   try {
     if (req.user.role !== "client") {
@@ -649,24 +935,35 @@ router.post("/:id/feedback", protect, async (req, res) => {
     }
 
     if (task.status !== "done") {
-      return res.status(400).json({ message: "Feedback is available after the job is completed" });
+      return res.status(400).json({ message: "Feedback is available after the project is completed" });
     }
 
-    const rating = Number(req.body.rating);
-    const comment = String(req.body.comment || "").trim();
+    const rating = Number(req.body.overallRating);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Please select a rating from 1 to 5" });
-    }
-    if (comment.length > 1000) {
-      return res.status(400).json({ message: "Feedback must be 1000 characters or less" });
+      return res.status(400).json({ message: "Please select an overall rating" });
     }
 
-    const submittedAt = new Date();
-    task.feedback = { user: req.user._id, rating, comment, submittedAt };
+    const optionalRating = (value) => {
+      const parsed = Number(value);
+      return Number.isInteger(parsed) && parsed >= 1 && parsed <= 5 ? parsed : undefined;
+    };
+
+    task.feedback = {
+      submittedBy: req.user._id,
+      overallRating: rating,
+      quality: optionalRating(req.body.quality),
+      communication: optionalRating(req.body.communication),
+      timeliness: optionalRating(req.body.timeliness),
+      overallSatisfaction: optionalRating(req.body.overallSatisfaction),
+      comment: String(req.body.comment || "").trim().slice(0, 1000),
+      wouldRecommend: req.body.wouldRecommend === true,
+      submittedAt: new Date(),
+    };
+
     addActivity(task, {
       type: "feedback_submitted",
       title: "Client submitted feedback",
-      details: `${rating}/5 rating${comment ? `: ${comment}` : ""}`,
+      details: `${rating}/5 rating${task.feedback.comment ? `: ${task.feedback.comment}` : ""}`,
       actor: req.user._id,
       actorName: getActorName(req.user),
     });
@@ -679,12 +976,156 @@ router.post("/:id/feedback", protect, async (req, res) => {
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
       .populate("feedback.user", "firstName lastName email role")
+      .populate("feedback.submittedBy", "firstName lastName email role")
       .lean();
 
     res.status(200).json(updatedTask);
   } catch (error) {
     console.error("Submit task feedback error:", error);
     res.status(500).json({ message: "Unable to submit feedback" });
+  }
+});
+
+router.delete("/:id/feedback", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only administrators can delete client feedback" });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    if (!task.feedback?.submittedAt) {
+      return res.status(404).json({ message: "This project does not have submitted feedback" });
+    }
+
+    task.set("feedback", undefined);
+    task.activities = task.activities.filter(
+      (activity) => !["feedback_submitted", "feedback_replied"].includes(activity.type)
+    );
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .select("-comments")
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Delete task feedback error:", error);
+    res.status(500).json({ message: "Unable to delete feedback" });
+  }
+});
+
+router.post("/:id/feedback/reply", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only administrators can reply to client feedback" });
+    }
+
+    const message = String(req.body.message || "").trim();
+    if (!message) {
+      return res.status(400).json({ message: "Please enter a reply" });
+    }
+    if (message.length > 1000) {
+      return res.status(400).json({ message: "Reply must be 1000 characters or fewer" });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    if (!task.feedback?.submittedAt) {
+      return res.status(400).json({ message: "This project does not have submitted feedback yet" });
+    }
+
+    const repliedAt = new Date();
+    task.feedback.reply = {
+      message,
+      repliedBy: req.user._id,
+      repliedAt,
+    };
+    addActivity(task, {
+      type: "feedback_replied",
+      title: "Admin replied to your feedback",
+      details: message,
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+      createdAt: repliedAt,
+    });
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .select("-comments")
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role avatar")
+      .populate("requestedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.user", "firstName lastName companyName email role avatar")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
+      .populate("feedback.reply.repliedBy", "firstName lastName email role")
+      .lean();
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Reply to feedback error:", error);
+    res.status(500).json({ message: "Unable to send feedback reply" });
+  }
+});
+
+router.get("/:id/output/download", protect, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    }).select("amount paid finalOutput");
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (!task.finalOutput?.fileName) {
+      return res.status(404).json({ message: "No uploaded output is available for this task" });
+    }
+
+    const fullyPaid = Number(task.amount || 0) > 0 && Number(task.paid || 0) >= Number(task.amount || 0);
+    const canAccessOriginal = req.user.role !== "client" || fullyPaid;
+    const canUseOriginal = canAccessOriginal && task.finalOutput.originalStoredName;
+    if (!canAccessOriginal && !task.finalOutput.fileUrl) {
+      return res.status(402).json({
+        message: "The original output is protected until the project is fully paid",
+      });
+    }
+
+    const selectedRoot = canUseOriginal ? privateUploadsRoot : uploadsRoot;
+    const storedFileName = canUseOriginal
+      ? path.basename(task.finalOutput.originalStoredName)
+      : path.basename(task.finalOutput.fileUrl);
+    const filePath = path.join(selectedRoot, String(task._id), storedFileName);
+    const rootPath = `${selectedRoot}${path.sep}`;
+    if (!filePath.startsWith(rootPath)) {
+      return res.status(400).json({ message: "Invalid output file" });
+    }
+
+    try {
+      await fs.access(filePath);
+    } catch {
+      return res.status(404).json({ message: "The uploaded output file could not be found" });
+    }
+
+    const downloadName = canAccessOriginal
+      ? task.finalOutput.fileName
+      : task.finalOutput.previewFileName || `watermarked-${task.finalOutput.fileName}`;
+    return res.download(filePath, safeFileName(downloadName || storedFileName));
+  } catch (error) {
+    console.error("Download task output error:", error);
+    return res.status(500).json({ message: "Unable to download task output" });
   }
 });
 
@@ -702,6 +1143,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     }
 
     const outputMethod = req.body.outputMethod === "link" ? "link" : "file";
+    const finalize = req.body.finalize !== false;
     const message = String(req.body.message || "").trim();
     const previousSubtasks = task.subtasks.toObject();
     let subtasks = req.body.subtasks !== undefined
@@ -740,9 +1182,20 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       return res.status(400).json({ message: subtaskValidationMessage });
     }
 
-    if (!allSubtasksCompleted(subtasks)) {
+    const clientReviewGateMessage = validateClientReviewGate(task, subtasks);
+    if (clientReviewGateMessage) {
+      return res.status(400).json({ message: clientReviewGateMessage });
+    }
+
+    if (finalize && !allSubtasksCompleted(subtasks)) {
       return res.status(400).json({
         message: "Complete every subtask before submitting the final output",
+      });
+    }
+
+    if (!finalize && !isClientReviewReady(subtasks)) {
+      return res.status(400).json({
+        message: "Complete the Client review and revisions step before submitting for client review",
       });
     }
 
@@ -751,8 +1204,24 @@ router.post("/:id/submit-output", protect, async (req, res) => {
         return res.status(400).json({ message: "Please upload a file before submitting" });
       }
 
-      fileOutput = await saveOutputFile(task._id, req.body.file);
-      task.attachments.push(fileOutput);
+      const requiresPaymentProtection =
+        Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
+      if (requiresPaymentProtection) {
+        const originalFile = await saveOutputFile(task._id, req.body.file, { private: true });
+        const reviewFile = req.body.watermarkedFile?.dataUrl
+          ? await saveOutputFile(task._id, req.body.watermarkedFile)
+          : await saveOutputFile(task._id, req.body.file);
+        fileOutput = {
+          fileName: originalFile.fileName,
+          fileUrl: reviewFile.fileUrl,
+          previewFileName: reviewFile.fileName,
+          originalStoredName: originalFile.storedName,
+          mimeType: originalFile.mimeType,
+          watermarked: Boolean(req.body.watermarkedFile?.dataUrl),
+        };
+      } else {
+        fileOutput = await saveOutputFile(task._id, req.body.file);
+      }
     } else {
       link = String(req.body.link || "").trim();
       if (!link) {
@@ -762,22 +1231,24 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     recordSubtaskActivities(task, previousSubtasks, subtasks, req.user);
     task.subtasks = subtasks;
-    task.status = "done";
-    task.completedAt = task.completedAt || new Date();
+    task.status = finalize ? "done" : "review";
+    task.completedAt = finalize ? task.completedAt || new Date() : undefined;
     task.finalOutput = {
       submittedBy: req.user._id,
       message,
       outputMethod,
       fileName: fileOutput.fileName,
       fileUrl: fileOutput.fileUrl,
-      fileData: fileOutput.fileData,
+      previewFileName: fileOutput.previewFileName,
+      originalStoredName: fileOutput.originalStoredName,
       mimeType: fileOutput.mimeType,
+      watermarked: Boolean(fileOutput.watermarked),
       link,
       submittedAt: new Date(),
     };
     addActivity(task, {
       type: "output_submitted",
-      title: "Final output submitted for client review",
+      title: finalize ? "Final output submitted" : "Output submitted for client review",
       details: message || "Project output was submitted",
       actor: req.user._id,
       actorName: getActorName(req.user),
@@ -806,62 +1277,6 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     res.status(error.message?.includes("File size") || error.message?.includes("Invalid file") ? 400 : 500).json({
       message: error.message || "Unable to submit output",
     });
-  }
-});
-
-router.get("/:id/output/download", protect, async (req, res) => {
-  try {
-    const task = await Task.findOne({
-      _id: req.params.id,
-      ...taskQueryForUser(req.user),
-    }).select(
-      "finalOutput.fileName finalOutput.fileUrl finalOutput.mimeType +finalOutput.fileData attachments.fileName attachments.fileUrl"
-    );
-
-    if (!task?.finalOutput?.fileUrl) {
-      return res.status(404).json({ message: "Submitted output file not found" });
-    }
-
-    const { fileName, fileData, fileUrl, mimeType } = task.finalOutput;
-    const downloadName = safeFileName(fileName || "submitted-output");
-
-    if (fileData?.length) {
-      res.set({
-        "Content-Type": mimeType || "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${downloadName}"`,
-        "Content-Length": fileData.length,
-      });
-      return res.send(fileData);
-    }
-
-    // Files submitted before durable storage was added may still exist on the
-    // current server. Restrict the fallback to this task's upload directory.
-    const legacyFileUrls = [
-      fileUrl,
-      // A re-upload may have generated a new filename while the final-output
-      // record still references the earlier one. Use only attachments for the
-      // same displayed filename and only inside this task's directory.
-      ...task.attachments
-        .filter((attachment) => attachment.fileName === fileName)
-        .map((attachment) => attachment.fileUrl),
-    ].filter(Boolean);
-
-    for (const legacyFileUrl of legacyFileUrls) {
-      const legacyPath = path.join(uploadsRoot, String(task._id), path.basename(legacyFileUrl));
-      try {
-        await fs.access(legacyPath);
-        return res.download(legacyPath, downloadName);
-      } catch {
-        // Try the next matching attachment before reporting that it is gone.
-      }
-    }
-
-    return res.status(410).json({
-      message: "This older uploaded file is no longer available. Please ask the team to submit it again.",
-    });
-  } catch (error) {
-    console.error("Download task output error:", error);
-    return res.status(500).json({ message: "Unable to download the submitted output" });
   }
 });
 

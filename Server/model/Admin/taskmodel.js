@@ -36,6 +36,18 @@ const taskSchema = new mongoose.Schema(
       required: true,
     },
 
+    amount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    paid: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
     subtasks: [
       {
         title: {
@@ -64,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "output_submitted", "feedback_submitted"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "revision_started", "output_submitted", "client_approved", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 
@@ -186,6 +198,13 @@ const taskSchema = new mongoose.Schema(
           type: Date,
         },
 
+        startedAt: Date,
+
+        startedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+
         createdAt: {
           type: Date,
           default: Date.now,
@@ -215,11 +234,13 @@ const taskSchema = new mongoose.Schema(
       },
       fileName: String,
       fileUrl: String,
-      fileData: {
-        type: Buffer,
-        select: false,
-      },
+      previewFileName: String,
+      originalStoredName: String,
       mimeType: String,
+      watermarked: {
+        type: Boolean,
+        default: false,
+      },
       link: String,
       submittedAt: Date,
     },
@@ -234,13 +255,67 @@ const taskSchema = new mongoose.Schema(
         min: 1,
         max: 5,
       },
+      submittedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      overallRating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      quality: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      communication: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      timeliness: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      overallSatisfaction: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
       comment: {
         type: String,
         default: "",
         trim: true,
         maxlength: 1000,
       },
+      wouldRecommend: Boolean,
       submittedAt: Date,
+      reply: {
+        message: {
+          type: String,
+          default: "",
+          trim: true,
+          maxlength: 1000,
+        },
+        repliedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        repliedAt: Date,
+      },
+    },
+
+    archived: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    archivedAt: Date,
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
 
     tags: [String],

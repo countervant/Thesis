@@ -8,8 +8,6 @@ import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
-const taskStatuses = ["All", "In progress", "Pending", "In review", "Done"];
-const groupPreviewLimit = 5;
 const statusFromApi = {
   pending: "Pending",
   in_progress: "In progress",
@@ -168,12 +166,15 @@ const normalizeTask = (task) => {
   return {
     raw: task,
     id: getEntityId(task),
+    apiStatus: task?.status || "pending",
     title: task?.title || "Untitled task",
     description: task?.description || "",
     startDate: task?.startDate || task?.createdAt || task?.dueDate,
     dueDate: task?.dueDate,
     status,
     priority: task?.priority ? task.priority[0].toUpperCase() + task.priority.slice(1) : "Medium",
+    amount: Number(task?.amount ?? task?.budget ?? 0),
+    paid: Number(task?.paid ?? 0),
     assignedTo: task?.assignedTo,
     assignees: task?.assignees?.length ? task.assignees : [task?.assignedTo].filter(Boolean),
     createdBy: task?.createdBy,
@@ -181,26 +182,14 @@ const normalizeTask = (task) => {
     requestedByName: task?.requestedByName || "",
     subtasks,
     progress: getTaskProgress(subtasks),
+    finalOutput: task?.finalOutput || null,
+    revisionRequests: Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    clientApproved: task?.activities?.some((activity) => activity?.type === "client_approved") || false,
     feedback: task?.feedback || null,
   };
 };
 
-const FeedbackSummary = ({ feedback }) => {
-  if (!feedback?.rating) return null;
-
-  return (
-    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-black text-[#10142d]">Client feedback</span>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-600">{"★".repeat(feedback.rating)} <span className="text-slate-500">({feedback.rating}/5)</span></span>
-      </div>
-      {feedback.comment && <p className="mt-2 text-sm font-semibold text-slate-600">“{feedback.comment}”</p>}
-      {feedback.submittedAt && <p className="mt-2 text-[11px] font-bold text-slate-400">Submitted {formatDate(feedback.submittedAt)}</p>}
-    </div>
-  );
-};
-
-const TaskRow = ({ currentUserId, isExpanded, item, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
+const TaskRow = ({ currentUserId, isExpanded, item, onSubmitOutput, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
   const progressSummary =
@@ -237,31 +226,66 @@ const TaskRow = ({ currentUserId, isExpanded, item, onToggleExpand, onToggleSubt
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
                 {item.subtasks.map((subtask, index) => {
+                  const clientReviewIndex = item.subtasks.findIndex((candidate) =>
+                    /client\s+(?:review.*revision|revision)/i.test(candidate.title)
+                  );
                   const isAssignedToCurrentUser = subtask.assignedTo
                     ? getEntityId(subtask.assignedTo) === currentUserId
                     : item.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
                   const isSequenceLocked = subtask.completed
                     ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
                     : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed);
-                  const isLocked = isSequenceLocked || !isAssignedToCurrentUser;
+                  const isWaitingForClientApproval =
+                    clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
+                  const isLocked = isSequenceLocked || isWaitingForClientApproval || !isAssignedToCurrentUser;
+                  const isClientReviewSubtask = /client\s+(?:review.*revision|revision)/i.test(subtask.title);
+                  const canSubmitOutput =
+                    item.status !== "Done" &&
+                    isAssignedToCurrentUser &&
+                    isClientReviewSubtask &&
+                    item.subtasks.slice(0, index).every((previousSubtask) => previousSubtask.completed);
+                  const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
+                  const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
+                  const isApproved = hasSubmittedOutput && item.clientApproved;
+                  const needsRevision =
+                    hasSubmittedOutput &&
+                    item.apiStatus === "pending" &&
+                    item.revisionRequests.length > 0;
                   return (
-                  <label key={subtask.id || `${item.id}-${index}`} className={`flex min-w-0 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={!isAssignedToCurrentUser ? "This subtask is assigned to another employee" : isSequenceLocked ? "Complete the previous subtask first" : undefined}>
-                    <input
-                      type="checkbox"
-                      checked={subtask.completed}
-                      disabled={isLocked}
-                      onChange={() => onToggleSubtask(item, index)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
-                      {subtask.title}
-                    </span>
-                    {subtask.assignedTo && (
-                      <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
-                        {getPersonName(subtask.assignedTo)}
-                      </span>
-                    )}
-                  </label>
+                    <div key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2">
+                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={!isAssignedToCurrentUser ? "This subtask is assigned to another employee" : isWaitingForClientApproval ? "Wait for the client to approve the review first" : isSequenceLocked ? "Complete the previous subtask first" : undefined}>
+                        <input
+                          type="checkbox"
+                          checked={subtask.completed}
+                          disabled={isLocked}
+                          onChange={() => onToggleSubtask(item, index)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
+                          {subtask.title}
+                        </span>
+                        {subtask.assignedTo && (
+                          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
+                            {getPersonName(subtask.assignedTo)}
+                          </span>
+                        )}
+                      </label>
+                      {isClientReviewSubtask && isApproved && (
+                        <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">
+                          Approved
+                        </span>
+                      )}
+                      {isClientReviewSubtask && isUnderReview && (
+                        <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[9px] font-black text-amber-700">
+                          Under Review
+                        </span>
+                      )}
+                      {canSubmitOutput && !isUnderReview && !isApproved && (
+                        <button type="button" onClick={() => onSubmitOutput(item, index)} className="shrink-0 rounded-lg bg-[#c72fb2] px-2.5 py-1.5 text-[9px] font-black text-white transition hover:brightness-105">
+                          {needsRevision ? "Needs Revision" : "Submit Output"}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -346,35 +370,9 @@ const TaskRow = ({ currentUserId, isExpanded, item, onToggleExpand, onToggleSubt
           </button>
         </div>
       )}
-      <FeedbackSummary feedback={item.feedback} />
     </article>
   );
 };
-
-const TaskGroup = ({ title, count, tone, children, footer, isOpen = true, onToggle }) => (
-  <Card className="overflow-hidden">
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-pink-50/60"
-      aria-expanded={isOpen}
-    >
-      <span className={`text-lg font-black transition-transform ${tone} ${isOpen ? "rotate-90" : ""}`}>
-        {">"}
-      </span>
-      <h2 className={`text-sm font-black ${tone}`}>{title}</h2>
-      <span className="text-sm font-black text-slate-400">({count})</span>
-    </button>
-    {isOpen && (
-      <>
-        <div className="mx-5 overflow-hidden rounded-2xl border border-pink-50 bg-white">
-          {children}
-        </div>
-        {footer && <div className="py-4 text-center">{footer}</div>}
-      </>
-    )}
-  </Card>
-);
 
 const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   const [message, setMessage] = useState(`Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`);
@@ -384,6 +382,8 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   const [fileError, setFileError] = useState("");
 
   const task = completion.task;
+  const pendingAmount = Math.max(0, Number(task.amount || 0) - Number(task.paid || 0));
+  const needsPaymentProtection = Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -392,6 +392,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
       link,
       message,
       outputMethod,
+      watermark: needsPaymentProtection,
     });
   };
 
@@ -402,7 +403,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
         className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Completed Task</h2>
+          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
           <button
             type="button"
             onClick={onClose}
@@ -436,6 +437,17 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
             <span className="text-slate-400">Due Date</span>
             <span className="font-black text-[#10142d] dark:text-white">{formatDate(task.dueDate)}</span>
+          </p>
+        </div>
+
+        <div className={`mt-4 rounded-xl border px-4 py-3 ${needsPaymentProtection ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+          <p className={`text-xs font-black ${needsPaymentProtection ? "text-amber-700" : "text-emerald-700"}`}>
+            {needsPaymentProtection ? "Watermark protection is ON" : "Watermark protection is OFF"}
+          </p>
+          <p className="mt-1 text-[11px] font-bold text-slate-600">
+            {needsPaymentProtection
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image review copies are watermarked and remain viewable/downloadable. For other file types, upload a pre-watermarked review copy.`
+              : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>
 
@@ -551,22 +563,64 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   );
 };
 
+const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
+  const revision = task.revisionRequests[task.revisionRequests.length - 1] || {};
+  const priority = revision.priority
+    ? revision.priority[0].toUpperCase() + revision.priority.slice(1)
+    : "Medium";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+      <section className="w-full max-w-2xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-rose-600">Needs Revision</span>
+            <h2 className="mt-3 text-xl font-black text-[#10142d] dark:text-white">{revision.title || "Client revision request"}</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">Review the client’s requested changes before starting.</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={isStarting} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:opacity-50" aria-label="Close revision details">x</button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/40 p-4 text-xs font-bold text-slate-600 dark:border-neutral-800 dark:bg-neutral-950">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Task</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{task.title}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Client</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{getClientName(task)}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Section / Area</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{revision.section || "Not specified"}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Priority</span><span className={`mt-1 inline-flex rounded-full px-3 py-1 text-[10px] font-black ${priority === "Urgent" || priority === "High" ? "bg-rose-100 text-rose-700" : priority === "Low" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}>{priority}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Requested On</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{formatDate(revision.createdAt)}</span></p>
+            <p><span className="block text-[10px] font-black uppercase tracking-wide text-slate-400">Preferred Completion</span><span className="mt-1 block font-black text-[#10142d] dark:text-white">{revision.preferredCompletionDate ? formatDate(revision.preferredCompletionDate) : "No preferred date"}</span></p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 p-4 dark:border-neutral-800">
+          <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Requested Changes</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{revision.description || "No additional instructions were provided."}</p>
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button type="button" onClick={onClose} disabled={isStarting} className="h-11 rounded-xl border border-slate-200 bg-white px-7 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">Close</button>
+          <button type="button" onClick={onStart} disabled={isStarting} className="inline-flex h-11 items-center justify-center rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-7 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60">
+            {isStarting ? "Starting..." : "Start Revision"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+};
+
 const EmpTask = () => {
   const { user } = useAuth();
   const currentUserId = getEntityId(user);
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedTaskStatus, setSelectedTaskStatus] = useState("All");
-  const [selectedPriority, setSelectedPriority] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("Due Date");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [completionDraft, setCompletionDraft] = useState(null);
+  const [revisionDraft, setRevisionDraft] = useState(null);
+  const [isStartingRevision, setIsStartingRevision] = useState(false);
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -602,38 +656,21 @@ const EmpTask = () => {
           (visibleGroup === "Upcoming" && dateStatus === "Upcoming" && task.status !== "Done") ||
           (visibleGroup === "Overdue" && dateStatus === "Overdue" && task.status !== "Done") ||
           (visibleGroup === "Completed" && task.status === "Done");
-        const matchesStatus = selectedTaskStatus === "All" || task.status === selectedTaskStatus;
-        const matchesPriority = selectedPriority === "All" || task.priority === selectedPriority;
         const matchesSearch =
           !normalizedSearch ||
           task.title.toLowerCase().includes(normalizedSearch) ||
           task.description.toLowerCase().includes(normalizedSearch);
 
-        return matchesGroup && matchesStatus && matchesPriority && matchesSearch;
+        return matchesGroup && matchesSearch;
       })
       .sort((firstTask, secondTask) => {
-        if (sortBy === "Priority") {
-          const ranks = { High: 0, Medium: 1, Low: 2 };
-          return (ranks[firstTask.priority] ?? 3) - (ranks[secondTask.priority] ?? 3);
-        }
-        if (sortBy === "Status") return firstTask.status.localeCompare(secondTask.status);
         return (parseDate(firstTask.dueDate) || new Date(8640000000000000)) - (parseDate(secondTask.dueDate) || new Date(8640000000000000));
       });
-  }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, tasks, visibleGroup]);
-
-  useEffect(() => {
-    setExpandedGroups({});
-    setCollapsedGroups({});
-  }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, visibleGroup]);
-
-  const dueTodayTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
-  const overdueTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
-  const upcomingTasks = visibleTasks.filter((task) => getDateStatus(task.dueDate) === "Upcoming" && task.status !== "Done");
-  const completedTasks = visibleTasks.filter((task) => task.status === "Done");
+  }, [searchQuery, tasks, visibleGroup]);
 
   const taskStats = [
     { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today").length, icon: pendingrequest, tone: "orange" },
+    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
     { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
@@ -650,46 +687,12 @@ const EmpTask = () => {
         isExpanded={expandedTaskIds.has(item.id)}
         key={item.id}
         item={item}
+        onSubmitOutput={handleSubmitOutput}
         onToggleExpand={handleToggleExpand}
         onToggleSubtask={handleToggleSubtask}
         onViewCalendar={handleViewCalendar}
       />
     ));
-  };
-
-  const getGroupItems = (groupKey, items) =>
-    expandedGroups[groupKey] ? items : items.slice(0, groupPreviewLimit);
-
-  const isGroupOpen = (groupKey) => !collapsedGroups[groupKey];
-
-  const toggleGroupOpen = (groupKey) => {
-    setCollapsedGroups((currentGroups) => ({
-      ...currentGroups,
-      [groupKey]: !currentGroups[groupKey],
-    }));
-  };
-
-  const getGroupFooter = (groupKey, items, label, toneClass) => {
-    if (items.length <= groupPreviewLimit) {
-      return null;
-    }
-
-    const isExpanded = Boolean(expandedGroups[groupKey]);
-
-    return (
-      <button
-        type="button"
-        onClick={() =>
-          setExpandedGroups((currentGroups) => ({
-            ...currentGroups,
-            [groupKey]: !isExpanded,
-          }))
-        }
-        className={`text-sm font-black ${toneClass}`}
-      >
-        {isExpanded ? "Show less" : `View all ${label} (${items.length})`}
-      </button>
-    );
   };
 
   function handleToggleExpand(taskId) {
@@ -722,6 +725,13 @@ const EmpTask = () => {
 
   const handleToggleSubtask = async (task, subtaskIndex) => {
     const toggledSubtask = task.subtasks[subtaskIndex];
+    const clientReviewIndex = task.subtasks.findIndex((subtask) =>
+      /client\s+(?:review.*revision|revision)/i.test(subtask.title)
+    );
+    if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
+      setErrorMessage("Wait for the client to approve the review before continuing to the final subtask.");
+      return;
+    }
     const isAssignedToCurrentUser = toggledSubtask?.assignedTo
       ? getEntityId(toggledSubtask.assignedTo) === currentUserId
       : task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
@@ -742,17 +752,60 @@ const EmpTask = () => {
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const willCompleteTask =
-      isCompletingSubtask &&
-      nextSubtasks.length > 0 &&
-      nextSubtasks.every((subtask) => subtask.completed);
+    const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
 
-    if (willCompleteTask) {
-      setCompletionDraft({ task, nextSubtasks });
+    if (isCompletingSubtask && isClientReviewSubtask) {
+      setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
 
     await updateTaskSubtasks(task, nextSubtasks);
+  };
+
+  const handleSubmitOutput = (task, subtaskIndex) => {
+    const reviewSubtask = task.subtasks[subtaskIndex];
+    const isAssignedToCurrentUser = reviewSubtask?.assignedTo
+      ? getEntityId(reviewSubtask.assignedTo) === currentUserId
+      : task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
+    const previousStepsCompleted = task.subtasks
+      .slice(0, subtaskIndex)
+      .every((subtask) => subtask.completed);
+
+    if (!isAssignedToCurrentUser || !previousStepsCompleted || task.status === "Done") return;
+
+    const needsRevision =
+      Boolean(task.finalOutput?.submittedAt) &&
+      task.apiStatus === "pending" &&
+      task.revisionRequests.length > 0;
+    if (needsRevision) {
+      setRevisionDraft({ task, subtaskIndex });
+      return;
+    }
+
+    const nextSubtasks = task.subtasks.map((subtask, index) =>
+      index === subtaskIndex ? { ...subtask, completed: true } : subtask
+    );
+    setCompletionDraft({ task, nextSubtasks, finalize: false });
+  };
+
+  const handleStartRevision = async () => {
+    if (!revisionDraft || isStartingRevision) return;
+
+    try {
+      setIsStartingRevision(true);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = await taskAPI.startRevision(revisionDraft.task.id);
+      setTasks((currentTasks) =>
+        currentTasks.map((item) => (item.id === revisionDraft.task.id ? normalizeTask(updatedTask) : item))
+      );
+      setRevisionDraft(null);
+      setNoticeMessage(`${revisionDraft.task.title} revision is now in progress.`);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to start revision."));
+    } finally {
+      setIsStartingRevision(false);
+    }
   };
 
   const submitCompletedTask = async (output) => {
@@ -775,6 +828,7 @@ const EmpTask = () => {
       const updatedTask = await taskAPI.submitOutput(draft.task.id, {
         ...output,
         subtasks: draft.nextSubtasks,
+        finalize: draft.finalize,
       });
       setTasks((currentTasks) =>
         currentTasks.map((item) => (item.id === draft.task.id ? normalizeTask(updatedTask) : item))
@@ -830,7 +884,7 @@ const EmpTask = () => {
       </div>
 
       <Card className="p-5">
-        <div className="grid gap-4 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
+        <div>
           <label className="relative block">
             <span className="sr-only">Search tasks</span>
             <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -842,9 +896,6 @@ const EmpTask = () => {
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
             />
           </label>
-          <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
-          <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
-          <SelectControl label="Sort by" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
@@ -863,57 +914,25 @@ const EmpTask = () => {
       {isLoading && <TaskListSkeleton rows={5} />}
 
       {!isLoading && (
-        <>
-          <TaskGroup
-            title="Overdue"
-            count={overdueTasks.length}
-            tone="text-rose-500"
-            footer={getGroupFooter("overdue", overdueTasks, "overdue", "text-rose-500")}
-            isOpen={isGroupOpen("overdue")}
-            onToggle={() => toggleGroupOpen("overdue")}
-          >
-            {renderTaskRows(getGroupItems("overdue", overdueTasks))}
-          </TaskGroup>
-
-          <TaskGroup
-            title="Due Today"
-            count={dueTodayTasks.length}
-            tone="text-orange-500"
-            footer={getGroupFooter("dueToday", dueTodayTasks, "due today", "text-orange-500")}
-            isOpen={isGroupOpen("dueToday")}
-            onToggle={() => toggleGroupOpen("dueToday")}
-          >
-            {renderTaskRows(getGroupItems("dueToday", dueTodayTasks))}
-          </TaskGroup>
-
-          <TaskGroup
-            title="Upcoming"
-            count={upcomingTasks.length}
-            tone="text-slate-700"
-            footer={getGroupFooter("upcoming", upcomingTasks, "upcoming", "text-pink-600")}
-            isOpen={isGroupOpen("upcoming")}
-            onToggle={() => toggleGroupOpen("upcoming")}
-          >
-            {renderTaskRows(getGroupItems("upcoming", upcomingTasks))}
-          </TaskGroup>
-
-          <TaskGroup
-            title="Completed"
-            count={completedTasks.length}
-            tone="text-emerald-600"
-            footer={getGroupFooter("completed", completedTasks, "completed", "text-emerald-600")}
-            isOpen={isGroupOpen("completed")}
-            onToggle={() => toggleGroupOpen("completed")}
-          >
-            {renderTaskRows(getGroupItems("completed", completedTasks))}
-          </TaskGroup>
-        </>
+        <Card className="overflow-hidden p-0">
+          <div className="divide-y divide-pink-50">
+            {renderTaskRows(visibleTasks)}
+          </div>
+        </Card>
       )}
       {completionDraft && (
         <CompletedTaskModal
           completion={completionDraft}
           onClose={() => setCompletionDraft(null)}
           onSubmit={submitCompletedTask}
+        />
+      )}
+      {revisionDraft && (
+        <RevisionDetailsModal
+          isStarting={isStartingRevision}
+          onClose={() => setRevisionDraft(null)}
+          onStart={handleStartRevision}
+          task={revisionDraft.task}
         />
       )}
     </div>

@@ -30,6 +30,10 @@ client/dist
 server/dist
 dist-ssr
 
+# Runtime task output storage
+Server/uploads/
+Server/private_uploads/
+
 *.local
 .env
 .env.*

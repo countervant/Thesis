@@ -27,6 +27,7 @@ const emptyForm = {
   country: defaultCountry,
   phone: "",
   position: "",
+  birthday: "",
   password: "",
   confirmPassword: "",
   avatar: "",
@@ -55,6 +56,12 @@ const antiAutofillProps = {
   "data-form-type": "other",
 };
 
+const toDateInputValue = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
 const profileToForm = (profile) => {
   const country = profile?.country || defaultCountry;
   const role = profile?.role?.toLowerCase() || "";
@@ -67,6 +74,7 @@ const profileToForm = (profile) => {
     country,
     phone: ensureCountryDialCode(profile?.phone || getCountryDialCode(country), country),
     position: role === "client" ? "Client" : profile?.position || "",
+    birthday: toDateInputValue(profile?.birthday),
     password: "",
     confirmPassword: "",
     avatar: profile?.avatar || "",
@@ -262,6 +270,7 @@ const Profile = ({ embedded = false }) => {
         country: formData.country,
         phone: formData.phone.trim(),
         position: user?.role === "client" ? "Client" : formData.position.trim(),
+        birthday: formData.birthday,
         avatar: formData.avatar,
         coverPhoto: formData.coverPhoto,
       };
@@ -476,8 +485,14 @@ const Profile = ({ embedded = false }) => {
                       className={iconInputClass}
                     />
                   </Field>
-                  <Field label="Birthday" icon="calendar" required>
-                    <input type="text" value="February 14, 2001" readOnly className={iconInputClass} />
+                  <Field label="Birthday" icon="calendar">
+                    <input
+                      type="date"
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={formData.birthday}
+                      onChange={(event) => updateField("birthday", event.target.value)}
+                      className={iconInputClass}
+                    />
                   </Field>
                   <Field label="Gender" icon="person" required>
                     <select className={iconInputClass} defaultValue="Male">

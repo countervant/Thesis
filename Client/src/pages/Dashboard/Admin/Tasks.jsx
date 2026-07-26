@@ -10,9 +10,7 @@ import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 
-const taskStatuses = ["All", "In progress", "Pending", "In review","Done"];
 const notificationTargetKey = "clientraNotificationTarget";
-const groupPreviewLimit = 5;
 const statusFromApi = {
   pending: "Pending",
   in_progress: "In progress",
@@ -146,21 +144,21 @@ const normalizeTasks = (data) => {
   return [];
 };
 
-const isMobileViewport = () =>
-  typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
-
 const normalizeTask = (task) => {
   const subtasks = normalizeSubtasks(task?.subtasks);
   const status = statusFromApi[task?.status] || task?.status || "Pending";
 
   return {
     id: task?._id || task?.id || "",
+    apiStatus: task?.status || "pending",
     title: task?.title || "Untitled task",
     description: task?.description || "",
     startDate: toDisplayDate(String(task?.startDate || task?.createdAt || task?.dueDate || "").slice(0, 10)),
     dueDate: toDisplayDate(String(task?.dueDate || "").slice(0, 10)),
     status,
     priority: task?.priority || "medium",
+    amount: Number(task?.amount ?? task?.budget ?? 0),
+    paid: Number(task?.paid ?? 0),
     assignedTo: task?.assignedTo,
     assignees: task?.assignees?.length ? task.assignees : [task?.assignedTo].filter(Boolean),
     createdBy: task?.createdBy,
@@ -168,6 +166,9 @@ const normalizeTask = (task) => {
     requestedByName: task?.requestedByName || "",
     subtasks,
     progress: getTaskProgress(subtasks),
+    finalOutput: task?.finalOutput || null,
+    revisionRequests: Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    clientApproved: task?.activities?.some((activity) => activity?.type === "client_approved") || false,
     feedback: task?.feedback || null,
   };
 };
@@ -372,22 +373,7 @@ const SelectControl = ({ label, onChange, options, value }) => (
   </label>
 );
 
-const FeedbackSummary = ({ feedback }) => {
-  if (!feedback?.rating) return null;
-
-  return (
-    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-black text-[#10142d]">Client feedback</span>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-600">{"★".repeat(feedback.rating)} <span className="text-slate-500">({feedback.rating}/5)</span></span>
-      </div>
-      {feedback.comment && <p className="mt-2 text-sm font-semibold text-slate-600">“{feedback.comment}”</p>}
-      {feedback.submittedAt && <p className="mt-2 text-[11px] font-bold text-slate-400">Submitted {formatReadableDate(feedback.submittedAt)}</p>}
-    </div>
-  );
-};
-
-const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onToggleExpand, onToggleSubtask }) => {
+const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
   const effectiveExpanded = canAccessSubtasks && isExpanded;
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
@@ -435,27 +421,61 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
                 {item.subtasks.map((subtask, index) => {
-                  const isLocked = isDone || (subtask.completed
+                  const clientReviewIndex = item.subtasks.findIndex((candidate) =>
+                    /client\s+(?:review.*revision|revision)/i.test(candidate.title)
+                  );
+                  const isWaitingForClientApproval =
+                    clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
+                  const isLocked = isDone || isWaitingForClientApproval || (subtask.completed
                     ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
                     : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed));
+                  const isClientReviewSubtask = /client\s+(?:review.*revision|revision)/i.test(subtask.title);
+                  const canSubmitOutput =
+                    !isDone &&
+                    isClientReviewSubtask &&
+                    item.subtasks.slice(0, index).every((previousSubtask) => previousSubtask.completed);
+                  const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
+                  const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
+                  const isApproved = hasSubmittedOutput && item.clientApproved;
+                  const needsRevision =
+                    hasSubmittedOutput &&
+                    item.apiStatus === "pending" &&
+                    item.revisionRequests.length > 0;
                   return (
-                  <label key={subtask.id || `${item.id}-${index}`} className={`flex min-w-0 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={isLocked && !isDone ? "Complete the previous subtask first" : undefined}>
-                    <input
-                      type="checkbox"
-                      checked={subtask.completed}
-                      disabled={isLocked}
-                      onChange={() => onToggleSubtask(item, index)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
-                    />
-                    <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
-                      {subtask.title}
-                    </span>
-                    {subtask.assignedTo && (
-                      <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
-                        {getPersonName(subtask.assignedTo)}
-                      </span>
-                    )}
-                  </label>
+                    <div key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2">
+                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={isWaitingForClientApproval ? "Wait for the client to approve the review first" : isLocked && !isDone ? "Complete the previous subtask first" : undefined}>
+                        <input
+                          type="checkbox"
+                          checked={subtask.completed}
+                          disabled={isLocked}
+                          onChange={() => onToggleSubtask(item, index)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#e347a8] disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        <span className={subtask.completed ? "truncate text-slate-400 line-through" : "truncate"}>
+                          {subtask.title}
+                        </span>
+                        {subtask.assignedTo && (
+                          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
+                            {getPersonName(subtask.assignedTo)}
+                          </span>
+                        )}
+                      </label>
+                      {isClientReviewSubtask && isApproved && (
+                        <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">
+                          Approved
+                        </span>
+                      )}
+                      {isClientReviewSubtask && isUnderReview && (
+                        <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[9px] font-black text-amber-700">
+                          Under Review
+                        </span>
+                      )}
+                      {canSubmitOutput && !isUnderReview && !isApproved && (
+                        <button type="button" onClick={() => onSubmitOutput(item, index)} className="shrink-0 rounded-lg bg-[#c72fb2] px-2.5 py-1.5 text-[9px] font-black text-white transition hover:brightness-105">
+                          {needsRevision ? "Needs Revision" : "Submit Output"}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -636,35 +656,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
         </div>
         </>
       )}
-      <FeedbackSummary feedback={item.feedback} />
     </article>
   );
 };
-
-const TaskGroup = ({ children, count, footer, isOpen = true, onToggle, title, tone }) => (
-  <Card className="overflow-hidden rounded-xl md:rounded-2xl">
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex w-full items-center gap-2 px-3 py-3 text-left transition hover:bg-pink-50/60 md:gap-3 md:px-5 md:py-4"
-      aria-expanded={isOpen}
-    >
-      <span className={`text-base font-black transition-transform md:text-lg ${tone} ${isOpen ? "rotate-90" : ""}`}>
-        {">"}
-      </span>
-      <h2 className={`text-sm font-black ${tone}`}>{title}</h2>
-      <span className="text-xs font-black text-slate-400 md:text-sm">({count})</span>
-    </button>
-    {isOpen && (
-      <>
-        <div className="mx-3 mb-3 space-y-3 overflow-hidden rounded-xl border-0 bg-transparent md:mx-5 md:mb-0 md:space-y-0 md:rounded-2xl md:border md:border-pink-50 md:bg-white">
-          {children}
-        </div>
-        {footer && <div className="pb-4 pt-1 text-center md:py-4">{footer}</div>}
-      </>
-    )}
-  </Card>
-);
 
 const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   const [message, setMessage] = useState(`Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`);
@@ -674,6 +668,8 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   const [fileError, setFileError] = useState("");
 
   const task = completion.task;
+  const pendingAmount = Math.max(0, Number(task.amount || 0) - Number(task.paid || 0));
+  const needsPaymentProtection = Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -682,6 +678,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
       link,
       message,
       outputMethod,
+      watermark: needsPaymentProtection,
     });
   };
 
@@ -692,7 +689,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
         className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Completed Task</h2>
+          <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
           <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close submit completed task">
             x
           </button>
@@ -721,6 +718,17 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           <p className="grid grid-cols-[90px_1fr] gap-3 py-1">
             <span className="text-slate-400">Due Date</span>
             <span className="font-black text-[#10142d] dark:text-white">{formatReadableDate(task.dueDate)}</span>
+          </p>
+        </div>
+
+        <div className={`mt-4 rounded-xl border px-4 py-3 ${needsPaymentProtection ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+          <p className={`text-xs font-black ${needsPaymentProtection ? "text-amber-700" : "text-emerald-700"}`}>
+            {needsPaymentProtection ? "Watermark protection is ON" : "Watermark protection is OFF"}
+          </p>
+          <p className="mt-1 text-[11px] font-bold text-slate-600">
+            {needsPaymentProtection
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image review copies are watermarked and remain viewable/downloadable. For other file types, upload a pre-watermarked review copy.`
+              : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>
 
@@ -824,18 +832,12 @@ const Tasks = ({
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedTaskStatus, setSelectedTaskStatus] = useState("All");
-  const [selectedPriority, setSelectedPriority] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("Due Date");
+  const [visibleGroup, setVisibleGroup] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
   const [completionDraft, setCompletionDraft] = useState(null);
   const [focusedTaskId, setFocusedTaskId] = useState("");
   const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const [collapsedGroups, setCollapsedGroups] = useState(() =>
-    isMobileViewport() ? { dueToday: true, upcoming: true, completed: true } : {}
-  );
   const currentUserId = getEntityId(user);
 
   useEffect(() => {
@@ -845,7 +847,7 @@ const Tasks = ({
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll();
+        const data = await taskAPI.getAll({ refresh: true });
         if (isMounted) {
           setTasks(normalizeTasks(data).map(normalizeTask));
         }
@@ -876,7 +878,7 @@ const Tasks = ({
         const target = JSON.parse(rawTarget);
         if (target?.page !== "tasks" || !target?.taskId) return;
 
-        setSelectedTaskStatus("All");
+        setVisibleGroup("All");
         setFocusedTaskId(target.taskId);
 
         window.setTimeout(() => {
@@ -901,37 +903,26 @@ const Tasks = ({
 
   const visibleTasks = useMemo(() => {
     const filteredTasks = tasks.filter((task) => {
-      const matchesTaskStatus =
-        selectedTaskStatus === "All" || task.status === selectedTaskStatus;
-      const matchesPriority =
-        selectedPriority === "All" || task.priority === selectedPriority.toLowerCase();
+      const dateStatus = getDateStatus(task.dueDate);
+      const matchesGroup =
+        visibleGroup === "All" ||
+        (visibleGroup === "Due Today" && dateStatus === "Today" && task.status !== "Done") ||
+        (visibleGroup === "Upcoming" && (dateStatus === "Week" || dateStatus === "Upcoming") && task.status !== "Done") ||
+        (visibleGroup === "Overdue" && dateStatus === "Overdue" && task.status !== "Done") ||
+        (visibleGroup === "Completed" && task.status === "Done");
       const normalizedSearch = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !normalizedSearch ||
         task.title.toLowerCase().includes(normalizedSearch) ||
         task.description.toLowerCase().includes(normalizedSearch);
 
-      return matchesTaskStatus && matchesPriority && matchesSearch;
+      return matchesGroup && matchesSearch;
     });
 
     return [...filteredTasks].sort((firstTask, secondTask) => {
-      if (sortBy === "Priority") {
-        const priorityRank = { high: 0, medium: 1, low: 2 };
-        return (priorityRank[firstTask.priority] ?? 3) - (priorityRank[secondTask.priority] ?? 3);
-      }
-
-      if (sortBy === "Status") {
-        return firstTask.status.localeCompare(secondTask.status);
-      }
-
       return new Date(toInputDate(firstTask.dueDate)) - new Date(toInputDate(secondTask.dueDate));
     });
-  }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy, tasks]);
-
-  useEffect(() => {
-    setExpandedGroups({});
-    setCollapsedGroups({});
-  }, [searchQuery, selectedPriority, selectedTaskStatus, sortBy]);
+  }, [searchQuery, tasks, visibleGroup]);
 
   const isOwnedByCurrentUser = (task) => {
     if (!currentUserId) return false;
@@ -940,19 +931,9 @@ const Tasks = ({
     }
     return task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
   };
-  const myTasks = visibleTasks.filter(isOwnedByCurrentUser);
-  const teamTasks = visibleTasks.filter((task) => !isOwnedByCurrentUser(task));
-  const dueTodayTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done");
-  const overdueTasks = teamTasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done");
-  const upcomingTasks = teamTasks.filter((task) => {
-    const dateStatus = getDateStatus(task.dueDate);
-    return (dateStatus === "Week" || dateStatus === "Upcoming") && task.status !== "Done";
-  });
-  const completedTasks = teamTasks.filter((task) => task.status === "Done");
-
   const taskStats = [
     { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today").length, icon: pendingrequest, tone: "orange" },
+    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
     { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
@@ -982,46 +963,11 @@ const Tasks = ({
         item={task}
         onDelete={requestDeleteTask}
         onEdit={handleEditTask}
+        onSubmitOutput={handleSubmitOutput}
         onToggleExpand={handleToggleExpand}
         onToggleSubtask={handleToggleSubtask}
       />
     ));
-  };
-
-  const getGroupItems = (groupKey, items) =>
-    expandedGroups[groupKey] ? items : items.slice(0, groupPreviewLimit);
-
-  const isGroupOpen = (groupKey) => !collapsedGroups[groupKey];
-
-  const toggleGroupOpen = (groupKey) => {
-    setCollapsedGroups((currentGroups) => ({
-      ...currentGroups,
-      [groupKey]: !currentGroups[groupKey],
-    }));
-  };
-
-  const getGroupFooter = (groupKey, items, label, toneClass) => {
-    if (items.length <= groupPreviewLimit) {
-      return null;
-    }
-
-    const isExpanded = Boolean(expandedGroups[groupKey]);
-
-    return (
-      <button
-        type="button"
-        onClick={() =>
-          setExpandedGroups((currentGroups) => ({
-            ...currentGroups,
-            [groupKey]: !isExpanded,
-          }))
-        }
-        className={`inline-flex items-center gap-1 text-xs font-black md:text-sm ${toneClass}`}
-      >
-        {isExpanded ? "Show less" : `View all ${label} (${items.length})`}
-        {!isExpanded && <SmallIcon name="chevron" className="h-3.5 w-3.5" />}
-      </button>
-    );
   };
 
   const handleAddTask = () => {
@@ -1074,6 +1020,13 @@ const Tasks = ({
     }
 
     const toggledSubtask = task.subtasks[subtaskIndex];
+    const clientReviewIndex = task.subtasks.findIndex((subtask) =>
+      /client\s+(?:review.*revision|revision)/i.test(subtask.title)
+    );
+    if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
+      setErrorMessage("Wait for the client to approve the review before continuing to the final subtask.");
+      return;
+    }
     const isLocked = toggledSubtask?.completed
       ? task.subtasks.slice(subtaskIndex + 1).some((subtask) => subtask.completed)
       : task.subtasks.slice(0, subtaskIndex).some((subtask) => !subtask.completed);
@@ -1087,17 +1040,27 @@ const Tasks = ({
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const willCompleteTask =
-      isCompletingSubtask &&
-      nextSubtasks.length > 0 &&
-      nextSubtasks.every((subtask) => subtask.completed);
+    const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
 
-    if (willCompleteTask) {
-      setCompletionDraft({ task, nextSubtasks });
+    if (isCompletingSubtask && isClientReviewSubtask) {
+      setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
 
     await updateTaskSubtasks(task, nextSubtasks);
+  };
+
+  const handleSubmitOutput = (task, subtaskIndex) => {
+    const previousStepsCompleted = task.subtasks
+      .slice(0, subtaskIndex)
+      .every((subtask) => subtask.completed);
+
+    if (!isOwnedByCurrentUser(task) || !previousStepsCompleted || task.status === "Done") return;
+
+    const nextSubtasks = task.subtasks.map((subtask, index) =>
+      index === subtaskIndex ? { ...subtask, completed: true } : subtask
+    );
+    setCompletionDraft({ task, nextSubtasks, finalize: false });
   };
 
   const submitCompletedTask = async (output) => {
@@ -1119,6 +1082,7 @@ const Tasks = ({
       const updatedTask = await taskAPI.submitOutput(draft.task.id, {
         ...output,
         subtasks: draft.nextSubtasks,
+        finalize: draft.finalize,
       });
       setTasks((currentTasks) =>
         currentTasks.map((currentTask) =>
@@ -1206,28 +1170,28 @@ const Tasks = ({
           </div>
 
           <Card className="p-3 md:p-5">
-            <div className="grid gap-3 xl:grid-cols-[1.25fr_150px_150px_150px] xl:items-end">
-              <div className="grid grid-cols-[1fr_44px] gap-2 xl:contents">
-                <label className="relative block">
-                  <span className="sr-only">Search tasks</span>
-                  <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search tasks..."
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
-                  />
-                </label>
-                <span className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 xl:hidden">
-                  <SmallIcon name="filter" className="h-5 w-5" />
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 xl:contents">
-                <SelectControl label="Status" onChange={setSelectedTaskStatus} options={taskStatuses} value={selectedTaskStatus} />
-                <SelectControl label="Priority" onChange={setSelectedPriority} options={["All", "High", "Medium", "Low"]} value={selectedPriority} />
-                <SelectControl label="Sort By" onChange={setSortBy} options={["Due Date", "Priority", "Status"]} value={sortBy} />
-              </div>
+            <label className="relative block">
+              <span className="sr-only">Search tasks</span>
+              <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search tasks..."
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
+              />
+            </label>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
+                <button
+                  key={group}
+                  type="button"
+                  onClick={() => setVisibleGroup(group)}
+                  className={`rounded-full px-4 py-2 text-xs font-black transition ${visibleGroup === group ? "bg-pink-100 text-pink-700" : "border border-pink-100 bg-white text-slate-600 hover:bg-pink-50"}`}
+                >
+                  {group}
+                </button>
+              ))}
             </div>
           </Card>
 
@@ -1243,62 +1207,11 @@ const Tasks = ({
             )}
 
             {!isLoading && (
-              <>
-                <TaskGroup
-                  count={myTasks.length}
-                  footer={getGroupFooter("myTasks", myTasks, "my tasks", "text-pink-600")}
-                  isOpen={isGroupOpen("myTasks")}
-                  onToggle={() => toggleGroupOpen("myTasks")}
-                  title="My Tasks"
-                  tone="text-pink-600"
-                >
-                  {renderTaskRows(getGroupItems("myTasks", myTasks), "bg-pink-500")}
-                </TaskGroup>
-
-                <TaskGroup
-                  count={overdueTasks.length}
-                  footer={getGroupFooter("overdue", overdueTasks, "overdue", "text-rose-500")}
-                  isOpen={isGroupOpen("overdue")}
-                  onToggle={() => toggleGroupOpen("overdue")}
-                  title="Overdue"
-                  tone="text-rose-500"
-                >
-                  {renderTaskRows(getGroupItems("overdue", overdueTasks), "bg-rose-500")}
-                </TaskGroup>
-
-                <TaskGroup
-                  count={dueTodayTasks.length}
-                  footer={getGroupFooter("dueToday", dueTodayTasks, "due today", "text-orange-500")}
-                  isOpen={isGroupOpen("dueToday")}
-                  onToggle={() => toggleGroupOpen("dueToday")}
-                  title="Due Today"
-                  tone="text-orange-500"
-                >
-                  {renderTaskRows(getGroupItems("dueToday", dueTodayTasks), "bg-orange-500")}
-                </TaskGroup>
-
-                <TaskGroup
-                  count={upcomingTasks.length}
-                  footer={getGroupFooter("upcoming", upcomingTasks, "upcoming", "text-pink-600")}
-                  isOpen={isGroupOpen("upcoming")}
-                  onToggle={() => toggleGroupOpen("upcoming")}
-                  title="Upcoming"
-                  tone="text-blue-600"
-                >
-                  {renderTaskRows(getGroupItems("upcoming", upcomingTasks), "bg-blue-500")}
-                </TaskGroup>
-
-                <TaskGroup
-                  count={completedTasks.length}
-                  footer={getGroupFooter("completed", completedTasks, "completed", "text-emerald-600")}
-                  isOpen={isGroupOpen("completed")}
-                  onToggle={() => toggleGroupOpen("completed")}
-                  title="Completed"
-                  tone="text-emerald-600"
-                >
-                  {renderTaskRows(getGroupItems("completed", completedTasks), "bg-emerald-500")}
-                </TaskGroup>
-              </>
+              <Card className="overflow-hidden p-0">
+                <div className="space-y-3 p-3 md:space-y-0 md:p-0">
+                  {renderTaskRows(visibleTasks)}
+                </div>
+              </Card>
             )}
 
           </section>

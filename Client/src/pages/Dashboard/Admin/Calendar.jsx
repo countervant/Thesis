@@ -1,26 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { calendarAPI, employeeAPI } from "../../../services/api.js";
-
-const baseDepartments = [
-  ["All Departments", "bg-violet-600"],
-];
-
-const departmentColors = [
-  { label: "Violet", value: "bg-violet-600", swatch: "bg-violet-600" },
-  { label: "Blue", value: "bg-blue-500", swatch: "bg-blue-500" },
-  { label: "Orange", value: "bg-orange-500", swatch: "bg-orange-500" },
-  { label: "Pink", value: "bg-pink-500", swatch: "bg-pink-500" },
-  { label: "Emerald", value: "bg-emerald-500", swatch: "bg-emerald-500" },
-  { label: "Rose", value: "bg-pink-400", swatch: "bg-pink-400" },
-];
+import { authAPI, calendarAPI, taskAPI } from "../../../services/api.js";
 
 const calendarChecks = [
-  ["Company Events", "bg-violet-600"],
+  ["Company Events", "bg-violet-500"],
   ["Meetings", "bg-orange-500"],
   ["Deadlines", "bg-blue-500"],
-  ["Leaves", "bg-pink-500"],
+  ["Leaves", "bg-rose-500"],
   ["Holidays", "bg-emerald-500"],
-  ["Birthdays", "bg-violet-500"],
+  ["Birthdays", "bg-cyan-500"],
+  ["Tasks & Projects", "bg-indigo-500"],
 ];
 
 const toneStyles = {
@@ -28,33 +16,36 @@ const toneStyles = {
   green: "bg-emerald-50 text-emerald-600",
   orange: "bg-orange-50 text-orange-600",
   pink: "bg-pink-50 text-pink-600",
-  violet: "bg-violet-50 text-violet-600",
+  violet: "bg-pink-50 text-pink-600",
 };
 
 const statCardStyles = {
-  blue: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  blue: "!border-[#3b82f6]/45 !border-b-[#3b82f6] !ring-[#3b82f6]/20 dark:!border-[#3b82f6] dark:!border-b-[#3b82f6] dark:!ring-[#3b82f6]/45",
   green: "!border-[#28b84c]/45 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
   orange: "!border-[#ff8317]/45 !border-b-[#ff8317] !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
   pink: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
-  violet: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  violet: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
 };
 
 const typeStyles = {
   "Company Event": "bg-violet-50 text-violet-700",
   Meeting: "bg-orange-50 text-orange-600",
-  Deadline: "bg-violet-50 text-violet-700",
-  Leave: "bg-pink-50 text-pink-700",
+  Deadline: "bg-blue-50 text-blue-700",
+  Leave: "bg-rose-50 text-rose-700",
   Holiday: "bg-emerald-50 text-emerald-700",
-  Birthday: "bg-violet-50 text-violet-700",
+  Birthday: "bg-cyan-50 text-cyan-700",
+  Task: "bg-indigo-50 text-indigo-700",
+  Project: "bg-amber-50 text-amber-700",
 };
 
 const calendarStyles = {
   "Company Events": "bg-violet-50 text-violet-700",
   Meetings: "bg-orange-50 text-orange-600",
   Deadlines: "bg-blue-50 text-blue-700",
-  Leaves: "bg-pink-50 text-pink-700",
+  Leaves: "bg-rose-50 text-rose-700",
   Holidays: "bg-emerald-50 text-emerald-700",
-  Birthdays: "bg-violet-50 text-violet-700",
+  Birthdays: "bg-cyan-50 text-cyan-700",
+  "Tasks & Projects": "bg-indigo-50 text-indigo-700",
 };
 
 const dotStyles = {
@@ -62,8 +53,46 @@ const dotStyles = {
   emerald: "bg-emerald-500",
   orange: "bg-orange-500",
   pink: "bg-pink-500",
-  violet: "bg-violet-600",
+  violet: "bg-violet-500",
+  cyan: "bg-cyan-500",
+  rose: "bg-rose-500",
+  indigo: "bg-indigo-500",
+  amber: "bg-amber-500",
 };
+
+const typeTones = {
+  "Company Event": "violet",
+  Meeting: "orange",
+  Deadline: "blue",
+  Leave: "rose",
+  Holiday: "emerald",
+  Birthday: "cyan",
+  Task: "indigo",
+  Project: "amber",
+};
+
+const calendarTones = {
+  "Company Events": "violet",
+  Meetings: "orange",
+  Deadlines: "blue",
+  Leaves: "rose",
+  Holidays: "emerald",
+  Birthdays: "cyan",
+  "Tasks & Projects": "indigo",
+};
+
+const typeCalendars = {
+  "Company Event": "Company Events",
+  Meeting: "Meetings",
+  Deadline: "Deadlines",
+  Leave: "Leaves",
+  Holiday: "Holidays",
+  Birthday: "Birthdays",
+  Task: "Tasks & Projects",
+  Project: "Tasks & Projects",
+};
+
+const getCalendarForType = (type, fallback = "Meetings") => typeCalendars[type] || fallback;
 
 const getMonthOptions = (year) => Array.from({ length: 12 }, (_, index) => new Date(year, index, 1));
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -107,18 +136,6 @@ const addDays = (dateKey, days) => {
   return toDateKey(date);
 };
 
-const splitParticipants = (value) =>
-  String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-const employeeDisplayName = (employee) =>
-  [employee.firstName, employee.lastName].filter(Boolean).join(" ") || employee.email || "Employee";
-
-const employeeSearchText = (employee) =>
-  [employeeDisplayName(employee), employee.email, employee.position].filter(Boolean).join(" ").toLowerCase();
-
 const getCalendarDays = (monthDate) => {
   const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const firstCell = new Date(firstDay);
@@ -131,15 +148,63 @@ const getCalendarDays = (monthDate) => {
   });
 };
 
-const normalizeEvent = (event) => ({
-  ...event,
-  id: event._id || event.id,
-  dateKey: toDateKey(event.date),
-  time: event.startTime === "All Day" ? "All Day" : [event.startTime, event.endTime].filter(Boolean).join(" - "),
-  dot: dotStyles[event.color || (event.type === "Deadline" ? "blue" : event.type === "Leave" ? "pink" : event.type === "Holiday" ? "emerald" : event.type === "Company Event" ? "emerald" : "orange")],
-  typeClass: typeStyles[event.type] || typeStyles.Meeting,
-  calendarClass: calendarStyles[event.calendar] || calendarStyles.Meetings,
+const getEntityId = (entity) => typeof entity === "string" ? entity : entity?._id || entity?.id || "";
+const getPersonName = (person) => [person?.firstName, person?.lastName].filter(Boolean).join(" ") || person?.email || "Employee";
+
+const normalizeEvent = (event) => {
+  const calendar = getCalendarForType(event.type, event.calendar || "Meetings");
+  const tone = calendarTones[calendar] || typeTones[event.type] || "orange";
+  const visualClass = calendarStyles[calendar] || typeStyles[event.type] || typeStyles.Meeting;
+
+  return {
+    ...event,
+    calendar,
+    id: event._id || event.id,
+    dateKey: toDateKey(event.date),
+    time: event.startTime === "All Day" ? "All Day" : [event.startTime, event.endTime].filter(Boolean).join(" - "),
+    dot: dotStyles[tone],
+    typeClass: visualClass,
+    calendarClass: visualClass,
+  };
+};
+
+const normalizeTaskEvent = (task) => ({
+  id: `task-${task._id || task.id}`,
+  sourceId: task._id || task.id,
+  source: "task",
+  readOnly: true,
+  title: task.title || "Untitled task / project",
+  date: task.dueDate,
+  dateKey: toDateKey(task.dueDate),
+  startTime: "All Day",
+  endTime: "",
+  time: "All Day",
+  type: task.subtasks?.length ? "Project" : "Task",
+  calendar: "Tasks & Projects",
+  participants: (task.assignees?.length ? task.assignees : [task.assignedTo]).filter(Boolean).map(getEntityId),
+  dot: dotStyles.indigo,
+  typeClass: calendarStyles["Tasks & Projects"],
+  calendarClass: calendarStyles["Tasks & Projects"],
 });
+
+const loadCalendarSources = async (currentMonth) => {
+  const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+  const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
+  const [calendarResult, taskResult] = await Promise.allSettled([
+    calendarAPI.getAll({ month: monthKey(currentMonth) }),
+    taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
+  ]);
+  const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
+  const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];
+
+  if (calendarResult.status === "rejected") console.error("Unable to load calendar events", calendarResult.reason);
+  if (taskResult.status === "rejected") console.error("Unable to load calendar tasks", taskResult.reason);
+
+  return [
+    ...calendarEvents.map(normalizeEvent),
+    ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
+  ];
+};
 
 const emptyEventForm = (date) => ({
   id: "",
@@ -149,9 +214,7 @@ const emptyEventForm = (date) => ({
   endTime: "10:00 AM",
   type: "Meeting",
   calendar: "Meetings",
-  department: "All Departments",
-  participantsText: "",
-  color: "orange",
+  participants: [],
   visibility: "all",
 });
 
@@ -176,67 +239,84 @@ const Field = ({ label, children }) => (
   </label>
 );
 
-const EventListTable = ({ events, onEdit, onDelete, compact = false }) => (
-  <table className={`w-full table-fixed text-left text-xs ${compact ? "min-w-[1080px]" : "min-w-[1240px]"}`}>
+const EmployeeMultiSelect = ({ employees, selected, onChange }) => {
+  const selectedEmployees = employees.filter((employee) => selected.includes(getEntityId(employee)));
+  const toggleEmployee = (employeeId) => onChange(
+    selected.includes(employeeId)
+      ? selected.filter((id) => id !== employeeId)
+      : [...selected, employeeId],
+  );
+
+  return (
+    <details className="group relative">
+      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-pink-300">
+        <span className={selectedEmployees.length ? "text-[#10142d]" : "text-slate-400"}>
+          {selectedEmployees.length ? `${selectedEmployees.length} employee${selectedEmployees.length > 1 ? "s" : ""} selected` : "Select employees"}
+        </span>
+        <span className="text-slate-400 transition group-open:rotate-180">⌄</span>
+      </summary>
+      <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+        {employees.length ? employees.map((employee) => {
+          const employeeId = getEntityId(employee);
+          const name = getPersonName(employee);
+          return (
+            <label key={employeeId} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold hover:bg-pink-50">
+              <input type="checkbox" checked={selected.includes(employeeId)} onChange={() => toggleEmployee(employeeId)} className="h-4 w-4 accent-[#c72fb2]" />
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-pink-100 text-[10px] font-black text-pink-700">{initials(name)}</span>
+              <span>{name}</span>
+            </label>
+          );
+        }) : <p className="px-3 py-2 text-sm font-bold text-slate-400">No employees available.</p>}
+      </div>
+      {selectedEmployees.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selectedEmployees.map((employee) => <span key={getEntityId(employee)} className="rounded-full bg-pink-50 px-2.5 py-1 text-xs font-black text-pink-700">{getPersonName(employee)}</span>)}
+        </div>
+      )}
+    </details>
+  );
+};
+
+const initials = (name) => String(name || "?").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
+const EventListTable = ({ events, onEdit, onDelete, employeeNames, compact = false }) => (
+  <table className={`w-full text-left text-xs ${compact ? "min-w-[960px]" : "min-w-[1180px]"}`}>
     <thead className="sticky top-0 z-10 bg-white text-xs font-black text-slate-500">
-      <tr>
-        <th className="w-[24%] px-3 py-3 align-middle">Event</th>
-        <th className="w-[11%] px-3 py-3 text-center align-middle">Type</th>
-        <th className="w-[18%] px-3 py-3 align-middle">Date & Time</th>
-        <th className="w-[27%] px-3 py-3 align-middle">Participants / Assignees</th>
-        <th className="w-[12%] px-3 py-3 text-center align-middle">Calendar</th>
-        <th className="w-[8%] px-3 py-3 text-center align-middle">Actions</th>
-      </tr>
+      <tr>{["Event", "Type", "Date & Time", "Participants / Assignees", "Calendar", "Actions"].map((heading) => <th key={heading} className="px-3 py-3">{heading}</th>)}</tr>
     </thead>
     <tbody className="divide-y divide-slate-100">
       {events.map((event) => (
         <tr key={event.id}>
-          <td className="px-3 py-3 align-middle font-black">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className={`h-3 w-3 shrink-0 rounded-full ${event.dot}`} />
-              <span className="min-w-0 truncate">{event.title}</span>
+          <td className="px-3 py-3 font-black"><span className={`mr-4 inline-block h-3 w-3 rounded-full ${event.dot}`} />{event.title}</td>
+          <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.typeClass}`}>{event.type}</span></td>
+          <td className="px-3 py-3 font-bold text-slate-600">{formatDate(event.date)} <span className="ml-8">{event.time}</span></td>
+          <td className="px-3 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {(event.participants || []).slice(0, 4).map((participant) => {
+                  const name = employeeNames.get(getEntityId(participant)) || (typeof participant === "string" ? participant : getPersonName(participant));
+                  return <span key={getEntityId(participant) || name} title={name} className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-pink-100 text-[10px] font-black text-pink-700">{initials(name)}</span>;
+                })}
+              </div>
+              <span className="text-xs font-black text-slate-500">{(event.participants || []).length || "No"} assigned</span>
             </div>
           </td>
-          <td className="px-3 py-3 text-center align-middle">
-            <span className={`inline-flex max-w-full justify-center truncate rounded-full px-3 py-1 text-xs font-black ${event.typeClass}`}>{event.type}</span>
-          </td>
-          <td className="px-3 py-3 align-middle font-bold text-slate-600">
-            <span className="block truncate">{formatDate(event.date)}</span>
-            <span className="mt-1 block truncate text-xs text-slate-400">{event.time}</span>
-          </td>
-          <td className="px-3 py-3 align-middle">
-            <div className="min-w-0 space-y-1.5">
-              <div className="flex min-w-0 flex-wrap gap-1.5">
-                {(event.participants || []).slice(0, 4).map((participant) => (
-                  <span key={participant} className="max-w-full truncate rounded-full bg-pink-50 px-2.5 py-1 text-[11px] font-black leading-none text-pink-700">
-                    {participant}
-                  </span>
-                ))}
-                {(event.participants || []).length > 4 && (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black leading-none text-slate-500">
-                    +{event.participants.length - 4}
-                  </span>
-                )}
-              </div>
-              <span className="block truncate text-xs font-black text-slate-500">{event.department}</span>
+          <td className="px-3 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${event.calendarClass}`}>{event.calendar}</span></td>
+          <td className="px-3 py-3">
+            <div className="flex gap-2">
+              {event.readOnly ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500">Synced</span>
+              ) : (
+                <>
+                  <button type="button" onClick={() => onEdit(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
+                    <Icon name="edit" className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => onDelete(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
+                    <Icon name="trash" className="h-4 w-4" />
+                  </button>
+                </>
+              )}
             </div>
-          </td>
-          <td className="px-3 py-3 text-center align-middle">
-            <span className={`inline-flex max-w-full justify-center truncate rounded-full px-3 py-1 text-xs font-black ${event.calendarClass}`}>{event.calendar}</span>
-          </td>
-          <td className="px-3 py-3 text-center align-middle">
-            {event.readOnly ? (
-              <span className="inline-block max-w-full text-xs font-bold leading-tight text-slate-400">Managed in Tasks</span>
-            ) : (
-              <div className="flex justify-center gap-2">
-                <button type="button" onClick={() => onEdit(event)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-blue-600" aria-label={`Edit ${event.title}`}>
-                  <Icon name="edit" className="h-4 w-4" />
-                </button>
-                <button type="button" onClick={() => onDelete(event)} className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-pink-600" aria-label={`Delete ${event.title}`}>
-                  <Icon name="trash" className="h-4 w-4" />
-                </button>
-              </div>
-            )}
           </td>
         </tr>
       ))}
@@ -249,75 +329,28 @@ const AdminCalendar = () => {
   const todayKey = toDateKey(today);
   const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(() => todayKey);
-  const [selectedView, setSelectedView] = useState("Company Calendar");
-  const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
   const [enabledCalendars, setEnabledCalendars] = useState(() => Object.fromEntries(calendarChecks.map(([item]) => [item, true])));
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [eventForm, setEventForm] = useState(null);
-  const [departmentForm, setDepartmentForm] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAllEventsPanel, setShowAllEventsPanel] = useState(false);
-  const [participantSearch, setParticipantSearch] = useState("");
+  const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
 
-  const allDepartments = [
-    ...baseDepartments,
-    ...departments.map((department) => [department.name, department.color || "bg-violet-600"]),
-  ];
-  const selectedParticipantsText = eventForm?.participantsText || "";
-  const selectedParticipants = useMemo(() => splitParticipants(selectedParticipantsText), [selectedParticipantsText]);
-  const employeeParticipantNames = useMemo(() => employees.map(employeeDisplayName), [employees]);
-  const allEmployeesSelected =
-    employeeParticipantNames.length > 0 &&
-    employeeParticipantNames.every((employeeName) => selectedParticipants.includes(employeeName));
-
-  const participantOptions = useMemo(() => {
-    const employeeOptions = employees.map((employee) => ({
-      id: String(employee._id || employee.id || employee.email || employeeDisplayName(employee)),
-      name: employeeDisplayName(employee),
-      detail: employee.email || employee.position || "",
-      searchText: employeeSearchText(employee),
-    }));
-    const employeeNames = new Set(employeeOptions.map((employee) => employee.name));
-    const legacyOptions = selectedParticipants
-      .filter((participant) => !employeeNames.has(participant))
-      .map((participant) => ({
-        id: `legacy-${participant}`,
-        name: participant,
-        detail: "Saved participant",
-        searchText: participant.toLowerCase(),
-      }));
-
-    return [...employeeOptions, ...legacyOptions];
-  }, [employees, selectedParticipants]);
-
-  const filteredParticipantOptions = useMemo(() => {
-    const search = participantSearch.trim().toLowerCase();
-    if (!search) return participantOptions;
-
-    return participantOptions.filter((participant) => participant.searchText.includes(search));
-  }, [participantOptions, participantSearch]);
+  const employeeNames = useMemo(() => new Map(employees.map((employee) => [getEntityId(employee), getPersonName(employee)])), [employees]);
 
   const loadEvents = async () => {
-    const data = await calendarAPI.getAll({ month: monthKey(currentMonth) });
-    setEvents(data.map(normalizeEvent));
-  };
-
-  const loadDepartments = async () => {
-    const data = await calendarAPI.getDepartments();
-    setDepartments(data);
+    setEvents(await loadCalendarSources(currentMonth));
   };
 
   useEffect(() => {
     let isActive = true;
 
-    calendarAPI
-      .getAll({ month: monthKey(currentMonth) })
-      .then((data) => {
+    loadCalendarSources(currentMonth)
+      .then((calendarEvents) => {
         if (isActive) {
-          setEvents(data.map(normalizeEvent));
+          setEvents(calendarEvents);
         }
       })
       .catch((error) => console.error("Unable to load calendar events", error));
@@ -330,17 +363,14 @@ const AdminCalendar = () => {
   useEffect(() => {
     let isActive = true;
 
-    Promise.all([
-      calendarAPI.getDepartments(),
-      employeeAPI.getAll({ limit: 100, isActive: true }).catch(() => []),
-    ])
-      .then(([departmentData, employeeData]) => {
+    authAPI
+      .getAssignees()
+      .then((data) => {
         if (isActive) {
-          setDepartments(departmentData);
-          setEmployees(employeeData);
+          setEmployees(data.filter((person) => person?.role === "employee"));
         }
       })
-      .catch((error) => console.error("Unable to load calendar form choices", error));
+      .catch((error) => console.error("Unable to load calendar employees", error));
 
     return () => {
       isActive = false;
@@ -349,21 +379,25 @@ const AdminCalendar = () => {
 
   const monthEvents = useMemo(() => {
     return events.filter((event) => {
-      const departmentMatches = selectedDepartment === "All Departments" || event.department === selectedDepartment || event.department === "All Departments";
-      return enabledCalendars[event.calendar] !== false && departmentMatches;
+      return enabledCalendars[event.calendar] !== false;
     });
-  }, [enabledCalendars, events, selectedDepartment]);
+  }, [enabledCalendars, events]);
 
   const sortedMonthEvents = useMemo(() => {
     return [...monthEvents].sort((first, second) => first.dateKey.localeCompare(second.dateKey) || first.startTime.localeCompare(second.startTime));
   }, [monthEvents]);
+
+  const selectedDayEvents = useMemo(
+    () => sortedMonthEvents.filter((event) => event.dateKey === selectedDate),
+    [selectedDate, sortedMonthEvents],
+  );
 
   const stats = [
     { label: "Total Events", value: monthEvents.length, sublabel: "this month", tone: "violet", icon: "calendar" },
     { label: "Meetings", value: monthEvents.filter((event) => event.type === "Meeting").length, sublabel: "this month", tone: "orange", icon: "cup" },
     { label: "Deadlines", value: monthEvents.filter((event) => event.type === "Deadline").length, sublabel: "this month", tone: "green", icon: "check" },
     { label: "On Leave", value: monthEvents.filter((event) => event.type === "Leave" && event.dateKey === toDateKey(today)).length, sublabel: "today", tone: "pink", icon: "users" },
-    { label: "Holidays", value: monthEvents.filter((event) => event.type === "Holiday").length, sublabel: "this month", tone: "blue", icon: "flag" },
+    { label: "Tasks & Projects", value: monthEvents.filter((event) => event.type === "Task" || event.type === "Project").length, sublabel: "due this month", tone: "blue", icon: "flag" },
   ];
 
   const analyticsTotal = Math.max(monthEvents.length, 1);
@@ -372,6 +406,7 @@ const AdminCalendar = () => {
     ["Deadlines", monthEvents.filter((event) => event.type === "Deadline").length, "bg-blue-500"],
     ["Leaves", monthEvents.filter((event) => event.type === "Leave").length, "bg-pink-500"],
     ["Holidays", monthEvents.filter((event) => event.type === "Holiday").length, "bg-emerald-500"],
+    ["Tasks & Projects", monthEvents.filter((event) => event.type === "Task" || event.type === "Project").length, "bg-indigo-500"],
   ];
 
   const upcomingEvents = [...monthEvents]
@@ -380,33 +415,11 @@ const AdminCalendar = () => {
     .slice(0, 5);
 
   const addEvent = () => {
-    setParticipantSearch("");
-    setEventForm({
-      ...emptyEventForm(selectedDate < todayKey ? todayKey : selectedDate),
-      department: selectedDepartment,
-    });
-  };
-
-  const toggleAllEmployees = () => {
-    setEventForm((form) => {
-      const selected = new Set(splitParticipants(form.participantsText));
-
-      if (allEmployeesSelected) {
-        employeeParticipantNames.forEach((employeeName) => selected.delete(employeeName));
-      } else {
-        employeeParticipantNames.forEach((employeeName) => selected.add(employeeName));
-      }
-
-      return {
-        ...form,
-        participantsText: Array.from(selected).join(", "),
-      };
-    });
+    setEventForm(emptyEventForm(selectedDate < todayKey ? todayKey : selectedDate));
   };
 
   const editEvent = (event) => {
     setShowAllEventsPanel(false);
-    setParticipantSearch("");
     setEventForm({
       id: event.id,
       title: event.title,
@@ -414,10 +427,8 @@ const AdminCalendar = () => {
       startTime: event.startTime || "",
       endTime: event.endTime || "",
       type: event.type || "Meeting",
-      calendar: event.calendar || "Meetings",
-      department: event.department || "All Departments",
-      participantsText: (event.participants || []).join(", "),
-      color: event.color || "orange",
+      calendar: getCalendarForType(event.type || "Meeting", event.calendar || "Meetings"),
+      participants: (event.participants || []).map(getEntityId).filter(Boolean),
       visibility: event.visibility || "all",
     });
   };
@@ -430,10 +441,8 @@ const AdminCalendar = () => {
       startTime: eventForm.startTime,
       endTime: eventForm.endTime,
       type: eventForm.type,
-      calendar: eventForm.calendar,
-      department: eventForm.department,
-      participants: splitParticipants(eventForm.participantsText),
-      color: eventForm.color,
+      calendar: getCalendarForType(eventForm.type),
+      participants: eventForm.participants,
       visibility: eventForm.visibility,
     };
 
@@ -455,35 +464,7 @@ const AdminCalendar = () => {
     await loadEvents();
   };
 
-  const addDepartment = () => {
-    setDepartmentForm({ name: "", color: "bg-violet-600" });
-  };
-
-  const saveDepartment = async (event) => {
-    event.preventDefault();
-    await calendarAPI.createDepartment(departmentForm);
-    setDepartmentForm(null);
-    await loadDepartments();
-  };
-
-  const toggleParticipant = (participantName) => {
-    setEventForm((form) => {
-      const selected = new Set(splitParticipants(form.participantsText));
-      if (selected.has(participantName)) {
-        selected.delete(participantName);
-      } else {
-        selected.add(participantName);
-      }
-
-      return {
-        ...form,
-        participantsText: Array.from(selected).join(", "),
-      };
-    });
-  };
-
   const resetFilters = () => {
-    setSelectedDepartment("All Departments");
     setEnabledCalendars(Object.fromEntries(calendarChecks.map(([item]) => [item, true])));
   };
 
@@ -519,11 +500,8 @@ const AdminCalendar = () => {
             <select value={currentMonth.getMonth()} onChange={(event) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="h-9 rounded-xl border border-transparent bg-white px-3 text-sm font-black text-[#26314f] outline-none">
               {getMonthOptions(currentMonth.getFullYear()).map((month) => <option key={month.getMonth()} value={month.getMonth()}>{formatMonth(month)}</option>)}
             </select>
-            <button type="button" onClick={resetFilters} className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Filter</button>
-            <select value={selectedDepartment} onChange={(event) => setSelectedDepartment(event.target.value)} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm outline-none">
-              {allDepartments.map(([department]) => <option key={department}>{department}</option>)}
-            </select>
-            <button type="button" onClick={addEvent} className="flex h-9 items-center gap-2 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
+            <button type="button" onClick={resetFilters} className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Reset filters</button>
+            <button type="button" onClick={addEvent} className="flex h-9 items-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
           </div>
         </header>
 
@@ -546,26 +524,6 @@ const AdminCalendar = () => {
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(680px,1fr)_370px]">
           <div className="space-y-4">
-            <Card className="p-4">
-              <h2 className="mb-4 text-base font-black">Calendar View</h2>
-              {["Company Calendar", "Team Calendar", "Employee Calendar", "Project Calendar"].map((item) => (
-                <button key={item} type="button" onClick={() => setSelectedView(item)} className={`mb-2 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedView === item ? "bg-violet-50 text-violet-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-violet-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
-                  <Icon name="calendar" className="h-4 w-4" /> {item}
-                </button>
-              ))}
-            </Card>
-
-            <Card className="p-4">
-              <h2 className="mb-4 text-base font-black">Teams / Departments</h2>
-              {allDepartments.map(([item, color]) => (
-                <button key={item} type="button" onClick={() => setSelectedDepartment(item)} className={`mb-2 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-black ${selectedDepartment === item ? "bg-violet-50 text-violet-700 dark:!bg-[#c72fb2] dark:text-white" : "text-slate-600 hover:bg-violet-50 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"}`}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
-                  {item}
-                </button>
-              ))}
-              <button type="button" onClick={addDepartment} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"><Icon name="plus" className="h-4 w-4" />Add Department</button>
-            </Card>
-
             <Card className="p-4">
               <h2 className="mb-4 text-base font-black">Calendars</h2>
               {calendarChecks.map(([item, color]) => (
@@ -599,11 +557,19 @@ const AdminCalendar = () => {
                 const dateKey = toDateKey(date);
                 const muted = !sameMonth(date, currentMonth);
                 const selected = selectedDate === dateKey;
-                const locked = dateKey < todayKey;
                 const dayEvents = monthEvents.filter((event) => event.dateKey === dateKey);
 
                 return (
-                  <button key={dateKey} type="button" disabled={locked} onClick={() => setSelectedDate(dateKey)} className={`min-h-28 border-b border-r border-slate-200 p-2.5 text-left transition ${locked ? "cursor-not-allowed bg-slate-50 opacity-60 dark:!bg-neutral-900" : "hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white"} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}>
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(dateKey);
+                      setShowDayEventsPanel(true);
+                    }}
+                    className={`min-h-28 border-b border-r border-slate-200 p-2.5 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
+                    aria-label={`View events for ${formatDate(dateKey)}`}
+                  >
                     <div className={`mb-2 text-sm font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
                     <div className="space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (
@@ -625,7 +591,7 @@ const AdminCalendar = () => {
             <Card className="p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-black">Upcoming Events</h2>
-                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="text-xs font-black text-violet-700">{showAllUpcoming ? "This week" : "View all"}</button>
+                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="text-xs font-black text-pink-700">{showAllUpcoming ? "This week" : "View all"}</button>
               </div>
               {upcomingEvents.map((event) => (
                 <div key={event.id} className="grid grid-cols-[14px_1fr_auto] items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
@@ -669,10 +635,10 @@ const AdminCalendar = () => {
           </div>
           <div className="px-5 pb-4">
             <div className="max-h-[326px] overflow-auto">
-              <EventListTable events={sortedMonthEvents} onEdit={editEvent} onDelete={setDeleteTarget} />
+            <EventListTable events={sortedMonthEvents} onEdit={editEvent} onDelete={setDeleteTarget} employeeNames={employeeNames} />
             </div>
             <div className="pt-3 text-center">
-              <button type="button" onClick={() => setShowAllEventsPanel(true)} className="text-base font-black text-violet-700">View all events</button>
+              <button type="button" onClick={() => setShowAllEventsPanel(true)} className="text-base font-black text-pink-700">View all events</button>
             </div>
           </div>
         </Card>
@@ -695,11 +661,52 @@ const AdminCalendar = () => {
                 compact
                 events={sortedMonthEvents}
                 onEdit={editEvent}
+                employeeNames={employeeNames}
                 onDelete={(event) => {
                   setShowAllEventsPanel(false);
                   setDeleteTarget(event);
                 }}
               />
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showDayEventsPanel && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-6">
+          <section className="flex max-h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-black text-[#10142d]">Events for {formatDate(selectedDate)}</h2>
+                <p className="text-xs font-bold text-slate-500">{selectedDayEvents.length} {selectedDayEvents.length === 1 ? "event" : "events"}</p>
+              </div>
+              <button type="button" onClick={() => setShowDayEventsPanel(false)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500" aria-label="Close daily events">
+                x
+              </button>
+            </div>
+            <div className="overflow-auto p-5">
+              {selectedDayEvents.length ? (
+                <EventListTable
+                  compact
+                  events={selectedDayEvents}
+                  onEdit={(event) => {
+                    setShowDayEventsPanel(false);
+                    editEvent(event);
+                  }}
+                  onDelete={(event) => {
+                    setShowDayEventsPanel(false);
+                    setDeleteTarget(event);
+                  }}
+                  employeeNames={employeeNames}
+                />
+              ) : (
+                <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                  <div>
+                    <p className="text-base font-black text-[#10142d]">No events on this day</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">There are no schedules for the selected date.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -743,162 +750,27 @@ const AdminCalendar = () => {
                   placeholder="10:00 AM"
                 />
               </Field>
-              <Field label="Type">
-                <select
-                  value={eventForm.type}
-                  onChange={(event) => setEventForm((form) => ({ ...form, type: event.target.value }))}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                >
-                  {["Meeting", "Deadline", "Leave", "Holiday", "Company Event", "Birthday"].map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </Field>
-              <Field label="Calendar">
-                <select
-                  value={eventForm.calendar}
-                  onChange={(event) => setEventForm((form) => ({ ...form, calendar: event.target.value }))}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                >
-                  {calendarChecks.map(([item]) => <option key={item}>{item}</option>)}
-                </select>
-              </Field>
-              <Field label="Department">
-                <select
-                  value={eventForm.department}
-                  onChange={(event) => setEventForm((form) => ({ ...form, department: event.target.value }))}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                >
-                  {allDepartments.map(([item]) => <option key={item}>{item}</option>)}
-                </select>
-              </Field>
-              <Field label="Color">
-                <select
-                  value={eventForm.color}
-                  onChange={(event) => setEventForm((form) => ({ ...form, color: event.target.value }))}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                >
-                  {["orange", "blue", "pink", "emerald", "violet"].map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </Field>
+              <div className="md:col-span-2">
+                <Field label="Type">
+                  <select
+                    value={eventForm.type}
+                    onChange={(event) => setEventForm((form) => ({ ...form, type: event.target.value, calendar: typeCalendars[event.target.value] }))}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
+                  >
+                    {["Meeting", "Deadline", "Leave", "Holiday", "Company Event", "Task", "Project"].map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                </Field>
+              </div>
             </div>
             <Field label="Participants / Assignees">
-              <div className="rounded-xl border border-slate-200 bg-white p-3">
-                <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <input
-                    value={participantSearch}
-                    onChange={(event) => setParticipantSearch(event.target.value)}
-                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-                    placeholder="Search employees by name, email, or position"
-                  />
-                  <button
-                    type="button"
-                    onClick={toggleAllEmployees}
-                    disabled={employeeParticipantNames.length === 0}
-                    className="h-10 rounded-lg border border-pink-200 bg-pink-50 px-4 text-xs font-black text-pink-700 transition hover:bg-pink-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    {allEmployeesSelected ? "Clear all" : "Select all"}
-                  </button>
-                </div>
-                <p className="mb-3 text-xs font-bold text-slate-500">
-                  {selectedParticipants.length} selected
-                  {employeeParticipantNames.length > 0 ? ` from ${employeeParticipantNames.length} active employees` : ""}
-                </p>
-                {selectedParticipants.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-1.5">
-                    {selectedParticipants.map((participant) => (
-                      <button
-                        key={participant}
-                        type="button"
-                        onClick={() => toggleParticipant(participant)}
-                        className="rounded-full bg-pink-50 px-2.5 py-1 text-[11px] font-black text-pink-700 transition hover:bg-pink-100"
-                        aria-label={`Remove ${participant}`}
-                      >
-                        {participant}
-                        <span className="ml-1 text-pink-400">x</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="grid max-h-44 gap-2 overflow-auto pr-1 sm:grid-cols-2">
-                  {filteredParticipantOptions.map((participant) => {
-                    const selected = selectedParticipants.includes(participant.name);
-
-                    return (
-                      <label key={participant.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black transition ${selected ? "border-pink-200 bg-pink-50 text-pink-700" : "border-slate-100 bg-white text-slate-600 hover:border-pink-200 hover:bg-pink-50/60"}`}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleParticipant(participant.name)}
-                          className="h-4 w-4 rounded border-slate-300 accent-pink-500"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate">{participant.name}</span>
-                          {participant.detail && <span className="block truncate text-[10px] font-bold text-slate-400">{participant.detail}</span>}
-                        </span>
-                      </label>
-                    );
-                  })}
-                  {participantOptions.length === 0 && (
-                    <p className="col-span-full rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                      No active employees available.
-                    </p>
-                  )}
-                  {participantOptions.length > 0 && filteredParticipantOptions.length === 0 && (
-                    <p className="col-span-full rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                      No employees match your search.
-                    </p>
-                  )}
-                </div>
-              </div>
+              <EmployeeMultiSelect employees={employees} selected={eventForm.participants} onChange={(participants) => setEventForm((form) => ({ ...form, participants }))} />
             </Field>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
+              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
                 Save Event
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {departmentForm && (
-        <Modal title="Add Department" onClose={() => setDepartmentForm(null)}>
-          <form onSubmit={saveDepartment} className="space-y-4">
-            <Field label="Department Name">
-              <input
-                required
-                value={departmentForm.name}
-                onChange={(event) => setDepartmentForm((form) => ({ ...form, name: event.target.value }))}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-pink-300"
-              />
-            </Field>
-            <Field label="Dot Color">
-              <div className="grid gap-2 sm:grid-cols-3">
-                {departmentColors.map((color) => {
-                  const selected = departmentForm.color === color.value;
-
-                  return (
-                    <button
-                      key={color.value}
-                      type="button"
-                      onClick={() => setDepartmentForm((form) => ({ ...form, color: color.value }))}
-                      className={`flex h-12 items-center gap-3 rounded-xl border px-3 text-left text-xs font-black transition ${selected ? "border-pink-300 bg-pink-50 text-pink-700 shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-pink-200 hover:bg-pink-50/50"}`}
-                      aria-pressed={selected}
-                    >
-                      <span className={`h-5 w-5 rounded-full shadow-inner ring-2 ring-white ${color.swatch}`} />
-                      <span>{color.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setDepartmentForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
-                Cancel
-              </button>
-              <button type="submit" className="h-10 rounded-lg bg-linear-to-b from-[#8b35ff] to-[#d72fc0] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
-                Add Department
               </button>
             </div>
           </form>

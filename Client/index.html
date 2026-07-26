@@ -72,6 +72,20 @@
         </section>
       </main>
     </div>
+    <script>
+      window.__clientraBootTimer = window.setTimeout(function () {
+        var root = document.getElementById("root");
+        if (!root || !root.querySelector(".clientra-preload")) return;
+
+        root.innerHTML =
+          '<main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:system-ui,sans-serif">' +
+          '<section style="max-width:520px;text-align:center">' +
+          '<h1 style="font-size:24px;margin:0 0 12px">Clientra failed to start</h1>' +
+          '<p style="color:#525252;line-height:1.5">The application bundle did not load. Restart the client server, then refresh this page.</p>' +
+          '<button onclick="location.reload()" style="margin-top:12px;padding:10px 18px;border:0;border-radius:8px;background:#dc4fb2;color:white;font-weight:700;cursor:pointer">Reload</button>' +
+          '</section></main>';
+      }, 8000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

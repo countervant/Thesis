@@ -8,7 +8,6 @@ import cors from "cors";
 import { dbConnect, isDbConnected } from "./config/dbConnect.js";
 import auth from "./routes/auth.js";
 import budgets from "./routes/budgets.js";
-import budgetPlanner from "./routes/budgetPlanner.js";
 import clients from "./routes/clients.js";
 import calendar from "./routes/calendar.js";
 import leaveRequests from "./routes/leaveRequests.js";
@@ -116,8 +115,8 @@ app.use(
     },
   })
 );
-app.use(express.json({ limit: "15mb" }));
-app.use(express.urlencoded({ extended: true, limit: "15mb" }));
+app.use(express.json({ limit: "30mb" }));
+app.use(express.urlencoded({ extended: true, limit: "30mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/api/health", (req, res) => {
@@ -160,7 +159,6 @@ app.use("/api/auth", auth);
 // Back-compat / alternate base path (some clients call this as /api/user/*)
 app.use("/api/user", auth);
 app.use("/api/budgets", budgets);
-app.use("/api/budget-planner", budgetPlanner);
 app.use("/api/clients", clients);
 app.use("/api/calendar", calendar);
 app.use("/api/leave-requests", leaveRequests);
@@ -186,6 +184,10 @@ if (isProduction) {
     );
 
     app.get(/^(?!\/api).*/, (req, res) => {
+      // index.html points at hashed build assets. Never cache it across
+      // deployments or an older page can request bundles that no longer exist
+      // and leave the browser on the static preload screen forever.
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       res.sendFile(path.join(clientDistPath, "index.html"));
     });
   } else {

@@ -24,16 +24,30 @@ const normalizeUser = (userData, fallbackUser = null) => {
 
 const persistUser = (userData) => {
   try {
-    localStorage.setItem("user", JSON.stringify(userForStorage(userData)));
+    sessionStorage.setItem("user", JSON.stringify(userForStorage(userData)));
   } catch {
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
+  }
+};
+
+const readStoredSession = () => {
+  const storedToken = sessionStorage.getItem("token");
+  const storedUser = sessionStorage.getItem("user");
+
+  if (!storedToken || !storedUser) return { token: null, user: null };
+
+  try {
+    return { token: storedToken, user: normalizeUser(JSON.parse(storedUser)) };
+  } catch {
+    return { token: null, user: null };
   }
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
-  const [loading, setLoading] = useState(true);
+  const [initialSession] = useState(readStoredSession);
+  const [user, setUser] = useState(initialSession.user);
+  const [token, setToken] = useState(initialSession.token);
+  const loading = false;
 
   const markOffline = useCallback(async (authToken = token) => {
     if (!authToken) return;
@@ -46,46 +60,39 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const storedUser = localStorage.getItem("user");
-        const storedToken = localStorage.getItem("token");
+    let cancelled = false;
 
-        if (storedToken) {
-          setToken(storedToken);
-        }
+    // Authentication belongs to this browser tab only. Remove credentials
+    // left by older versions that persisted accounts across browser sessions.
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
 
-        if (storedUser) {
-          try {
-            const parsedUser = JSON.parse(storedUser);
-            const normalizedUser = normalizeUser(parsedUser);
-            setUser(normalizedUser);
-            persistUser(normalizedUser);
-          } catch {
-            localStorage.removeItem("user");
-          }
-        }
+    if (!initialSession.token || !initialSession.user) {
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
+    } else {
+      persistUser(initialSession.user);
+    }
 
-        if (storedToken) {
-          try {
-            const profile = await authAPI.getMe();
-            const normalizedProfile = normalizeUser(profile);
-            setUser(normalizedProfile);
-            persistUser(normalizedProfile);
-          } catch {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            setToken(null);
-            setUser(null);
-          }
-        }
-      } finally {
-        setLoading(false);
-      }
+    if (initialSession.token && initialSession.user) {
+      authAPI
+        .getMe()
+        .then((profile) => {
+          if (cancelled) return;
+          const normalizedProfile = normalizeUser(profile, initialSession.user);
+          setUser(normalizedProfile);
+          persistUser(normalizedProfile);
+        })
+        .catch(() => {
+          // The cached tab session remains usable during temporary API outages.
+          // Invalid tokens are cleared globally by the API's 401 interceptor.
+        });
+    }
+
+    return () => {
+      cancelled = true;
     };
-
-    initializeAuth();
-  }, []);
+  }, [initialSession]);
 
   const userId = user?.id || user?._id;
 
@@ -125,7 +132,7 @@ export const AuthProvider = ({ children }) => {
     setUser(normalizedUser);
     setToken(authToken);
     persistUser(normalizedUser);
-    localStorage.setItem("token", authToken);
+    sessionStorage.setItem("token", authToken);
   };
 
   const logout = async () => {
@@ -134,9 +141,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     authAPI.clearSessionCache();
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("clientraBackLockedAfterLogin");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
   };
 
   const updateUser = useCallback((userData) => {
@@ -148,7 +154,9 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  const isAuthenticated = !!token;
+  // A token by itself is not a usable session. Treat partial/invalid sessions
+  // as signed out so route guards cannot remain on the loading screen forever.
+  const isAuthenticated = Boolean(token && user);
 
   // Check if user has required role(s)
   const hasRole = (roles) => {

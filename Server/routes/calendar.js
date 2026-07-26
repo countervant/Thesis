@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import CalendarDepartment from "../model/calendarDepartmentModel.js";
 import CalendarEvent from "../model/calendarEventModel.js";
-import Task from "../model/Admin/taskmodel.js";
+import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 
 const router = express.Router();
@@ -13,6 +13,18 @@ const startOfToday = () => {
   return new Date(today.getFullYear(), today.getMonth(), today.getDate());
 };
 const isPastDate = (date) => startOfDay(date) < startOfToday();
+
+const calendarsByType = {
+  "Company Event": "Company Events",
+  Meeting: "Meetings",
+  Deadline: "Deadlines",
+  Leave: "Leaves",
+  Holiday: "Holidays",
+  Birthday: "Birthdays",
+  Task: "Tasks & Projects",
+  Project: "Tasks & Projects",
+  Personal: "Personal",
+};
 
 const parseDateOnly = (value) => {
   if (!value) return null;
@@ -26,6 +38,7 @@ const parseDateOnly = (value) => {
 
 const normalizePayload = (body, user) => {
   const date = parseDateOnly(body.date);
+  const type = String(body.type || "Meeting").trim();
 
   return {
     title: String(body.title || "").trim(),
@@ -33,8 +46,8 @@ const normalizePayload = (body, user) => {
     date,
     startTime: String(body.startTime || body.time || "").trim(),
     endTime: String(body.endTime || "").trim(),
-    type: String(body.type || "Meeting").trim(),
-    calendar: String(body.calendar || "Meetings").trim(),
+    type,
+    calendar: calendarsByType[type] || String(body.calendar || "Meetings").trim(),
     department: String(body.department || "All Departments").trim(),
     participants: Array.isArray(body.participants) ? body.participants.map(String) : [],
     color: String(body.color || "").trim(),
@@ -69,36 +82,45 @@ const writableEventQueryForUser = (user) => {
   return { createdBy: user._id };
 };
 
-const taskQueryForUser = (user) => {
-  if (user.role === "admin") return {};
-  if (user.role === "client") {
-    return { $or: [{ createdBy: user._id }, { requestedBy: user._id }] };
-  }
-  return {
-    $or: [
-      { assignedTo: user._id },
-      { assignees: user._id },
-      { "subtasks.assignedTo": user._id },
-    ],
-  };
-};
+const birthdayEventsForMonth = async (user, year, monthIndex) => {
+  if (!["admin", "employee"].includes(user.role)) return [];
 
-const getTaskAssigneeNames = (task) => {
-  const people = [
-    task.assignedTo,
-    ...(Array.isArray(task.assignees) ? task.assignees : []),
-    ...(Array.isArray(task.subtasks) ? task.subtasks.map((subtask) => subtask.assignedTo) : []),
-  ].filter(Boolean);
+  const people = await User.find({
+    role: { $in: ["admin", "employee"] },
+    isActive: { $ne: false },
+    birthday: { $exists: true, $ne: null },
+  })
+    .select("firstName lastName birthday")
+    .sort({ firstName: 1, lastName: 1 })
+    .lean()
+    .maxTimeMS(8000);
 
-  const seen = new Set();
-  return people
-    .map((person) => {
-      const id = String(person._id || person.id || person.email || "");
-      if (!id || seen.has(id)) return "";
-      seen.add(id);
-      return [person.firstName, person.lastName].filter(Boolean).join(" ") || person.email || "";
-    })
-    .filter(Boolean);
+  return people.flatMap((person) => {
+    const birthday = new Date(person.birthday);
+    if (Number.isNaN(birthday.getTime()) || birthday.getUTCMonth() !== monthIndex) return [];
+
+    const lastDayOfMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    const day = Math.min(birthday.getUTCDate(), lastDayOfMonth);
+    const name = [person.firstName, person.lastName].filter(Boolean).join(" ") || "Team member";
+
+    return [{
+      _id: `birthday-${person._id}-${year}`,
+      id: `birthday-${person._id}-${year}`,
+      source: "birthday",
+      readOnly: true,
+      title: `${name}'s Birthday`,
+      description: "Automatically added from the user's profile birthday.",
+      date: new Date(Date.UTC(year, monthIndex, day, 12)),
+      startTime: "All Day",
+      endTime: "",
+      type: "Birthday",
+      calendar: "Birthdays",
+      department: "All Departments",
+      participants: [name],
+      color: "cyan",
+      visibility: "employee",
+    }];
+  });
 };
 
 router.get("/departments", protect, async (req, res) => {
@@ -146,7 +168,6 @@ router.get("/", protect, async (req, res) => {
   try {
     const query = { ...eventQueryForUser(req.user) };
     const month = String(req.query.month || "").trim();
-    let taskDateQuery = {};
 
     if (month) {
       const [year, monthIndex] = month.split("-").map(Number);
@@ -154,7 +175,6 @@ router.get("/", protect, async (req, res) => {
         const from = new Date(year, monthIndex - 1, 1);
         const to = new Date(year, monthIndex, 1);
         query.date = { $gte: from, $lt: to };
-        taskDateQuery = { dueDate: { $gte: from, $lt: to } };
       }
     }
 
@@ -171,43 +191,19 @@ router.get("/", protect, async (req, res) => {
       ];
     }
 
-    const includeTaskDeadlines = !req.query.calendar || req.query.calendar === "Deadlines";
-    const [events, tasks] = await Promise.all([
-      CalendarEvent.find(query)
-        .sort({ date: 1, startTime: 1, createdAt: 1 })
-        .lean()
-        .maxTimeMS(8000),
-      includeTaskDeadlines
-        ? Task.find({ ...taskQueryForUser(req.user), ...taskDateQuery })
-            .select("title description dueDate assignedTo assignees subtasks.assignedTo status")
-            .populate("assignedTo", "firstName lastName email")
-            .populate("assignees", "firstName lastName email")
-            .populate("subtasks.assignedTo", "firstName lastName email")
-            .lean()
-            .maxTimeMS(8000)
-        : [],
-    ]);
+    const events = await CalendarEvent.find(query)
+      .sort({ date: 1, startTime: 1, createdAt: 1 })
+      .lean()
+      .maxTimeMS(8000);
 
-    const taskDeadlineEvents = tasks
-      .filter((task) => task.dueDate)
-      .map((task) => ({
-        _id: `task-${task._id}`,
-        title: `Task deadline: ${task.title}`,
-        description: task.description || "",
-        date: task.dueDate,
-        startTime: "All Day",
-        endTime: "",
-        type: "Deadline",
-        calendar: "Deadlines",
-        department: "All Departments",
-        participants: getTaskAssigneeNames(task),
-        color: "blue",
-        readOnly: true,
-        taskId: String(task._id),
-      }));
+    const now = new Date();
+    const [requestedYear, requestedMonth] = month.split("-").map(Number);
+    const birthdayYear = requestedYear || now.getFullYear();
+    const birthdayMonthIndex = requestedMonth ? requestedMonth - 1 : now.getMonth();
+    const birthdayEvents = await birthdayEventsForMonth(req.user, birthdayYear, birthdayMonthIndex);
 
-    res.status(200).json([...events, ...taskDeadlineEvents].sort((first, second) =>
-      new Date(first.date) - new Date(second.date) || String(first.startTime).localeCompare(String(second.startTime))
+    res.status(200).json([...events, ...birthdayEvents].sort(
+      (first, second) => new Date(first.date) - new Date(second.date) || String(first.startTime).localeCompare(String(second.startTime))
     ));
   } catch (error) {
     console.error("Get calendar events error:", error);

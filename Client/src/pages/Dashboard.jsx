@@ -13,11 +13,11 @@ import AdminCalendar from "./Dashboard/Admin/Calendar.jsx";
 import LeaveRequest from "./Leaverequest.jsx";
 import ClientDashboard from "./Dashboard/Client.jsx";
 import ClientProjects from "./Dashboard/ClientProjects.jsx";
+import Feedback from "./Dashboard/Feedback.jsx";
 import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
 import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
 import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
 import EmpTask from "./Dashboard/Employee/EmpTask.jsx";
-import EmpBudgetPlanner from "./Dashboard/Employee/EmpBudgetPlanner.jsx";
 import Newsfeed from "./newsfeed.jsx";
 import Profile from "./Profile.jsx";
 import Settings from "./Settings/settings.jsx";
@@ -25,11 +25,12 @@ import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton.jsx";
-import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
+import { getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const adminPages = new Set([
   "dashboard",
   "newsfeed",
+  "feedback",
   "messages",
   "profile",
   "settings",
@@ -743,10 +744,10 @@ const MessagesPanel = () => {
   });
 
   return (
-  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] overflow-hidden border-y border-slate-100 bg-white text-[#172033] dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
+  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
     <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-[#DA70D6]/60 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-black leading-none">Messages</h1>
+        <h1 className="page-title text-2xl leading-none">Messages</h1>
         <button
           type="button"
           onClick={handleStartNewMessage}
@@ -769,7 +770,7 @@ const MessagesPanel = () => {
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           placeholder="Search messages..."
-          className="min-w-0 flex-1 border-0 bg-transparent text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+          className="min-w-0 flex-1 select-text border-0 bg-transparent text-xs font-bold text-slate-700 caret-[#ff3faf] outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
         />
       </label>
 
@@ -866,14 +867,16 @@ const MessagesPanel = () => {
                 {preview}
               </span>
             </span>
-            <span className="absolute right-12 top-4 text-[10px] font-bold text-slate-400">
-              {formatMessageTime(item.lastMessage?.createdAt) || ""}
-            </span>
-            {item.unreadCount > 0 && (
-              <span className="absolute bottom-4 right-12 grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3faf] px-1.5 text-[10px] font-bold text-white">
-                {item.unreadCount > 9 ? "9+" : item.unreadCount}
+            <span className="mr-5 flex w-11 shrink-0 flex-col items-end gap-2 self-stretch pt-1">
+              <span className="whitespace-nowrap text-[10px] font-bold text-slate-400">
+                {formatMessageTime(item.lastMessage?.createdAt) || ""}
               </span>
-            )}
+              {item.unreadCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3faf] px-1.5 text-[10px] font-bold text-white">
+                  {item.unreadCount > 9 ? "9+" : item.unreadCount}
+                </span>
+              )}
+            </span>
             <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
               <span
                 role="button"
@@ -948,7 +951,7 @@ const MessagesPanel = () => {
     <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950">
       <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
         <div className="min-w-0">
-          <h1 className="text-2xl font-black leading-none">Messages</h1>
+          <h1 className="page-title text-2xl leading-none">Messages</h1>
           {activeName && (
             <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-neutral-300">
               {activeName}
@@ -992,7 +995,16 @@ const MessagesPanel = () => {
 
       {activeParticipant && (
         <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex">
-          <Avatar className="h-12 w-12" user={activeParticipant} />
+          <span className="relative shrink-0">
+            <Avatar className="h-12 w-12" user={activeParticipant} />
+            {(activeParticipant.isOnline || activeParticipant.online) && (
+              <span
+                className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950"
+                aria-label="Online"
+                title="Online"
+              />
+            )}
+          </span>
           <div className="min-w-0">
             <p className="truncate text-base font-black">{activeName}</p>
             <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
@@ -1047,7 +1059,7 @@ const MessagesPanel = () => {
                 </p>
               )}
               <div
-                className={`group/message flex items-end gap-3 ${isMine ? "justify-end" : ""}`}
+                className={`group/message flex items-end gap-3 ${isMine ? "justify-end" : "pl-6 sm:pl-10"}`}
               >
                 {!isMine && (
                   <Avatar className="h-9 w-9 shrink-0" user={activeParticipant} />
@@ -1099,7 +1111,7 @@ const MessagesPanel = () => {
                 )}
                 <div className={`flex max-w-[76%] flex-col ${isMine ? "items-end" : "items-start"} sm:max-w-[560px]`}>
                   <div
-                    className={`rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
+                    className={`relative mb-4 rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
                       isMine
                         ? "bg-pink-50 text-[#172033] dark:text-white"
                         : "bg-slate-100 text-[#172033] dark:bg-neutral-800 dark:text-white"
@@ -1113,7 +1125,7 @@ const MessagesPanel = () => {
                           onChange={(event) => setEditingText(event.target.value)}
                           maxLength={1000}
                           autoFocus
-                          className="h-10 rounded-full border border-black/20 bg-white px-4 text-sm text-neutral-950 outline-none focus:ring-2 focus:ring-white/80"
+                          className="h-10 select-text rounded-full border border-black/20 bg-white px-4 text-sm text-neutral-950 caret-[#ff3faf] outline-none focus:ring-2 focus:ring-white/80"
                         />
                         <span className="flex justify-end gap-2">
                           <button
@@ -1134,10 +1146,10 @@ const MessagesPanel = () => {
                       </form>
                     ) : (
                       <>
-                        <p className="break-words">{message.text}</p>
+                        <p className="select-text break-words caret-[#ff3faf]">{message.text}</p>
                         <p
-                          className={`mt-1 text-right text-[10px] font-bold ${
-                            isMine ? "text-slate-400" : "text-slate-400 dark:text-neutral-400"
+                          className={`absolute top-full mt-1 whitespace-nowrap text-[10px] font-bold ${
+                            isMine ? "right-0 text-slate-400" : "left-0 text-slate-400 dark:text-neutral-400"
                           }`}
                         >
                           {formatMessageTime(message.createdAt)}
@@ -1184,7 +1196,7 @@ const MessagesPanel = () => {
               placeholder="Type your message..."
               maxLength={1000}
               disabled={!activeUserId || isSending}
-              className="h-10 w-full rounded-full border-0 bg-transparent px-2 pr-11 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+              className="h-10 w-full select-text rounded-full border-0 bg-transparent px-2 pr-11 text-sm font-semibold text-slate-700 caret-[#ff3faf] outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
             />
             <button
               type="button"
@@ -1237,7 +1249,7 @@ const MessagesPanel = () => {
             value={newMessageSearch}
             onChange={(event) => setNewMessageSearch(event.target.value)}
             placeholder="Search users"
-            className="mt-4 h-10 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-sm outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
+            className="mt-4 h-10 w-full select-text rounded-lg border border-neutral-300 bg-transparent px-4 text-sm caret-[#ff3faf] outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
           />
           <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
             {modalUsers.map((participant) => {
@@ -1267,7 +1279,7 @@ const MessagesPanel = () => {
             onChange={(event) => setBulkDraft(event.target.value)}
             maxLength={1000}
             placeholder="Type a message"
-            className="mt-4 h-28 w-full resize-none rounded-lg border border-neutral-300 bg-transparent p-3 text-sm outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
+            className="mt-4 h-28 w-full select-text resize-none rounded-lg border border-neutral-300 bg-transparent p-3 text-sm caret-[#ff3faf] outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
           />
           <div className="mt-4 flex justify-end gap-3">
             <button type="button" onClick={() => setIsNewMessageOpen(false)} className="h-10 rounded-lg border border-neutral-300 px-5 text-sm font-bold">
@@ -1302,15 +1314,14 @@ const Dashboard = () => {
     role === "admin" && adminPages.has(requestedAdminPage)
       ? requestedAdminPage
       : "dashboard";
-  const initialLocalPage = ["dashboard", "projects", "newsfeed", "messages", "profile", "settings", "tasks", "calendar", "budget", "leave-request"].includes(
-    location.state?.page
-  )
-    ? location.state.page
-    : "dashboard";
-  const [localPage, setLocalPage] = useState(initialLocalPage);
+  const localPages = new Set([
+    "dashboard", "projects", "newsfeed", "feedback", "messages", "profile", "settings",
+    "tasks", "add-task", "edit-task", "calendar", "leave-request",
+  ]);
+  const requestedLocalPage = searchParams.get("page") || location.state?.page;
+  const localPage = localPages.has(requestedLocalPage) ? requestedLocalPage : "dashboard";
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingBudgetEntry, setEditingBudgetEntry] = useState(null);
-  const [employeeBudgetEditor, setEmployeeBudgetEditor] = useState(undefined);
   const [editingTask, setEditingTask] = useState(null);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [employeeRefreshKey, setEmployeeRefreshKey] = useState(0);
@@ -1342,13 +1353,26 @@ const Dashboard = () => {
     setSearchParams(nextParams, { replace: options.replace === true });
   };
 
+  const handleLocalNavigate = (page, options = {}) => {
+    if (!localPages.has(page)) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (page === "dashboard") {
+      nextParams.delete("page");
+    } else {
+      nextParams.set("page", page);
+    }
+
+    setSearchParams(nextParams, { replace: options.replace === true });
+  };
+
   const handleTaskCreated = () => {
     setTaskRefreshKey((currentKey) => currentKey + 1);
     setEditingTask(null);
     if (role === "admin") {
       handleAdminNavigate("tasks", { replace: true });
     } else {
-      setLocalPage("tasks");
+      handleLocalNavigate("tasks", { replace: true });
     }
   };
 
@@ -1357,7 +1381,7 @@ const Dashboard = () => {
     if (role === "admin") {
       handleAdminNavigate("edit-task");
     } else {
-      setLocalPage("edit-task");
+      handleLocalNavigate("edit-task");
     }
   };
 
@@ -1375,19 +1399,6 @@ const Dashboard = () => {
   const handleEditBudgetEntry = (entry) => {
     setEditingBudgetEntry(entry);
     handleAdminNavigate("edit-budget");
-  };
-
-  const handleEmployeeBudgetSaved = () => {
-    setBudgetRefreshKey((currentKey) => currentKey + 1);
-    setEmployeeBudgetEditor(undefined);
-  };
-
-  const handleAddEmployeeBudgetEntry = () => {
-    setEmployeeBudgetEditor(null);
-  };
-
-  const handleEditEmployeeBudgetEntry = (entry) => {
-    setEmployeeBudgetEditor(entry);
   };
 
   const handleEmployeeSaved = () => {
@@ -1460,6 +1471,8 @@ const Dashboard = () => {
       );
     } else if (adminPage === "newsfeed") {
       adminContent = <Newsfeed />;
+    } else if (adminPage === "feedback") {
+      adminContent = <Feedback />;
     } else if (adminPage === "messages") {
       adminContent = <MessagesPanel />;
     } else if (adminPage === "profile") {
@@ -1528,36 +1541,22 @@ const Dashboard = () => {
       <EmpTask />
     ) : role === "employee" && localPage === "calendar" ? (
       <EmpCalendar />
-    ) : role === "employee" && localPage === "budget" ? (
-      <>
-        <EmpBudgetPlanner
-          onAddEntry={handleAddEmployeeBudgetEntry}
-          onEditEntry={handleEditEmployeeBudgetEntry}
-          refreshKey={budgetRefreshKey}
-        />
-        {employeeBudgetEditor !== undefined && (
-          <AdminAddBudget
-            dataAPI={budgetPlannerAPI}
-            entry={employeeBudgetEditor}
-            onBudgetSaved={handleEmployeeBudgetSaved}
-            onNavigate={() => setEmployeeBudgetEditor(undefined)}
-          />
-        )}
-      </>
     ) : role === "employee" && localPage === "leave-request" ? (
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
       <Newsfeed />
+    ) : role === "employee" && localPage === "feedback" ? (
+      <Feedback />
     ) : role === "client" && ["tasks", "add-task", "edit-task"].includes(localPage) ? (
       <>
         <AdminTasks
           onEditTask={handleEditTask}
-          onNavigate={setLocalPage}
+          onNavigate={handleLocalNavigate}
           refreshKey={taskRefreshKey}
         />
         {(localPage === "add-task" || localPage === "edit-task") && (
           <AdminAddTask
-            onNavigate={setLocalPage}
+            onNavigate={handleLocalNavigate}
             onTaskCreated={handleTaskCreated}
             task={localPage === "edit-task" ? editingTask : null}
           />
@@ -1608,7 +1607,7 @@ const Dashboard = () => {
       <MainBars
         activePage={["add-task", "edit-task"].includes(localPage) ? "tasks" : localPage}
         onLogout={handleLogout}
-        onNavigate={setLocalPage}
+        onNavigate={handleLocalNavigate}
       >
         {regularContent}
       </MainBars>
