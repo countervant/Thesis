@@ -348,26 +348,18 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
   }
 
   if (name === "progress") {
-    return (
-    <img src={progress} alt="In Progress" className={className} aria-hidden="true" />
-    );
+    return <img src={progress} alt="" className={className} aria-hidden="true" />;
   }
 
   if (name === "pending") {
-    return (
-      <img src={pending} alt="Pending" className={className} aria-hidden="true" />
-    );
+    return <img src={pending} alt="" className={className} aria-hidden="true" />;
   }
 
   if (name === "review") {
-    return (
-      <img src={review} alt="In Review" className={className} aria-hidden="true" />
-    );
+    return <img src={review} alt="" className={className} aria-hidden="true" />;
   }
 
-  return (
-    <img src={done} alt="Done" className={className} aria-hidden="true" />
-  );
+  return <img src={done} alt="" className={className} aria-hidden="true" />;
 };
 
 const Avatar = ({ name }) => (

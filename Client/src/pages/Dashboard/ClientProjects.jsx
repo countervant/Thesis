@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import Skeleton from "../../components/Skeleton.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
+import progressIcon from "../../assets/progress.png";
+import pendingIcon from "../../assets/pending.png";
+import reviewIcon from "../../assets/Review.png";
+import doneIcon from "../../assets/done.png";
 
 const notificationTargetKey = "clientraNotificationTarget";
 
@@ -198,10 +202,10 @@ const normalizeProject = (task) => {
 
 const ProjectStats = ({ projects }) => {
   const stats = [
-    { label: "In Progress", value: projects.filter((item) => item.status === "In Progress").length, sub: "Active projects", icon: "folder" },
-    { label: "In Review", value: projects.filter((item) => item.status === "In Review").length, sub: "Awaiting your review", icon: "hourglass" },
-    { label: "Completed", value: projects.filter((item) => item.status === "Completed").length, sub: "Successfully delivered", icon: "check" },
-    { label: "Pending Revisions", value: projects.filter((item) => item.status === "Pending Revisions").length, sub: "Action needed", icon: "refresh" },
+    { label: "In Progress", value: projects.filter((item) => item.status === "In Progress").length, sub: "Active projects", icon: progressIcon },
+    { label: "In Review", value: projects.filter((item) => item.status === "In Review").length, sub: "Awaiting your review", icon: reviewIcon },
+    { label: "Completed", value: projects.filter((item) => item.status === "Completed").length, sub: "Successfully delivered", icon: doneIcon },
+    { label: "Pending Revisions", value: projects.filter((item) => item.status === "Pending Revisions").length, sub: "Action needed", icon: pendingIcon },
   ];
 
   return (
@@ -210,7 +214,7 @@ const ProjectStats = ({ projects }) => {
         <Card key={item.label} className="p-5">
           <div className="flex items-center gap-4">
             <span className={`grid h-16 w-16 place-items-center rounded-2xl ring-1 ${statStyles[item.label]}`}>
-              <Icon name={item.icon} className="h-8 w-8" />
+              <img src={item.icon} alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
             </span>
             <span>
               <span className="block text-3xl font-black text-[#10142d] dark:text-white">{item.value}</span>
@@ -908,13 +912,12 @@ const RatingStars = ({ label, onChange, required = false, value }) => (
           key={rating}
           type="button"
           onClick={() => onChange(rating)}
-          className={`flex h-9 w-7 flex-col items-center justify-center gap-0.5 rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
+          className={`flex h-9 w-7 items-center justify-center rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
           aria-label={`${rating} star rating`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
             <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           </svg>
-          <span className="text-[9px] font-black leading-none">{rating}</span>
         </button>
       ))}
     </span>

@@ -19,8 +19,13 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../components/InitialsAvatar.jsx";
 
+const notificationTargetKey = "clientraNotificationTarget";
 const ratingColors = ["#7c3aed", "#a855f7", "#ec4899", "#fb923c", "#94a3b8"];
 const pageSize = 6;
+const primaryButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60";
+const secondaryButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white font-black text-slate-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300";
 
 const getPersonName = (person, fallback = "CLIENTRA Client") => {
   const fullName = [person?.firstName, person?.lastName].filter(Boolean).join(" ");
@@ -227,6 +232,11 @@ const ReplyModal = ({ item, onClose, onSent }) => {
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  useEffect(() => {
+    setMessage(item?.reply?.message || "");
+    setErrorMessage("");
+  }, [item]);
+
   if (!item) return null;
 
   const handleSubmit = async (event) => {
@@ -240,8 +250,10 @@ const ReplyModal = ({ item, onClose, onSent }) => {
     try {
       setIsSending(true);
       setErrorMessage("");
+      const wasEditing = Boolean(item.reply?.message);
       const updatedTask = await taskAPI.replyToFeedback(item.id, reply);
-      onSent(updatedTask);
+      setMessage("");
+      onSent(updatedTask, wasEditing);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to send your reply."));
     } finally {
@@ -259,7 +271,13 @@ const ReplyModal = ({ item, onClose, onSent }) => {
         <div className="mt-5 rounded-xl bg-slate-50 p-4 dark:bg-neutral-800"><Stars rating={item.rating} /><p className="mt-2 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">“{item.comment || "Rating submitted without a comment."}”</p></div>
         <label className="mt-5 block"><span className="text-xs font-black text-slate-600 dark:text-slate-300">Your reply</span><textarea autoFocus maxLength={1000} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write a helpful response to the client..." className="mt-2 h-36 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" /><span className="mt-1 block text-right text-[10px] font-bold text-slate-400">{message.length}/1000</span></label>
         {errorMessage && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{errorMessage}</p>}
-        <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={isSending} onClick={onClose} className="h-10 rounded-xl border border-slate-200 px-5 text-xs font-black text-slate-600 disabled:opacity-50">Cancel</button><button type="submit" disabled={isSending || !message.trim()} className="inline-flex h-10 items-center gap-2 rounded-xl bg-linear-to-r from-pink-500 to-violet-600 px-5 text-xs font-black text-white shadow-lg shadow-pink-200/50 disabled:cursor-not-allowed disabled:opacity-50"><Mail className="h-4 w-4" />{isSending ? "Sending..." : item.reply?.message ? "Update Reply" : "Send Reply"}</button></div>
+        <div className="mt-5 flex justify-end gap-3">
+          <button type="button" disabled={isSending} onClick={onClose} className={`${secondaryButtonClass} h-10 px-5 text-xs`}>Cancel</button>
+          <button type="submit" disabled={isSending || !message.trim()} className={`${primaryButtonClass} h-10 px-5 text-xs`}>
+            <Mail className="h-4 w-4" />
+            {isSending ? "Sending..." : item.reply?.message ? "Update Reply" : "Send Reply"}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -323,6 +341,30 @@ const Feedback = () => {
     }];
   }), [tasks]);
 
+  useEffect(() => {
+    const openNotificationTarget = () => {
+      const rawTarget = sessionStorage.getItem(notificationTargetKey);
+      if (!rawTarget || isLoading) return;
+
+      try {
+        const target = JSON.parse(rawTarget);
+        if (target?.page !== "feedback" || !target?.taskId) return;
+
+        const targetFeedback = feedback.find((item) => String(item.id) === String(target.taskId));
+        if (!targetFeedback) return;
+
+        setSelectedFeedback(targetFeedback);
+        sessionStorage.removeItem(notificationTargetKey);
+      } catch {
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    };
+
+    openNotificationTarget();
+    window.addEventListener("clientra:notification-target", openNotificationTarget);
+    return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
+  }, [feedback, isLoading]);
+
   const pendingReviews = tasks.filter((task) => task.status === "done" && !task.feedback?.submittedAt);
   const average = feedback.length ? (feedback.reduce((sum, item) => sum + item.rating, 0) / feedback.length).toFixed(1) : "0.0";
   const satisfiedPercent = feedback.length ? Math.round((feedback.filter((item) => item.rating >= 4).length / feedback.length) * 100) : 0;
@@ -360,11 +402,11 @@ const Feedback = () => {
     setSortBy("newest");
   };
 
-  const handleReplySent = (updatedTask) => {
+  const handleReplySent = (updatedTask, wasEditing) => {
     const updatedId = updatedTask?._id || updatedTask?.id;
     setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
     setReplyTarget(null);
-    setNoticeMessage("Reply sent. The client can now view it in their project and notifications.");
+    setNoticeMessage(wasEditing ? "Reply updated successfully." : "Reply sent. The client can now view it in their project and notifications.");
     window.setTimeout(() => setNoticeMessage(""), 4500);
   };
 
@@ -428,7 +470,7 @@ const Feedback = () => {
               <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
                 <option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="highest">Highest Rated</option><option value="lowest">Lowest Rated</option>
               </select>
-              <button type="button" onClick={resetFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-black text-slate-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:text-slate-300"><SlidersHorizontal className="h-4 w-4" />Reset Filters</button>
+              <button type="button" onClick={resetFilters} className={`${secondaryButtonClass} h-10 px-4 text-xs`}><SlidersHorizontal className="h-4 w-4" />Reset Filters</button>
             </div>
           </div>
 
@@ -445,8 +487,8 @@ const Feedback = () => {
                 </div>
                 <div className="min-w-0 text-xs"><p className="font-bold text-slate-400">Project</p><p className="mt-1 truncate font-black text-[#10142d] dark:text-white">{item.project}</p><p className="mt-2 inline-flex items-center gap-1.5 font-bold text-slate-500"><CalendarDays className="h-3.5 w-3.5" />{formatDate(item.submittedAt)}</p><span className="mt-2 block w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-600">Published</span></div>
                 <div className="flex gap-2 md:justify-end">
-                  {user?.role === "admin" && <button type="button" onClick={() => setReplyTarget(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"><Mail className="h-3.5 w-3.5" />{item.reply?.message ? "Edit Reply" : "Reply"}</button>}
-                  <button type="button" onClick={() => setSelectedFeedback(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-pink-200 px-3 text-xs font-black text-pink-600 transition hover:bg-pink-50"><Eye className="h-3.5 w-3.5" />View</button>
+                  {user?.role === "admin" && <button type="button" onClick={() => setReplyTarget(item)} className={`${primaryButtonClass} h-9 px-3 text-xs`}><Mail className="h-3.5 w-3.5" />{item.reply?.message ? "Edit Reply" : "Reply"}</button>}
+                  <button type="button" onClick={() => setSelectedFeedback(item)} className={`${primaryButtonClass} h-9 px-3 text-xs`}><Eye className="h-3.5 w-3.5" />View</button>
                   {user?.role === "admin" && <button type="button" onClick={() => { setDeleteError(""); setDeleteTarget(item); }} className="grid h-9 w-9 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50" aria-label={`Delete feedback from ${item.clientName}`}><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
               </article>
@@ -467,7 +509,7 @@ const Feedback = () => {
         </aside>
       </div>
       <FeedbackDetails item={selectedFeedback} onClose={() => setSelectedFeedback(null)} />
-      <ReplyModal item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />
+      <ReplyModal key={`${replyTarget?.id || "closed"}-${replyTarget?.reply?.repliedAt || ""}`} item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />
       <ConfirmDialog
         confirmLabel="Yes, delete"
         confirmingLabel="Deleting..."

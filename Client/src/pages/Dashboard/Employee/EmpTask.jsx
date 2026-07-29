@@ -8,6 +8,7 @@ import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
+const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
   pending: "Pending",
   in_progress: "In progress",
@@ -198,7 +199,7 @@ const TaskRow = ({ currentUserId, isExpanded, item, onSubmitOutput, onToggleExpa
       : "No subtasks yet";
 
   return (
-    <article className="border-b border-pink-50 px-4 py-4 last:border-b-0">
+    <article id={`task-card-${item.id}`} className="border-b border-pink-50 px-4 py-4 last:border-b-0">
       {isExpanded ? (
         <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
           <button
@@ -643,6 +644,39 @@ const EmpTask = () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const openNotificationTarget = () => {
+      const rawTarget = sessionStorage.getItem(notificationTargetKey);
+      if (!rawTarget || isLoading) return;
+
+      try {
+        const target = JSON.parse(rawTarget);
+        if (target?.page !== "tasks" || !target?.taskId) return;
+
+        const hasTargetTask = tasks.some((task) => String(task.id) === String(target.taskId));
+        if (!hasTargetTask) return;
+
+        setVisibleGroup("All");
+        setSearchQuery("");
+        setExpandedTaskIds((currentIds) => new Set([...currentIds, String(target.taskId)]));
+
+        window.setTimeout(() => {
+          document.getElementById(`task-card-${target.taskId}`)?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          sessionStorage.removeItem(notificationTargetKey);
+        }, 160);
+      } catch {
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    };
+
+    openNotificationTarget();
+    window.addEventListener("clientra:notification-target", openNotificationTarget);
+    return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
+  }, [isLoading, tasks]);
 
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();

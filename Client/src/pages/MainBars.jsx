@@ -248,9 +248,10 @@ const buildTaskNotifications = (tasks, user) => {
       })
       .map((activity) => {
         const activityId = activity?._id || `${activity?.type}-${activity?.createdAt}`;
+        const isFeedbackActivity = ["feedback_submitted", "feedback_replied"].includes(activity?.type);
         const targetPage = role === "client"
           ? "projects"
-          : role === "admin" && activity?.type === "feedback_submitted"
+          : isFeedbackActivity
             ? "feedback"
             : "tasks";
         return {
@@ -453,7 +454,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const [isNotificationOptionsOpen, setIsNotificationOptionsOpen] = useState(false);
   const [openNotificationMenuId, setOpenNotificationMenuId] = useState("");
   const [notificationDeleteAction, setNotificationDeleteAction] = useState(null);
-  const [isNotificationLoading, setIsNotificationLoading] = useState(false);
+  const [isNotificationLoading, setIsNotificationLoading] = useState(true);
   const [notificationError, setNotificationError] = useState("");
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [newsfeedSearch, setNewsfeedSearch] = useState("");
@@ -583,7 +584,6 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
     const loadNotifications = async () => {
       try {
-        if (isNotificationOpen) setIsNotificationLoading(true);
         setNotificationError("");
         const [postsResult, tasksResult] = await Promise.allSettled([
           newsfeedAPI.getActivity({ refresh: Date.now() }),
@@ -624,7 +624,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [isNotificationOpen, token, user, userId]);
+  }, [token, user, userId]);
 
   const handleOpenNotification = (notification) => {
     const nextReadIds = Array.from(new Set([...readNotificationIds, notification.id]));
