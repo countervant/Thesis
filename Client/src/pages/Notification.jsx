@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { getApiErrorMessage, newsfeedAPI, taskAPI } from "../services/api.js";
 import { NotificationSkeleton } from "../components/Skeleton.jsx";
 
+const notificationTargetKey = "clientraNotificationTarget";
 const dashboardPathByRole = {
   admin: "/admin/dashboard",
   client: "/client/dashboard",
@@ -92,7 +93,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
           title: `${getUserName(actor)} hearted your post`,
           message: postPreview,
           date: post?.updatedAt || post?.createdAt,
-          target: "newsfeed",
+          target: { page: "newsfeed", postId },
         });
       });
     }
@@ -109,7 +110,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
           title: `${getUserName(comment.user)} commented on your post`,
           message: trimText(comment?.text, postPreview),
           date: comment?.createdAt,
-          target: "newsfeed",
+          target: { page: "newsfeed", postId, commentId },
         });
       }
 
@@ -124,7 +125,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
             title: `${getUserName(reply.user)} replied ${isOwnComment ? "to your comment" : "on your post"}`,
             message: trimText(reply?.text, "New reply on newsfeed"),
             date: reply?.createdAt,
-            target: "newsfeed",
+            target: { page: "newsfeed", postId, commentId, replyId: reply?._id || reply?.id },
           });
         }
       });
@@ -149,7 +150,7 @@ const buildTaskNotifications = (tasks, user) => {
       title: "New task assigned to you",
       message: trimText(task?.title, "You have a new task"),
       date: task?.createdAt,
-      target: "tasks",
+      target: { page: "tasks", taskId: task?._id || task?.id },
     }));
 };
 
@@ -228,7 +229,11 @@ const Notification = () => {
 
   const openNotification = (notification) => {
     setIsAllNotificationsOpen(false);
-    handleNavigate(notification.target || "newsfeed");
+    const target = typeof notification.target === "string"
+      ? { page: notification.target }
+      : notification.target || { page: "newsfeed" };
+    sessionStorage.setItem(notificationTargetKey, JSON.stringify(target));
+    handleNavigate(target.page);
   };
 
   return (

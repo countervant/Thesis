@@ -19,8 +19,13 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../components/InitialsAvatar.jsx";
 
+const notificationTargetKey = "clientraNotificationTarget";
 const ratingColors = ["#7c3aed", "#a855f7", "#ec4899", "#fb923c", "#94a3b8"];
 const pageSize = 6;
+const primaryButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60";
+const secondaryButtonClass =
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white font-black text-slate-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300";
 
 const getPersonName = (person, fallback = "CLIENTRA Client") => {
   const fullName = [person?.firstName, person?.lastName].filter(Boolean).join(" ");
@@ -66,15 +71,15 @@ const Trend = ({ value }) => (
 );
 
 const MetricCard = ({ icon, iconClass, label, trend, value }) => (
-  <article className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900">
-    <div className="flex items-center gap-3">
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${iconClass}`}>
+  <article className="rounded-xl border border-pink-100 bg-white p-3 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900 md:rounded-2xl md:p-4">
+    <div className="flex items-center gap-2 md:gap-3">
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl md:h-11 md:w-11 md:rounded-2xl ${iconClass}`}>
         {icon}
       </span>
       <div className="min-w-0">
         <p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">{label}</p>
-        <p className="mt-1 text-2xl font-black text-[#10142d] dark:text-white">{value}</p>
-        <Trend value={trend} />
+        <p className="mt-0.5 text-xl font-black text-[#10142d] dark:text-white md:mt-1 md:text-2xl">{value}</p>
+        <span className="hidden md:block"><Trend value={trend} /></span>
       </div>
     </div>
   </article>
@@ -104,18 +109,18 @@ const SatisfactionChart = ({ average, distribution, total }) => {
   const background = total ? `conic-gradient(${segments.join(", ")})` : "#f1f5f9";
 
   return (
-    <article className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900">
-      <h2 className="text-sm font-black text-[#10142d] dark:text-white">Client Satisfaction</h2>
-      <div className="mt-5 flex items-center justify-center gap-6 sm:justify-start xl:justify-center">
-        <div className="relative h-36 w-36 shrink-0 rounded-full" style={{ background }}>
-          <div className="absolute inset-[22px] grid place-items-center rounded-full bg-white text-center dark:bg-neutral-900">
+    <article className="min-w-0 rounded-xl border border-pink-100 bg-white p-3 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900 md:rounded-2xl md:p-5">
+      <h2 className="truncate text-xs font-black text-[#10142d] dark:text-white md:text-sm">Client Satisfaction</h2>
+      <div className="mt-3 flex items-center justify-center gap-6 md:mt-5 md:justify-start xl:justify-center">
+        <div className="relative h-20 w-20 shrink-0 rounded-full md:h-36 md:w-36" style={{ background }}>
+          <div className="absolute inset-3 grid place-items-center rounded-full bg-white text-center dark:bg-neutral-900 md:inset-[22px]">
             <div>
-              <p className="text-2xl font-black text-[#10142d] dark:text-white">{average}</p>
-              <p className="text-[10px] font-bold text-slate-500">Average Rating</p>
+              <p className="text-lg font-black text-[#10142d] dark:text-white md:text-2xl">{average}</p>
+              <p className="text-[8px] font-bold leading-tight text-slate-500 md:text-[10px]">Average<br className="md:hidden" /> Rating</p>
             </div>
           </div>
         </div>
-        <div className="space-y-2.5">
+        <div className="hidden space-y-2.5 md:block">
           {distribution.map((count, index) => {
             const stars = 5 - index;
             const percent = total ? Math.round((count / total) * 100) : 0;
@@ -161,12 +166,12 @@ const TrendChart = ({ feedback }) => {
   const area = `20,142 ${polyline} ${points.at(-1)?.x || 340},142`;
 
   return (
-    <article className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900">
+    <article className="min-w-0 rounded-xl border border-pink-100 bg-white p-3 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900 md:rounded-2xl md:p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-[#10142d] dark:text-white">Feedback Trend</h2>
-        <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500 dark:bg-neutral-800">Last 6 Months</span>
+        <h2 className="truncate text-xs font-black text-[#10142d] dark:text-white md:text-sm">Feedback Trend</h2>
+        <span className="hidden rounded-lg bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500 dark:bg-neutral-800 md:inline-flex">Last 6 Months</span>
       </div>
-      <svg viewBox="0 0 360 170" className="mt-4 h-44 w-full" role="img" aria-label="Feedback received during the last six months">
+      <svg viewBox="0 0 360 170" className="mt-2 h-24 w-full md:mt-4 md:h-44" role="img" aria-label="Feedback received during the last six months">
         <defs>
           <linearGradient id="feedbackArea" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#ec4899" stopOpacity="0.3" />
@@ -212,7 +217,7 @@ const FeedbackDetails = ({ item, onClose }) => {
             <p className="mt-2 text-[11px] font-bold text-slate-400">{getPersonName(item.reply.repliedBy)} · {formatDate(item.reply.repliedAt)}</p>
           </div>
         )}
-        <div className="mt-5 grid grid-cols-2 gap-3 text-xs font-bold sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 text-xs font-bold md:grid-cols-4">
           {[['Quality', item.quality], ['Communication', item.communication], ['Timeliness', item.timeliness], ['Satisfaction', item.satisfaction]].map(([label, value]) => (
             <div key={label} className="rounded-xl border border-pink-100 p-3 text-center dark:border-neutral-700"><p className="text-slate-400">{label}</p><p className="mt-1 text-base font-black text-[#10142d] dark:text-white">{value || '—'}/5</p></div>
           ))}
@@ -227,6 +232,11 @@ const ReplyModal = ({ item, onClose, onSent }) => {
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  useEffect(() => {
+    setMessage(item?.reply?.message || "");
+    setErrorMessage("");
+  }, [item]);
+
   if (!item) return null;
 
   const handleSubmit = async (event) => {
@@ -240,8 +250,10 @@ const ReplyModal = ({ item, onClose, onSent }) => {
     try {
       setIsSending(true);
       setErrorMessage("");
+      const wasEditing = Boolean(item.reply?.message);
       const updatedTask = await taskAPI.replyToFeedback(item.id, reply);
-      onSent(updatedTask);
+      setMessage("");
+      onSent(updatedTask, wasEditing);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to send your reply."));
     } finally {
@@ -259,7 +271,13 @@ const ReplyModal = ({ item, onClose, onSent }) => {
         <div className="mt-5 rounded-xl bg-slate-50 p-4 dark:bg-neutral-800"><Stars rating={item.rating} /><p className="mt-2 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">“{item.comment || "Rating submitted without a comment."}”</p></div>
         <label className="mt-5 block"><span className="text-xs font-black text-slate-600 dark:text-slate-300">Your reply</span><textarea autoFocus maxLength={1000} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write a helpful response to the client..." className="mt-2 h-36 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" /><span className="mt-1 block text-right text-[10px] font-bold text-slate-400">{message.length}/1000</span></label>
         {errorMessage && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{errorMessage}</p>}
-        <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={isSending} onClick={onClose} className="h-10 rounded-xl border border-slate-200 px-5 text-xs font-black text-slate-600 disabled:opacity-50">Cancel</button><button type="submit" disabled={isSending || !message.trim()} className="inline-flex h-10 items-center gap-2 rounded-xl bg-linear-to-r from-pink-500 to-violet-600 px-5 text-xs font-black text-white shadow-lg shadow-pink-200/50 disabled:cursor-not-allowed disabled:opacity-50"><Mail className="h-4 w-4" />{isSending ? "Sending..." : item.reply?.message ? "Update Reply" : "Send Reply"}</button></div>
+        <div className="mt-5 flex justify-end gap-3">
+          <button type="button" disabled={isSending} onClick={onClose} className={`${secondaryButtonClass} h-10 px-5 text-xs`}>Cancel</button>
+          <button type="submit" disabled={isSending || !message.trim()} className={`${primaryButtonClass} h-10 px-5 text-xs`}>
+            <Mail className="h-4 w-4" />
+            {isSending ? "Sending..." : item.reply?.message ? "Update Reply" : "Send Reply"}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -323,6 +341,30 @@ const Feedback = () => {
     }];
   }), [tasks]);
 
+  useEffect(() => {
+    const openNotificationTarget = () => {
+      const rawTarget = sessionStorage.getItem(notificationTargetKey);
+      if (!rawTarget || isLoading) return;
+
+      try {
+        const target = JSON.parse(rawTarget);
+        if (target?.page !== "feedback" || !target?.taskId) return;
+
+        const targetFeedback = feedback.find((item) => String(item.id) === String(target.taskId));
+        if (!targetFeedback) return;
+
+        setSelectedFeedback(targetFeedback);
+        sessionStorage.removeItem(notificationTargetKey);
+      } catch {
+        sessionStorage.removeItem(notificationTargetKey);
+      }
+    };
+
+    openNotificationTarget();
+    window.addEventListener("clientra:notification-target", openNotificationTarget);
+    return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
+  }, [feedback, isLoading]);
+
   const pendingReviews = tasks.filter((task) => task.status === "done" && !task.feedback?.submittedAt);
   const average = feedback.length ? (feedback.reduce((sum, item) => sum + item.rating, 0) / feedback.length).toFixed(1) : "0.0";
   const satisfiedPercent = feedback.length ? Math.round((feedback.filter((item) => item.rating >= 4).length / feedback.length) * 100) : 0;
@@ -360,11 +402,11 @@ const Feedback = () => {
     setSortBy("newest");
   };
 
-  const handleReplySent = (updatedTask) => {
+  const handleReplySent = (updatedTask, wasEditing) => {
     const updatedId = updatedTask?._id || updatedTask?.id;
     setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
     setReplyTarget(null);
-    setNoticeMessage("Reply sent. The client can now view it in their project and notifications.");
+    setNoticeMessage(wasEditing ? "Reply updated successfully." : "Reply sent. The client can now view it in their project and notifications.");
     window.setTimeout(() => setNoticeMessage(""), 4500);
   };
 
@@ -404,7 +446,7 @@ const Feedback = () => {
       {errorMessage && <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{errorMessage}</p>}
       {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
         <MetricCard icon={<Star className="h-5 w-5" strokeWidth={2.4} />} iconClass="bg-violet-50 text-violet-500" label="Average Rating" value={average} trend={feedbackTrend} />
         <MetricCard icon={<Smile className="h-5 w-5" strokeWidth={2.4} />} iconClass="bg-emerald-50 text-emerald-500" label="Satisfied Clients" value={`${satisfiedPercent}%`} trend={feedbackTrend} />
         <MetricCard icon={<MessageCircle className="h-5 w-5" strokeWidth={2.4} />} iconClass="bg-orange-50 text-orange-500" label="Total Feedback" value={feedback.length} trend={feedbackTrend} />
@@ -412,41 +454,41 @@ const Feedback = () => {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="min-w-0 space-y-4">
+        <section className="order-2 min-w-0 space-y-4 xl:order-1">
           <div className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900">
-            <label className="relative block">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search feedback by client, project, or comment..." className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" />
-            </label>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <select value={ratingFilter} onChange={(event) => setRatingFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 min-[520px]:grid min-[520px]:grid-cols-[minmax(130px,1.4fr)_minmax(82px,.75fr)_minmax(88px,.8fr)_minmax(92px,.85fr)_minmax(92px,.8fr)] min-[520px]:overflow-visible">
+              <label className="relative min-w-[180px] flex-1 min-[520px]:min-w-0">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search feedback..." className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" />
+              </label>
+              <select value={ratingFilter} onChange={(event) => setRatingFilter(event.target.value)} className="h-10 min-w-[110px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
                 <option value="all">All Ratings</option>{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} Stars</option>)}
               </select>
-              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
+              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="h-10 min-w-[115px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
                 <option value="all">All Projects</option>{projects.map((project) => <option key={project} value={project}>{project}</option>)}
               </select>
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300">
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="h-10 min-w-[115px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
                 <option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="highest">Highest Rated</option><option value="lowest">Lowest Rated</option>
               </select>
-              <button type="button" onClick={resetFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-black text-slate-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:text-slate-300"><SlidersHorizontal className="h-4 w-4" />Reset Filters</button>
+              <button type="button" onClick={resetFilters} className={`${secondaryButtonClass} h-10 min-w-[110px] shrink-0 px-2 text-[11px] min-[520px]:min-w-0`}><SlidersHorizontal className="h-4 w-4" />Reset</button>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-pink-100 bg-white p-2 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-1 md:gap-3 md:p-3">
             {isLoading ? (
-              <div className="space-y-3 p-5">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-neutral-800" />)}</div>
+              <div className="col-span-2 grid grid-cols-2 gap-2 md:col-span-1 md:grid-cols-1 md:gap-3">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-neutral-800 md:h-24" />)}</div>
             ) : visibleFeedback.length === 0 ? (
-              <div className="grid min-h-72 place-items-center px-5 text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-pink-300" /><h2 className="mt-3 font-black text-[#10142d] dark:text-white">No feedback found</h2><p className="mt-1 text-sm font-semibold text-slate-500">Submitted client feedback will appear here.</p></div></div>
-            ) : visibleFeedback.map((item, index) => (
-              <article key={item.id} className={`grid gap-4 p-4 md:grid-cols-[minmax(220px,1.2fr)_minmax(170px,.8fr)_auto] md:items-center md:p-5 ${index ? "border-t border-pink-50 dark:border-neutral-800" : ""}`}>
+              <div className="col-span-2 grid min-h-72 place-items-center px-5 text-center md:col-span-1"><div><MessageCircle className="mx-auto h-10 w-10 text-pink-300" /><h2 className="mt-3 font-black text-[#10142d] dark:text-white">No feedback found</h2><p className="mt-1 text-sm font-semibold text-slate-500">Submitted client feedback will appear here.</p></div></div>
+            ) : visibleFeedback.map((item) => (
+              <article key={item.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-pink-100 p-3 dark:border-neutral-800 md:grid md:grid-cols-[minmax(220px,1.2fr)_minmax(170px,.8fr)_auto] md:items-center md:gap-4 md:p-4">
                 <div className="flex min-w-0 gap-3">
-                  <InitialsAvatar user={item.client} name={item.clientName} alt={item.clientName} className="h-11 w-11" />
+                  <InitialsAvatar user={item.client} name={item.clientName} alt={item.clientName} className="h-9 w-9 md:h-11 md:w-11" />
                   <div className="min-w-0"><p className="truncate text-sm font-black text-[#10142d] dark:text-white">{item.clientName}</p><Stars rating={item.rating} /><p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">“{item.comment || "Rating submitted without a comment."}”</p></div>
                 </div>
-                <div className="min-w-0 text-xs"><p className="font-bold text-slate-400">Project</p><p className="mt-1 truncate font-black text-[#10142d] dark:text-white">{item.project}</p><p className="mt-2 inline-flex items-center gap-1.5 font-bold text-slate-500"><CalendarDays className="h-3.5 w-3.5" />{formatDate(item.submittedAt)}</p><span className="mt-2 block w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-600">Published</span></div>
-                <div className="flex gap-2 md:justify-end">
-                  {user?.role === "admin" && <button type="button" onClick={() => setReplyTarget(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"><Mail className="h-3.5 w-3.5" />{item.reply?.message ? "Edit Reply" : "Reply"}</button>}
-                  <button type="button" onClick={() => setSelectedFeedback(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-pink-200 px-3 text-xs font-black text-pink-600 transition hover:bg-pink-50"><Eye className="h-3.5 w-3.5" />View</button>
+                <div className="min-w-0 border-t border-pink-50 pt-3 text-xs dark:border-neutral-800 md:border-t-0 md:pt-0"><p className="font-bold text-slate-400">Project</p><p className="mt-1 truncate font-black text-[#10142d] dark:text-white">{item.project}</p><div className="mt-2 flex flex-wrap items-center gap-2"><p className="inline-flex items-center gap-1.5 font-bold text-slate-500"><CalendarDays className="h-3.5 w-3.5" />{formatDate(item.submittedAt)}</p><span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-600">Published</span></div></div>
+                <div className="mt-auto flex flex-nowrap items-center gap-1.5 md:mt-0 md:justify-end">
+                  {user?.role === "admin" && <button type="button" onClick={() => setReplyTarget(item)} className={`${primaryButtonClass} h-9 min-w-0 flex-1 px-2 text-xs`}><Mail className="h-3.5 w-3.5" /><span className="hidden min-[520px]:inline">{item.reply?.message ? "Edit" : "Reply"}</span></button>}
+                  <button type="button" onClick={() => setSelectedFeedback(item)} className={`${primaryButtonClass} h-9 min-w-0 flex-1 px-2 text-xs`}><Eye className="h-3.5 w-3.5" /><span className="hidden min-[520px]:inline">View</span></button>
                   {user?.role === "admin" && <button type="button" onClick={() => { setDeleteError(""); setDeleteTarget(item); }} className="grid h-9 w-9 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50" aria-label={`Delete feedback from ${item.clientName}`}><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
               </article>
@@ -461,13 +503,13 @@ const Feedback = () => {
           )}
         </section>
 
-        <aside className="space-y-5">
+        <aside className="order-1 grid grid-cols-2 gap-2 xl:order-2 xl:block xl:space-y-5">
           <SatisfactionChart average={average} distribution={distribution} total={feedback.length} />
           <TrendChart feedback={feedback} />
         </aside>
       </div>
       <FeedbackDetails item={selectedFeedback} onClose={() => setSelectedFeedback(null)} />
-      <ReplyModal item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />
+      <ReplyModal key={`${replyTarget?.id || "closed"}-${replyTarget?.reply?.repliedAt || ""}`} item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />
       <ConfirmDialog
         confirmLabel="Yes, delete"
         confirmingLabel="Deleting..."

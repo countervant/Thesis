@@ -428,16 +428,16 @@ const EmpLeaverequest = () => {
         </p>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         {stats.map((item) => (
-          <Card key={item.label} className={`p-6 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
-            <div className="flex items-center gap-8">
-              <span className={`grid h-20 w-20 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
-                <ImageIcon src={item.icon} className="h-11 w-11" />
+          <Card key={item.label} className={`p-3 !shadow-sm dark:!shadow-none md:p-4 ${statCardStyles[item.tone]}`}>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl md:h-12 md:w-12 md:rounded-2xl ${toneStyles[item.tone]}`}>
+                <ImageIcon src={item.icon} className="h-5 w-5 md:h-7 md:w-7" />
               </span>
               <div>
-                <p className="text-sm font-black text-slate-600">{item.label}</p>
-                <p className="mt-2 text-4xl font-black text-[#10142d]">{item.value}</p>
+                <p className="text-[10px] font-black leading-tight text-slate-600 md:text-xs">{item.label}</p>
+                <p className="mt-1 text-xl font-black text-[#10142d] md:text-2xl">{item.value}</p>
               </div>
             </div>
           </Card>
@@ -636,7 +636,7 @@ const EmpLeaverequest = () => {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <DetailSection icon="person" title="Employee Information">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start">
                   <InitialsAvatar
                     alt={getUserName(user)}
                     className="h-24 w-24"

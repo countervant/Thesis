@@ -75,7 +75,7 @@ const Toggle = ({ enabled, onClick, label }) => (
     aria-pressed={enabled}
     className={`relative inline-flex h-7 w-12 items-center rounded-full p-1 transition ${
       enabled
-        ? "bg-linear-to-r from-[#e347b3] to-[#8b35ff] shadow-[0_6px_14px_rgba(227,71,179,0.24)]"
+        ? "bg-linear-to-r from-[#df4bb4] to-[#c72fb2] shadow-[0_6px_14px_rgba(219,74,181,0.28)]"
         : "bg-slate-300"
     }`}
   >
@@ -165,7 +165,10 @@ const SecuritySettings = ({ user }) => {
 
     setIsSavingPassword(true);
     try {
-      await authAPI.updateMe({ password: nextPassword });
+      await authAPI.updateMe({
+        currentPassword: passwordForm.currentPassword,
+        password: nextPassword,
+      });
       const nextSettings = {
         ...settings,
         lastPasswordChange: formatDateTime(new Date()),
@@ -203,7 +206,7 @@ const SecuritySettings = ({ user }) => {
           <Icon name="shield" className="h-8 w-8" />
         </span>
         <div>
-          <h2 className="text-3xl font-black text-[#10142d] dark:text-white">Security Settings</h2>
+          <h2 className="text-2xl font-black text-[#10142d] dark:text-white md:text-3xl">Security Settings</h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">
             Manage your account security and keep your data safe.
           </p>
@@ -266,7 +269,7 @@ const SecuritySettings = ({ user }) => {
                   <button
                     type="submit"
                     disabled={isSavingPassword}
-                    className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(227,71,179,0.22)] transition hover:brightness-105 disabled:opacity-60"
+                    className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 disabled:opacity-60"
                   >
                     {isSavingPassword ? "Saving..." : "Save Password"}
                   </button>
@@ -331,11 +334,11 @@ const SecuritySettings = ({ user }) => {
             </div>
           </Card>
 
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={cancelSettings} className="h-9 min-w-[120px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white">
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
+            <button type="button" onClick={cancelSettings} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white md:h-9 md:w-auto md:min-w-[120px]">
               Cancel
             </button>
-            <button type="button" onClick={saveSettings} className="h-9 min-w-[160px] rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(227,71,179,0.22)] transition hover:brightness-105">
+            <button type="button" onClick={saveSettings} className="h-10 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-9 md:w-auto md:min-w-[160px]">
               Save Changes
             </button>
           </div>
@@ -345,7 +348,7 @@ const SecuritySettings = ({ user }) => {
           <Card>
             <h3 className="text-sm font-black text-[#10142d] dark:text-white">Security Overview</h3>
             <div className="mt-5 flex items-center gap-5">
-              <span className="grid h-24 w-24 place-items-center rounded-3xl bg-linear-to-b from-[#e347b3] to-[#8b35ff] text-white shadow-[0_16px_30px_rgba(227,71,179,0.22)]">
+              <span className="grid h-24 w-24 place-items-center rounded-3xl bg-pink-500 text-white shadow-[0_16px_30px_rgba(236,72,153,0.22)]">
                 <Icon name="shield" className="h-14 w-14" />
               </span>
               <div>
@@ -422,7 +425,7 @@ const SecuritySettings = ({ user }) => {
                 setSettings(nextSettings);
                 persistSettings(nextSettings);
               }}
-              className="mt-4 h-9 w-full rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] text-xs font-black text-white"
+              className="mt-4 h-9 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
             >
               Generate New Codes
             </button>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import done from "../../../assets/done.png";
-import pending from "../../../assets/pendingrequest.png";
+import pendingRequest from "../../../assets/pendingrequest.png";
+import pending from "../../../assets/pending.png";
 import progress from "../../../assets/progress.png";
 import task from "../../../assets/task.png";
 import Skeleton from "../../../components/Skeleton.jsx";
@@ -310,8 +311,8 @@ const EmpDashboard = () => {
 
   const stats = [
     { label: "My Tasks", value: tasks.length, sub: "Total Tasks", icon: task, tone: "pink" },
-    { label: "Due Today", value: dashboardData.dueTodayTasks.length, sub: "Tasks", icon: pending, tone: "orange" },
-    { label: "Pending", value: dashboardData.pendingTasks.length, sub: "Tasks", icon: progress, tone: "blue" },
+    { label: "Due Today", value: dashboardData.dueTodayTasks.length, sub: "Tasks", icon: pendingRequest, tone: "orange" },
+    { label: "Pending", value: dashboardData.pendingTasks.length, sub: "Tasks", icon: pending, tone: "blue" },
     { label: "Completed", value: dashboardData.completedTasks.length, sub: "Tasks", icon: done, tone: "green" },
   ];
 

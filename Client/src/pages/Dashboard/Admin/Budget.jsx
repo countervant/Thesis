@@ -281,14 +281,14 @@ const summaryIconStyles = {
 };
 
 const SummaryCard = ({ icon, label, note = "This month", noteClass = "text-slate-500", value }) => (
-  <section className={`flex h-28 items-center gap-5 rounded-2xl border bg-white px-6 !shadow-sm ring-1 dark:bg-[#141414] dark:!shadow-none ${summaryCardStyles[icon] || summaryCardStyles.balance}`}>
-    <span className={`grid h-15 w-15 place-items-center rounded-2xl ${summaryIconStyles[icon] || "bg-pink-50"}`}>
-      <Icon name={icon} className="h-10 w-10" />
+  <section className={`flex min-w-0 flex-col items-start gap-2 rounded-xl border bg-white p-3 !shadow-sm ring-1 dark:bg-[#141414] dark:!shadow-none md:flex-row md:items-center md:gap-3 md:rounded-2xl md:p-4 ${summaryCardStyles[icon] || summaryCardStyles.balance}`}>
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl md:h-12 md:w-12 md:rounded-2xl ${summaryIconStyles[icon] || "bg-pink-50"}`}>
+      <Icon name={icon} className="h-5 w-5 md:h-7 md:w-7" />
     </span>
     <div className="min-w-0 leading-tight">
-      <p className="text-[11px] font-black uppercase text-slate-500 dark:text-neutral-400">{label}</p>
-      <p className="mt-1 text-2xl font-black text-[#10142d] dark:text-white">{value}</p>
-      <p className={`mt-2 text-xs font-black ${noteClass}`}>{note}</p>
+      <p className="truncate text-[9px] font-black uppercase text-slate-500 dark:text-neutral-400 md:text-[11px]">{label}</p>
+      <p className="mt-0.5 truncate text-base font-black text-[#10142d] dark:text-white md:mt-1 md:text-xl">{value}</p>
+      <p className={`mt-1 hidden text-xs font-black md:block ${noteClass}`}>{note}</p>
     </div>
   </section>
 );
@@ -645,7 +645,7 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
 
   return (
         <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <h1
                 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
@@ -658,11 +658,11 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex w-full items-center gap-3 md:w-auto">
               <button
                 type="button"
                 onClick={onAddEntry}
-                className="flex h-10 items-center gap-2 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 md:w-auto"
               >
                 <Icon className="h-5 w-5" />
                 <span>Add Entry</span>
@@ -670,7 +670,7 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
             </div>
           </header>
 
-          <section className="mt-5 grid gap-4 md:grid-cols-3">
+          <section className="mt-5 grid grid-cols-3 gap-2 md:gap-4">
             {isLoading ? (
               <BudgetSummarySkeleton />
             ) : (
@@ -712,10 +712,10 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
           )}
 
           <section className="mt-4 overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 dark:bg-[#141414] dark:ring-neutral-800">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <div className="flex flex-col items-stretch gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
               <h2 className="text-base font-black text-[#10142d] dark:text-white">Recent Transactions</h2>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="relative block">
+              <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-3">
+                <label className="relative col-span-2 block md:col-span-1">
                   <span className="sr-only">Search transactions</span>
                   <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" aria-hidden="true">
                     <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.8" />
@@ -726,13 +726,13 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search transactions..."
-                    className="h-10 w-64 rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:w-64"
                   />
                 </label>
                 <select
                   value={typeFilter}
                   onChange={(event) => setTypeFilter(event.target.value)}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:w-auto md:px-4"
                 >
                   <option>All Types</option>
                   <option>Income</option>
@@ -741,13 +741,14 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                 <select
                   value={sortOrder}
                   onChange={(event) => setSortOrder(event.target.value)}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:w-auto md:px-4"
                 >
                   <option>Newest</option>
                   <option>Oldest</option>
                 </select>
               </div>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-xs text-[#10142d] dark:text-neutral-200">
               <thead className="bg-slate-50 text-slate-500 dark:border-neutral-700">
                 <tr>
@@ -811,6 +812,7 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                 ))}
               </tbody>
             </table>
+            </div>
             {!isLoading && visibleBudgetEntries.length > pageSize && (
               <div className="flex items-center justify-center gap-5 px-5 py-4">
                 <button

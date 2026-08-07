@@ -755,7 +755,7 @@ const Newsfeed = () => {
         <div className="min-w-0 space-y-4">
           <header>
             <h1
-              className="text-3xl uppercase leading-none text-neutral-950"
+              className="text-2xl uppercase leading-none text-neutral-950 md:text-3xl"
               style={{ fontFamily: "var(--font-bruno)" }}
             >
               <span className="text-[#dc4fb2]">Clientra</span> Newsfeed
@@ -776,7 +776,7 @@ const Newsfeed = () => {
           onSubmit={handleCreatePost}
           className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
         >
-          <div className="flex items-center gap-3 px-5 py-4">
+          <div className="flex items-start gap-3 px-4 py-4 md:items-center md:px-5">
             <Avatar user={user} size="h-9 w-9" />
             <textarea
               value={postContent}
@@ -787,8 +787,8 @@ const Newsfeed = () => {
               className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
-          <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-2.5">
-            <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-2.5 md:gap-3 md:px-5">
+            <div className="flex flex-wrap items-center gap-2 md:gap-4">
               <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                 <img
                   src={insertImageIcon}
@@ -990,7 +990,7 @@ const Newsfeed = () => {
                         : "0"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-8">
+                  <div className="flex shrink-0 items-center gap-3 md:gap-8">
                     <button
                       type="button"
                       onClick={() => toggleComments(post.id)}

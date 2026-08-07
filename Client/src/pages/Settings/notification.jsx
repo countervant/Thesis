@@ -45,7 +45,7 @@ const Toggle = ({ enabled, onClick, label }) => (
     aria-pressed={enabled}
     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
       enabled
-        ? "bg-linear-to-r from-[#8b35ff] to-[#c72fb2] shadow-[0_6px_14px_rgba(199,47,178,0.24)]"
+        ? "bg-linear-to-r from-[#df4bb4] to-[#c72fb2] shadow-[0_6px_14px_rgba(219,74,181,0.28)]"
         : "bg-slate-300"
     }`}
   >
@@ -77,7 +77,7 @@ const NotificationSettings = ({ user }) => {
   return (
     <div className="space-y-5">
       <header>
-        <h2 className="text-3xl font-black text-[#10142d] dark:text-white">
+        <h2 className="text-2xl font-black text-[#10142d] dark:text-white md:text-3xl">
           Notification Settings
         </h2>
         <p className="mt-2 text-sm font-semibold text-slate-500">
@@ -85,7 +85,7 @@ const NotificationSettings = ({ user }) => {
         </p>
       </header>
 
-      <section className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+      <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800 md:p-5">
         <div className="border-b border-pink-50 pb-4">
           <h3 className="text-lg font-black text-[#10142d] dark:text-white">
             Notification Preferences
@@ -97,8 +97,8 @@ const NotificationSettings = ({ user }) => {
 
         <div className="divide-y divide-pink-50">
           {notificationItems.map((item) => (
-            <div key={item.id} className="flex items-center justify-between gap-5 py-4">
-              <div className="flex min-w-0 items-center gap-4">
+            <div key={item.id} className="flex items-center justify-between gap-3 py-4 md:gap-5">
+              <div className="flex min-w-0 items-start gap-3 md:items-center md:gap-4">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
                   <Icon name={item.icon} />
                 </span>
@@ -117,19 +117,19 @@ const NotificationSettings = ({ user }) => {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        {message && <p className="mr-auto text-xs font-black text-emerald-500">{message}</p>}
+      <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:items-center md:justify-end">
+        {message && <p className="col-span-2 mr-auto text-xs font-black text-emerald-500">{message}</p>}
         <button
           type="button"
           onClick={resetSettings}
-          className="h-9 min-w-[120px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white md:h-9 md:w-auto md:min-w-[120px]"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={saveSettings}
-          className="h-9 min-w-[160px] rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(227,71,179,0.22)] transition hover:brightness-105"
+          className="h-10 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-9 md:w-auto md:min-w-[160px]"
         >
           Save Changes
         </button>

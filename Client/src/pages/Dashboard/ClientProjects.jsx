@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import Skeleton from "../../components/Skeleton.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
+import progressIcon from "../../assets/progress.png";
+import pendingIcon from "../../assets/pending.png";
+import reviewIcon from "../../assets/Review.png";
+import doneIcon from "../../assets/done.png";
 
 const notificationTargetKey = "clientraNotificationTarget";
 
@@ -198,24 +202,24 @@ const normalizeProject = (task) => {
 
 const ProjectStats = ({ projects }) => {
   const stats = [
-    { label: "In Progress", value: projects.filter((item) => item.status === "In Progress").length, sub: "Active projects", icon: "folder" },
-    { label: "In Review", value: projects.filter((item) => item.status === "In Review").length, sub: "Awaiting your review", icon: "hourglass" },
-    { label: "Completed", value: projects.filter((item) => item.status === "Completed").length, sub: "Successfully delivered", icon: "check" },
-    { label: "Pending Revisions", value: projects.filter((item) => item.status === "Pending Revisions").length, sub: "Action needed", icon: "refresh" },
+    { label: "In Progress", value: projects.filter((item) => item.status === "In Progress").length, sub: "Active projects", icon: progressIcon },
+    { label: "In Review", value: projects.filter((item) => item.status === "In Review").length, sub: "Awaiting your review", icon: reviewIcon },
+    { label: "Completed", value: projects.filter((item) => item.status === "Completed").length, sub: "Successfully delivered", icon: doneIcon },
+    { label: "Pending Revisions", value: projects.filter((item) => item.status === "Pending Revisions").length, sub: "Action needed", icon: pendingIcon },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
       {stats.map((item) => (
-        <Card key={item.label} className="p-5">
-          <div className="flex items-center gap-4">
-            <span className={`grid h-16 w-16 place-items-center rounded-2xl ring-1 ${statStyles[item.label]}`}>
-              <Icon name={item.icon} className="h-8 w-8" />
+        <Card key={item.label} className="p-3 md:p-5">
+          <div className="flex items-center gap-2 md:gap-4">
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 md:h-16 md:w-16 md:rounded-2xl ${statStyles[item.label]}`}>
+              <img src={item.icon} alt="" className="h-5 w-5 object-contain md:h-8 md:w-8" aria-hidden="true" />
             </span>
             <span>
-              <span className="block text-3xl font-black text-[#10142d] dark:text-white">{item.value}</span>
-              <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.label}</span>
-              <span className="mt-1 block text-xs font-bold text-slate-500">{item.sub}</span>
+              <span className="block text-xl font-black text-[#10142d] dark:text-white md:text-3xl">{item.value}</span>
+              <span className="block text-[10px] font-black leading-tight text-[#10142d] dark:text-white md:text-sm">{item.label}</span>
+              <span className="mt-1 hidden text-xs font-bold text-slate-500 md:block">{item.sub}</span>
             </span>
           </div>
         </Card>
@@ -876,7 +880,7 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
           </label>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
           <button
             type="button"
             onClick={onClose}
@@ -908,13 +912,12 @@ const RatingStars = ({ label, onChange, required = false, value }) => (
           key={rating}
           type="button"
           onClick={() => onChange(rating)}
-          className={`flex h-9 w-7 flex-col items-center justify-center gap-0.5 rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
+          className={`flex h-9 w-7 items-center justify-center rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
           aria-label={`${rating} star rating`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
             <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9 6.6 19.8l1-6.1-4.4-4.3 6.1-.9L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           </svg>
-          <span className="text-[9px] font-black leading-none">{rating}</span>
         </button>
       ))}
     </span>
@@ -984,7 +987,7 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
           </fieldset>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
           <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
           <button type="submit" disabled={!form.overallRating} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c72fb2] text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="send" className="h-4 w-4" />Submit Feedback</button>
         </div>
@@ -1011,14 +1014,14 @@ const ClientProjectsSkeleton = () => (
         <Skeleton className="h-9 w-44" />
         <Skeleton className="mt-3 h-4 w-80 max-w-full" />
       </div>
-      <div className="grid w-full gap-3 sm:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
+      <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
         <Skeleton className="h-11 w-full rounded-xl" />
         <Skeleton className="h-11 w-full rounded-xl" />
         <Skeleton className="h-11 w-full rounded-xl" />
       </div>
     </header>
 
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <Card key={index} className="p-5">
           <div className="flex items-center gap-4">
@@ -1368,7 +1371,7 @@ const ClientProjects = () => {
             Track the progress of all your projects in one place.
           </p>
         </div>
-        <div className="grid w-full gap-3 sm:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
+        <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
           <label className="relative block">
             <span className="sr-only">Search projects</span>
             <input

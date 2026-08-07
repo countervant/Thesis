@@ -199,7 +199,7 @@ const PostPreview = ({
       </div>
     </div>
 
-    <div className="mt-3 pl-12">
+    <div className="mt-3 md:pl-12">
       {post.content && (
         <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-800">
           {post.content}
@@ -893,7 +893,7 @@ const PublicProfile = () => {
                 ))}
               </div>
 
-              <div className="p-5">
+              <div className="p-3 md:p-5">
                 {activeProfileTab === "Newsfeed" ? (
                   <>
                     <h2 className="mb-4 text-base font-black text-[#10142d]">
@@ -955,7 +955,7 @@ const PublicProfile = () => {
                         ["Birthday", "February 14, 2001"],
                         ["Gender", "Male"],
                       ].map(([label, value]) => (
-                        <div key={label} className="grid grid-cols-[92px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 sm:grid-cols-[130px_minmax(0,1fr)]">
+                        <div key={label} className="grid grid-cols-[92px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 md:grid-cols-[130px_minmax(0,1fr)]">
                           <span className="text-xs font-black text-[#243154]">{label}</span>
                           <span className="truncate text-xs font-bold text-[#10142d]">{value}</span>
                         </div>
@@ -973,7 +973,7 @@ const PublicProfile = () => {
                         ["Join Date", formatJoinedDate(profileUser.createdAt)],
                         ["Work Status", "Full-time"],
                       ].map(([label, value]) => (
-                        <div key={label} className="grid grid-cols-[98px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 sm:grid-cols-[140px_minmax(0,1fr)]">
+                        <div key={label} className="grid grid-cols-[98px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 md:grid-cols-[140px_minmax(0,1fr)]">
                           <span className="text-xs font-black text-[#243154]">{label}</span>
                           {label === "Work Status" ? (
                             <span className="w-fit rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">
@@ -1013,7 +1013,7 @@ const PublicProfile = () => {
                       <h2 className="mb-4 text-sm font-black text-[#10142d]">
                         Profile Statistics
                       </h2>
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 md:grid-cols-2">
                         {[
                           ["Posts", userPosts.length, "Total posts made"],
                           ["Likes Received", totalLikes, "Total likes received"],

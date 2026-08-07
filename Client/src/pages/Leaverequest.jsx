@@ -146,7 +146,6 @@ const normalizeRequest = (request) => ({
   type: request.leaveType || "Others",
   dates: formatDates(request),
   duration: `${request.durationDays || 1} ${Number(request.durationDays) === 1 ? "day" : "days"}`,
-  department: request.department || "Unassigned",
   status: request.status || "Pending",
 });
 
@@ -250,11 +249,11 @@ const LeaveRequest = () => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const tabs = ["All", "Pending", "Approved", "Rejected"];
   const [requests, setRequests] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [summary, setSummary] = useState({});
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("this");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -272,11 +271,11 @@ const LeaveRequest = () => {
       };
 
       if (statusFilter !== "All") params.status = statusFilter;
-      if (departmentFilter) params.department = departmentFilter;
+      if (roleFilter) params.role = roleFilter;
 
       const response = await leaveRequestAPI.getAll(params);
       setRequests(response.leaveRequests.map(normalizeRequest));
-      setDepartments(response.departments || []);
+      setRoles(response.roles || []);
       setSummary(response.summary || {});
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
@@ -284,7 +283,7 @@ const LeaveRequest = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [departmentFilter, monthFilter, statusFilter]);
+  }, [roleFilter, monthFilter, statusFilter]);
 
   useEffect(() => {
     loadLeaveRequests();
@@ -439,16 +438,16 @@ const LeaveRequest = () => {
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
         {summaryCards.map((card) => (
-          <Card key={card.label} className={`p-4 !shadow-sm dark:!shadow-none ${statCardStyles[card.tone]}`}>
-            <div className="flex items-center gap-3">
-              <span className={`grid h-12 w-12 place-items-center rounded-2xl ${toneStyles[card.tone]}`}>
-                <ImageIcon src={card.icon} className="h-7 w-7" />
+          <Card key={card.label} className={`p-3 !shadow-sm dark:!shadow-none md:p-4 ${statCardStyles[card.tone]}`}>
+            <div className="flex items-center gap-2 md:gap-3">
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl md:h-12 md:w-12 md:rounded-2xl ${toneStyles[card.tone]}`}>
+                <ImageIcon src={card.icon} className="h-5 w-5 md:h-7 md:w-7" />
               </span>
               <div>
-                <p className="text-xs font-extrabold text-slate-600">{card.label}</p>
-                <p className="mt-1 text-2xl font-black text-[#10142d]">{card.value}</p>
+                <p className="text-[10px] font-extrabold leading-tight text-slate-600 md:text-xs">{card.label}</p>
+                <p className="mt-0.5 text-xl font-black text-[#10142d] md:mt-1 md:text-2xl">{card.value}</p>
               </div>
             </div>
           </Card>
@@ -462,12 +461,12 @@ const LeaveRequest = () => {
             <div className="flex flex-wrap gap-3">
               <select
                 className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none"
-                value={departmentFilter}
-                onChange={(event) => setDepartmentFilter(event.target.value)}
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
               >
-                <option value="">All Departments</option>
-                {departments.map((department) => (
-                  <option key={department} value={department}>{department}</option>
+                <option value="">All Roles</option>
+                {roles.map((role) => (
+                  <option key={role} value={role}>{role}</option>
                 ))}
               </select>
               <select
@@ -497,7 +496,7 @@ const LeaveRequest = () => {
             <table className="w-full min-w-[980px] text-left text-xs">
               <thead className="text-xs font-black uppercase text-slate-400">
                 <tr>
-                  {["Request ID", "Employee", "Leave Type", "Dates", "Duration", "Department", "Status", "Actions"].map((heading) => (
+                  {["Request ID", "Employee", "Leave Type", "Dates", "Duration", "Role", "Status", "Actions"].map((heading) => (
                     <th key={heading} className="px-3 py-3">{heading}</th>
                   ))}
                 </tr>
@@ -526,7 +525,7 @@ const LeaveRequest = () => {
                     <td className="px-3 py-3 font-bold text-slate-700">{request.type}</td>
                     <td className="px-3 py-3 font-bold text-slate-600">{request.dates}</td>
                     <td className="px-3 py-3 font-bold text-slate-600">{request.duration}</td>
-                    <td className="px-3 py-3 font-bold text-slate-600">{request.department}</td>
+                    <td className="px-3 py-3 font-bold text-slate-600">{request.role}</td>
                     <td className="px-3 py-3"><StatusPill status={request.status} /></td>
                     <td className="px-3 py-3">
                       <div className="flex gap-2">
@@ -603,12 +602,11 @@ const LeaveRequest = () => {
             </div>
             {selectedRequest ? (
               <>
-                <div className="grid gap-5 sm:grid-cols-[0.8fr_1.2fr]">
+                <div className="grid gap-5 md:grid-cols-[0.8fr_1.2fr]">
                   <div className="text-center">
                     <Avatar initials={selectedRequest.initials} name={selectedRequest.employee} size="mx-auto h-14 w-14" user={selectedRequest.employeeProfile} />
                     <p className="mt-3 text-base font-black">{selectedRequest.employee}</p>
                     <p className="text-sm font-bold text-slate-500">{selectedRequest.role}</p>
-                    <p className="text-sm font-bold text-slate-500">{selectedRequest.department}</p>
                   </div>
                   <div className="grid gap-3 text-sm font-bold text-slate-600">
                     <p><span className="text-slate-400">Leave dates:</span> {selectedRequest.dates}</p>
@@ -618,7 +616,7 @@ const LeaveRequest = () => {
                     <p><span className="text-slate-400">Emergency contact:</span> {selectedRequest.emergencyContact || "-"}</p>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => handleStatusUpdate(selectedRequest, "Approved")}
@@ -665,17 +663,17 @@ const LeaveRequest = () => {
               <option value="all">All Months</option>
             </select>
           </div>
-          <div className="grid gap-0 lg:grid-cols-[1.15fr_1fr_0.62fr]">
-            <div className="grid gap-5 px-5 py-5 sm:grid-cols-[140px_1fr]">
-              <div>
-                <p className="mb-3 text-sm font-black">Leave by Type</p>
-                <div className="grid h-36 w-36 place-items-center rounded-full" style={{ background: "conic-gradient(#10b867 0 51%, #f53b98 51% 75%, #1e9de8 75% 90%, #ec4899 90% 100%)" }}>
-                  <div className="grid h-20 w-20 place-items-center rounded-full bg-white text-center shadow-sm">
-                    <span className="text-2xl font-black leading-none">{leaveTypeStats.total}<span className="mt-1 block text-xs text-slate-500">Total</span></span>
+          <div className="grid grid-cols-2 gap-2 p-2 lg:grid-cols-[1.15fr_1fr_0.62fr] lg:gap-0 lg:p-0">
+            <div className="order-1 grid justify-items-center gap-3 rounded-xl border border-pink-50 px-3 py-4 lg:grid-cols-[140px_1fr] lg:justify-items-stretch lg:gap-5 lg:rounded-none lg:border-0 lg:px-5 lg:py-5">
+              <div className="min-w-0">
+                <p className="mb-3 truncate text-xs font-black lg:text-sm">Leave by Type</p>
+                <div className="mx-auto grid h-20 w-20 place-items-center rounded-full lg:mx-0 lg:h-36 lg:w-36" style={{ background: "conic-gradient(#10b867 0 51%, #f53b98 51% 75%, #1e9de8 75% 90%, #ec4899 90% 100%)" }}>
+                  <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-center shadow-sm lg:h-20 lg:w-20">
+                    <span className="text-lg font-black leading-none lg:text-2xl">{leaveTypeStats.total}<span className="mt-0.5 block text-[8px] text-slate-500 lg:mt-1 lg:text-xs">Total</span></span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center">
+              <div className="hidden items-center lg:flex">
                 <div className="w-full space-y-3 text-xs font-bold">
                   {leaveTypeStats.items.map((item, index) => (
                     <p key={item.type} className="grid grid-cols-[1fr_auto] items-center gap-5">
@@ -690,7 +688,7 @@ const LeaveRequest = () => {
               </div>
             </div>
 
-            <div className="border-y border-pink-50 px-5 py-5 lg:border-x lg:border-y-0">
+            <div className="order-3 col-span-2 border-y border-pink-50 px-4 py-4 lg:order-2 lg:col-span-1 lg:border-x lg:border-y-0 lg:px-5 lg:py-5">
               <p className="mb-4 text-sm font-black">Most Used Leave Type</p>
               {leaveTypeStats.items.map((item, index) => (
                 <div key={item.type} className="mb-3 last:mb-0">
@@ -705,13 +703,13 @@ const LeaveRequest = () => {
               ))}
             </div>
 
-            <div className="flex flex-col items-center justify-center px-5 py-5 text-center">
-              <p className="mb-4 text-sm font-black">Employees on Leave Today</p>
-              <div className="grid h-16 w-16 place-items-center rounded-full bg-pink-100">
-                <ImageIcon src={employees} className="h-9 w-9" />
+            <div className="order-2 flex flex-col items-center justify-center rounded-xl border border-pink-50 px-3 py-4 text-center lg:order-3 lg:rounded-none lg:border-0 lg:px-5 lg:py-5">
+              <p className="mb-3 text-xs font-black leading-tight lg:mb-4 lg:text-sm">Employees on Leave Today</p>
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-pink-100 lg:h-16 lg:w-16">
+                <ImageIcon src={employees} className="h-7 w-7 lg:h-9 lg:w-9" />
               </div>
-              <p className="mt-3 text-3xl font-black">{summary.onLeaveToday || 0}</p>
-              <p className="text-xs font-bold text-slate-500">employees</p>
+              <p className="mt-2 text-2xl font-black lg:mt-3 lg:text-3xl">{summary.onLeaveToday || 0}</p>
+              <p className="text-[10px] font-bold text-slate-500 lg:text-xs">employees</p>
             </div>
           </div>
         </Card>
@@ -781,7 +779,7 @@ const LeaveRequest = () => {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <DetailSection icon="user" title="Employee Information">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start">
                   <Avatar
                     initials={detailRequest.initials}
                     name={detailRequest.employee}
@@ -794,12 +792,7 @@ const LeaveRequest = () => {
                     <div className="mt-4 grid gap-3 text-sm font-bold text-slate-600">
                       <p className="grid grid-cols-[24px_100px_1fr] items-center gap-2">
                         <DetailIcon name="briefcase" />
-                        <span>Department</span>
-                        <span className="font-black text-[#111936]">{detailRequest.department}</span>
-                      </p>
-                      <p className="grid grid-cols-[24px_100px_1fr] items-center gap-2">
-                        <DetailIcon name="user" />
-                        <span>Position</span>
+                        <span>Role</span>
                         <span className="font-black text-[#111936]">{detailRequest.role}</span>
                       </p>
                       <p className="grid grid-cols-[24px_100px_1fr] items-center gap-2">

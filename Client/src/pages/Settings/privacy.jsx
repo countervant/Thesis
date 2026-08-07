@@ -79,7 +79,7 @@ const Toggle = ({ enabled, onClick, label }) => (
     aria-pressed={enabled}
     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
       enabled
-        ? "bg-linear-to-r from-[#f472b6] to-[#c72fb2] shadow-[0_6px_14px_rgba(199,47,178,0.22)]"
+        ? "bg-linear-to-r from-[#df4bb4] to-[#c72fb2] shadow-[0_6px_14px_rgba(219,74,181,0.28)]"
         : "bg-slate-300"
     }`}
   >
@@ -128,7 +128,7 @@ const PrivacySettings = ({ user }) => {
   return (
     <div className="space-y-5">
       <header>
-        <h2 className="text-3xl font-black text-[#10142d] dark:text-white">
+        <h2 className="text-2xl font-black text-[#10142d] dark:text-white md:text-3xl">
           Privacy Settings
         </h2>
         <p className="mt-2 text-sm font-semibold text-slate-500">
@@ -136,7 +136,7 @@ const PrivacySettings = ({ user }) => {
         </p>
       </header>
 
-      <section className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+      <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800 md:p-5">
         <div className="divide-y divide-pink-50">
           {privacyItems.map((item) => (
             <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 py-5 first:pt-0 last:pb-0">
@@ -172,19 +172,19 @@ const PrivacySettings = ({ user }) => {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        {message && <p className="mr-auto text-xs font-black text-emerald-500">{message}</p>}
+      <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:items-center md:justify-end">
+        {message && <p className="col-span-2 mr-auto text-xs font-black text-emerald-500">{message}</p>}
         <button
           type="button"
           onClick={resetSettings}
-          className="h-8 min-w-[110px] rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white md:h-8 md:w-auto md:min-w-[110px]"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={saveSettings}
-          className="flex h-8 min-w-[132px] items-center justify-center gap-2 rounded-lg bg-linear-to-r from-[#f472b6] to-[#c72fb2] px-4 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(227,71,179,0.2)] transition hover:brightness-105"
+          className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-8 md:w-auto md:min-w-[132px]"
         >
           <Icon name="save" className="h-4 w-4" />
           Save Changes

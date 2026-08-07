@@ -323,14 +323,14 @@ const EmpCalendar = () => {
       <div className="mx-auto max-w-[1840px] space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl uppercase leading-none text-neutral-950 dark:text-white" style={{ fontFamily: "var(--font-bruno)" }}>
+            <h1 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white md:text-4xl" style={{ fontFamily: "var(--font-bruno)" }}>
               Calendar
             </h1>
-            <p className="mt-2 text-base font-semibold text-slate-500">
+            <p className="mt-2 text-sm font-semibold text-slate-500 md:text-base">
               Manage your schedule, events, and important deadlines.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:gap-3">
             <button type="button" onClick={goToday} className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-[#10142d] shadow-sm">Today</button>
             <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <button type="button" onClick={() => goToMonth(-1)} className="grid h-11 w-12 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
@@ -339,7 +339,7 @@ const EmpCalendar = () => {
             <select value={currentMonth.getMonth()} onChange={(event) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="h-11 rounded-xl border border-transparent bg-white px-3 text-base font-black text-[#26314f] outline-none">
               {getMonthOptions(currentMonth.getFullYear()).map((month) => <option key={month.getMonth()} value={month.getMonth()}>{formatMonth(month)}</option>)}
             </select>
-            <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+            <div className="grid w-full grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-sm md:flex md:w-auto">
               {["Month", "Week", "Day"].map((item) => (
                 <button key={item} type="button" onClick={() => setActiveView(item)} className={`h-9 min-w-20 rounded-lg px-4 text-sm font-black ${activeView === item ? "border border-pink-200 bg-pink-50 text-pink-600 dark:!bg-[#c72fb2] dark:text-white" : "text-[#10142d] dark:text-white dark:hover:!bg-pink-500/15"}`}>
                   {item}
@@ -349,17 +349,17 @@ const EmpCalendar = () => {
           </div>
         </header>
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
           {stats.map((item) => (
-            <Card key={item.label} className={`min-h-32 px-6 py-5 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
-              <div className="flex items-center gap-6">
-                <span className={`grid h-17 w-17 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
-                  <Icon name={item.icon} className="h-9 w-9" />
+            <Card key={item.label} className={`min-h-0 px-3 py-3 !shadow-sm dark:!shadow-none md:min-h-28 md:px-5 md:py-4 ${statCardStyles[item.tone]}`}>
+              <div className="flex items-center gap-2 md:gap-4">
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl md:h-14 md:w-14 md:rounded-2xl ${toneStyles[item.tone]}`}>
+                  <Icon name={item.icon} className="h-5 w-5 md:h-7 md:w-7" />
                 </span>
                 <div>
-                  <p className="text-4xl font-black leading-none text-[#10142d]">{item.value}</p>
-                  <p className="mt-2 text-sm font-black leading-tight text-[#10142d]">{item.label}</p>
-                  <p className="text-xs font-semibold text-slate-500">{item.sublabel}</p>
+                  <p className="text-xl font-black leading-none text-[#10142d] md:text-2xl">{item.value}</p>
+                  <p className="mt-1 text-[10px] font-black leading-tight text-[#10142d] md:text-xs">{item.label}</p>
+                  <p className="hidden text-xs font-semibold text-slate-500 md:block">{item.sublabel}</p>
                 </div>
               </div>
             </Card>
@@ -402,8 +402,8 @@ const EmpCalendar = () => {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-slate-200 text-center text-base font-black text-[#10142d]">
-              {weekDays.map((day) => <span key={day} className="py-5">{day}</span>)}
+            <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[10px] font-black text-[#10142d] md:text-base">
+              {weekDays.map((day) => <span key={day} className="py-2 md:py-5">{day}</span>)}
             </div>
             <div className="grid grid-cols-7">
               {getCalendarDays(currentMonth).map((date) => {
@@ -420,19 +420,19 @@ const EmpCalendar = () => {
                       setSelectedDate(dateKey);
                       setShowDayEventsPanel(true);
                     }}
-                    className={`min-h-32 border-b border-r border-slate-200 p-3 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
+                    className={`min-h-16 border-b border-r border-slate-200 p-1 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white md:min-h-32 md:p-3 ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
                     aria-label={`View events for ${date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
                   >
-                    <div className={`mb-3 text-base font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
-                    <div className="space-y-1.5">
+                    <div className={`mb-1 text-[10px] font-black md:mb-3 md:text-base ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
+                    <div className="flex flex-wrap gap-1 md:block md:space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (
-                        <div key={event.id} className={`relative truncate rounded-lg px-2.5 py-1.5 text-xs font-black ${event.color}`}>
-                          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current align-middle" />
-                          {event.title}
-                          {event.time && <span className="block pl-3 font-bold opacity-80">{event.time}</span>}
+                        <div key={event.id} className={`relative h-2 w-2 truncate rounded-full text-[0] font-black md:h-auto md:w-auto md:rounded-lg md:px-2.5 md:py-1.5 md:text-xs ${event.color}`}>
+                          <span className="hidden h-1.5 w-1.5 rounded-full bg-current align-middle md:mr-1 md:inline-block" />
+                          <span className="hidden md:inline">{event.title}</span>
+                          {event.time && <span className="hidden pl-3 font-bold opacity-80 md:block">{event.time}</span>}
                         </div>
                       ))}
-                      {dayEvents.length > 2 && <p className="pl-2 text-xs font-black text-slate-500">+ {dayEvents.length - 2} more</p>}
+                      {dayEvents.length > 2 && <p className="text-[9px] font-black text-slate-500 md:pl-2 md:text-xs">+{dayEvents.length - 2}<span className="hidden md:inline"> more</span></p>}
                     </div>
                   </button>
                 );
@@ -441,12 +441,13 @@ const EmpCalendar = () => {
           </Card>
         </div>
 
-        <Card className="overflow-hidden p-6">
+        <Card className="overflow-hidden p-4 md:p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-black">{activeView === "Month" ? "Today's Schedule" : `${activeView} Schedule`}</h2>
             <button type="button" onClick={goToday} className="text-sm font-black text-pink-600">View full day</button>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="overflow-x-auto">
+          <div className="min-w-[760px] divide-y divide-slate-100">
             {(selectedEvents.length ? selectedEvents : sortedUpcoming.slice(0, 3)).map((row) => (
               <div key={row.id} className="grid grid-cols-[18px_170px_minmax(220px,1fr)_minmax(240px,1fr)_90px_36px] items-center gap-3 py-4 text-sm">
                 <span className={`h-3 w-3 rounded-full ${row.dot}`} />
@@ -464,6 +465,7 @@ const EmpCalendar = () => {
                 )}
               </div>
             ))}
+          </div>
           </div>
         </Card>
       </div>
