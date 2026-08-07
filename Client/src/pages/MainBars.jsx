@@ -756,10 +756,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           <button
             type="button"
             onClick={toggleSidebar}
-            className="grid h-11 w-11 place-items-center text-neutral-950 dark:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl bg-neutral-900 text-white transition hover:bg-neutral-800 dark:bg-white/5 dark:hover:bg-white/10"
             aria-label="Open menu"
           >
-            <img src={menuIcon} alt="" className="h-7 w-7 object-contain" aria-hidden="true" />
+            <img src={menuIcon} alt="" className="h-7 w-7 object-contain brightness-0 invert" aria-hidden="true" />
           </button>
         </div>
 
@@ -843,9 +843,9 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             </button>
 
             {isNotificationOpen && (
-              <section className="absolute right-0 top-14 z-40 w-[390px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl">
-                <div className="flex items-center justify-between px-5 pt-5">
-                  <h2 className="text-2xl font-bold text-neutral-950">Notifications</h2>
+              <section className="fixed inset-x-0 bottom-[86px] top-[92px] z-50 flex w-auto max-w-none flex-col overflow-hidden border-y border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-white md:absolute md:bottom-auto md:left-auto md:right-0 md:top-14 md:block md:w-[390px] md:max-w-[calc(100vw-2rem)] md:rounded-2xl md:border">
+                <div className="flex shrink-0 items-center justify-between border-b border-neutral-100 px-4 pb-4 pt-5 dark:border-neutral-800 md:border-0 md:px-5 md:pb-0">
+                  <h2 className="text-2xl font-bold text-neutral-950 dark:text-white">Notifications</h2>
                   <div className="flex items-center gap-1">
                     <div className="relative">
                       <button
@@ -853,7 +853,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                         onClick={() =>
                           setIsNotificationOptionsOpen((isOpen) => !isOpen)
                         }
-                        className="grid h-8 w-8 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+                        className="grid h-9 w-9 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white"
                         aria-label="Notification options"
                         aria-expanded={isNotificationOptionsOpen}
                         aria-haspopup="menu"
@@ -867,13 +867,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
                       {isNotificationOptionsOpen && (
                         <div
-                          className="absolute right-0 top-9 z-50 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white py-2 text-sm shadow-lg"
+                          className="absolute right-0 top-10 z-50 w-52 overflow-hidden rounded-xl border border-neutral-200 bg-white py-2 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
                           role="menu"
                         >
                           <button
                             type="button"
                             onClick={handleMarkAllNotificationsRead}
-                            className="block w-full px-4 py-2 text-left font-semibold text-neutral-800 transition hover:bg-pink-50 hover:text-[#c72fb2]"
+                            className="block w-full px-4 py-2.5 text-left font-semibold text-neutral-800 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:bg-neutral-800"
                             role="menuitem"
                           >
                             Mark all as read
@@ -881,7 +881,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                           <button
                             type="button"
                             onClick={requestRemoveAllNotifications}
-                            className="block w-full px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                            className="block w-full px-4 py-2.5 text-left font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-neutral-800"
                             role="menuitem"
                           >
                             Delete all notifications
@@ -893,7 +893,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                     <button
                       type="button"
                       onClick={() => setIsNotificationOpen(false)}
-                      className="grid h-8 w-8 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+                      className="grid h-9 w-9 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white"
                       aria-label="Close notifications"
                     >
                       <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
@@ -908,14 +908,14 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                   </div>
                 </div>
 
-                <div className="flex gap-2 px-5 py-3">
+                <div className="flex shrink-0 gap-2 px-4 py-3 md:px-5">
                   <button
                     type="button"
                     onClick={() => setNotificationFilter("all")}
                     className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                       notificationFilter === "all"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-neutral-600 hover:bg-neutral-100"
+                        ? "bg-pink-100 text-[#c72fb2] dark:bg-pink-500/20 dark:text-pink-300"
+                        : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
                     }`}
                   >
                     All
@@ -925,8 +925,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                     onClick={() => setNotificationFilter("unread")}
                     className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                       notificationFilter === "unread"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-neutral-600 hover:bg-neutral-100"
+                        ? "bg-pink-100 text-[#c72fb2] dark:bg-pink-500/20 dark:text-pink-300"
+                        : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
                     }`}
                   >
                     Unread
@@ -934,7 +934,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                   </button>
                 </div>
 
-                <div className="max-h-[520px] overflow-y-auto px-3 pb-4">
+                <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 md:max-h-[520px] md:px-3">
                   {isNotificationLoading && (
                     <div className="mx-2">
                       <NotificationSkeleton rows={4} />
@@ -948,7 +948,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                   )}
 
                   {!isNotificationLoading && visibleNotifications.length === 0 && !notificationError && (
-                    <p className="mx-2 rounded-lg bg-neutral-50 px-4 py-8 text-center text-sm font-semibold text-neutral-600">
+                    <p className="mx-2 rounded-lg bg-neutral-50 px-4 py-8 text-center text-sm font-semibold text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
                       {notificationFilter === "unread"
                         ? "No unread notifications."
                         : "No notifications yet."}
@@ -964,13 +964,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                           key={notification.id}
                           type="button"
                           onClick={() => handleOpenNotification(notification)}
-                          className={`flex w-full items-start gap-3 rounded-xl px-2 py-3 text-left transition hover:bg-pink-50 ${
-                            isUnread ? "bg-white" : "opacity-75"
+                          className={`flex w-full items-start gap-3 rounded-xl px-3 py-3.5 text-left transition hover:bg-pink-50 dark:hover:bg-neutral-900 md:px-2 md:py-3 ${
+                            isUnread ? "bg-white dark:bg-neutral-950" : "opacity-75"
                           }`}
                         >
                           <span className="relative shrink-0">
                             <UserAvatar user={notification.actor} />
-                            <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white shadow-sm">
+                            <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white shadow-sm dark:bg-neutral-800">
                               <img
                                 src={notification.icon}
                                 alt=""
@@ -979,18 +979,18 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                             </span>
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-semibold leading-5 text-neutral-800">
+                            <span className="block text-sm font-semibold leading-5 text-neutral-800 dark:text-white">
                               {notification.title}
                             </span>
-                            <span className="mt-0.5 block text-sm leading-5 text-neutral-600">
+                            <span className="mt-0.5 block text-sm leading-5 text-neutral-600 dark:text-neutral-300">
                               {notification.message}
                             </span>
-                            <span className="mt-1 block text-xs font-bold text-blue-600">
+                            <span className="mt-1 block text-xs font-bold text-[#c72fb2] dark:text-pink-300">
                               {formatNotificationTime(notification.date)}
                             </span>
                           </span>
                           {isUnread && (
-                            <span className="mt-4 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
+                            <span className="mt-4 h-2.5 w-2.5 shrink-0 rounded-full bg-[#dc4fb2]" />
                           )}
                           <span className="relative -mr-1 shrink-0">
                             <span
@@ -1011,7 +1011,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                                   );
                                 }
                               }}
-                              className="grid h-8 w-8 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+                              className="grid h-8 w-8 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white"
                               aria-label="Notification actions"
                               aria-haspopup="menu"
                               aria-expanded={openNotificationMenuId === notification.id}
@@ -1025,7 +1025,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
                             {openNotificationMenuId === notification.id && (
                               <span
-                                className="absolute right-0 top-9 z-50 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white py-2 text-sm shadow-lg"
+                                className="absolute right-0 top-9 z-50 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white py-2 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
                                 role="menu"
                                 onClick={(event) => event.stopPropagation()}
                               >
@@ -1041,7 +1041,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                                       requestDeleteNotification(event, notification.id);
                                     }
                                   }}
-                                  className="block w-full cursor-pointer px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50"
+                                  className="block w-full cursor-pointer px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-neutral-800"
                                 >
                                   Delete notification
                                 </span>
@@ -1302,7 +1302,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           {children}
         </div>
       </main>
-      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 pb-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 md:hidden ${
+      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-neutral-300 bg-[#f8f9fd]/95 px-4 pb-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-neutral-800 dark:bg-neutral-950/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] md:hidden ${
         isSidebarExpanded ? "translate-y-full" : "translate-y-0"
       }`}>
         <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
@@ -1315,14 +1315,14 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 onClick={() => onNavigate?.(item.id)}
                 className={`flex min-h-[66px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-black transition ${
                   isActive
-                    ? "bg-pink-50 text-[#e11d9c]"
-                    : "text-slate-500 hover:bg-slate-50"
+                    ? "bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]"
+                    : "text-neutral-900 hover:bg-white hover:text-[#c72fb2] dark:text-white dark:hover:bg-linear-to-b dark:hover:from-[#df4bb4] dark:hover:to-[#c72fb2] dark:hover:text-white"
                 }`}
               >
                 <Icon
                   name={item.icon}
                   className={`h-7 w-7 object-contain ${
-                    isActive ? "" : "opacity-70 grayscale"
+                    isActive ? "brightness-0 invert" : "opacity-70 grayscale dark:brightness-0 dark:invert"
                   }`}
                 />
                 <span>{item.label}</span>

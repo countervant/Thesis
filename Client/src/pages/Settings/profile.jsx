@@ -1,10 +1,28 @@
 import { useMemo, useState } from "react";
 import InitialsAvatar from "../../components/InitialsAvatar.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { authAPI, getApiErrorMessage } from "../../services/api.js";
 
-const skills = {
+const defaultSkills = {
   "Technical Skills": ["React", "Laravel", "JavaScript", "TypeScript", "PHP", "MySQL", "Git", "UI/UX Design"],
   "Soft Skills": ["Leadership", "Communication", "Problem Solving", "Time Management", "Teamwork", "Adaptability"],
   "Other Expertise": ["System Administration", "Database Management", "Cybersecurity Basics", "Agile Methodology"],
+};
+
+const getStorageKey = (user) => `clientraProfileSettings:${user?._id || user?.id || user?.email || "guest"}`;
+
+const formatBirthday = (birthday) => {
+  if (!birthday) return "";
+  const date = new Date(birthday);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
+const loadLocalSettings = (user) => {
+  try {
+    return JSON.parse(localStorage.getItem(getStorageKey(user)) || "{}");
+  } catch {
+    return {};
+  }
 };
 
 const getFullName = (user) =>
@@ -60,25 +78,91 @@ const inputClass =
 const iconInputClass = `${inputClass} pl-10`;
 
 const ProfileSettings = ({ user }) => {
+  const { updateUser } = useAuth();
+  const localSettings = useMemo(() => loadLocalSettings(user), [user]);
   const initialData = useMemo(
     () => ({
       fullName: getFullName(user),
       email: user?.email || "peejong@gmail.com",
       phone: user?.phone || "+632313213123",
       address: user?.country || "Philippines",
-      birthday: "February 14, 2001",
-      gender: "Male",
-      department: user?.companyName || "Clientra",
-      position: user?.position || "",
+      birthday: formatBirthday(user?.birthday),
+      gender: localSettings.gender || "Prefer not to say",
+      companyName: user?.companyName || "Clientra",
+      role: user?.position || "",
       avatar: user?.avatar || "",
       coverPhoto: user?.coverPhoto || "",
     }),
-    [user]
+    [localSettings.gender, user]
   );
   const [formData, setFormData] = useState(initialData);
+  const [skillGroups, setSkillGroups] = useState(() => localSettings.skills || defaultSkills);
+  const [newSkill, setNewSkill] = useState("");
+  const [newSkillGroup, setNewSkillGroup] = useState("Technical Skills");
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({ ...currentData, [field]: value }));
+    setMessage("");
+    setError("");
+  };
+
+  const addSkill = () => {
+    const skill = newSkill.trim();
+    if (!skill) return;
+    setSkillGroups((currentGroups) => ({
+      ...currentGroups,
+      [newSkillGroup]: currentGroups[newSkillGroup].includes(skill)
+        ? currentGroups[newSkillGroup]
+        : [...currentGroups[newSkillGroup], skill],
+    }));
+    setNewSkill("");
+    setShowSkillForm(false);
+  };
+
+  const removeSkill = (group, skill) => {
+    setSkillGroups((currentGroups) => ({
+      ...currentGroups,
+      [group]: currentGroups[group].filter((item) => item !== skill),
+    }));
+  };
+
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    if (isSaving) return;
+    const nameParts = formData.fullName.trim().split(/\s+/).filter(Boolean);
+    if (nameParts.length < 2) {
+      setError("Please enter both first and last name.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage("");
+    setError("");
+    try {
+      const updatedUser = await authAPI.updateMe({
+        firstName: nameParts[0],
+        lastName: nameParts.slice(1).join(" "),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        country: formData.address.trim(),
+        birthday: formData.birthday,
+        companyName: formData.companyName.trim(),
+        position: formData.role.trim(),
+        avatar: formData.avatar,
+        coverPhoto: formData.coverPhoto,
+      });
+      localStorage.setItem(getStorageKey(user), JSON.stringify({ gender: formData.gender, skills: skillGroups }));
+      updateUser(updatedUser);
+      setMessage("Profile settings saved.");
+    } catch (saveError) {
+      setError(getApiErrorMessage(saveError, "Unable to save profile settings."));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -116,7 +200,7 @@ const ProfileSettings = ({ user }) => {
               {user?.role || "Admin"}
             </span>
             <p className="mt-3 text-sm font-black text-[#10142d] dark:text-white">
-              {formData.position || "System Administrator"}
+              {formData.role || "System Administrator"}
             </p>
             <p className="mx-auto mt-2 max-w-[220px] text-xs font-semibold leading-5 text-slate-500">
               Managing the system and ensuring everything runs smoothly.
@@ -124,7 +208,7 @@ const ProfileSettings = ({ user }) => {
             <div className="mt-4 space-y-3 border-y border-pink-50 py-3.5 text-left text-xs font-bold text-slate-600">
               <p className="flex items-center gap-3"><Icon name="mail" />{formData.email}</p>
               <p className="flex items-center gap-3"><Icon name="phone" />{formData.phone}</p>
-              <p className="flex items-center gap-3"><Icon name="location" />{formData.department}</p>
+              <p className="flex items-center gap-3"><Icon name="location" />{formData.companyName}</p>
               <p className="flex items-center gap-3"><Icon name="calendar" />{getJoinedDate(user)}</p>
             </div>
             <div className="mt-4">
@@ -149,7 +233,12 @@ const ProfileSettings = ({ user }) => {
         </section>
       </aside>
 
-      <form className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+      <form id="profile-settings-form" onSubmit={saveProfile} className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+        {(message || error) && (
+          <p className={`mb-4 rounded-xl px-4 py-3 text-sm font-black ${error ? "bg-red-50 text-red-500" : "bg-pink-50 text-pink-600"}`}>
+            {error || message}
+          </p>
+        )}
         <section>
           <h2 className="mb-4 flex items-center gap-3 text-base font-black text-[#10142d] dark:text-white">
             <Icon name="person" className="h-5 w-5" /> Personal Information
@@ -168,7 +257,7 @@ const ProfileSettings = ({ user }) => {
               <input type="text" value={formData.address} onChange={(event) => updateField("address", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Birthday" icon="calendar" required>
-              <input type="text" value={formData.birthday} onChange={(event) => updateField("birthday", event.target.value)} className={iconInputClass} />
+              <input type="date" value={formData.birthday} onChange={(event) => updateField("birthday", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Gender" icon="person" required>
               <select value={formData.gender} onChange={(event) => updateField("gender", event.target.value)} className={iconInputClass}>
@@ -188,11 +277,11 @@ const ProfileSettings = ({ user }) => {
             <Field label="Employee ID" icon="id">
               <input type="text" value={getEmployeeId(user)} readOnly className={`${iconInputClass} bg-slate-50`} />
             </Field>
-            <Field label="Department" icon="briefcase">
-              <input type="text" value={formData.department} onChange={(event) => updateField("department", event.target.value)} className={iconInputClass} />
+            <Field label="Company" icon="briefcase">
+              <input type="text" value={formData.companyName} onChange={(event) => updateField("companyName", event.target.value)} className={iconInputClass} />
             </Field>
-            <Field label="Position" icon="person">
-              <input type="text" value={formData.position} onChange={(event) => updateField("position", event.target.value)} className={iconInputClass} />
+            <Field label="Role" icon="person">
+              <input type="text" value={formData.role} onChange={(event) => updateField("role", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Work Status" required>
               <input type="text" value="Full-time" readOnly className={`${inputClass} bg-slate-50`} />
@@ -210,23 +299,33 @@ const ProfileSettings = ({ user }) => {
                 Manage your skills and expertise to showcase your strengths.
               </p>
             </div>
-            <button type="button" className="h-9 rounded-lg border border-[#c72fb2] px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
+            <button type="button" onClick={() => setShowSkillForm((visible) => !visible)} className="h-9 rounded-lg border border-pink-500 px-4 text-xs font-black text-pink-600 transition hover:bg-pink-50 dark:hover:bg-pink-500 dark:hover:text-white">
               + Add Skill
             </button>
           </div>
-          {Object.entries(skills).map(([group, items]) => (
+          {showSkillForm && (
+            <div className="mb-4 flex flex-wrap gap-2 rounded-xl bg-pink-50 p-3">
+              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} placeholder="Enter a skill" className={`${inputClass} min-w-[180px] flex-1`} />
+              <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-auto`}>
+                {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
+              </select>
+              <button type="button" onClick={addSkill} className="h-10 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Add</button>
+            </div>
+          )}
+          {Object.entries(skillGroups).map(([group, items]) => (
             <div key={group} className="mb-4 last:mb-0">
               <h3 className="mb-3 text-sm font-black text-[#10142d] dark:text-white">{group}</h3>
               <div className="flex flex-wrap gap-2">
                 {items.map((skill) => (
-                  <span key={skill} className="rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]">
-                    {skill} <span className="ml-1">x</span>
-                  </span>
+                  <button type="button" onClick={() => removeSkill(group, skill)} key={skill} aria-label={`Remove ${skill}`} className="rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-pink-600 transition hover:border-pink-300 hover:bg-pink-100">
+                    {skill} <span className="ml-1">×</span>
+                  </button>
                 ))}
               </div>
             </div>
           ))}
         </section>
+        <span className="sr-only" aria-live="polite">{isSaving ? "Saving profile settings" : message}</span>
       </form>
     </div>
   );

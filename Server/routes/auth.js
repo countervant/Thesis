@@ -390,6 +390,7 @@ router.post("/reset-password", async (req, res) => {
           birthday,
           avatar,
           coverPhoto,
+          currentPassword,
           password,
         } = req.body;
 
@@ -454,6 +455,10 @@ router.post("/reset-password", async (req, res) => {
         if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
 
         if (password) {
+          if (currentPassword && !(await user.matchPassword(currentPassword))) {
+            return res.status(400).json({ message: "Current password is incorrect" });
+          }
+
           if (password.length < 8) {
             return res
               .status(400)

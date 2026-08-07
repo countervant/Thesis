@@ -82,14 +82,14 @@ const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
             {status && <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-500">
               <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-neutral-900"><Mail className="h-4 w-4 text-[#b62ca1]" />Method: {status.method}</span>
               <span className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-neutral-900">{status.maskedEmail}</span>
-              {status.required && <span className="rounded-lg bg-violet-50 px-3 py-2 text-violet-600">Required for Admin</span>}
+              {status.required && <span className="rounded-lg bg-pink-50 px-3 py-2 text-pink-600">Required for Admin</span>}
             </div>}
           </div>
         </div>
         {loading ? <LoaderCircle className="h-5 w-5 animate-spin text-[#b62ca1]" /> : status && (
           status.enabled
             ? <button type="button" disabled={status.required} onClick={() => setDisableOpen(true)} className="h-10 shrink-0 rounded-xl border border-slate-200 px-5 text-xs font-black text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50">{status.required ? "Required" : "Disable 2FA"}</button>
-            : <button type="button" onClick={() => setEnableOpen(true)} className="h-10 shrink-0 rounded-xl bg-linear-to-r from-pink-500 to-purple-600 px-5 text-xs font-black text-white shadow-lg shadow-pink-200/40">Enable 2FA</button>
+            : <button type="button" onClick={() => setEnableOpen(true)} className="h-10 shrink-0 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Enable 2FA</button>
         )}
       </div>
       {status?.enabled && <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />Email verification is required on new devices. Verified devices are trusted for {status.trustedDeviceDays || 30} days.</div>}

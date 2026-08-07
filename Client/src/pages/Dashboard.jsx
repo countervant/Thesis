@@ -233,7 +233,6 @@ const MessagesPanel = () => {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
-  const [editingText, setEditingText] = useState("");
   const [busyMessageId, setBusyMessageId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoadingInbox, setIsLoadingInbox] = useState(true);
@@ -244,18 +243,27 @@ const MessagesPanel = () => {
   const [bulkDraft, setBulkDraft] = useState("");
   const [selectedRecipientIds, setSelectedRecipientIds] = useState([]);
   const [openMenuMessageId, setOpenMenuMessageId] = useState("");
+  const [mobileActionMessage, setMobileActionMessage] = useState(null);
   const [openInboxMenuId, setOpenInboxMenuId] = useState("");
   const [inboxFilter, setInboxFilter] = useState("all");
   const [inboxState, setInboxState] = useState(() =>
     readMessageInboxState(currentUserId)
   );
   const [newMessageSearch, setNewMessageSearch] = useState("");
+  const [isMobileThreadOpen, setIsMobileThreadOpen] = useState(false);
   const threadEndRef = useRef(null);
+  const messageInputRef = useRef(null);
   const activeUserIdRef = useRef("");
+  const longPressTimerRef = useRef(null);
+  const longPressStartRef = useRef(null);
 
   useEffect(() => {
     setInboxState(readMessageInboxState(currentUserId));
   }, [currentUserId]);
+
+  useEffect(() => () => {
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+  }, []);
 
   const updateInboxState = (updater) => {
     setInboxState((currentState) => {
@@ -274,6 +282,7 @@ const MessagesPanel = () => {
       setActiveUserId("");
       setActiveParticipant(null);
       setMessages([]);
+      setIsMobileThreadOpen(false);
     }
     setOpenInboxMenuId("");
   };
@@ -295,6 +304,7 @@ const MessagesPanel = () => {
       setActiveUserId("");
       setActiveParticipant(null);
       setMessages([]);
+      setIsMobileThreadOpen(false);
     }
     setOpenInboxMenuId("");
   };
@@ -497,9 +507,9 @@ const MessagesPanel = () => {
   const handleSelectConversation = (participant) => {
     setActiveUserId(getEntityId(participant));
     setActiveParticipant(participant);
+    setIsMobileThreadOpen(true);
     setDraft("");
     setEditingMessageId("");
-    setEditingText("");
   };
 
   const handleStartNewMessage = () => {
@@ -624,18 +634,19 @@ const MessagesPanel = () => {
 
   const handleStartEditMessage = (message) => {
     setEditingMessageId(getEntityId(message));
-    setEditingText(message.text || "");
+    setDraft(message.text || "");
+    window.setTimeout(() => messageInputRef.current?.focus(), 0);
   };
 
   const handleCancelEditMessage = () => {
     setEditingMessageId("");
-    setEditingText("");
+    setDraft("");
   };
 
   const handleUpdateMessage = async (event) => {
     event.preventDefault();
 
-    const text = editingText.trim();
+    const text = draft.trim();
     if (!editingMessageId || !text || busyMessageId) return;
 
     try {
@@ -650,7 +661,7 @@ const MessagesPanel = () => {
         )
       );
       setEditingMessageId("");
-      setEditingText("");
+      setDraft("");
       await refreshThreads();
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to edit message.");
@@ -672,13 +683,40 @@ const MessagesPanel = () => {
       );
       if (editingMessageId === messageId) {
         setEditingMessageId("");
-        setEditingText("");
+        setDraft("");
       }
       await refreshThreads();
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete message.");
     } finally {
       setBusyMessageId("");
+    }
+  };
+
+  const cancelMessageLongPress = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  };
+
+  const startMessageLongPress = (event, message, isMine, isEditing) => {
+    if (!isMine || isEditing || event.pointerType === "mouse") return;
+    cancelMessageLongPress();
+    longPressStartRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      setMobileActionMessage(message);
+      longPressTimerRef.current = null;
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 550);
+  };
+
+  const moveMessageLongPress = (event) => {
+    const start = longPressStartRef.current;
+    if (!start) return;
+    if (Math.abs(event.clientX - start.x) > 8 || Math.abs(event.clientY - start.y) > 8) {
+      cancelMessageLongPress();
     }
   };
 
@@ -742,12 +780,15 @@ const MessagesPanel = () => {
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(term));
   });
+  const mobileContactUsers = users
+    .filter((participant) => participant.isOnline || participant.online)
+    .slice(0, 10);
 
   return (
-  <section className="-mx-4 -mb-0 -mt-4 flex h-[calc(100vh-74px)] select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
-    <aside className="hidden w-[310px] shrink-0 border-r border-slate-100 bg-white px-5 py-7 dark:border-[#DA70D6]/60 dark:bg-neutral-950 sm:flex sm:flex-col lg:w-[350px]">
+  <section className="relative -mx-4 -mb-0 -mt-4 flex h-[calc(100dvh-188px)] select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 md:h-[calc(100vh-74px)] lg:-mx-9">
+    <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#DA70D6]/60 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
       <div className="flex items-center justify-between gap-4">
-        <h1 className="page-title text-2xl leading-none">Messages</h1>
+        <h1 className="page-title text-3xl leading-none md:text-2xl">Messages</h1>
         <button
           type="button"
           onClick={handleStartNewMessage}
@@ -759,7 +800,7 @@ const MessagesPanel = () => {
         </button>
       </div>
 
-      <label className="mt-6 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#DA70D6]/80 dark:bg-neutral-900">
+      <label className="mt-5 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#DA70D6]/80 dark:bg-neutral-900 md:mt-6">
         <span className="sr-only">Search inbox</span>
         <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.9" />
@@ -774,11 +815,38 @@ const MessagesPanel = () => {
         />
       </label>
 
-      <div className="mt-5 grid grid-cols-3 gap-3 text-xs font-black">
+      {mobileContactUsers.length > 0 && (
+        <div className="-mx-4 mt-5 flex gap-4 overflow-x-auto px-4 pb-2 md:hidden">
+          {mobileContactUsers.map((participant) => {
+            const participantId = getEntityId(participant);
+            const isOnline = Boolean(participant.isOnline || participant.online);
+            return (
+              <button
+                key={participantId}
+                type="button"
+                onClick={() => handleSelectConversation(participant)}
+                className="w-[72px] shrink-0 text-center"
+              >
+                <span className="relative mx-auto block w-fit">
+                  <Avatar className="h-16 w-16 ring-2 ring-pink-200 dark:ring-neutral-700" user={participant} />
+                  {isOnline && (
+                    <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950" />
+                  )}
+                </span>
+                <span className="mt-2 block truncate text-xs font-bold text-slate-700 dark:text-neutral-200">
+                  {getDisplayName(participant).split(" ")[0]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-3 gap-2 text-xs font-black md:mt-5 md:gap-3">
         <button
           type="button"
           onClick={() => setInboxFilter("all")}
-          className={`rounded-2xl px-4 py-3 ${
+          className={`rounded-full px-3 py-2.5 md:rounded-2xl md:px-4 md:py-3 ${
             inboxFilter === "all"
               ? "bg-pink-50 text-[#ff3faf]"
               : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-300"
@@ -789,7 +857,7 @@ const MessagesPanel = () => {
         <button
           type="button"
           onClick={() => setInboxFilter("unread")}
-          className={`rounded-2xl px-4 py-3 ${
+          className={`rounded-full px-3 py-2.5 md:rounded-2xl md:px-4 md:py-3 ${
             inboxFilter === "unread"
               ? "bg-pink-50 text-[#ff3faf]"
               : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-300"
@@ -805,7 +873,7 @@ const MessagesPanel = () => {
         <button
           type="button"
           onClick={() => setInboxFilter("archived")}
-          className={`rounded-2xl px-4 py-3 ${
+          className={`rounded-full px-3 py-2.5 md:rounded-2xl md:px-4 md:py-3 ${
             inboxFilter === "archived"
               ? "bg-pink-50 text-[#ff3faf]"
               : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-300"
@@ -815,7 +883,7 @@ const MessagesPanel = () => {
         </button>
       </div>
 
-      <div className="mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-4 min-h-0 flex-1 space-y-0 overflow-y-auto md:mt-6 md:space-y-3 md:pr-1">
         {isLoadingInbox && (
           <MessageInboxSkeleton rows={5} />
         )}
@@ -839,35 +907,35 @@ const MessagesPanel = () => {
             key={participantId}
             type="button"
             onClick={() => handleSelectConversation(participant)}
-            className={`relative flex w-full items-center gap-4 rounded-2xl border px-3 py-4 pr-12 text-left transition ${
+            className={`relative flex w-full items-center gap-3 border px-1 py-3.5 pr-11 text-left transition md:gap-4 md:rounded-2xl md:px-3 md:py-4 md:pr-12 ${
               isActive
-                ? "border-pink-200 bg-pink-50 shadow-[0_10px_28px_rgba(236,72,153,0.12)] dark:border-[#DA70D6] dark:bg-neutral-900"
-                : "border-pink-100 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.06)] hover:bg-pink-50/70 dark:border-[#DA70D6]/80 dark:bg-neutral-950 dark:hover:bg-neutral-900"
+                ? "border-transparent bg-transparent md:border-pink-200 md:bg-pink-50 md:shadow-[0_10px_28px_rgba(236,72,153,0.12)] md:dark:border-[#DA70D6] md:dark:bg-neutral-900"
+                : "border-transparent bg-transparent hover:bg-pink-50/70 dark:hover:bg-neutral-900 md:border-pink-100 md:bg-white md:shadow-[0_6px_22px_rgba(15,23,42,0.06)] md:dark:border-[#DA70D6]/80 md:dark:bg-neutral-950"
             }`}
           >
             <span className="relative shrink-0">
-              <Avatar className="h-12 w-12" user={participant} />
+              <Avatar className="h-14 w-14 md:h-12 md:w-12" user={participant} />
               {isOnline && (
                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950" />
               )}
             </span>
             <span className="min-w-0 flex-1">
               <span
-                className={`block truncate text-sm leading-tight ${
+                className={`block truncate text-base leading-tight md:text-sm ${
                   isActive || item.unreadCount ? "font-extrabold" : "font-medium"
                 }`}
               >
                 {getDisplayName(participant)}
               </span>
               <span
-                className={`mt-1 block truncate text-xs leading-tight text-slate-500 ${
+                className={`mt-1.5 block truncate text-sm leading-tight text-slate-500 md:mt-1 md:text-xs ${
                   item.unreadCount ? "font-bold" : "font-medium"
                 }`}
               >
                 {preview}
               </span>
             </span>
-            <span className="mr-5 flex w-11 shrink-0 flex-col items-end gap-2 self-stretch pt-1">
+            <span className="mr-4 flex w-12 shrink-0 flex-col items-end gap-2 self-stretch pt-1 md:mr-5 md:w-11">
               <span className="whitespace-nowrap text-[10px] font-bold text-slate-400">
                 {formatMessageTime(item.lastMessage?.createdAt) || ""}
               </span>
@@ -948,15 +1016,28 @@ const MessagesPanel = () => {
       </div>
     </aside>
 
-    <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950">
-      <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
-        <div className="min-w-0">
-          <h1 className="page-title text-2xl leading-none">Messages</h1>
-          {activeName && (
-            <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-neutral-300">
-              {activeName}
+    <div className={`${isMobileThreadOpen ? "flex" : "hidden"} min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950 md:flex`}>
+      <div className="flex min-h-[68px] items-center justify-between gap-3 border-b border-slate-100 bg-white px-3 py-3 dark:border-neutral-800 dark:bg-neutral-950 md:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsMobileThreadOpen(false)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-600 transition hover:bg-pink-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-900"
+            aria-label="Back to conversations"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <path d="m15 5-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {activeParticipant && <Avatar className="h-10 w-10 shrink-0" user={activeParticipant} />}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black">{activeName || "Conversation"}</p>
+            <p className="truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
+              {activeParticipant?.isOnline || activeParticipant?.online
+                ? "Online"
+                : activeParticipant?.role || "Offline"}
             </p>
-          )}
+          </div>
         </div>
         <button
           type="button"
@@ -969,32 +1050,8 @@ const MessagesPanel = () => {
         </button>
       </div>
 
-      {conversationItems.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto border-b border-slate-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950 sm:hidden">
-          {conversationItems.map((item) => {
-            const participant = item.participant;
-            const participantId = getEntityId(participant);
-
-            return (
-              <button
-                key={participantId}
-                type="button"
-                onClick={() => handleSelectConversation(participant)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${
-                  participantId === activeUserId
-                    ? "bg-[#ff3faf] text-white"
-                    : "bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-neutral-200"
-                }`}
-              >
-                {getDisplayName(participant)}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {activeParticipant && (
-        <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 sm:flex">
+        <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 md:flex">
           <span className="relative shrink-0">
             <Avatar className="h-12 w-12" user={activeParticipant} />
             {(activeParticipant.isOnline || activeParticipant.online) && (
@@ -1020,12 +1077,12 @@ const MessagesPanel = () => {
       )}
 
       {errorMessage && (
-        <p className="mx-4 mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-200 sm:mx-8">
+        <p className="mx-4 mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-200 md:mx-8">
           {errorMessage}
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-5 dark:bg-neutral-950 sm:px-8">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-5 dark:bg-neutral-950 md:px-8">
         <div className="w-full space-y-3">
           {isLoadingThread && (
             <MessageThreadSkeleton />
@@ -1059,13 +1116,13 @@ const MessagesPanel = () => {
                 </p>
               )}
               <div
-                className={`group/message flex items-end gap-3 ${isMine ? "justify-end" : "pl-6 sm:pl-10"}`}
+                className={`group/message flex items-end gap-2 md:gap-3 ${isMine ? "justify-end" : "pl-0 md:pl-10"}`}
               >
                 {!isMine && (
                   <Avatar className="h-9 w-9 shrink-0" user={activeParticipant} />
                 )}
                 {isMine && !isEditing && (
-                  <div className="relative flex h-full min-h-10 items-center opacity-0 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+                  <div className="relative mt-1 hidden min-h-10 self-start items-center opacity-0 transition md:flex md:group-hover/message:opacity-100 md:group-focus-within/message:opacity-100">
                     <button
                       type="button"
                       onClick={() =>
@@ -1109,44 +1166,28 @@ const MessagesPanel = () => {
                     )}
                   </div>
                 )}
-                <div className={`flex max-w-[76%] flex-col ${isMine ? "items-end" : "items-start"} sm:max-w-[560px]`}>
+                <div className={`flex max-w-[82%] flex-col ${isMine ? "items-end" : "items-start"} md:max-w-[560px]`}>
                   <div
-                    className={`relative mb-4 rounded-[22px] px-5 py-3 text-sm font-semibold shadow-sm ${
+                    className={`relative mb-4 touch-manipulation rounded-[22px] px-4 py-3 text-sm font-semibold shadow-sm md:px-5 ${
                       isMine
-                        ? "bg-pink-50 text-[#172033] dark:text-white"
+                        ? "bg-pink-100 text-[#172033] dark:bg-neutral-800 dark:text-white md:bg-pink-50"
                         : "bg-slate-100 text-[#172033] dark:bg-neutral-800 dark:text-white"
                     }`}
+                    onPointerDown={(event) => startMessageLongPress(event, message, isMine, isEditing)}
+                    onPointerMove={moveMessageLongPress}
+                    onPointerUp={cancelMessageLongPress}
+                    onPointerCancel={cancelMessageLongPress}
+                    onPointerLeave={cancelMessageLongPress}
+                    onContextMenu={(event) => {
+                      if (!isMine || isEditing) return;
+                      event.preventDefault();
+                      if (window.matchMedia("(max-width: 767px)").matches) {
+                        setMobileActionMessage(message);
+                      }
+                    }}
                   >
-                    {isEditing ? (
-                      <form onSubmit={handleUpdateMessage} className="flex min-w-[240px] flex-col gap-2">
-                        <input
-                          type="text"
-                          value={editingText}
-                          onChange={(event) => setEditingText(event.target.value)}
-                          maxLength={1000}
-                          autoFocus
-                          className="h-10 select-text rounded-full border border-black/20 bg-white px-4 text-sm text-neutral-950 caret-[#ff3faf] outline-none focus:ring-2 focus:ring-white/80"
-                        />
-                        <span className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCancelEditMessage}
-                            className="rounded-full bg-black/10 px-3 py-1 text-xs font-bold"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={!editingText.trim() || busyMessageId === messageId}
-                            className="rounded-full bg-black px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
-                          >
-                            Save
-                          </button>
-                        </span>
-                      </form>
-                    ) : (
-                      <>
-                        <p className="select-text break-words caret-[#ff3faf]">{message.text}</p>
+                    <>
+                      <p className="select-none break-words caret-[#ff3faf] md:select-text">{message.text}</p>
                         <p
                           className={`absolute top-full mt-1 whitespace-nowrap text-[10px] font-bold ${
                             isMine ? "right-0 text-slate-400" : "left-0 text-slate-400 dark:text-neutral-400"
@@ -1155,8 +1196,7 @@ const MessagesPanel = () => {
                           {formatMessageTime(message.createdAt)}
                           {message.editedAt ? " · edited" : ""}
                         </p>
-                      </>
-                    )}
+                    </>
                   </div>
                   {isMine && !isEditing && (
                     <div className="mt-1 flex items-center gap-2 pr-2 text-[11px] font-bold text-slate-400 dark:text-neutral-400">
@@ -1174,12 +1214,20 @@ const MessagesPanel = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSendMessage} className="shrink-0 border-t border-slate-100 bg-white px-4 py-4 dark:border-neutral-800 dark:bg-neutral-950 sm:px-8">
-        <div className="flex w-full items-center gap-3 rounded-full border border-slate-100 bg-white px-4 py-2 shadow-[0_8px_30px_rgba(15,23,42,0.08)] dark:border-neutral-800 dark:bg-neutral-900">
+      <form onSubmit={editingMessageId ? handleUpdateMessage : handleSendMessage} className="shrink-0 border-t border-slate-100 bg-white px-2 py-2.5 dark:border-neutral-800 dark:bg-neutral-950 md:px-8 md:py-4">
+        {editingMessageId && (
+          <div className="mb-2 flex items-center justify-between gap-3 rounded-xl bg-pink-50 px-3 py-2 text-xs font-bold text-[#c72fb2] dark:bg-neutral-900 dark:text-pink-300">
+            <span className="min-w-0 truncate">Editing message</span>
+            <button type="button" onClick={handleCancelEditMessage} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm hover:bg-pink-100 dark:hover:bg-neutral-800" aria-label="Cancel editing">
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+        )}
+        <div className="flex w-full items-center gap-1.5 rounded-full border border-slate-100 bg-white px-2 py-1.5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] dark:border-neutral-800 dark:bg-neutral-900 md:gap-3 md:px-4 md:py-2">
           <button
             type="button"
             disabled={!activeUserId || isSending}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] disabled:opacity-40 dark:text-white dark:hover:bg-neutral-800"
+            className="hidden h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] disabled:opacity-40 dark:text-white dark:hover:bg-neutral-800 min-[390px]:grid"
             aria-label="Attach file"
             title="Attach file"
           >
@@ -1190,19 +1238,20 @@ const MessagesPanel = () => {
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Message</span>
             <input
+              ref={messageInputRef}
               type="text"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Type your message..."
+              placeholder={editingMessageId ? "Edit your message..." : "Type your message..."}
               maxLength={1000}
               disabled={!activeUserId || isSending}
-              className="h-10 w-full select-text rounded-full border-0 bg-transparent px-2 pr-11 text-sm font-semibold text-slate-700 caret-[#ff3faf] outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+              className="h-10 w-full select-text rounded-full border-0 bg-transparent px-2 pr-9 text-sm font-semibold text-slate-700 caret-[#ff3faf] outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white md:pr-11"
             />
             <button
               type="button"
               onClick={() => setDraft((currentDraft) => `${currentDraft} :)`)}
               disabled={!activeUserId || isSending}
-              className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
+              className="absolute right-0 top-1/2 hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800 min-[390px]:grid md:right-1"
               aria-label="Choose emoji"
               title="Choose emoji"
             >
@@ -1212,20 +1261,69 @@ const MessagesPanel = () => {
           <button
             type="submit"
             disabled={!draft.trim() || !activeUserId || isSending}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff3faf] text-white shadow-[0_10px_22px_rgba(255,63,175,0.28)] transition hover:bg-[#e9369f] disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Send message"
-            title="Send message"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ff3faf] text-white shadow-[0_10px_22px_rgba(255,63,175,0.28)] transition hover:bg-[#e9369f] disabled:cursor-not-allowed disabled:opacity-40 md:h-11 md:w-11"
+            aria-label={editingMessageId ? "Save edited message" : "Send message"}
+            title={editingMessageId ? "Save edited message" : "Send message"}
           >
-            <SendIcon className="h-5 w-5" />
+            {editingMessageId ? (
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+                <path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <SendIcon className="h-5 w-5" />
+            )}
           </button>
         </div>
       </form>
     </div>
+    {mobileActionMessage && (
+      <div
+        className="fixed inset-0 z-50 flex items-end bg-black/45 p-3 md:hidden"
+        onClick={() => setMobileActionMessage(null)}
+      >
+        <div
+          className="w-full rounded-3xl bg-white p-2 shadow-2xl dark:bg-neutral-900"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <p className="px-4 py-3 text-center text-xs font-bold text-slate-500 dark:text-neutral-400">
+            Message options
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              handleStartEditMessage(mobileActionMessage);
+              setMobileActionMessage(null);
+            }}
+            className="flex h-12 w-full items-center rounded-2xl px-4 text-left text-sm font-black transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-white dark:hover:bg-neutral-800"
+          >
+            Edit message
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const message = mobileActionMessage;
+              setMobileActionMessage(null);
+              handleDeleteMessage(message);
+            }}
+            className="flex h-12 w-full items-center rounded-2xl px-4 text-left text-sm font-black text-red-500 transition hover:bg-red-50 dark:hover:bg-neutral-800"
+          >
+            Delete message
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileActionMessage(null)}
+            className="mt-1 flex h-12 w-full items-center justify-center rounded-2xl bg-slate-100 px-4 text-sm font-black text-slate-700 dark:bg-neutral-800 dark:text-white"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
     {isNewMessageOpen && (
-      <div className="fixed inset-0 z-40 grid place-items-center bg-black/45 px-4">
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-3 py-4 sm:px-4">
         <form
           onSubmit={handleSendBulkMessage}
-          className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-2xl dark:bg-neutral-950"
+          className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-4 shadow-2xl dark:bg-neutral-950 sm:p-5"
         >
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-lg font-extrabold">New Message</h2>
@@ -1281,7 +1379,7 @@ const MessagesPanel = () => {
             placeholder="Type a message"
             className="mt-4 h-28 w-full select-text resize-none rounded-lg border border-neutral-300 bg-transparent p-3 text-sm caret-[#ff3faf] outline-none focus:border-[#dc4fb2] focus:ring-2 focus:ring-[#dc4fb2]/25 dark:border-neutral-800"
           />
-          <div className="mt-4 flex justify-end gap-3">
+          <div className="mt-4 flex flex-col-reverse gap-2 min-[390px]:flex-row min-[390px]:justify-end sm:gap-3">
             <button type="button" onClick={() => setIsNewMessageOpen(false)} className="h-10 rounded-lg border border-neutral-300 px-5 text-sm font-bold">
               Cancel
             </button>

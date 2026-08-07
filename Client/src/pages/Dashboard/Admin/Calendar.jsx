@@ -481,7 +481,7 @@ const AdminCalendar = () => {
 
   return (
     <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
-      <section className="mx-auto max-w-[1840px] rounded-2xl border border-pink-100 bg-white px-5 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)]">
+      <section className="mx-auto max-w-[1840px] rounded-2xl border border-pink-100 bg-white px-3 py-4 shadow-[0_8px_24px_rgba(190,65,158,0.08)] md:px-5 md:py-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white" style={{ fontFamily: "var(--font-bruno)" }}>
@@ -491,31 +491,31 @@ const AdminCalendar = () => {
               Manage company schedules, events, meetings, and deadlines.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={goToday} className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm">Today</button>
-            <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-2 md:flex md:w-auto md:flex-wrap md:items-center md:gap-3">
+            <button type="button" onClick={goToday} className="order-1 h-9 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm">Today</button>
+            <div className="order-3 flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <button type="button" onClick={() => goToMonth(-1)} className="grid h-9 w-10 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
               <button type="button" onClick={() => goToMonth(1)} className="grid h-9 w-10 place-items-center border-l border-slate-200 text-slate-700" aria-label="Next month"><Icon className="h-4 w-4" /></button>
             </div>
-            <select value={currentMonth.getMonth()} onChange={(event) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="h-9 rounded-xl border border-transparent bg-white px-3 text-sm font-black text-[#26314f] outline-none">
+            <select value={currentMonth.getMonth()} onChange={(event) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="order-2 h-9 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#26314f] outline-none md:border-transparent">
               {getMonthOptions(currentMonth.getFullYear()).map((month) => <option key={month.getMonth()} value={month.getMonth()}>{formatMonth(month)}</option>)}
             </select>
-            <button type="button" onClick={resetFilters} className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-[#10142d] shadow-sm"><Icon name="filter" className="h-4 w-4" />Reset filters</button>
-            <button type="button" onClick={addEvent} className="flex h-9 items-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]"><Icon name="plus" className="h-4 w-4" />Add Event</button>
+            <button type="button" onClick={resetFilters} className="order-4 flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-[#10142d] shadow-sm md:px-4"><Icon name="filter" className="h-4 w-4" />Reset</button>
+            <button type="button" onClick={addEvent} className="order-5 col-span-2 flex h-9 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] md:col-span-1"><Icon name="plus" className="h-4 w-4" />Add Event</button>
           </div>
         </header>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-5 grid grid-cols-5 gap-1 md:gap-4">
           {stats.map((item) => (
-            <Card key={item.label} className={`min-h-28 px-5 py-4 !shadow-sm dark:!shadow-none ring-1 ${statCardStyles[item.tone]}`}>
-              <div className="flex items-center gap-4">
-                <span className={`grid h-14 w-14 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
-                  <Icon name={item.icon} className="h-7 w-7" />
+            <Card key={item.label} className={`min-h-0 px-1.5 py-2 !shadow-sm dark:!shadow-none ring-1 md:min-h-24 md:px-4 md:py-3 ${statCardStyles[item.tone]}`}>
+              <div className="flex items-center gap-1.5 md:gap-3">
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg md:h-12 md:w-12 md:rounded-2xl ${toneStyles[item.tone]}`}>
+                  <Icon name={item.icon} className="h-4 w-4 md:h-6 md:w-6" />
                 </span>
                 <div>
-                  <p className="text-2xl font-black leading-none text-[#10142d]">{item.value}</p>
-                  <p className="mt-1 text-xs font-black leading-tight text-[#10142d]">{item.label}</p>
-                  <p className="text-xs font-semibold text-slate-500">{item.sublabel}</p>
+                  <p className="text-base font-black leading-none text-[#10142d] md:text-2xl">{item.value}</p>
+                  <p className="mt-0.5 text-[8px] font-black leading-tight text-[#10142d] md:mt-1 md:text-xs">{item.label}</p>
+                  <p className="hidden text-xs font-semibold text-slate-500 md:block">{item.sublabel}</p>
                 </div>
               </div>
             </Card>
@@ -523,11 +523,11 @@ const AdminCalendar = () => {
         </div>
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(680px,1fr)_370px]">
-          <div className="space-y-4">
-            <Card className="p-4">
-              <h2 className="mb-4 text-base font-black">Calendars</h2>
+          <div className="grid grid-cols-2 gap-2 xl:block xl:space-y-4">
+            <Card className="p-3 md:p-4">
+              <h2 className="mb-3 text-sm font-black md:mb-4 md:text-base">Calendars</h2>
               {calendarChecks.map(([item, color]) => (
-                <label key={item} className="mb-3 flex items-center gap-3 text-sm font-bold text-slate-600">
+                <label key={item} className="mb-2 flex min-w-0 items-center gap-2 text-[10px] font-bold text-slate-600 md:mb-3 md:gap-3 md:text-sm">
                   <input
                     type="checkbox"
                     checked={enabledCalendars[item]}
@@ -541,16 +541,35 @@ const AdminCalendar = () => {
                       </svg>
                     )}
                   </span>
-                  {item}
+                  <span className="truncate">{item}</span>
                 </label>
               ))}
-              <button type="button" onClick={() => setAllCalendars(!Object.values(enabledCalendars).every(Boolean))} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-black text-[#26314f]"> Select All</button>
+              <button type="button" onClick={() => setAllCalendars(!Object.values(enabledCalendars).every(Boolean))} className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-[10px] font-black text-[#26314f] md:mt-3 md:h-11 md:text-sm">Select All</button>
+            </Card>
+
+            <Card className="p-3 xl:hidden">
+              <h2 className="mb-3 truncate text-sm font-black">Calendar Analytics</h2>
+              <div className="grid justify-items-center gap-3">
+                <div className="grid h-20 w-20 place-items-center rounded-full" style={{ background: "conic-gradient(#f97316 0 39%, #3b82f6 39% 61%, #ec4899 61% 82%, #22c55e 82% 100%)" }}>
+                  <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-center shadow-sm">
+                    <span className="text-lg font-black leading-none">{monthEvents.length}<span className="mt-0.5 block text-[8px] text-slate-500">Events</span></span>
+                  </div>
+                </div>
+                <div className="w-full space-y-1.5 text-[9px] font-bold">
+                  {analytics.map(([label, value, color]) => (
+                    <p key={label} className="flex min-w-0 items-center justify-between gap-1">
+                      <span className="flex min-w-0 items-center gap-1.5"><span className={`h-2 w-2 shrink-0 rounded-full ${color}`} /><span className="truncate">{label}</span></span>
+                      <span className="shrink-0">{value}</span>
+                    </p>
+                  ))}
+                </div>
+              </div>
             </Card>
           </div>
 
           <Card className="overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-slate-200 text-center text-base font-black text-[#10142d]">
-              {weekDays.map((day) => <span key={day} className="py-3">{day}</span>)}
+            <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[10px] font-black text-[#10142d] md:text-base">
+              {weekDays.map((day) => <span key={day} className="py-2 md:py-3">{day}</span>)}
             </div>
             <div className="grid grid-cols-7">
               {getCalendarDays(currentMonth).map((date) => {
@@ -567,19 +586,19 @@ const AdminCalendar = () => {
                       setSelectedDate(dateKey);
                       setShowDayEventsPanel(true);
                     }}
-                    className={`min-h-28 border-b border-r border-slate-200 p-2.5 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
+                    className={`min-h-16 border-b border-r border-slate-200 p-1 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white md:min-h-28 md:p-2.5 ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
                     aria-label={`View events for ${formatDate(dateKey)}`}
                   >
-                    <div className={`mb-2 text-sm font-black ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
-                    <div className="space-y-1.5">
+                    <div className={`mb-1 text-[10px] font-black md:mb-2 md:text-sm ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
+                    <div className="flex flex-wrap gap-1 md:block md:space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (
-                        <div key={event.id} className={`relative truncate rounded-lg px-2.5 py-1.5 text-xs font-black ${event.calendarClass}`}>
-                          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current align-middle" />
-                          {event.title}
-                          {event.time && <span className="block pl-3 font-bold opacity-80">{event.time}</span>}
+                        <div key={event.id} className={`relative h-2 w-2 truncate rounded-full text-[0] font-black md:h-auto md:w-auto md:rounded-lg md:px-2.5 md:py-1.5 md:text-xs ${event.calendarClass}`}>
+                          <span className="hidden h-1.5 w-1.5 rounded-full bg-current align-middle md:mr-1 md:inline-block" />
+                          <span className="hidden md:inline">{event.title}</span>
+                          {event.time && <span className="hidden pl-3 font-bold opacity-80 md:block">{event.time}</span>}
                         </div>
                       ))}
-                      {dayEvents.length > 2 && <p className="pl-2 text-xs font-black text-slate-500">+ {dayEvents.length - 2} more</p>}
+                      {dayEvents.length > 2 && <p className="text-[9px] font-black text-slate-500 md:pl-2 md:text-xs">+{dayEvents.length - 2}<span className="hidden md:inline"> more</span></p>}
                     </div>
                   </button>
                 );
@@ -605,9 +624,9 @@ const AdminCalendar = () => {
               ))}
             </Card>
 
-            <Card className="p-4">
+            <Card className="hidden p-4 xl:block">
               <h2 className="mb-4 text-base font-black">Calendar Analytics</h2>
-              <div className="grid gap-5 sm:grid-cols-[132px_minmax(0,1fr)] sm:items-center">
+              <div className="grid justify-items-center gap-5 md:grid-cols-[132px_minmax(0,1fr)] md:items-center md:justify-items-stretch">
                 <div className="grid h-32 w-32 place-items-center rounded-full" style={{ background: "conic-gradient(#f97316 0 39%, #3b82f6 39% 61%, #ec4899 61% 82%, #22c55e 82% 100%)" }}>
                   <div className="grid h-20 w-20 place-items-center rounded-full bg-white text-center shadow-sm">
                     <span className="text-3xl font-black leading-none">{monthEvents.length}<span className="mt-1 block text-xs text-slate-500">Total Events</span></span>

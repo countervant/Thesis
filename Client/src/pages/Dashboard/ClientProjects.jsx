@@ -209,17 +209,17 @@ const ProjectStats = ({ projects }) => {
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
       {stats.map((item) => (
-        <Card key={item.label} className="p-5">
-          <div className="flex items-center gap-4">
-            <span className={`grid h-16 w-16 place-items-center rounded-2xl ring-1 ${statStyles[item.label]}`}>
-              <img src={item.icon} alt="" className="h-8 w-8 object-contain" aria-hidden="true" />
+        <Card key={item.label} className="p-3 md:p-5">
+          <div className="flex items-center gap-2 md:gap-4">
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 md:h-16 md:w-16 md:rounded-2xl ${statStyles[item.label]}`}>
+              <img src={item.icon} alt="" className="h-5 w-5 object-contain md:h-8 md:w-8" aria-hidden="true" />
             </span>
             <span>
-              <span className="block text-3xl font-black text-[#10142d] dark:text-white">{item.value}</span>
-              <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.label}</span>
-              <span className="mt-1 block text-xs font-bold text-slate-500">{item.sub}</span>
+              <span className="block text-xl font-black text-[#10142d] dark:text-white md:text-3xl">{item.value}</span>
+              <span className="block text-[10px] font-black leading-tight text-[#10142d] dark:text-white md:text-sm">{item.label}</span>
+              <span className="mt-1 hidden text-xs font-bold text-slate-500 md:block">{item.sub}</span>
             </span>
           </div>
         </Card>
@@ -880,7 +880,7 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
           </label>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
           <button
             type="button"
             onClick={onClose}
@@ -987,7 +987,7 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
           </fieldset>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
           <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
           <button type="submit" disabled={!form.overallRating} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c72fb2] text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="send" className="h-4 w-4" />Submit Feedback</button>
         </div>
@@ -1014,14 +1014,14 @@ const ClientProjectsSkeleton = () => (
         <Skeleton className="h-9 w-44" />
         <Skeleton className="mt-3 h-4 w-80 max-w-full" />
       </div>
-      <div className="grid w-full gap-3 sm:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
+      <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
         <Skeleton className="h-11 w-full rounded-xl" />
         <Skeleton className="h-11 w-full rounded-xl" />
         <Skeleton className="h-11 w-full rounded-xl" />
       </div>
     </header>
 
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <Card key={index} className="p-5">
           <div className="flex items-center gap-4">
@@ -1371,7 +1371,7 @@ const ClientProjects = () => {
             Track the progress of all your projects in one place.
           </p>
         </div>
-        <div className="grid w-full gap-3 sm:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
+        <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_150px_150px] lg:w-auto lg:min-w-[620px]">
           <label className="relative block">
             <span className="sr-only">Search projects</span>
             <input

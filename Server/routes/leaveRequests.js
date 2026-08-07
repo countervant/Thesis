@@ -57,8 +57,8 @@ const buildRequestQuery = (req) => {
     query.status = req.query.status;
   }
 
-  if (req.query.department) {
-    query.department = req.query.department;
+  if (req.query.role) {
+    query.employeeRole = req.query.role;
   }
 
   const monthRange = getMonthRange(req.query.month || "this");
@@ -126,7 +126,7 @@ router.get("/", protect, async (req, res) => {
     const summaryQuery = { ...query };
     delete summaryQuery.status;
 
-    const [requests, total, summary, leaveTypes, departments] = await Promise.all([
+    const [requests, total, summary, leaveTypes, roles] = await Promise.all([
       LeaveRequest.find(query)
         .populate(leaveRequestPopulate)
         .sort({ createdAt: -1 })
@@ -167,7 +167,7 @@ router.get("/", protect, async (req, res) => {
         },
       ]).option({ maxTimeMS: 8000 }),
       LeaveRequest.distinct("leaveType", baseQuery),
-      LeaveRequest.distinct("department", baseQuery),
+      LeaveRequest.distinct("employeeRole", baseQuery),
     ]);
 
     const summaryData = summary[0] || {};
@@ -177,7 +177,7 @@ router.get("/", protect, async (req, res) => {
 
     res.status(200).json({
       ...pagedResponse({ data: requests, page, limit, total, key: "leaveRequests" }),
-      departments: departments.filter(Boolean).sort(),
+      roles: roles.filter(Boolean).sort(),
       leaveTypes: leaveTypes.filter(Boolean).sort(),
       summary: {
         pending: byStatus.Pending || 0,

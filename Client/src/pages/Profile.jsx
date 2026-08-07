@@ -304,10 +304,10 @@ const Profile = ({ embedded = false }) => {
   const fullName = getFullName(formData);
 
   const content = (
-    <main className={embedded ? "w-full" : "w-full px-5 py-10"}>
+    <main className={embedded ? "w-full" : "w-full px-4 py-6 md:px-5 md:py-10"}>
       <div className="mb-4">
         <h1
-          className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
+          className="text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-3xl"
           style={{ fontFamily: "var(--font-bruno)" }}
         >
         Profile
@@ -582,61 +582,20 @@ const Profile = ({ embedded = false }) => {
                 ))}
               </section>
 
-              <section className="border-t border-pink-50 pt-5">
-                <h2 className="mb-4 flex items-center gap-3 text-base font-black">
-                  <FormIcon name="lock" /> Account Settings
-                </h2>
-                <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
-                  <button
-                    type="button"
-                    className="flex h-16 w-full self-start items-center gap-4 rounded-lg border border-pink-200 bg-pink-50/30 px-4 py-3 text-left transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2]"
-                  >
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-pink-100 text-[#c72fb2]">
-                      <FormIcon name="lock" className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-black text-[#10142d] dark:text-white">
-                        Change Password
-                      </span>
-                      <span className="mt-1 block text-xs font-semibold text-slate-500">
-                        Update your password regularly for better security.
-                      </span>
-                    </span>
-                    <span className="text-3xl font-light text-[#c72fb2]" aria-hidden="true">
-                      ›
-                    </span>
-                  </button>
-                  <div className="space-y-4 rounded-xl border border-slate-100 bg-white p-4 dark:bg-[#141414]">
-                    {["Two-factor authentication (2FA)", "Email notifications"].map((setting) => (
-                      <div key={setting} className="flex items-center justify-between rounded-xl border border-pink-50 bg-white px-4 py-3 dark:bg-neutral-950">
-                        <span>
-                          <span className="block text-sm font-black text-[#10142d] dark:text-white">{setting}</span>
-                          <span className="text-sm font-semibold text-slate-500">
-                            {setting.startsWith("Two") ? "Add an extra layer of security to your account." : "Receive email updates about your account."}
-                          </span>
-                        </span>
-                        <span className="flex h-7 w-12 items-center rounded-full bg-[#c72fb2] p-1">
-                          <span className="h-5 w-5 translate-x-5 rounded-full bg-white shadow-sm" />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-pink-50 px-5 py-4">
+            <div className="grid grid-cols-2 gap-3 border-t border-pink-50 px-4 py-4 md:flex md:justify-end md:px-5">
               <button
                 type="button"
                 onClick={() => navigate(`/${user?.role || "client"}/dashboard`)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-8 text-xs font-black text-slate-600 dark:bg-[#141414] dark:text-white"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 dark:bg-[#141414] dark:text-white md:px-8"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="h-10 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-8 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                className="h-10 rounded-lg bg-linear-to-b from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 md:px-8"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
               </button>

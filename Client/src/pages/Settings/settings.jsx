@@ -146,9 +146,9 @@ const Settings = () => {
             ? "xl:grid-cols-[210px_minmax(0,1fr)]"
             : "xl:grid-cols-[210px_minmax(0,1fr)_270px]"
         }`}>
-          <aside className="self-start rounded-2xl border border-pink-100 bg-white p-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+          <aside className="min-w-0 self-start overflow-hidden rounded-2xl border border-pink-100 bg-white p-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800 xl:overflow-visible">
             <div className="flex h-full flex-col">
-              <nav className="space-y-1.5">
+              <nav className="flex gap-2 overflow-x-auto pb-1 xl:block xl:space-y-1.5 xl:overflow-visible xl:pb-0">
                 {menuItems.map(([label, icon]) => {
                   const isActive = label === activeTab;
                   return (
@@ -156,7 +156,7 @@ const Settings = () => {
                       key={label}
                       type="button"
                       onClick={() => setActiveTab(label)}
-                      className={`flex h-9 w-full items-center gap-3 rounded-lg px-3 text-xs font-black transition ${
+                      className={`flex h-10 w-auto shrink-0 items-center gap-2 rounded-lg px-4 text-xs font-black transition xl:h-9 xl:w-full xl:gap-3 xl:px-3 ${
                         isActive
                           ? "bg-pink-50 text-[#c72fb2] dark:bg-[#c72fb2] dark:text-white"
                           : "text-[#243154] hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-[#c72fb2] dark:hover:text-white"
@@ -169,7 +169,7 @@ const Settings = () => {
                 })}
               </nav>
 
-              <section className="mt-4 rounded-xl border border-pink-200 bg-pink-50/60 p-3 shadow-[0_4px_14px_rgba(199,47,178,0.08)]">
+              <section className="mt-4 hidden rounded-xl border border-pink-200 bg-pink-50/60 p-3 shadow-[0_4px_14px_rgba(199,47,178,0.08)] xl:block">
                 <div className="flex items-start gap-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#c72fb2] bg-white text-sm font-black text-[#c72fb2]">
                     ?
@@ -203,10 +203,11 @@ const Settings = () => {
             ) : (
               <>
                 <ProfileSettings user={user} />
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex items-center justify-stretch gap-3 md:justify-end">
                   <button
-                    type="button"
-                    className="h-9 min-w-[160px] rounded-lg bg-linear-to-r from-[#8b35ff] to-[#dc4fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(139,53,255,0.2)] transition hover:brightness-105"
+                    type="submit"
+                    form="profile-settings-form"
+                    className="h-10 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-9 md:w-auto md:min-w-[160px]"
                   >
                     Save Changes
                   </button>
@@ -218,7 +219,7 @@ const Settings = () => {
           {!usesFullContent && <aside className="space-y-3">
             <section className="rounded-2xl border border-pink-100 bg-white p-3.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
               <h2 className="mb-3 flex items-center gap-3 text-sm font-black text-[#10142d] dark:text-white">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-50 text-[#8b35ff]">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-pink-50 text-pink-600">
                   <img src={settingsIcon} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
                 </span>
                 Account Overview
@@ -226,7 +227,7 @@ const Settings = () => {
               <div className="divide-y divide-pink-50">
                 {overviewItems.map(([label, value, icon]) => (
                   <div key={label} className="flex items-center gap-3 py-3">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-50 text-[#8b35ff]">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-pink-50 text-pink-600">
                       <Icon name={icon} className="h-4 w-4" />
                     </span>
                     <span>
@@ -244,7 +245,7 @@ const Settings = () => {
 
             <section className="rounded-2xl border border-pink-100 bg-white p-3.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
               <h2 className="mb-3 flex items-center gap-3 text-sm font-black text-[#10142d] dark:text-white">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-50 text-[#8b35ff]">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-pink-50 text-pink-600">
                   <Icon name="bolt" className="h-5 w-5" />
                 </span>
                 Quick Actions
@@ -264,8 +265,8 @@ const Settings = () => {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-violet-100 bg-linear-to-b from-violet-50 to-pink-50 p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.05)] dark:border-[#8b35ff] dark:from-[#141414] dark:to-[#141414]">
-              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-b from-[#8b35ff] to-[#b44cff] text-white shadow-[0_12px_24px_rgba(139,53,255,0.24)]">
+            <section className="rounded-2xl border border-pink-100 bg-pink-50 p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.05)] dark:border-pink-500 dark:bg-[#141414]">
+              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-pink-500 text-white shadow-[0_12px_24px_rgba(236,72,153,0.24)]">
                 <Icon name="shield" className="h-8 w-8" />
               </span>
               <h2 className="mt-4 text-sm font-black text-[#10142d] dark:text-white">
@@ -277,7 +278,7 @@ const Settings = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("Privacy & Security")}
-                className="mt-4 h-9 w-full rounded-lg border border-[#b678ff] bg-white text-xs font-black text-[#8b35ff] transition hover:bg-violet-50 dark:bg-neutral-950 dark:text-[#b678ff] dark:hover:!bg-[#8b35ff] dark:hover:text-white"
+                className="mt-4 h-9 w-full rounded-lg border border-pink-400 bg-white text-xs font-black text-pink-600 transition hover:bg-pink-100 dark:bg-neutral-950 dark:text-pink-400 dark:hover:!bg-pink-500 dark:hover:text-white"
               >
                 Go to Privacy & Security
               </button>
@@ -359,7 +360,7 @@ const Settings = () => {
                 </button>
                 <button
                   type="submit"
-                  className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#8b35ff] via-[#c72fb2] to-[#e347b3] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(227,71,179,0.22)] transition hover:brightness-105"
+                  className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
                 >
                   Submit Request
                 </button>

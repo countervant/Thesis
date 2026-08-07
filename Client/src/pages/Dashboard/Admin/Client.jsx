@@ -422,7 +422,7 @@ const AdminClients = () => {
   return (
         <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
         <div className="mx-auto max-w-[1500px]">
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <h1
                 className="text-3xl leading-none text-neutral-950 dark:text-white"
@@ -434,11 +434,11 @@ const AdminClients = () => {
                 Manage and organize your client relationships
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex w-full items-center md:w-auto">
               <button
                 type="button"
                 onClick={exportClients}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.32)] transition hover:brightness-105"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.32)] transition hover:brightness-105 md:w-auto"
               >
                 <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
                   <path d="M10 3v9m0 0 4-4m-4 4-4-4M4 16h12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

@@ -418,7 +418,7 @@ const AdminEmployees = ({
   return (
         <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
           <div className="mx-auto max-w-[1500px]">
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
                  <h1
                 className="text-3xl leading-none text-neutral-950 dark:text-white"
@@ -431,11 +431,11 @@ const AdminEmployees = ({
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center md:gap-3">
               <button
                 type="button"
                 onClick={onAddEmployee}
-                className="flex h-10 items-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
+                className="flex h-10 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:px-5"
               >
                 <Icon name="add" className="h-5 w-5" />
                 <span>Add Employee</span>
@@ -444,7 +444,7 @@ const AdminEmployees = ({
               <button
                 type="button"
                 onClick={exportEmployees}
-                className="h-10 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
+                className="h-10 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:px-5"
               >
                 Export
               </button>

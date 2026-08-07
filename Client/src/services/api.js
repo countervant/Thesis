@@ -922,7 +922,7 @@ export const leaveRequestAPI = {
     return {
       ...response,
       leaveRequests: asArray(response?.leaveRequests || response?.data, "leave requests"),
-      departments: Array.isArray(response?.departments) ? response.departments : [],
+      roles: Array.isArray(response?.roles) ? response.roles : [],
       leaveTypes: Array.isArray(response?.leaveTypes) ? response.leaveTypes : [],
       summary: response?.summary || {},
     };
