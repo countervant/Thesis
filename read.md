@@ -35,13 +35,16 @@ CORS_ORIGINS=https://your-client-domain.example
 VITE_API_URL=https://your-api-domain.example/api
 ```
 
-Password reset and email two-factor authentication need a Gmail account with an
-app password:
+Password reset and email two-factor authentication use Brevo's HTTPS email API:
 
 ```bash
-GMAIL_USER=
-GMAIL_PASS=
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=
+BREVO_SENDER_NAME=CLIENTRA Security
 ```
+
+Create and verify the sender in Brevo before deploying. Use the REST API
+configuration above rather than Brevo SMTP so email works on Render's free tier.
 
 OTP hashes use `JWT_SECRET` as the key by default. For independent key rotation,
 set a separate long random value:

@@ -5,9 +5,9 @@ import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { sendPasswordResetCode } from "../utils/email.js";
 import {
   disableTwoFactor,
   getTwoFactorStatus,
@@ -156,10 +156,6 @@ router.post("/forgot-password", async (req, res) => {
     return res.status(400).json({ message: "Enter a valid email" });
   }
 
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
-    return res.status(500).json({ message: "Email service not configured" });
-  }
-
   try {
     const user = await User.findOne({ email: normalizedEmail }).select("+trustedDevices");
 
@@ -174,72 +170,19 @@ router.post("/forgot-password", async (req, res) => {
     user.resetPasswordOTPExpires = Date.now() + 1000 * 60 * 10; // 10 minutes
     await user.save();
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      to: user.email,
-      from: process.env.GMAIL_USER,
-      subject: "Your password reset code",
-      html: `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #f6f7fb; padding: 32px 0;">
-          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-            <tr>
-              <td align="center">
-                <table role="presentation" cellpadding="0" cellspacing="0" width="520" style="background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.06);">
-                  <tr>
-                    <td style="text-align: center; padding-bottom: 12px;">
-                      <div style="display: inline-block; padding: 10px 14px; border-radius: 14px; background: linear-gradient(135deg, #ff72a1, #8c6ff0); color: #fff; font-weight: 700; letter-spacing: 0.5px;">
-                        Reset Request
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="text-align: center; color: #1f2937; font-size: 22px; font-weight: 700; padding: 4px 0 8px;">
-                      Here is your OTP
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="text-align: center; color: #4b5563; font-size: 15px; padding: 0 16px 18px;">
-                      Use this one-time code to reset your password. It will expire in 10 minutes.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="text-align: center; padding: 10px 0 24px;">
-                      <div style="display: inline-block; letter-spacing: 6px; font-size: 30px; font-weight: 800; color: #111827; background: #f5f3ff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 24px;">
-                        ${otp}
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="text-align: center; color: #6b7280; font-size: 13px; padding-bottom: 6px;">
-                      If you did not request this, you can ignore this email.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="text-align: center; color: #9ca3af; font-size: 12px;">
-                      This is an automated message. Please do not reply.
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </div>
-      `,
-    });
+    try {
+      await sendPasswordResetCode({ to: user.email, code: otp });
+    } catch (error) {
+      user.resetPasswordOTP = undefined;
+      user.resetPasswordOTPExpires = undefined;
+      await user.save({ validateModifiedOnly: true }).catch(() => {});
+      throw error;
+    }
 
     res.status(200).json({ message: "If that email is registered, reset instructions have been sent." });
   } catch (error) {
     console.error("Forgot password error:", error);
-    res.status(500).json({ message: "Unable to send reset email" });
+    res.status(error.status || 500).json({ message: "Unable to send reset email" });
   }
 });
 
