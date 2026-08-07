@@ -17,7 +17,7 @@ const taskTemplates = [
       "Generate initial image drafts",
       "Select and enhance best output",
       "Client review and revisions",
-      "Export final image",
+      "completed/paid",
     ],
   },
   {
