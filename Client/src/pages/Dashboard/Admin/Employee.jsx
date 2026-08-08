@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { employeeAPI, getApiErrorMessage } from "../../../services/api.js";
+import { employeeAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
@@ -7,13 +7,71 @@ import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
 const filters = ["All", "Active", "Inactive"];
 
+const taskStatusLabels = {
+  pending: "Pending",
+  in_progress: "In progress",
+  review: "In review",
+  done: "Completed",
+};
+
+const taskStatusStyles = {
+  pending: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-300",
+  in_progress: "bg-pink-50 text-[#c72fb2] dark:bg-pink-950/40 dark:text-pink-300",
+  review: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300",
+  done: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300",
+};
+
+const getEntityId = (entity) => String(entity?._id || entity?.id || entity || "");
+
+const getAssignedEmployeeIds = (task) => {
+  const assigneeIds = [
+    getEntityId(task?.assignedTo),
+    ...(Array.isArray(task?.assignees) ? task.assignees.map(getEntityId) : []),
+    ...(Array.isArray(task?.subtasks)
+      ? task.subtasks.map((subtask) => getEntityId(subtask?.assignedTo))
+      : []),
+  ].filter(Boolean);
+
+  return [...new Set(assigneeIds)];
+};
+
+const formatTaskDueDate = (value) => {
+  if (!value) return "No due date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No due date";
+
+  return `Due ${date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+};
+
+const normalizeAssignedTask = (task) => ({
+  id: getEntityId(task),
+  title: task?.title || "Untitled task",
+  status: task?.status || "pending",
+  dueDate: task?.dueDate || "",
+  archived: Boolean(task?.archived),
+});
+
+const sortAssignedTasks = (firstTask, secondTask) => {
+  const firstCompleted = firstTask.status === "done";
+  const secondCompleted = secondTask.status === "done";
+  if (firstCompleted !== secondCompleted) return firstCompleted ? 1 : -1;
+
+  const firstDueDate = new Date(firstTask.dueDate || 8640000000000000).getTime();
+  const secondDueDate = new Date(secondTask.dueDate || 8640000000000000).getTime();
+  return firstDueDate - secondDueDate;
+};
+
 const getInitials = (firstName = "", lastName = "") => {
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.trim();
   return initials.toUpperCase() || "EM";
 };
 
 const normalizeEmployee = (employee) => ({
-  id: employee._id || employee.id,
+  id: getEntityId(employee),
   initials: getInitials(employee.firstName, employee.lastName),
   name: [employee.firstName, employee.lastName].filter(Boolean).join(" "),
   avatar: employee.avatar || "",
@@ -23,6 +81,7 @@ const normalizeEmployee = (employee) => ({
   email: employee.email || "",
   country: employee.country || "",
   phone: employee.phone || "",
+  assignedTasks: [],
 });
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
@@ -280,7 +339,50 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
         </p>
       </div>
 
-      <div className="mt-auto flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-neutral-800">
+      <div className="mt-5 border-t border-slate-200 pt-4 dark:border-neutral-800">
+        <div className="flex items-center justify-between gap-3">
+          <p className="flex items-center gap-2 text-xs font-extrabold text-neutral-800 dark:text-neutral-100">
+            <Icon name="tasks" className="h-5 w-5 text-[#c72fb2]" />
+            Assigned tasks
+          </p>
+          <span className="rounded-full bg-pink-50 px-2.5 py-1 text-[10px] font-black text-[#c72fb2] dark:bg-pink-950/40 dark:text-pink-300">
+            {employee.assignedTasks.length} active
+          </span>
+        </div>
+
+        {employee.assignedTasks.length === 0 ? (
+          <p className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-400">
+            No tasks assigned.
+          </p>
+        ) : (
+          <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+            {employee.assignedTasks.map((task) => (
+              <li
+                key={task.id}
+                className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 truncate text-xs font-extrabold text-neutral-800 dark:text-neutral-100">
+                    {task.title}
+                  </p>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${
+                      taskStatusStyles[task.status] || taskStatusStyles.pending
+                    }`}
+                  >
+                    {taskStatusLabels[task.status] || task.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] font-semibold text-slate-500 dark:text-neutral-400">
+                  {formatTaskDueDate(task.dueDate)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-neutral-800">
         <button
           type="button"
           onClick={() => onEdit(employee)}
@@ -321,10 +423,36 @@ const AdminEmployees = ({
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await employeeAPI.getAll();
+        const [employeeData, taskData] = await Promise.all([
+          employeeAPI.getAll({ limit: 100 }),
+          taskAPI.getAll({ limit: 100, refresh: true }),
+        ]);
 
         if (isMounted) {
-          setEmployees(data.map(normalizeEmployee));
+          const tasksByEmployee = new Map();
+
+          taskData.forEach((sourceTask) => {
+            const task = normalizeAssignedTask(sourceTask);
+            if (task.archived || task.status === "done") return;
+
+            getAssignedEmployeeIds(sourceTask).forEach((employeeId) => {
+              const assignedTasks = tasksByEmployee.get(employeeId) || [];
+              assignedTasks.push(task);
+              tasksByEmployee.set(employeeId, assignedTasks);
+            });
+          });
+
+          setEmployees(
+            employeeData.map((employee) => {
+              const normalizedEmployee = normalizeEmployee(employee);
+              return {
+                ...normalizedEmployee,
+                assignedTasks: [...(tasksByEmployee.get(normalizedEmployee.id) || [])].sort(
+                  sortAssignedTasks
+                ),
+              };
+            })
+          );
         }
       } catch (error) {
         if (isMounted) {
@@ -357,6 +485,7 @@ const AdminEmployees = ({
         employee.email,
         employee.country,
         employee.phone,
+        ...employee.assignedTasks.map((task) => task.title),
       ]
         .join(" ")
         .toLowerCase()
@@ -391,7 +520,7 @@ const AdminEmployees = ({
   };
 
   const exportEmployees = () => {
-    const header = ["Name", "Status", "Role", "Email", "Country", "Phone"];
+    const header = ["Name", "Status", "Role", "Email", "Country", "Phone", "Assigned Tasks"];
     const rows = visibleEmployees.map((employee) => [
       employee.name,
       employee.status,
@@ -399,6 +528,7 @@ const AdminEmployees = ({
       employee.email,
       employee.country,
       employee.phone,
+      employee.assignedTasks.map((task) => task.title).join("; "),
     ]);
     const csv = [header, ...rows]
       .map((row) =>

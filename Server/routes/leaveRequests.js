@@ -166,8 +166,8 @@ router.get("/", protect, async (req, res) => {
           },
         },
       ]).option({ maxTimeMS: 8000 }),
-      LeaveRequest.distinct("leaveType", baseQuery),
-      LeaveRequest.distinct("employeeRole", baseQuery),
+      LeaveRequest.distinct("leaveType", baseQuery).maxTimeMS(8000),
+      LeaveRequest.distinct("employeeRole", baseQuery).maxTimeMS(8000),
     ]);
 
     const summaryData = summary[0] || {};

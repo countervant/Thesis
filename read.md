@@ -10,6 +10,20 @@ npm run build
 npm start
 ```
 
+### Render
+
+The repository includes a root `render.yaml` Blueprint. Deploy it from the
+repository root with:
+
+```text
+Build Command: npm run render-build
+Start Command: npm start
+Health Check Path: /api/health
+```
+
+The root `index.js` remains as a compatibility entry point for an existing
+Render service that is still configured to run `node index.js`.
+
 ### Required server environment
 
 Set these in the hosting provider:

@@ -5,7 +5,7 @@
   "name": "thesis",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "Server/server.js",
   "dependencies": {
     "ansi-regex": "^5.0.1",
     "ansi-styles": "^4.3.0",
@@ -36,6 +36,8 @@
     "server": "npm run dev --prefix Server",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "build": "npm install --include=dev --prefix Client && npm run build --prefix Client",
+    "render-build": "npm install --omit=dev --prefix Server && npm run build",
+    "postinstall": "npm run render-build",
     "start": "npm run start --prefix Server",
     "lint": "npm run lint --prefix Client",
     "install:all": "npm install && npm install --prefix Client && npm install --prefix Server"
