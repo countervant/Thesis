@@ -39,9 +39,19 @@ console.info(`[api] Base URL: ${API_URL}`);
 
 const cache = new Map();
 const CACHE_TIME = 2 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 100;
 const MAX_GET_RETRIES = 1;
 const RETRY_DELAY_MS = 750;
 const wait = (milliseconds) => new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
+
+const setCacheEntry = (key, value) => {
+  cache.delete(key);
+  cache.set(key, value);
+
+  while (cache.size > MAX_CACHE_ENTRIES) {
+    cache.delete(cache.keys().next().value);
+  }
+};
 
 const cachedGet = async (url) => {
   const cached = cache.get(url);
@@ -64,7 +74,7 @@ const cachedGet = async (url) => {
         ? `array(${response.data.length})`
         : typeof response.data;
       console.debug(`[api] GET ${url} cached ${dataShape}`);
-      cache.set(url, {
+      setCacheEntry(url, {
         data: response.data,
         time: Date.now(),
       });
@@ -75,7 +85,7 @@ const cachedGet = async (url) => {
       throw error;
     });
 
-  cache.set(url, { promise, time: now });
+  setCacheEntry(url, { promise, time: now });
   return promise;
 };
 
@@ -126,16 +136,24 @@ const asArray = (data, label) => {
     return data;
   }
 
-  if (Array.isArray(data?.data)) {
-    return data.data;
-  }
+  const collectionKeys = [
+    "data",
+    "items",
+    "tasks",
+    "employees",
+    "clients",
+    "budgets",
+    "posts",
+    "users",
+    "threads",
+    "messages",
+    "leaveRequests",
+  ];
 
-  if (Array.isArray(data?.tasks)) {
-    return data.tasks;
-  }
-
-  if (Array.isArray(data?.items)) {
-    return data.items;
+  for (const key of collectionKeys) {
+    if (Array.isArray(data?.[key])) {
+      return data[key];
+    }
   }
 
   console.warn(`[api] Expected ${label} to be an array, received:`, data);
@@ -260,17 +278,21 @@ const mergeCachedPost = (currentPost, nextPost) => ({
 });
 
 const updateCachedPost = (postId, updater) => {
-  ["/newsfeed", "/newsfeed/activity"].forEach((url) => {
-    const cached = cache.get(url);
-
-    if (!Array.isArray(cached?.data)) {
+  Array.from(cache.entries()).forEach(([url, cached]) => {
+    if (url !== "/newsfeed" && !url.startsWith("/newsfeed?") && !url.startsWith("/newsfeed/activity")) {
       return;
     }
 
-    cache.set(url, {
-      data: cached.data.map((post) =>
-        getEntityId(post) === postId ? updater(post) : post
-      ),
+    const posts = Array.isArray(cached?.data) ? cached.data : cached?.data?.posts;
+    if (!Array.isArray(posts)) return;
+
+    const updatedPosts = posts.map((post) =>
+      getEntityId(post) === postId ? updater(post) : post
+    );
+    setCacheEntry(url, {
+      data: Array.isArray(cached.data)
+        ? updatedPosts
+        : { ...cached.data, posts: updatedPosts },
       time: Date.now(),
     });
   });
@@ -284,15 +306,19 @@ const replaceCachedPost = (updatedPost) => {
 };
 
 const removeCachedPost = (postId) => {
-  ["/newsfeed", "/newsfeed/activity"].forEach((url) => {
-    const cached = cache.get(url);
-
-    if (!Array.isArray(cached?.data)) {
+  Array.from(cache.entries()).forEach(([url, cached]) => {
+    if (url !== "/newsfeed" && !url.startsWith("/newsfeed?") && !url.startsWith("/newsfeed/activity")) {
       return;
     }
 
-    cache.set(url, {
-      data: cached.data.filter((post) => getEntityId(post) !== postId),
+    const posts = Array.isArray(cached?.data) ? cached.data : cached?.data?.posts;
+    if (!Array.isArray(posts)) return;
+
+    const remainingPosts = posts.filter((post) => getEntityId(post) !== postId);
+    setCacheEntry(url, {
+      data: Array.isArray(cached.data)
+        ? remainingPosts
+        : { ...cached.data, posts: remainingPosts },
       time: Date.now(),
     });
   });
@@ -504,12 +530,15 @@ export const authAPI = {
 export const taskAPI = {
   getAll: async (params = "") => {
     let query = params;
+    let refresh = false;
     if (typeof params !== "string") {
-      const { refresh, ...queryParams } = params;
-      if (refresh) clearCache("/tasks");
+      const { refresh: shouldRefresh = false, ...queryParams } = params;
+      refresh = shouldRefresh;
       query = new URLSearchParams(queryParams).toString();
     }
-    return asArray(await cachedGet(`/tasks${query ? `?${query}` : ""}`), "tasks");
+    const url = `/tasks${query ? `?${query}` : ""}`;
+    if (refresh) cache.delete(url);
+    return asArray(await cachedGet(url), "tasks");
   },
 
   create: async (task) => {
@@ -637,12 +666,15 @@ export const newsfeedAPI = {
 
   getActivity: async (params = "") => {
     let query = params;
+    let refresh = false;
     if (typeof params !== "string") {
-      const { refresh, ...queryParams } = params;
-      if (refresh) clearCache("/newsfeed/activity");
+      const { refresh: shouldRefresh = false, ...queryParams } = params;
+      refresh = shouldRefresh;
       query = new URLSearchParams(queryParams).toString();
     }
-    return asArray(await cachedGet(`/newsfeed/activity${query ? `?${query}` : ""}`), "newsfeed activity");
+    const url = `/newsfeed/activity${query ? `?${query}` : ""}`;
+    if (refresh) cache.delete(url);
+    return asArray(await cachedGet(url), "newsfeed activity");
   },
 
   getMedia: async (id) => {

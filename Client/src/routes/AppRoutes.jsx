@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import {
   Route,
   createBrowserRouter,
@@ -10,19 +10,20 @@ import {
   useRouteError,
 } from "react-router-dom";
 
-import Login from "../pages/auth/Login.jsx";
-import Register from "../pages/auth/Register.jsx";
-import ForgotPassword from "../pages/auth/ForgotPassword.jsx";
-import ResetPassword from "../pages/auth/ResetPassword.jsx";
-import Dashboard from "../pages/Dashboard.jsx";
-import Profile from "../pages/Profile.jsx";
-import PublicProfile from "../pages/PublicProfile.jsx";
-import Unauthorized from "../pages/auth/Unauthorized.jsx";
 import TwoFactorVerification from "../components/auth/TwoFactorVerification.jsx";
-import TwoFactorSetup from "../pages/auth/TwoFactorSetup.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import AppLoadingScreen from "../components/AppLoadingScreen.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
+
+const Login = lazy(() => import("../pages/auth/Login.jsx"));
+const Register = lazy(() => import("../pages/auth/Register.jsx"));
+const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword.jsx"));
+const ResetPassword = lazy(() => import("../pages/auth/ResetPassword.jsx"));
+const Dashboard = lazy(() => import("../pages/Dashboard.jsx"));
+const Profile = lazy(() => import("../pages/Profile.jsx"));
+const PublicProfile = lazy(() => import("../pages/PublicProfile.jsx"));
+const Unauthorized = lazy(() => import("../pages/auth/Unauthorized.jsx"));
+const TwoFactorSetup = lazy(() => import("../pages/auth/TwoFactorSetup.jsx"));
 
 const dashboardPathByRole = {
   client: "/client/dashboard",
@@ -194,7 +195,11 @@ const AppRoutes = () => {
     )
   );
 
-  return <RouterProvider router={router} />;
+  return (
+    <Suspense fallback={<AppLoadingScreen />}>
+      <RouterProvider router={router} />
+    </Suspense>
+  );
 };
 
 export default AppRoutes;

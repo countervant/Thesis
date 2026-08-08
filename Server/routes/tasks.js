@@ -16,6 +16,44 @@ const privateUploadsRoot = path.resolve(__dirname, "../private_uploads/tasks");
 
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
+const allowedTaskViews = new Set(["calendar", "dashboard", "employee", "notification"]);
+
+const fullTaskFields = [
+  "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
+  "subtasks", "activities", "completedAt", "assignedTo", "assignees", "createdBy",
+  "requestedBy", "requestedByName", "revisionRequests.user", "revisionRequests.title",
+  "revisionRequests.section", "revisionRequests.priority", "revisionRequests.description",
+  "revisionRequests.preferredCompletionDate", "revisionRequests.createdAt",
+  "revisionRequests.startedAt", "revisionRequests.startedBy", "finalOutput.submittedBy",
+  "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName",
+  "finalOutput.fileUrl", "finalOutput.previewFileName", "finalOutput.originalStoredName",
+  "finalOutput.mimeType", "finalOutput.watermarked", "finalOutput.link",
+  "finalOutput.submittedAt", "feedback.user", "feedback.rating", "feedback.submittedBy",
+  "feedback.overallRating", "feedback.communication", "feedback.communicationRating",
+  "feedback.quality", "feedback.qualityRating", "feedback.timeliness",
+  "feedback.timelinessRating", "feedback.overallSatisfaction", "feedback.comment",
+  "feedback.wouldRecommend", "feedback.submittedAt", "feedback.reply.message",
+  "feedback.reply.repliedBy", "feedback.reply.repliedAt",
+  "attachments.fileName", "attachments.fileUrl", "archived", "archivedAt", "archivedBy",
+  "createdAt", "updatedAt",
+].join(" ");
+
+const taskFieldsByView = {
+  notification: [
+    "title", "assignedTo", "assignees", "subtasks.assignedTo", "createdBy",
+    "activities._id", "activities.type", "activities.actor", "activities.actorName",
+    "activities.title", "activities.details", "activities.createdAt", "createdAt", "updatedAt",
+  ].join(" "),
+  employee: "title status dueDate assignedTo assignees subtasks.assignedTo archived createdAt updatedAt",
+  calendar: "title status startDate dueDate assignedTo assignees subtasks._id archived createdAt updatedAt",
+  dashboard: [
+    "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
+    "completedAt", "assignedTo", "assignees", "createdBy", "requestedBy", "requestedByName",
+    "subtasks.title", "subtasks.completed", "subtasks.assignedTo", "revisionRequests.title",
+    "revisionRequests.description", "revisionRequests.priority", "revisionRequests.createdAt",
+    "archived", "createdAt", "updatedAt",
+  ].join(" "),
+};
 
 const startOfToday = () => {
   const today = new Date();
@@ -327,6 +365,7 @@ router.get("/", protect, async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const query = { ...taskQueryForUser(req.user) };
     const search = String(req.query.search || "").trim();
+    const view = allowedTaskViews.has(req.query.view) ? req.query.view : "";
 
     if (search) {
       query.$and = [
@@ -353,85 +392,37 @@ router.get("/", protect, async (req, res) => {
       if (req.query.dueFrom) query.dueDate.$gte = new Date(req.query.dueFrom);
       if (req.query.dueTo) query.dueDate.$lte = new Date(req.query.dueTo);
     }
+    if (view === "employee") {
+      query.status = { $ne: "done" };
+      query.archived = { $ne: true };
+    }
 
-    const rawTasks = await Task.find(query)
-      .select([
-        "title",
-        "description",
-        "status",
-        "priority",
-        "startDate",
-        "dueDate",
-        "amount",
-        "paid",
-        "subtasks",
-        "activities",
-        "completedAt",
-        "assignedTo",
-        "assignees",
-        "createdBy",
-        "requestedBy",
-        "requestedByName",
-        "revisionRequests.user",
-        "revisionRequests.title",
-        "revisionRequests.section",
-        "revisionRequests.priority",
-        "revisionRequests.description",
-        "revisionRequests.preferredCompletionDate",
-        "revisionRequests.createdAt",
-        "revisionRequests.startedAt",
-        "revisionRequests.startedBy",
-        "finalOutput.submittedBy",
-        "finalOutput.message",
-        "finalOutput.outputMethod",
-        "finalOutput.fileName",
-        "finalOutput.fileUrl",
-        "finalOutput.previewFileName",
-        "finalOutput.originalStoredName",
-        "finalOutput.mimeType",
-        "finalOutput.watermarked",
-        "finalOutput.link",
-        "finalOutput.submittedAt",
-        "feedback.user",
-        "feedback.rating",
-        "feedback.submittedBy",
-        "feedback.overallRating",
-        "feedback.communication",
-        "feedback.communicationRating",
-        "feedback.quality",
-        "feedback.qualityRating",
-        "feedback.timeliness",
-        "feedback.timelinessRating",
-        "feedback.overallSatisfaction",
-        "feedback.comment",
-        "feedback.wouldRecommend",
-        "feedback.submittedAt",
-        "feedback.reply.message",
-        "feedback.reply.repliedBy",
-        "feedback.reply.repliedAt",
-        "attachments.fileName",
-        "attachments.fileUrl",
-        "archived",
-        "archivedAt",
-        "archivedBy",
-        "createdAt",
-        "updatedAt",
-      ].join(" "))
+    let taskRequest = Task.find(query)
+      .select(taskFieldsByView[view] || fullTaskFields)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .maxTimeMS(8000);
+
+    if (!view) {
       // Select only the avatar version here. The response transformer adds a
       // lightweight signed image URL instead of repeating Base64 image data.
-      .populate("assignedTo", "firstName lastName email role updatedAt")
+      taskRequest = taskRequest
+        .populate("assignedTo", "firstName lastName email role updatedAt")
       .populate("assignees", "firstName lastName email role updatedAt")
       .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
       .populate("createdBy", "firstName lastName companyName email role updatedAt")
       .populate("requestedBy", "firstName lastName companyName email role updatedAt")
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
-      .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
-      .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .maxTimeMS(8000)
-      .lean();
+        .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt");
+    } else if (view === "dashboard" || view === "notification") {
+      taskRequest = taskRequest
+        .populate("assignedTo", "firstName lastName email role updatedAt")
+        .populate("createdBy", "firstName lastName companyName email role updatedAt");
+    }
+
+    const rawTasks = await taskRequest.lean();
     const tasks = rawTasks.map(addTaskAvatarUrls);
     const total = skip + rawTasks.length;
 

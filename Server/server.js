@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 
 import { dbConnect, isDbConnected } from "./config/dbConnect.js";
 import auth from "./routes/auth.js";
@@ -113,6 +114,13 @@ app.use(
       console.warn(`[cors] Blocked origin: ${normalizedOrigin}`);
       return callback(new Error(`Origin ${normalizedOrigin} is not allowed by CORS`));
     },
+  })
+);
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) =>
+      req.path.endsWith("/events") ? false : compression.filter(req, res),
   })
 );
 app.use(express.json({ limit: "30mb" }));

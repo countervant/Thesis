@@ -1256,7 +1256,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
         setIsLoading(true);
         setLoadError("");
         const results = await Promise.allSettled([
-          taskAPI.getAll({ limit: 100 }),
+          taskAPI.getAll({ limit: 100, view: "dashboard" }),
           employeeAPI.getAll({ limit: 100 }),
           clientAPI.getAll({ limit: 100 }),
           budgetAPI.getAll({ limit: 100 }),

@@ -191,16 +191,17 @@ router.get("/", protect, async (req, res) => {
       ];
     }
 
-    const events = await CalendarEvent.find(query)
-      .sort({ date: 1, startTime: 1, createdAt: 1 })
-      .lean()
-      .maxTimeMS(8000);
-
     const now = new Date();
     const [requestedYear, requestedMonth] = month.split("-").map(Number);
     const birthdayYear = requestedYear || now.getFullYear();
     const birthdayMonthIndex = requestedMonth ? requestedMonth - 1 : now.getMonth();
-    const birthdayEvents = await birthdayEventsForMonth(req.user, birthdayYear, birthdayMonthIndex);
+    const [events, birthdayEvents] = await Promise.all([
+      CalendarEvent.find(query)
+        .sort({ date: 1, startTime: 1, createdAt: 1 })
+        .lean()
+        .maxTimeMS(8000),
+      birthdayEventsForMonth(req.user, birthdayYear, birthdayMonthIndex),
+    ]);
 
     res.status(200).json([...events, ...birthdayEvents].sort(
       (first, second) => new Date(first.date) - new Date(second.date) || String(first.startTime).localeCompare(String(second.startTime))

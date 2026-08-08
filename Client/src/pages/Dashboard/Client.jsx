@@ -277,7 +277,7 @@ const ClientDashboard = () => {
         setIsLoading(true);
         setErrorMessage("");
         const [taskResult, unreadResult, meetingResult, threadResult] = await Promise.allSettled([
-          taskAPI.getAll({ limit: 100 }),
+          taskAPI.getAll({ limit: 100, view: "dashboard" }),
           messageAPI.getUnreadCount(),
           calendarAPI.getAll({ limit: 20 }),
           messageAPI.getThreads({ limit: 3 }),
