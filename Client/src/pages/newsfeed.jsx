@@ -232,7 +232,9 @@ const Newsfeed = () => {
   const [isPosting, setIsPosting] = useState(false);
   const [showAllTeamMembers, setShowAllTeamMembers] = useState(false);
   const [onlineTeam, setOnlineTeam] = useState([]);
-  const canPost = user?.role === "admin" || user?.role === "client";
+  const canPost = ["admin", "client", "employee"].includes(
+    String(user?.role || "").toLowerCase()
+  );
   const userId = getEntityId(user);
 
   useEffect(() => {

@@ -932,7 +932,7 @@ const Tasks = ({
     return task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
   };
   const taskStats = [
-    { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
+    { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
     { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
     { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
@@ -947,7 +947,7 @@ const Tasks = ({
             <span className="mx-auto grid h-9 w-9 place-items-center rounded-xl bg-pink-50 text-pink-400">
               <SmallIcon name="list" className="h-5 w-5" />
             </span>
-            <p className="mt-2 text-xs font-bold text-slate-500 md:text-sm">No tasks found.</p>
+            <p className="mt-2 text-xs font-bold text-slate-500 md:text-sm">No projects found.</p>
           </div>
         </div>
       );
@@ -1134,10 +1134,10 @@ const Tasks = ({
                 className="text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-4xl"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
-                Tasks
+                Projects
               </h1>
               <p className="mt-2 hidden text-sm font-medium text-neutral-600 dark:text-neutral-400 md:block">
-                Assign and manage your tasks efficiently.
+                Assign and manage your projects efficiently.
               </p>
             </div>
 
@@ -1148,7 +1148,7 @@ const Tasks = ({
                 className="flex h-10 items-center gap-1.5 rounded-xl bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-11 md:gap-2 md:px-5 md:text-sm"
               >
                 <SmallIcon name="plus" className="h-4 w-4 md:h-5 md:w-5" />
-                <span>Create Task</span>
+                <span>Create Project</span>
               </button>
             </div>
           </header>
@@ -1171,13 +1171,13 @@ const Tasks = ({
 
           <Card className="p-3 md:p-5">
             <label className="relative block">
-              <span className="sr-only">Search tasks</span>
+              <span className="sr-only">Search projects</span>
               <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search tasks..."
+                placeholder="Search projects..."
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
               />
             </label>

@@ -8,7 +8,12 @@ import crypto from "crypto";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { sendPasswordResetCode } from "../utils/email.js";
-import { isValidAvatarSignature, parseAvatarDataUrl, withAvatarUrl } from "../utils/avatar.js";
+import {
+  getCachedAvatar,
+  isValidAvatarSignature,
+  setCachedAvatar,
+  withAvatarUrl,
+} from "../utils/avatar.js";
 import {
   disableTwoFactor,
   getTwoFactorStatus,
@@ -25,8 +30,25 @@ const emailRegex =
 const isMongoTimeoutError = (error) =>
   error?.name === "MongoNetworkTimeoutError" ||
   error?.name === "MongoNetworkError" ||
+  error?.name === "MongoServerSelectionError" ||
   String(error?.message || "").toLowerCase().includes("timed out");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const findUserAvatar = (userId) =>
+  User.findById(userId)
+    .select("avatar")
+    .maxTimeMS(8000)
+    .lean();
+
+const findUserAvatarWithRetry = async (userId) => {
+  try {
+    return await findUserAvatar(userId);
+  } catch (error) {
+    if (!isMongoTimeoutError(error)) throw error;
+    await wait(500);
+    return findUserAvatar(userId);
+  }
+};
 
 const isValidEmail = (email) => {
   const trimmedEmail = email.trim();
@@ -247,6 +269,7 @@ router.post("/reset-password", async (req, res) => {
           {
             returnDocument: "after",
             select: "firstName lastName email role companyName isActive isOnline lastSeen",
+            timestamps: false,
           }
         ).lean();
 
@@ -266,12 +289,12 @@ router.post("/reset-password", async (req, res) => {
           lastSeen: { $gte: onlineSince },
           isActive: { $ne: false },
         })
-          .select("firstName lastName email role companyName isActive isOnline lastSeen")
+          .select("firstName lastName email role companyName avatar isActive isOnline lastSeen updatedAt")
           .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
           .maxTimeMS(8000)
           .lean();
 
-        res.status(200).json(users);
+        res.status(200).json(users.map(withAvatarUrl));
       } catch (error) {
         console.error("Get online team error:", error);
         res.status(500).json({ message: "Unable to fetch online team" });
@@ -327,19 +350,15 @@ router.post("/reset-password", async (req, res) => {
           return res.status(404).end();
         }
 
-        const user = await User.findById(id)
-          .select("avatar updatedAt")
-          .maxTimeMS(8000)
-          .lean();
-        const actualVersion = user?.updatedAt
-          ? String(new Date(user.updatedAt).getTime())
-          : "0";
+        const cachedAvatar = getCachedAvatar(id, version);
+        let avatar = cachedAvatar.avatar;
 
-        if (!user || actualVersion !== version) {
-          return res.status(404).end();
+        if (!cachedAvatar.hit) {
+          const user = await findUserAvatarWithRetry(id);
+          if (!user) return res.status(404).end();
+          avatar = setCachedAvatar(id, version, user.avatar);
         }
 
-        const avatar = parseAvatarDataUrl(user.avatar);
         if (!avatar?.buffer.length) {
           return res.status(404).end();
         }
@@ -545,7 +564,7 @@ router.post("/reset-password", async (req, res) => {
         };
         const [employees, total] = await Promise.all([
           User.find(query)
-          .select("firstName lastName email phone country position role isActive createdAt updatedAt")
+          .select("firstName lastName email phone country position role avatar isActive createdAt updatedAt")
           .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)

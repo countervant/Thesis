@@ -273,8 +273,8 @@ const buildTaskNotifications = (tasks, user) => {
         id: `task-${taskId}`,
         icon: taskIcon,
         actor: task?.createdBy || user,
-        title: "New task assigned to you",
-        message: trimNotificationText(task?.title, "You have a new task"),
+        title: "New project assigned to you",
+        message: trimNotificationText(task?.title, "You have a new project"),
         date: task?.createdAt,
         target: { page: "tasks", taskId },
       });

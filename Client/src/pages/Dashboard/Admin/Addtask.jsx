@@ -410,7 +410,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     event.preventDefault();
 
     if (!formData.title.trim()) {
-      setErrorMessage("Task title is required.");
+      setErrorMessage("Project title is required.");
       return;
     }
 
@@ -435,7 +435,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     }
 
     if (formData.assignees.length === 0) {
-      setErrorMessage("Please choose at least one employee for this task.");
+      setErrorMessage("Please choose at least one employee for this project.");
       return;
     }
 
@@ -455,7 +455,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     }
 
     if (isAdmin && !formData.requestedBy) {
-      setErrorMessage("Please choose which client requested this task.");
+      setErrorMessage("Please choose which client requested this project.");
       return;
     }
 
@@ -515,7 +515,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     } catch (error) {
       setErrorMessage(
         error.response?.data?.message ||
-          `Unable to ${isEditing ? "update" : "create"} task.`
+          `Unable to ${isEditing ? "update" : "create"} project.`
       );
     } finally {
       setIsSubmitting(false);
@@ -560,7 +560,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             className="text-2xl uppercase leading-none text-neutral-950 dark:text-white sm:text-3xl"
             style={{ fontFamily: "var(--font-bruno)" }}
           >
-            {isEditing ? "Edit Task" : "New Task"}
+            {isEditing ? "Edit Project" : "New Project"}
           </h1>
         </header>
 
@@ -575,13 +575,13 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           )}
 
           <div className="space-y-1">
-            <FieldLabel>Task Title</FieldLabel>
+            <FieldLabel>Project Title</FieldLabel>
             <select
               value={selectedTemplateTitle}
               onChange={(event) => handleTaskTemplateSelect(event.target.value)}
               className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-200 dark:focus:ring-pink-950"
             >
-              <option value="custom">Custom Task</option>
+              <option value="custom">Custom Project</option>
               {taskTemplates.map((template) => (
                 <option key={template.title} value={template.title}>
                   {template.title}
@@ -593,7 +593,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                 type="text"
                 value={formData.title}
                 onChange={(event) => updateField("title", event.target.value)}
-                placeholder="Enter custom task title..."
+                placeholder="Enter custom project title..."
                 className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
               />
             )}
@@ -604,7 +604,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             <textarea
               value={formData.description}
               onChange={(event) => updateField("description", event.target.value)}
-              placeholder="Task description..."
+              placeholder="Project description..."
               rows={6}
               className="min-h-[126px] w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-4 py-3 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
             />
@@ -796,7 +796,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           )}
 
           <div className="mt-5 space-y-1">
-            <FieldLabel>Assign Task to:</FieldLabel>
+            <FieldLabel>Assign Project to:</FieldLabel>
             <p className="text-[11px] font-medium text-neutral-400">
               Select everyone who will collaborate, then assign individual subtasks above.
             </p>
@@ -832,8 +832,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                   ? "Updating..."
                   : "Creating..."
                 : isEditing
-                  ? "Update Task"
-                  : "Create Task"}
+                  ? "Update Project"
+                  : "Create Project"}
             </button>
           </div>
         </form>
