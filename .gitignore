@@ -39,3 +39,8 @@ Server/private_uploads/
 .env.*
 !.env.example
 !**/.env.example
+
+# Entity relationship diagram artifacts
+/ERD.mmd
+/ERD.png
+/ERD.svg
