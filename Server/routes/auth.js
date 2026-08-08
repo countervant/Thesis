@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { sendPasswordResetCode } from "../utils/email.js";
+import { isValidAvatarSignature, parseAvatarDataUrl } from "../utils/avatar.js";
 import {
   disableTwoFactor,
   getTwoFactorStatus,
@@ -310,6 +311,49 @@ router.post("/reset-password", async (req, res) => {
 
         console.error("Get public profile error:", error);
         res.status(500).json({ message: "Unable to load profile" });
+      }
+    });
+
+    router.get("/users/:id/avatar", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const version = String(req.query.v || "");
+        const signature = String(req.query.signature || "");
+
+        if (
+          !mongoose.Types.ObjectId.isValid(id) ||
+          !isValidAvatarSignature(id, version, signature)
+        ) {
+          return res.status(404).end();
+        }
+
+        const user = await User.findById(id)
+          .select("avatar updatedAt")
+          .maxTimeMS(8000)
+          .lean();
+        const actualVersion = user?.updatedAt
+          ? String(new Date(user.updatedAt).getTime())
+          : "0";
+
+        if (!user || actualVersion !== version) {
+          return res.status(404).end();
+        }
+
+        const avatar = parseAvatarDataUrl(user.avatar);
+        if (!avatar?.buffer.length) {
+          return res.status(404).end();
+        }
+
+        res.set({
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": avatar.contentType,
+          "Content-Length": String(avatar.buffer.length),
+          "X-Content-Type-Options": "nosniff",
+        });
+        return res.status(200).send(avatar.buffer);
+      } catch (error) {
+        console.error("Get user avatar error:", error);
+        return res.status(500).end();
       }
     });
 

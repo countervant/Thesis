@@ -7,6 +7,7 @@ import Task from "../model/Admin/taskmodel.js";
 import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { withAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -173,6 +174,33 @@ const addActivity = (task, activity) => {
     createdAt: activity.createdAt || new Date(),
   });
 };
+
+const addTaskAvatarUrls = (task) => ({
+  ...task,
+  assignedTo: withAvatarUrl(task.assignedTo),
+  assignees: Array.isArray(task.assignees) ? task.assignees.map(withAvatarUrl) : [],
+  subtasks: Array.isArray(task.subtasks)
+    ? task.subtasks.map((subtask) => ({
+        ...subtask,
+        assignedTo: withAvatarUrl(subtask.assignedTo),
+      }))
+    : [],
+  createdBy: withAvatarUrl(task.createdBy),
+  requestedBy: withAvatarUrl(task.requestedBy),
+  feedback: task.feedback
+    ? {
+        ...task.feedback,
+        user: withAvatarUrl(task.feedback.user),
+        submittedBy: withAvatarUrl(task.feedback.submittedBy),
+        reply: task.feedback.reply
+          ? {
+              ...task.feedback.reply,
+              repliedBy: withAvatarUrl(task.feedback.reply.repliedBy),
+            }
+          : task.feedback.reply,
+      }
+    : task.feedback,
+});
 
 const recordSubtaskActivities = (task, previousSubtasks, nextSubtasks, user) => {
   const previousByKey = new Map(
@@ -389,20 +417,22 @@ router.get("/", protect, async (req, res) => {
         "createdAt",
         "updatedAt",
       ].join(" "))
-      .populate("assignedTo", "firstName lastName email role avatar")
-      .populate("assignees", "firstName lastName email role avatar")
-      .populate("subtasks.assignedTo", "firstName lastName email role avatar")
-      .populate("createdBy", "firstName lastName companyName email role avatar")
-      .populate("requestedBy", "firstName lastName companyName email role avatar")
-      .populate("feedback.user", "firstName lastName companyName email role avatar")
-      .populate("feedback.submittedBy", "firstName lastName companyName email role avatar")
-      .populate("feedback.reply.repliedBy", "firstName lastName companyName email role avatar")
+      // Select only the avatar version here. The response transformer adds a
+      // lightweight signed image URL instead of repeating Base64 image data.
+      .populate("assignedTo", "firstName lastName email role updatedAt")
+      .populate("assignees", "firstName lastName email role updatedAt")
+      .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
+      .populate("createdBy", "firstName lastName companyName email role updatedAt")
+      .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("feedback.user", "firstName lastName companyName email role updatedAt")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
+      .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
       .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .maxTimeMS(8000)
       .lean();
-    const tasks = rawTasks;
+    const tasks = rawTasks.map(addTaskAvatarUrls);
     const total = skip + rawTasks.length;
 
     res.status(200).json(pagedResponse({ data: tasks, page, limit, total, key: "tasks" }));

@@ -69,7 +69,9 @@ const getMongoOptions = () => ({
   maxIdleTimeMS: numberFromEnv("MONGODB_MAX_IDLE_TIME_MS", 60000),
   connectTimeoutMS: numberFromEnv("MONGODB_CONNECT_TIMEOUT_MS", 15000),
   serverSelectionTimeoutMS: numberFromEnv("MONGODB_SERVER_SELECTION_TIMEOUT_MS", 15000),
-  socketTimeoutMS: numberFromEnv("MONGODB_SOCKET_TIMEOUT_MS", 45000),
+  // Keep database failures below the client's 30-second HTTP timeout so
+  // requests receive a controlled API error instead of hanging in the browser.
+  socketTimeoutMS: numberFromEnv("MONGODB_SOCKET_TIMEOUT_MS", 15000),
   heartbeatFrequencyMS: numberFromEnv("MONGODB_HEARTBEAT_FREQUENCY_MS", 10000),
   retryReads: true,
   retryWrites: true,
