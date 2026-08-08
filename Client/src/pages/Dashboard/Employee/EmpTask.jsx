@@ -190,7 +190,7 @@ const normalizeTask = (task) => {
   };
 };
 
-const TaskRow = ({ currentUserId, isExpanded, item, onSubmitOutput, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
+const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitOutput, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
   const progressSummary =
@@ -199,27 +199,41 @@ const TaskRow = ({ currentUserId, isExpanded, item, onSubmitOutput, onToggleExpa
       : "No subtasks yet";
 
   return (
-    <article id={`task-card-${item.id}`} className="border-b border-pink-50 px-4 py-4 last:border-b-0">
+    <article
+      id={`task-card-${item.id}`}
+      className={`border-b border-pink-50 px-4 py-4 last:border-b-0 ${!isExpanded ? "cursor-pointer transition hover:bg-pink-50/60 focus-visible:bg-pink-50/60 focus-visible:outline-none" : ""}`}
+      onClick={!isExpanded ? () => onToggleExpand(item.id) : undefined}
+      onKeyDown={!isExpanded ? (event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onToggleExpand(item.id);
+        }
+      } : undefined}
+      role={!isExpanded ? "button" : undefined}
+      tabIndex={!isExpanded ? 0 : undefined}
+    >
       {isExpanded ? (
         <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
-          <button
-            type="button"
-            onClick={() => onToggleExpand(item.id)}
-            className="flex min-w-0 items-center gap-3 text-left"
-            aria-expanded={isExpanded}
-            aria-label={`Hide subtasks for ${item.title}`}
-          >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600">
-              <span className="rotate-90 transition-transform">
-                <SmallIcon name="chevron" />
-              </span>
-            </span>
+          <div className="flex min-w-0 items-center gap-3 text-left">
+            {!isOverlay && (
+              <button
+                type="button"
+                onClick={() => onToggleExpand(item.id)}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                aria-label={`Close details for ${item.title}`}
+              >
+                <span className="rotate-90 transition-transform">
+                  <SmallIcon name="chevron" />
+                </span>
+              </button>
+            )}
             <span className="h-10 w-1 shrink-0 rounded-full bg-pink-500" aria-hidden="true" />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-black text-[#10142d]">{item.title}</span>
-              <span className="mt-1 block truncate text-xs font-bold text-slate-500">{item.description || "No description"}</span>
+              <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.title}</span>
+              <span className="mt-1 block text-xs font-bold leading-5 text-slate-500 dark:text-neutral-400">{item.description || "No description"}</span>
             </span>
-          </button>
+          </div>
 
           <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
             <p className="mb-1 text-[10px] font-black text-slate-500">Subtasks</p>
@@ -334,10 +348,13 @@ const TaskRow = ({ currentUserId, isExpanded, item, onSubmitOutput, onToggleExpa
         <div className="grid gap-4 lg:grid-cols-[28px_1.35fr_100px_120px_150px_110px_44px] lg:items-center">
           <button
             type="button"
-            onClick={() => onToggleExpand(item.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleExpand(item.id);
+            }}
             className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
             aria-expanded={isExpanded}
-            aria-label={`Show subtasks for ${item.title}`}
+            aria-label={`View details for ${item.title}`}
           >
             <span className="transition-transform">
               <SmallIcon name="chevron" />
@@ -366,12 +383,87 @@ const TaskRow = ({ currentUserId, isExpanded, item, onSubmitOutput, onToggleExpa
           <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || statusStyles.Pending}`}>
             {item.status}
           </span>
-          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`View ${item.title} date`}>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onViewCalendar(item); }} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`View ${item.title} date`}>
             <SmallIcon name="calendar" />
           </button>
         </div>
       )}
     </article>
+  );
+};
+
+const ProjectDetailsModal = ({
+  currentUserId,
+  item,
+  onClose,
+  onSubmitOutput,
+  onToggleSubtask,
+  onViewCalendar,
+}) => {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="employee-project-details-title"
+        aria-modal="true"
+        className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        role="dialog"
+      >
+        <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800 sm:px-7">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">
+              Assigned Project
+            </p>
+            <h2 id="employee-project-details-title" className="mt-1 text-xl font-black text-[#10142d] dark:text-white">
+              Project Details
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            aria-label="Close project details"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="max-h-[calc(92vh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
+          <TaskRow
+            currentUserId={currentUserId}
+            isExpanded
+            isOverlay
+            item={item}
+            onSubmitOutput={onSubmitOutput}
+            onToggleExpand={onClose}
+            onToggleSubtask={onToggleSubtask}
+            onViewCalendar={onViewCalendar}
+          />
+        </div>
+      </section>
+    </div>
   );
 };
 
@@ -621,7 +713,7 @@ const EmpTask = () => {
   const [completionDraft, setCompletionDraft] = useState(null);
   const [revisionDraft, setRevisionDraft] = useState(null);
   const [isStartingRevision, setIsStartingRevision] = useState(false);
-  const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
+  const [selectedTaskId, setSelectedTaskId] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -659,15 +751,8 @@ const EmpTask = () => {
 
         setVisibleGroup("All");
         setSearchQuery("");
-        setExpandedTaskIds((currentIds) => new Set([...currentIds, String(target.taskId)]));
-
-        window.setTimeout(() => {
-          document.getElementById(`task-card-${target.taskId}`)?.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-          sessionStorage.removeItem(notificationTargetKey);
-        }, 160);
+        setSelectedTaskId(String(target.taskId));
+        sessionStorage.removeItem(notificationTargetKey);
       } catch {
         sessionStorage.removeItem(notificationTargetKey);
       }
@@ -709,6 +794,7 @@ const EmpTask = () => {
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
   ];
+  const selectedTask = tasks.find((task) => String(task.id) === String(selectedTaskId)) || null;
 
   const renderTaskRows = (items) => {
     if (items.length === 0) {
@@ -718,28 +804,16 @@ const EmpTask = () => {
     return items.map((item) => (
       <TaskRow
         currentUserId={currentUserId}
-        isExpanded={expandedTaskIds.has(item.id)}
+        isExpanded={false}
         key={item.id}
         item={item}
         onSubmitOutput={handleSubmitOutput}
-        onToggleExpand={handleToggleExpand}
+        onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
         onToggleSubtask={handleToggleSubtask}
         onViewCalendar={handleViewCalendar}
       />
     ));
   };
-
-  function handleToggleExpand(taskId) {
-    setExpandedTaskIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-      if (nextIds.has(taskId)) {
-        nextIds.delete(taskId);
-      } else {
-        nextIds.add(taskId);
-      }
-      return nextIds;
-    });
-  }
 
   const updateTaskSubtasks = async (task, nextSubtasks) => {
     try {
@@ -789,6 +863,7 @@ const EmpTask = () => {
     const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
 
     if (isCompletingSubtask && isClientReviewSubtask) {
+      setSelectedTaskId("");
       setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
@@ -812,6 +887,7 @@ const EmpTask = () => {
       task.apiStatus === "pending" &&
       task.revisionRequests.length > 0;
     if (needsRevision) {
+      setSelectedTaskId("");
       setRevisionDraft({ task, subtaskIndex });
       return;
     }
@@ -819,6 +895,7 @@ const EmpTask = () => {
     const nextSubtasks = task.subtasks.map((subtask, index) =>
       index === subtaskIndex ? { ...subtask, completed: true } : subtask
     );
+    setSelectedTaskId("");
     setCompletionDraft({ task, nextSubtasks, finalize: false });
   };
 
@@ -953,6 +1030,16 @@ const EmpTask = () => {
             {renderTaskRows(visibleTasks)}
           </div>
         </Card>
+      )}
+      {selectedTask && (
+        <ProjectDetailsModal
+          currentUserId={currentUserId}
+          item={selectedTask}
+          onClose={() => setSelectedTaskId("")}
+          onSubmitOutput={handleSubmitOutput}
+          onToggleSubtask={handleToggleSubtask}
+          onViewCalendar={handleViewCalendar}
+        />
       )}
       {completionDraft && (
         <CompletedTaskModal
