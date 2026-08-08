@@ -1,5 +1,10 @@
 import crypto from "crypto";
 
+const avatarCache = new Map();
+const MAX_AVATAR_CACHE_ENTRIES = 100;
+const MAX_AVATAR_CACHE_BYTES = 24 * 1024 * 1024;
+let avatarCacheBytes = 0;
+
 const getAvatarSecret = () => process.env.JWT_SECRET || "";
 const getEntityId = (entity) => {
   if (!entity) return "";
@@ -19,6 +24,43 @@ const createAvatarSignature = (userId, version) =>
     .createHmac("sha256", getAvatarSecret())
     .update(`avatar:${userId}:${version}`)
     .digest("hex");
+
+const getAvatarCacheKey = (userId, version) => `${userId}:${version}`;
+
+export const getCachedAvatar = (userId, version) => {
+  const key = getAvatarCacheKey(userId, version);
+  const entry = avatarCache.get(key);
+
+  if (!entry) return { hit: false, avatar: null };
+
+  avatarCache.delete(key);
+  avatarCache.set(key, entry);
+  return { hit: true, avatar: entry.avatar };
+};
+
+export const setCachedAvatar = (userId, version, value) => {
+  const key = getAvatarCacheKey(userId, version);
+  const avatar = parseAvatarDataUrl(value);
+  const bytes = avatar?.buffer.length || 0;
+  const previous = avatarCache.get(key);
+
+  if (previous) avatarCacheBytes -= previous.bytes;
+  avatarCache.delete(key);
+  avatarCache.set(key, { avatar, bytes });
+  avatarCacheBytes += bytes;
+
+  while (
+    avatarCache.size > MAX_AVATAR_CACHE_ENTRIES ||
+    avatarCacheBytes > MAX_AVATAR_CACHE_BYTES
+  ) {
+    const oldestKey = avatarCache.keys().next().value;
+    const oldest = avatarCache.get(oldestKey);
+    avatarCacheBytes -= oldest?.bytes || 0;
+    avatarCache.delete(oldestKey);
+  }
+
+  return avatar;
+};
 
 export const getAvatarUrl = (user) => {
   const userId = getEntityId(user);
@@ -41,7 +83,16 @@ export const withAvatarUrl = (user) => {
   ) {
     return user;
   }
-  const { updatedAt, ...profile } = user;
+
+  const userId = getEntityId(user);
+  const version = getAvatarVersion(user);
+  if (Object.prototype.hasOwnProperty.call(user, "avatar")) {
+    setCachedAvatar(userId, version, user.avatar);
+  }
+
+  const profile = { ...user };
+  delete profile.updatedAt;
+  delete profile.avatar;
   return { ...profile, avatar: getAvatarUrl(user) };
 };
 

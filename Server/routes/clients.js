@@ -5,6 +5,7 @@ import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { withAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
 const emailRegex =
@@ -40,22 +41,27 @@ const validateClientPayload = (payload) => {
   return getPhoneValidationMessage(payload.phone, payload.country);
 };
 
-const clientUserToClient = (user) => ({
-  _id: user._id,
-  source: "user",
-  companyName: user.companyName || "Registered Client",
-  contactPerson: [user.firstName, user.lastName].filter(Boolean).join(" "),
-  email: user.email,
-  phone: user.phone || "",
-  country: user.country || "Philippines",
-  service: user.position || "",
-  isActive: user.isActive,
-  address: "",
-  notes: "",
-  assignedEmployee: undefined,
-  createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
-});
+const clientUserToClient = (user) => {
+  const avatar = withAvatarUrl(user)?.avatar || "";
+
+  return {
+    _id: user._id,
+    source: "user",
+    companyName: user.companyName || "Registered Client",
+    contactPerson: [user.firstName, user.lastName].filter(Boolean).join(" "),
+    email: user.email,
+    phone: user.phone || "",
+    country: user.country || "Philippines",
+    service: user.position || "",
+    isActive: user.isActive,
+    avatar,
+    address: "",
+    notes: "",
+    assignedEmployee: undefined,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+};
 
 router.get("/", protect, authorize("admin"), async (req, res) => {
   try {

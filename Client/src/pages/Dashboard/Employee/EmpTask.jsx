@@ -703,7 +703,7 @@ const EmpTask = () => {
   }, [searchQuery, tasks, visibleGroup]);
 
   const taskStats = [
-    { label: "Total Tasks", value: tasks.length, icon: taskIcon, tone: "pink" },
+    { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
     { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
     { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
@@ -712,7 +712,7 @@ const EmpTask = () => {
 
   const renderTaskRows = (items) => {
     if (items.length === 0) {
-      return <p className="px-4 py-5 text-center text-sm font-bold text-slate-500">No tasks found.</p>;
+      return <p className="px-4 py-5 text-center text-sm font-bold text-slate-500">No projects found.</p>;
     }
 
     return items.map((item) => (
@@ -887,10 +887,10 @@ const EmpTask = () => {
             className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
             style={{ fontFamily: "var(--font-bruno)" }}
           >
-            My Tasks
+            My Projects
           </h1>
           <p className="mt-2 text-sm font-semibold text-slate-500">
-            Manage your tasks and stay on top of your work.
+            Manage your projects and stay on top of your work.
           </p>
         </div>
       </header>
@@ -920,13 +920,13 @@ const EmpTask = () => {
       <Card className="p-5">
         <div>
           <label className="relative block">
-            <span className="sr-only">Search tasks</span>
+            <span className="sr-only">Search projects</span>
             <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search tasks..."
+              placeholder="Search projects..."
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
             />
           </label>
