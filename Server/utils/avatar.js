@@ -30,7 +30,17 @@ export const getAvatarUrl = (user) => {
 };
 
 export const withAvatarUrl = (user) => {
-  if (!user || typeof user !== "object" || !user._id) return user;
+  // A Mongoose ObjectId exposes an `_id` getter that points to itself. It is
+  // still only a reference, not a populated user, so do not spread it into a
+  // profile object or replace its normal string JSON representation.
+  if (
+    !user ||
+    typeof user !== "object" ||
+    typeof user.toHexString === "function" ||
+    !user._id
+  ) {
+    return user;
+  }
   const { updatedAt, ...profile } = user;
   return { ...profile, avatar: getAvatarUrl(user) };
 };
