@@ -1,11 +1,12 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../model/userModel.js';
+import { withAvatarUrl } from '../utils/avatar.js';
 
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
 const authUserCache = new Map();
 const authUserFields =
-  "firstName middleInitial lastName companyName email phone country role position birthday avatar coverPhoto isActive isOnline lastSeen twoFactorEnabled createdAt updatedAt";
+  "firstName middleInitial lastName companyName email phone country role position birthday isActive isOnline lastSeen twoFactorEnabled createdAt updatedAt";
 
 const isDatabaseTimeout = (error) => {
   const message = String(error?.message || "").toLowerCase();
@@ -33,10 +34,12 @@ const getCachedUser = async (userId) => {
     .lean()
     .then((user) => {
       if (user) {
+        const profile = withAvatarUrl(user);
         authUserCache.set(userId, {
-          user,
+          user: profile,
           expiresAt: Date.now() + AUTH_USER_CACHE_MS,
         });
+        return profile;
       } else {
         authUserCache.delete(userId);
       }

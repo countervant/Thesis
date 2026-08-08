@@ -476,7 +476,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       .filter((subtask) => subtask.title);
 
     if (subtasks.length === 0) {
-      setErrorMessage("At least one subtask is required.");
+      setErrorMessage("At least one task is required.");
       return;
     }
 
@@ -613,7 +613,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <span>
-                <FieldLabel>Subtasks</FieldLabel>
+                <FieldLabel>Tasks</FieldLabel>
                 <span className="ml-2 text-[10px] font-bold text-neutral-400">
                   Employees complete these in order
                 </span>
@@ -623,7 +623,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                 onClick={addSubtask}
                 className="h-8 rounded-lg bg-pink-50 px-3 text-xs font-black text-[#dc4fb2] transition hover:bg-pink-100"
               >
-                Add Subtask
+                Add Task
               </button>
             </div>
             <div className="space-y-2">
@@ -633,14 +633,14 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                     type="text"
                     value={subtask.title}
                     onChange={(event) => updateSubtask(index, "title", event.target.value)}
-                    placeholder={`Subtask ${index + 1}`}
+                    placeholder={`Task ${index + 1}`}
                     className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
                   />
                   <select
                     value={subtask.assignedTo || ""}
                     onChange={(event) => updateSubtask(index, "assignedTo", event.target.value)}
                     className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-3 text-xs font-medium text-neutral-600 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300"
-                    aria-label={`Assign subtask ${index + 1}`}
+                    aria-label={`Assign task ${index + 1}`}
                   >
                     <option value="">Any assigned employee</option>
                     {safeAssignees.map((assignee) => (
@@ -653,7 +653,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                     type="button"
                     onClick={() => removeSubtask(index)}
                     className="grid h-9 w-9 place-items-center rounded-lg text-pink-600 transition hover:bg-pink-50"
-                    aria-label={`Remove subtask ${index + 1}`}
+                    aria-label={`Remove task ${index + 1}`}
                   >
                     <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
                       <path d="M5 10h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -798,7 +798,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           <div className="mt-5 space-y-1">
             <FieldLabel>Assign Project to:</FieldLabel>
             <p className="text-[11px] font-medium text-neutral-400">
-              Select everyone who will collaborate, then assign individual subtasks above.
+              Select everyone who will collaborate, then assign individual tasks above.
             </p>
             <div className="mt-2 grid max-h-40 gap-2 overflow-y-auto rounded-lg border border-neutral-300 bg-white/40 p-3 dark:border-neutral-700 dark:bg-neutral-950 sm:grid-cols-2">
               {safeAssignees.map((assignee) => {

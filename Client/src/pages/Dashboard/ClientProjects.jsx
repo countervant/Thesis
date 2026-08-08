@@ -488,7 +488,7 @@ const ProjectDetails = ({ errorMessage, onApprove, onBack, onDownloadOutput, onF
         }))
     : project.subtasks.length > 0
       ? project.subtasks.map((subtask) => ({
-          label: `${subtask.completed ? "Completed" : "Pending"} subtask: ${subtask.title}`,
+          label: `${subtask.completed ? "Completed" : "Pending"} task: ${subtask.title}`,
           details: subtask.completed ? "Marked as done" : "Awaiting completion",
           date: subtask.completed ? project.updatedAt : project.dueDate,
           done: subtask.completed,
@@ -1128,6 +1128,8 @@ const ClientProjects = () => {
   const [revisionMessage, setRevisionMessage] = useState("");
   const [revisionProject, setRevisionProject] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [isLoadingProjectDetails, setIsLoadingProjectDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("Newest");
   const [statusFilter, setStatusFilter] = useState("All Status");
@@ -1141,7 +1143,7 @@ const ClientProjects = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, refresh: Date.now() });
+        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
         if (isMounted) setProjects(data.map(normalizeProject));
       } catch (error) {
         if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load projects."));
@@ -1157,19 +1159,51 @@ const ClientProjects = () => {
   }, []);
 
   useEffect(() => {
-    if (isLoading || projects.length === 0) return;
-    try {
-      const target = JSON.parse(sessionStorage.getItem(notificationTargetKey) || "null");
-      if (target?.page !== "projects" || !target?.taskId) return;
-      const project = projects.find((item) => item.id === target.taskId);
-      if (project) {
-        setSelectedProject(project);
+    const openNotificationTarget = () => {
+      if (isLoading || projects.length === 0) return;
+      try {
+        const target = JSON.parse(sessionStorage.getItem(notificationTargetKey) || "null");
+        if (target?.page !== "projects" || !target?.taskId) return;
+        const project = projects.find((item) => item.id === target.taskId);
+        if (project) {
+          setSelectedProjectId(project.id);
+          sessionStorage.removeItem(notificationTargetKey);
+        }
+      } catch {
         sessionStorage.removeItem(notificationTargetKey);
       }
-    } catch {
-      sessionStorage.removeItem(notificationTargetKey);
-    }
+    };
+
+    openNotificationTarget();
   }, [isLoading, projects]);
+
+  useEffect(() => {
+    if (!selectedProjectId) return undefined;
+
+    let isCurrent = true;
+    const loadProjectDetails = async () => {
+      setSelectedProject(null);
+      setIsLoadingProjectDetails(true);
+      setErrorMessage("");
+
+      try {
+        const task = await taskAPI.getById(selectedProjectId, { refresh: true });
+        if (isCurrent) setSelectedProject(normalizeProject(task));
+      } catch (error) {
+        if (!isCurrent) return;
+        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
+        setSelectedProjectId("");
+      } finally {
+        if (isCurrent) setIsLoadingProjectDetails(false);
+      }
+    };
+
+    loadProjectDetails();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedProjectId]);
 
   const visibleProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -1206,6 +1240,18 @@ const ClientProjects = () => {
   const projectsInCurrentSection = projects.filter((project) =>
     activeTab === "Archived" ? project.archived : !project.archived
   ).length;
+
+  const handleOpenFeedback = async (project) => {
+    try {
+      setErrorMessage("");
+      const completeProject = selectedProject?.id === project.id
+        ? selectedProject
+        : normalizeProject(await taskAPI.getById(project.id, { refresh: true }));
+      setFeedbackProject(completeProject);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to load project feedback."));
+    }
+  };
 
   const handleArchiveProject = async () => {
     const action = archiveAction;
@@ -1315,13 +1361,17 @@ const ClientProjects = () => {
     return <ClientProjectsSkeleton />;
   }
 
-  if (selectedProject) {
+  if (selectedProjectId && isLoadingProjectDetails) {
+    return <ClientProjectsSkeleton />;
+  }
+
+  if (selectedProjectId && selectedProject) {
     return (
       <>
         <ProjectDetails
           errorMessage={errorMessage}
           onApprove={setApproveProject}
-          onBack={() => setSelectedProject(null)}
+          onBack={() => setSelectedProjectId("")}
           onDownloadOutput={handleDownloadOutput}
           onFeedback={() => setFeedbackProject(selectedProject)}
           onRequestRevision={(project) => {
@@ -1450,15 +1500,13 @@ const ClientProjects = () => {
                 <ProjectCard
                   key={project.id || project.title}
                   onApprove={setApproveProject}
-                  onFeedback={(selectedProject) =>
-                    setFeedbackProject(selectedProject)
-                  }
+                  onFeedback={handleOpenFeedback}
                   onRequestRevision={(selectedProject) => {
                     setRevisionMessage("");
                     setRevisionProject(selectedProject);
                   }}
                   onToggleArchive={(selectedProject, archived) => setArchiveAction({ project: selectedProject, archived })}
-                  onViewDetails={setSelectedProject}
+                  onViewDetails={(project) => setSelectedProjectId(project.id)}
                   project={project}
                 />
               ))}

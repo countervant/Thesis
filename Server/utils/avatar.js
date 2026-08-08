@@ -1,8 +1,11 @@
 import crypto from "crypto";
+import sharp from "sharp";
 
 const avatarCache = new Map();
 const MAX_AVATAR_CACHE_ENTRIES = 100;
 const MAX_AVATAR_CACHE_BYTES = 24 * 1024 * 1024;
+const MAX_AVATAR_UPLOAD_BYTES = 6 * 1024 * 1024;
+export const MAX_STORED_AVATAR_BYTES = 512 * 1024;
 let avatarCacheBytes = 0;
 
 const getAvatarSecret = () => process.env.JWT_SECRET || "";
@@ -114,4 +117,42 @@ export const parseAvatarDataUrl = (value) => {
     contentType: match[1],
     buffer: Buffer.from(match[2].replace(/\s/g, ""), "base64"),
   };
+};
+
+export const optimizeAvatarDataUrl = async (value) => {
+  if (value === "") return "";
+
+  const avatar = parseAvatarDataUrl(value);
+  if (!avatar) {
+    const error = new Error("Avatar must be a PNG, JPEG, WebP, or GIF image");
+    error.status = 400;
+    throw error;
+  }
+
+  if (avatar.buffer.length > MAX_AVATAR_UPLOAD_BYTES) {
+    const error = new Error("Avatar image must be 6MB or smaller");
+    error.status = 413;
+    throw error;
+  }
+
+  let optimized = await sharp(avatar.buffer, {
+    failOn: "error",
+    limitInputPixels: 40_000_000,
+  })
+    .rotate()
+    .resize(512, 512, {
+      fit: "cover",
+      position: "centre",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 82, effort: 4 })
+    .toBuffer();
+
+  if (optimized.length > MAX_STORED_AVATAR_BYTES) {
+    optimized = await sharp(optimized)
+      .webp({ quality: 68, effort: 5 })
+      .toBuffer();
+  }
+
+  return `data:image/webp;base64,${optimized.toString("base64")}`;
 };
