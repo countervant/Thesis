@@ -171,7 +171,7 @@ const loadCalendarSources = async (currentMonth) => {
   const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
   const [calendarResult, taskResult] = await Promise.allSettled([
     calendarAPI.getAll({ month: monthKey(currentMonth) }),
-    taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 200 }),
+    taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 100, view: "calendar" }),
   ]);
   const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
   const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];

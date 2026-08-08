@@ -11,7 +11,6 @@ export const getPagination = (query = {}, defaults = {}) => {
 
 export const pagedResponse = ({ data, page, limit, total, key = "data" }) => ({
   [key]: data,
-  data,
   page,
   limit,
   total,

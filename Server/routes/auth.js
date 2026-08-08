@@ -8,7 +8,7 @@ import crypto from "crypto";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { sendPasswordResetCode } from "../utils/email.js";
-import { isValidAvatarSignature, parseAvatarDataUrl } from "../utils/avatar.js";
+import { isValidAvatarSignature, parseAvatarDataUrl, withAvatarUrl } from "../utils/avatar.js";
 import {
   disableTwoFactor,
   getTwoFactorStatus,
@@ -554,7 +554,13 @@ router.post("/reset-password", async (req, res) => {
           User.countDocuments(query).maxTimeMS(8000),
         ]);
 
-        res.status(200).json(pagedResponse({ data: employees, page, limit, total, key: "employees" }));
+        res.status(200).json(pagedResponse({
+          data: employees.map(withAvatarUrl),
+          page,
+          limit,
+          total,
+          key: "employees",
+        }));
       } catch (error) {
         console.error("Get employees error:", error);
         res.status(500).json({ message: "Unable to fetch employees" });

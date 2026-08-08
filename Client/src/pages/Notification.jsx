@@ -177,7 +177,9 @@ const Notification = () => {
       try {
         const [postsResult, tasksResult] = await Promise.allSettled([
           newsfeedAPI.getActivity(),
-          user?.role === "employee" ? taskAPI.getAll() : Promise.resolve([]),
+          user?.role === "employee"
+            ? taskAPI.getAll({ limit: 50, view: "notification" })
+            : Promise.resolve([]),
         ]);
         const posts = postsResult.status === "fulfilled" ? postsResult.value : [];
         const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];

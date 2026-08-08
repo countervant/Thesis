@@ -3,9 +3,10 @@ import mongoose from "mongoose";
 import NewsfeedPost from "../model/newsfeesModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { withAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
-const userPublicFields = "firstName lastName companyName email country role";
+const userPublicFields = "firstName lastName companyName email country role updatedAt";
 const isMongoTimeoutError = (error) =>
   error?.name === "MongoNetworkTimeoutError" ||
   error?.name === "MongoNetworkError" ||
@@ -32,12 +33,36 @@ const findPostMediaWithRetry = async (postId) => {
   }
 };
 
-const populatePost = (query) =>
-  query
+const withPostAvatarUrls = (post) => ({
+  ...post,
+  author: withAvatarUrl(post.author),
+  comments: Array.isArray(post.comments)
+    ? post.comments.map((comment) => ({
+        ...comment,
+        user: withAvatarUrl(comment.user),
+        replies: Array.isArray(comment.replies)
+          ? comment.replies.map((reply) => ({
+              ...reply,
+              user: withAvatarUrl(reply.user),
+            }))
+          : [],
+      }))
+    : [],
+});
+
+const populatePost = async (query) => {
+  const result = await query
     .populate("author", userPublicFields)
     .populate("comments.user", userPublicFields)
     .populate("comments.replies.user", userPublicFields)
     .lean();
+
+  return Array.isArray(result)
+    ? result.map(withPostAvatarUrls)
+    : result
+      ? withPostAvatarUrls(result)
+      : result;
+};
 
 const withCounts = (post) => ({
   ...post,

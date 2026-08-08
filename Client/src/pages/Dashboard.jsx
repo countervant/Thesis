@@ -1,31 +1,49 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import AdminDashboard from "./Dashboard/Admin/Home.jsx";
-import AdminTasks from "./Dashboard/Admin/Tasks.jsx";
-import AdminBudget from "./Dashboard/Admin/Budget.jsx";
-import AdminClients from "./Dashboard/Admin/Client.jsx";
-import AdminEmployees from "./Dashboard/Admin/Employee.jsx";
-import AdminAddTask from "./Dashboard/Admin/Addtask.jsx";
-import AdminAddBudget from "./Dashboard/Admin/Addbudget.jsx";
-import AdminAddEmployee from "./Dashboard/Admin/Addemployee.jsx";
-import AdminCalendar from "./Dashboard/Admin/Calendar.jsx";
-import LeaveRequest from "./Leaverequest.jsx";
-import ClientDashboard from "./Dashboard/Client.jsx";
-import ClientProjects from "./Dashboard/ClientProjects.jsx";
-import Feedback from "./Dashboard/Feedback.jsx";
-import EmpDashboard from "./Dashboard/Employee/EmpDashboard.jsx";
-import EmpCalendar from "./Dashboard/Employee/EmpCalendar.jsx";
-import EmpLeaverequest from "./Dashboard/Employee/EmpLeaverequest.jsx";
-import EmpTask from "./Dashboard/Employee/EmpTask.jsx";
-import Newsfeed from "./newsfeed.jsx";
-import Profile from "./Profile.jsx";
-import Settings from "./Settings/settings.jsx";
 import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton.jsx";
 import { getApiErrorMessage, messageAPI } from "../services/api.js";
+
+const AdminDashboard = lazy(() => import("./Dashboard/Admin/Home.jsx"));
+const AdminTasks = lazy(() => import("./Dashboard/Admin/Tasks.jsx"));
+const AdminBudget = lazy(() => import("./Dashboard/Admin/Budget.jsx"));
+const AdminClients = lazy(() => import("./Dashboard/Admin/Client.jsx"));
+const AdminEmployees = lazy(() => import("./Dashboard/Admin/Employee.jsx"));
+const AdminAddTask = lazy(() => import("./Dashboard/Admin/Addtask.jsx"));
+const AdminAddBudget = lazy(() => import("./Dashboard/Admin/Addbudget.jsx"));
+const AdminAddEmployee = lazy(() => import("./Dashboard/Admin/Addemployee.jsx"));
+const AdminCalendar = lazy(() => import("./Dashboard/Admin/Calendar.jsx"));
+const LeaveRequest = lazy(() => import("./Leaverequest.jsx"));
+const ClientDashboard = lazy(() => import("./Dashboard/Client.jsx"));
+const ClientProjects = lazy(() => import("./Dashboard/ClientProjects.jsx"));
+const Feedback = lazy(() => import("./Dashboard/Feedback.jsx"));
+const EmpDashboard = lazy(() => import("./Dashboard/Employee/EmpDashboard.jsx"));
+const EmpCalendar = lazy(() => import("./Dashboard/Employee/EmpCalendar.jsx"));
+const EmpLeaverequest = lazy(() => import("./Dashboard/Employee/EmpLeaverequest.jsx"));
+const EmpTask = lazy(() => import("./Dashboard/Employee/EmpTask.jsx"));
+const Newsfeed = lazy(() => import("./newsfeed.jsx"));
+const Profile = lazy(() => import("./Profile.jsx"));
+const Settings = lazy(() => import("./Settings/settings.jsx"));
+
+const DashboardPageFallback = () => (
+  <div className="space-y-4" aria-label="Loading page">
+    <Skeleton className="h-10 w-64 max-w-full" />
+    <Skeleton className="h-48 w-full rounded-2xl" />
+    <Skeleton className="h-48 w-full rounded-2xl" />
+  </div>
+);
 
 const adminPages = new Set([
   "dashboard",
@@ -257,10 +275,6 @@ const MessagesPanel = () => {
   const longPressTimerRef = useRef(null);
   const longPressStartRef = useRef(null);
 
-  useEffect(() => {
-    setInboxState(readMessageInboxState(currentUserId));
-  }, [currentUserId]);
-
   useEffect(() => () => {
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
   }, []);
@@ -412,8 +426,6 @@ const MessagesPanel = () => {
 
   useEffect(() => {
     if (!activeUserId) {
-      setMessages([]);
-      setActiveParticipant(null);
       return;
     }
 
@@ -1613,7 +1625,7 @@ const Dashboard = () => {
           onLogout={handleLogout}
           onNavigate={handleAdminNavigate}
         >
-          {adminContent}
+          <Suspense fallback={<DashboardPageFallback />}>{adminContent}</Suspense>
         </MainBars>
         <ConfirmDialog
           confirmLabel="Log out"
@@ -1707,7 +1719,7 @@ const Dashboard = () => {
         onLogout={handleLogout}
         onNavigate={handleLocalNavigate}
       >
-        {regularContent}
+        <Suspense fallback={<DashboardPageFallback />}>{regularContent}</Suspense>
       </MainBars>
       <ConfirmDialog
         confirmLabel="Log out"

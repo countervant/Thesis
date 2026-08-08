@@ -5,11 +5,12 @@ import { protect } from "../middleware/protectedjwt.js";
 import Message from "../model/messageModel.js";
 import User from "../model/userModel.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { getAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
 const messageClients = new Map();
 
-const userFields = "firstName lastName email role companyName isActive isOnline lastSeen";
+const userFields = "firstName lastName email role companyName isActive isOnline lastSeen updatedAt";
 
 const getUserId = (user) => {
   if (!user) return "";
@@ -37,7 +38,7 @@ const toParticipant = (user) => {
     lastName: user.lastName,
     email: user.email,
     role: user.role,
-    avatar: "",
+    avatar: getAvatarUrl(user),
     companyName: user.companyName || "",
     isActive: user.isActive,
     isOnline: online,
@@ -262,7 +263,7 @@ router.get("/threads", protect, async (req, res) => {
                 localField: "_id",
                 foreignField: "_id",
                 as: "participant",
-                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, companyName: 1, isActive: 1, isOnline: 1, lastSeen: 1 } }],
+                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, companyName: 1, isActive: 1, isOnline: 1, lastSeen: 1, updatedAt: 1 } }],
               },
             },
             { $unwind: "$participant" },
@@ -298,28 +299,29 @@ router.get("/threads/:userId", protect, async (req, res) => {
       return res.status(400).json({ message: "Invalid user" });
     }
 
-    const participant = await User.findById(otherUserId)
-      .select(userFields)
-      .maxTimeMS(8000)
-      .lean();
-    if (!participant) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
     const messageQuery = {
       $or: [
         { sender: currentUserId, recipient: otherUserId },
         { sender: otherUserId, recipient: currentUserId },
       ],
     };
-    const total = await Message.countDocuments(messageQuery).maxTimeMS(8000);
-    const messages = await Message.find(messageQuery)
-      .select("sender recipient text deliveredAt readAt editedAt createdAt updatedAt")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .maxTimeMS(8000)
-      .lean();
+    const [participant, total, messages] = await Promise.all([
+      User.findById(otherUserId)
+        .select(userFields)
+        .maxTimeMS(8000)
+        .lean(),
+      Message.countDocuments(messageQuery).maxTimeMS(8000),
+      Message.find(messageQuery)
+        .select("sender recipient text deliveredAt readAt editedAt createdAt updatedAt")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .maxTimeMS(8000)
+        .lean(),
+    ]);
+    if (!participant) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const readAt = new Date();
     const readResult = await Message.updateMany(

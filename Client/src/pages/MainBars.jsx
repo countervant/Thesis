@@ -525,7 +525,6 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
   useEffect(() => {
     if (!token || !userId) {
-      setUnreadMessageCount(0);
       return undefined;
     }
 
@@ -576,7 +575,6 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
   useEffect(() => {
     if (!token || !userId) {
-      setNotifications([]);
       return undefined;
     }
 
@@ -587,7 +585,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         setNotificationError("");
         const [postsResult, tasksResult] = await Promise.allSettled([
           newsfeedAPI.getActivity({ refresh: Date.now() }),
-          taskAPI.getAll({ limit: 100, refresh: Date.now() }),
+          taskAPI.getAll({ limit: 50, refresh: true, view: "notification" }),
         ]);
         const posts = postsResult.status === "fulfilled" ? postsResult.value : [];
         const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
@@ -618,7 +616,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     };
 
     loadNotifications();
-    const intervalId = window.setInterval(loadNotifications, 15000);
+    const intervalId = window.setInterval(loadNotifications, 60000);
 
     return () => {
       isMounted = false;

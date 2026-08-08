@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import done from "../../../assets/done.png";
 import pendingRequest from "../../../assets/pendingrequest.png";
 import pending from "../../../assets/pending.png";
-import progress from "../../../assets/progress.png";
 import task from "../../../assets/task.png";
 import Skeleton from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
@@ -269,7 +268,7 @@ const EmpDashboard = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100 });
+        const data = await taskAPI.getAll({ limit: 100, view: "dashboard" });
         if (isMounted) setTasks(data.map(normalizeTask));
       } catch (error) {
         if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load dashboard."));

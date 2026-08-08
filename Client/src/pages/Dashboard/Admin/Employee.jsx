@@ -425,7 +425,7 @@ const AdminEmployees = ({
         setErrorMessage("");
         const [employeeData, taskData] = await Promise.all([
           employeeAPI.getAll({ limit: 100 }),
-          taskAPI.getAll({ limit: 100, refresh: true }),
+          taskAPI.getAll({ limit: 100, refresh: true, view: "employee" }),
         ]);
 
         if (isMounted) {

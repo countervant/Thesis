@@ -4,6 +4,7 @@ import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { withAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
 
@@ -20,10 +21,22 @@ const getDepartment = (user, fallback = "") =>
   String(fallback || user?.companyName || user?.position || "Unassigned").trim() || "Unassigned";
 
 const leaveRequestPopulate = [
-  { path: "employee", select: "firstName lastName email position companyName role avatar" },
-  { path: "reviewedBy", select: "firstName lastName email role" },
-  { path: "comments.author", select: "firstName lastName email role position companyName avatar" },
+  { path: "employee", select: "firstName lastName email position companyName role updatedAt" },
+  { path: "reviewedBy", select: "firstName lastName email role updatedAt" },
+  { path: "comments.author", select: "firstName lastName email role position companyName updatedAt" },
 ];
+
+const withLeaveRequestAvatarUrls = (request) => ({
+  ...request,
+  employee: withAvatarUrl(request.employee),
+  reviewedBy: withAvatarUrl(request.reviewedBy),
+  comments: Array.isArray(request.comments)
+    ? request.comments.map((comment) => ({
+        ...comment,
+        author: withAvatarUrl(comment.author),
+      }))
+    : [],
+});
 
 const dayMs = 24 * 60 * 60 * 1000;
 
@@ -126,7 +139,10 @@ router.get("/", protect, async (req, res) => {
     const summaryQuery = { ...query };
     delete summaryQuery.status;
 
-    const [requests, total, summary, leaveTypes, roles] = await Promise.all([
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const [requests, total, metadata] = await Promise.all([
       LeaveRequest.find(query)
         .populate(leaveRequestPopulate)
         .sort({ createdAt: -1 })
@@ -136,17 +152,23 @@ router.get("/", protect, async (req, res) => {
         .lean(),
       LeaveRequest.countDocuments(query).maxTimeMS(8000),
       LeaveRequest.aggregate([
-        { $match: summaryQuery },
         {
           $facet: {
-            byStatus: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
-            byType: [{ $group: { _id: "$leaveType", count: { $sum: 1 } } }],
+            byStatus: [
+              { $match: summaryQuery },
+              { $group: { _id: "$status", count: { $sum: 1 } } },
+            ],
+            byType: [
+              { $match: summaryQuery },
+              { $group: { _id: "$leaveType", count: { $sum: 1 } } },
+            ],
             onLeaveToday: [
               {
                 $match: {
+                  ...summaryQuery,
                   status: "Approved",
-                  startDate: { $lte: new Date() },
-                  endDate: { $gte: new Date() },
+                  startDate: { $lte: now },
+                  endDate: { $gte: now },
                 },
               },
               { $count: "count" },
@@ -154,31 +176,46 @@ router.get("/", protect, async (req, res) => {
             approvedThisMonth: [
               {
                 $match: {
+                  ...summaryQuery,
                   status: "Approved",
                   reviewedAt: {
-                    $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-                    $lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+                    $gte: currentMonthStart,
+                    $lt: nextMonthStart,
                   },
                 },
               },
               { $count: "count" },
             ],
+            leaveTypes: [
+              { $match: baseQuery },
+              { $group: { _id: "$leaveType" } },
+              { $sort: { _id: 1 } },
+            ],
+            roles: [
+              { $match: { ...baseQuery, employeeRole: { $nin: [null, ""] } } },
+              { $group: { _id: "$employeeRole" } },
+              { $sort: { _id: 1 } },
+            ],
           },
         },
       ]).option({ maxTimeMS: 8000 }),
-      LeaveRequest.distinct("leaveType", baseQuery).maxTimeMS(8000),
-      LeaveRequest.distinct("employeeRole", baseQuery).maxTimeMS(8000),
     ]);
 
-    const summaryData = summary[0] || {};
+    const summaryData = metadata[0] || {};
     const byStatus = Object.fromEntries(
       (summaryData.byStatus || []).map((item) => [item._id, item.count])
     );
 
     res.status(200).json({
-      ...pagedResponse({ data: requests, page, limit, total, key: "leaveRequests" }),
-      roles: roles.filter(Boolean).sort(),
-      leaveTypes: leaveTypes.filter(Boolean).sort(),
+      ...pagedResponse({
+        data: requests.map(withLeaveRequestAvatarUrls),
+        page,
+        limit,
+        total,
+        key: "leaveRequests",
+      }),
+      roles: (summaryData.roles || []).map((item) => item._id),
+      leaveTypes: (summaryData.leaveTypes || []).map((item) => item._id).filter(Boolean),
       summary: {
         pending: byStatus.Pending || 0,
         approved: byStatus.Approved || 0,
@@ -212,7 +249,7 @@ router.post("/", protect, async (req, res) => {
       .populate(leaveRequestPopulate)
       .lean();
 
-    res.status(201).json(createdRequest);
+    res.status(201).json(withLeaveRequestAvatarUrls(createdRequest));
   } catch (error) {
     console.error("Create leave request error:", error);
     res.status(500).json({ message: "Unable to create leave request" });
@@ -249,7 +286,7 @@ router.patch("/:id/status", protect, authorize("admin"), async (req, res) => {
       .populate(leaveRequestPopulate)
       .lean();
 
-    res.status(200).json(updatedRequest);
+    res.status(200).json(withLeaveRequestAvatarUrls(updatedRequest));
   } catch (error) {
     console.error("Update leave request status error:", error);
     res.status(500).json({ message: "Unable to update leave request status" });
@@ -285,7 +322,7 @@ router.post("/:id/comments", protect, async (req, res) => {
       .populate(leaveRequestPopulate)
       .lean();
 
-    res.status(201).json(updatedRequest);
+    res.status(201).json(withLeaveRequestAvatarUrls(updatedRequest));
   } catch (error) {
     console.error("Add leave request comment error:", error);
     res.status(500).json({ message: "Unable to add leave request comment" });
