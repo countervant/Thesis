@@ -46,7 +46,7 @@ const sideNavSections = [
     title: "Management",
     items: [
       { id: "projects", label: "My Projects", icon: "tasks" },
-      { id: "tasks", label: "Tasks", icon: "tasks" },
+      { id: "tasks", label: "Projects", icon: "tasks" },
       { id: "calendar", label: "Calendar", icon: "calendar" },
       { id: "budget", label: "Budget", icon: "budget" },
       { id: "client", label: "Client", icon: "client" },
@@ -480,7 +480,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     userRole === "employee"
       ? [
           { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-          { id: "tasks", label: "Tasks", icon: "tasks" },
+          { id: "tasks", label: "Projects", icon: "tasks" },
           { id: "calendar", label: "Calendar", icon: "calendar" },
           { id: "leave-request", label: "Leave", icon: "leave-request" },
           { id: "settings", label: "Settings", icon: "settings" },
@@ -494,7 +494,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           ]
       : [
           { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-          { id: "tasks", label: "Tasks", icon: "tasks" },
+          { id: "tasks", label: "Projects", icon: "tasks" },
           { id: "calendar", label: "Calendar", icon: "calendar" },
           { id: "employee", label: "Employee", icon: "employee" },
           { id: "settings", label: "Settings", icon: "settings" },
