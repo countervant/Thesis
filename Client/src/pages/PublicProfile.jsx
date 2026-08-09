@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton.jsx";
 import companyIcon from "../assets/company.png";
-import defaultCoverPhoto from "../assets/defaultcoverphoto.png";
+import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
 import emailIcon from "../assets/email.png";
 import heartIcon from "../assets/heart.png";
 import phoneIcon from "../assets/phonenumber.png";
@@ -62,9 +62,9 @@ const formatDateTime = (value) => {
 };
 
 const formatJoinedDate = (value) => {
-  if (!value) return "May 8, 2026";
+  if (!value) return "Not available";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "May 8, 2026";
+  if (Number.isNaN(date.getTime())) return "Not available";
 
   return date.toLocaleDateString("en-US", {
     month: "long",
@@ -401,6 +401,7 @@ const PublicProfile = () => {
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState(null);
   const [activeProfileTab, setActiveProfileTab] = useState("Newsfeed");
+  const optimisticCommentId = useRef(0);
 
   const loadProfilePosts = useCallback(async ({ showLoading = true } = {}) => {
     try {
@@ -413,9 +414,18 @@ const PublicProfile = () => {
       const data = postsResult.status === "fulfilled" ? postsResult.value : [];
       const profileData = profileResult.status === "fulfilled" ? profileResult.value : null;
 
+      if (profileResult.status === "rejected") {
+        setPosts([]);
+        setDirectProfileUser(null);
+        setErrorMessage(
+          profileResult.reason?.response?.data?.message || "Unable to load profile."
+        );
+        return;
+      }
+
       setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
       setDirectProfileUser(profileData);
-      if (postsResult.status === "rejected" || profileResult.status === "rejected") {
+      if (postsResult.status === "rejected") {
         setErrorMessage("Some profile data could not be loaded. Refresh to retry.");
       }
     } catch (error) {
@@ -426,15 +436,8 @@ const PublicProfile = () => {
   }, [userId]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    loadProfilePosts().finally(() => {
-      if (!isMounted) return;
-    });
-
-    return () => {
-      isMounted = false;
-    };
+    const timer = window.setTimeout(loadProfilePosts, 0);
+    return () => window.clearTimeout(timer);
   }, [loadProfilePosts]);
 
   useEffect(() => {
@@ -500,7 +503,9 @@ const PublicProfile = () => {
   const { profileUser, userPosts } = useMemo(() => {
     const users = collectUsers(posts);
     const foundUser = users.get(userId) || null;
-    const authoredPosts = posts.filter((post) => getEntityId(post.author) === userId);
+    const authoredPosts = directProfileUser?.canViewActivity === false
+      ? []
+      : posts.filter((post) => getEntityId(post.author) === userId);
     const postProfileUser = foundUser || authoredPosts[0]?.author || null;
 
     return {
@@ -631,8 +636,9 @@ const PublicProfile = () => {
       return;
     }
 
+    optimisticCommentId.current += 1;
     const optimisticComment = normalizeComment({
-      id: `temp-comment-${Date.now()}`,
+      id: `temp-comment-${optimisticCommentId.current}`,
       text,
       user,
       hearts: [],
@@ -776,7 +782,10 @@ const PublicProfile = () => {
                 <div className="px-4 pb-4 text-center">
                   <div className="relative -mt-11 inline-block">
                     <Avatar user={profileUser} size="h-20 w-20" />
-                    <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
+                    <span
+                      className={`absolute bottom-1.5 right-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ${profileUser.isOnline ? "bg-emerald-500" : "bg-slate-400"}`}
+                      title={profileUser.isOnline ? "Online" : "Offline"}
+                    />
                   </div>
                   <div className="mt-3 flex items-center justify-center gap-2">
                     <h1 className="text-xl font-black leading-tight text-[#10142d]">
@@ -788,16 +797,18 @@ const PublicProfile = () => {
                     {profileUser.role || "user"}
                   </span>
                   <p className="mt-4 text-sm font-black text-[#10142d]">
-                    {profileUser.position || profileUser.companyName || "System Administrator"}
+                    {profileUser.position || profileUser.companyName || profileUser.role || "Profile"}
                   </p>
                   <p className="mx-auto mt-1.5 max-w-[210px] text-xs font-medium leading-5 text-slate-500">
-                    Managing the system and ensuring everything runs smoothly.
+                    {profileUser.companyName
+                      ? `${profileUser.role === "client" ? "Client" : "Team member"} at ${profileUser.companyName}.`
+                      : `${profileUser.role || "User"} profile.`}
                   </p>
 
                   <div className="mt-4 space-y-3 border-y border-pink-50 py-4 text-left text-xs font-semibold text-slate-600">
                     <p className="flex items-center gap-3">
                       <img src={companyIcon} alt="" className="h-4 w-4 object-contain" />
-                      {profileUser.companyName || "Clientra"}
+                      {profileUser.companyName || "Not provided"}
                     </p>
                     {profileUser.email && (
                       <a
@@ -951,9 +962,9 @@ const PublicProfile = () => {
                         ["Full Name", getUserName(profileUser)],
                         ["Email", profileUser.email || "No email provided"],
                         ["Phone", profileUser.phone || "No phone provided"],
-                        ["Address", getUserCountry(profileUser) || "Manila, Philippines"],
-                        ["Birthday", "February 14, 2001"],
-                        ["Gender", "Male"],
+                        ["Address", getUserCountry(profileUser) || "Not provided"],
+                        ["Birthday", profileUser.birthday ? new Date(profileUser.birthday).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Not provided"],
+                        ["Gender", profileUser.gender || "Not provided"],
                       ].map(([label, value]) => (
                         <div key={label} className="grid grid-cols-[92px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 md:grid-cols-[130px_minmax(0,1fr)]">
                           <span className="text-xs font-black text-[#243154]">{label}</span>
@@ -967,11 +978,11 @@ const PublicProfile = () => {
                         Work Information
                       </h2>
                       {[
-                        ["Employee ID", getEntityId(profileUser).slice(-8).toUpperCase() || "EMP-000123"],
-                        ["Department", profileUser.companyName || "IT Department"],
-                        ["Position", profileUser.position || "System Administrator"],
+                        ["Employee ID", getEntityId(profileUser).slice(-8).toUpperCase() || "Not available"],
+                        ["Department", profileUser.companyName || "Not provided"],
+                        ["Position", profileUser.position || "Not provided"],
                         ["Join Date", formatJoinedDate(profileUser.createdAt)],
-                        ["Work Status", "Full-time"],
+                        ["Work Status", profileUser.isActive === false ? "Inactive" : "Active"],
                       ].map(([label, value]) => (
                         <div key={label} className="grid grid-cols-[98px_minmax(0,1fr)] items-center border-b border-pink-50 py-2.5 last:border-b-0 md:grid-cols-[140px_minmax(0,1fr)]">
                           <span className="text-xs font-black text-[#243154]">{label}</span>
@@ -991,21 +1002,14 @@ const PublicProfile = () => {
                         Skills & Expertise
                       </h2>
                       <div className="flex flex-wrap gap-2.5">
-                        {[
-                          "UI/UX Design",
-                          "React",
-                          "JavaScript",
-                          "System Management",
-                          "Database Management",
-                          "Problem Solving",
-                          "Communication",
-                          "Leadership",
-                          "Teamwork",
-                        ].map((skill) => (
+                        {Object.values(profileUser.skillGroups || {}).flat().map((skill) => (
                           <span key={skill} className="rounded-full bg-pink-50 px-4 py-2 text-[11px] font-black text-[#c72fb2]">
                             {skill}
                           </span>
                         ))}
+                        {Object.values(profileUser.skillGroups || {}).flat().length === 0 && (
+                          <span className="text-xs font-semibold text-slate-500">No skills added yet.</span>
+                        )}
                       </div>
                     </section>
 

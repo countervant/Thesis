@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
-import defaultCoverPhoto from "../assets/defaultcoverphoto.png";
+import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
 import CountrySelect from "../components/CountrySelect.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { ProfileSkeleton } from "../components/Skeleton.jsx";

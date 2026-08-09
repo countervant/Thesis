@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { clientAPI, getApiErrorMessage } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
@@ -260,7 +261,15 @@ const ClientCard = ({ client, onDelete }) => {
         />
         <div className="min-w-0 pt-1">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="truncate text-base font-extrabold text-neutral-950 dark:text-white">{client.name}</h2>
+            <h2 className="min-w-0 truncate text-base font-extrabold">
+              <Link
+                to={`/profile/${client.id}`}
+                className="text-neutral-950 transition hover:text-[#c72fb2] focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 dark:text-white dark:hover:text-pink-300"
+                aria-label={`View ${client.name}'s profile`}
+              >
+                {client.name}
+              </Link>
+            </h2>
             {countryFlag && (
               <img
                 src={countryFlag}

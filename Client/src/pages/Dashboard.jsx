@@ -269,9 +269,13 @@ const MessagesPanel = () => {
   );
   const [newMessageSearch, setNewMessageSearch] = useState("");
   const [isMobileThreadOpen, setIsMobileThreadOpen] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const threadEndRef = useRef(null);
   const messageInputRef = useRef(null);
   const activeUserIdRef = useRef("");
+  const usersRef = useRef([]);
+  const threadRefreshPromiseRef = useRef(null);
+  const threadRefreshTimerRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const longPressStartRef = useRef(null);
 
@@ -393,6 +397,7 @@ const MessagesPanel = () => {
 
         setThreads(nextThreads);
         setUsers(nextUsers);
+        usersRef.current = nextUsers;
 
         if (threadResult.status === "rejected" && userResult.status === "rejected") {
           setErrorMessage(
@@ -401,8 +406,8 @@ const MessagesPanel = () => {
         }
 
         const firstParticipant = nextThreads?.[0]?.participant || null;
-        if (!activeUserId && firstParticipant) {
-          setActiveUserId(getEntityId(firstParticipant));
+        if (firstParticipant) {
+          setActiveUserId((currentId) => currentId || getEntityId(firstParticipant));
         }
       } catch (error) {
         if (isMounted) {
@@ -422,7 +427,7 @@ const MessagesPanel = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeUserId]);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!activeUserId) {
@@ -450,7 +455,7 @@ const MessagesPanel = () => {
         );
       } catch (error) {
         if (isMounted) {
-          const searchedParticipant = users.find(
+          const searchedParticipant = usersRef.current.find(
             (item) => getEntityId(item) === activeUserId
           );
 
@@ -476,18 +481,19 @@ const MessagesPanel = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeUserId, users]);
+  }, [activeUserId]);
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, activeUserId]);
 
   useEffect(() => {
-    if (!activeUserId) return undefined;
+    if (!activeUserId || isRealtimeConnected) return undefined;
 
     let isMounted = true;
-
     const refreshActiveThread = async () => {
+      if (document.visibilityState !== "visible") return;
+
       try {
         const thread = await messageAPI.getThread(activeUserId);
         if (!isMounted) return;
@@ -504,17 +510,16 @@ const MessagesPanel = () => {
             : nextMessages;
         });
       } catch {
-        // Keep the current view stable; the next interval or manual open can recover.
+        // EventSource reconnects automatically; this slower poll is only a fallback.
       }
     };
 
-    const intervalId = setInterval(refreshActiveThread, 2000);
-
+    const intervalId = window.setInterval(refreshActiveThread, 15000);
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
+      window.clearInterval(intervalId);
     };
-  }, [activeUserId]);
+  }, [activeUserId, isRealtimeConnected]);
 
   const handleSelectConversation = (participant) => {
     setActiveUserId(getEntityId(participant));
@@ -529,24 +534,56 @@ const MessagesPanel = () => {
   };
 
   const refreshThreads = useCallback(async () => {
-    try {
-      const nextThreads = await messageAPI.getThreads();
-      setThreads(
-        Array.isArray(nextThreads)
-          ? nextThreads.map((thread) =>
-              getEntityId(thread.participant) === activeUserId
-                ? { ...thread, unreadCount: 0 }
-                : thread
-            )
-          : []
-      );
-    } catch {
-      // Keep the current inbox visible; polling will try again.
+    if (threadRefreshTimerRef.current) {
+      window.clearTimeout(threadRefreshTimerRef.current);
+      threadRefreshTimerRef.current = null;
     }
-  }, [activeUserId]);
+
+    if (threadRefreshPromiseRef.current) {
+      return threadRefreshPromiseRef.current;
+    }
+
+    const request = messageAPI
+      .getThreadsFresh()
+      .then((nextThreads) => {
+        setThreads(
+          Array.isArray(nextThreads)
+            ? nextThreads.map((thread) =>
+                getEntityId(thread.participant) === activeUserIdRef.current
+                  ? { ...thread, unreadCount: 0 }
+                  : thread
+              )
+            : []
+        );
+      })
+      .catch(() => {
+        // Keep the current inbox visible; realtime or fallback refresh will retry.
+      });
+
+    threadRefreshPromiseRef.current = request;
+    try {
+      await request;
+    } finally {
+      if (threadRefreshPromiseRef.current === request) {
+        threadRefreshPromiseRef.current = null;
+      }
+    }
+  }, []);
+
+  const scheduleThreadRefresh = useCallback(() => {
+    if (threadRefreshTimerRef.current) {
+      window.clearTimeout(threadRefreshTimerRef.current);
+    }
+
+    threadRefreshTimerRef.current = window.setTimeout(() => {
+      threadRefreshTimerRef.current = null;
+      refreshThreads();
+    }, 150);
+  }, [refreshThreads]);
 
   useEffect(() => {
     const closeMessages = messageAPI.subscribe({
+      onOpen: () => setIsRealtimeConnected(true),
       onMessage: (event) => {
         const action = event?.action || "created";
         const message = event?.message || event;
@@ -598,26 +635,26 @@ const MessagesPanel = () => {
           );
         }
 
-        refreshThreads();
+        scheduleThreadRefresh();
       },
-      onError: () => {},
+      onError: () => setIsRealtimeConnected(false),
     });
 
-    return closeMessages;
-  }, [currentUserId, refreshThreads]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      refreshThreads();
-    }, 2000);
-
-    return () => clearInterval(intervalId);
-  }, [refreshThreads]);
+    return () => {
+      if (threadRefreshTimerRef.current) {
+        window.clearTimeout(threadRefreshTimerRef.current);
+        threadRefreshTimerRef.current = null;
+      }
+      closeMessages();
+    };
+  }, [currentUserId, scheduleThreadRefresh]);
 
   useEffect(() => {
     let isMounted = true;
 
     const refreshParticipantPresence = async () => {
+      if (document.visibilityState !== "visible") return;
+
       const [threadResult, userResult] = await Promise.allSettled([
         messageAPI.getThreadsFresh(),
         messageAPI.getUsersFresh({ limit: 100 }),
@@ -625,17 +662,29 @@ const MessagesPanel = () => {
       if (!isMounted) return;
 
       if (threadResult.status === "fulfilled") {
-        setThreads(threadResult.value);
+        setThreads(
+          threadResult.value.map((thread) =>
+            getEntityId(thread.participant) === activeUserIdRef.current
+              ? { ...thread, unreadCount: 0 }
+              : thread
+          )
+        );
       }
       if (userResult.status === "fulfilled") {
         setUsers(userResult.value);
+        usersRef.current = userResult.value;
       }
     };
 
     const intervalId = window.setInterval(refreshParticipantPresence, 30000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshParticipantPresence();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

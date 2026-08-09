@@ -2,19 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
 import TwoFactorSettings from "../../components/auth/TwoFactorSettings.jsx";
 
-const alertItems = [
-  { id: "emailAlerts", label: "Email alerts", icon: "mail" },
-  { id: "newDeviceAlerts", label: "New device alerts", icon: "monitor" },
-  { id: "suspiciousActivityAlerts", label: "Suspicious activity alerts", icon: "shield" },
-];
-
 const defaultSettings = {
-  alerts: {
-    emailAlerts: true,
-    newDeviceAlerts: true,
-    suspiciousActivityAlerts: true,
-  },
-  lastPasswordChange: "May 10, 2026 - 2:15 PM",
+  lastPasswordChange: "Not available",
 };
 
 const getStorageKey = (user) => `clientraSecuritySettings:${user?._id || user?.id || user?.email || "guest"}`;
@@ -32,14 +21,14 @@ const loadSettings = (user) => {
   try {
     const storageKey = getStorageKey(user);
     const savedSettings = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    if (Object.hasOwn(savedSettings, "backupCodes")) {
+    if (Object.hasOwn(savedSettings, "backupCodes") || Object.hasOwn(savedSettings, "alerts")) {
       delete savedSettings.backupCodes;
+      delete savedSettings.alerts;
       localStorage.setItem(storageKey, JSON.stringify(savedSettings));
     }
     return {
       ...defaultSettings,
       ...savedSettings,
-      alerts: { ...defaultSettings.alerts, ...(savedSettings.alerts || {}) },
     };
   } catch {
     return defaultSettings;
@@ -66,22 +55,6 @@ const Card = ({ children, className = "" }) => (
   </section>
 );
 
-const Toggle = ({ enabled, onClick, label }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-label={label}
-    aria-pressed={enabled}
-    className={`relative inline-flex h-7 w-12 items-center rounded-full p-1 transition ${
-      enabled
-        ? "bg-linear-to-r from-[#df4bb4] to-[#c72fb2] shadow-[0_6px_14px_rgba(219,74,181,0.28)]"
-        : "bg-slate-300"
-    }`}
-  >
-    <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${enabled ? "translate-x-5" : "translate-x-0"}`} />
-  </button>
-);
-
 const passwordInitialState = {
   currentPassword: "",
   newPassword: "",
@@ -89,7 +62,7 @@ const passwordInitialState = {
 };
 
 const SecuritySettings = ({ user }) => {
-  const email = user?.email || "peejong@gmail.com";
+  const email = user?.email || "No recovery email available";
   const savedSettings = useMemo(() => loadSettings(user), [user]);
   const [settings, setSettings] = useState(savedSettings);
   const [passwordForm, setPasswordForm] = useState(passwordInitialState);
@@ -109,29 +82,6 @@ const SecuritySettings = ({ user }) => {
 
   const persistSettings = (nextSettings) => {
     localStorage.setItem(getStorageKey(user), JSON.stringify(nextSettings));
-  };
-
-  const updateSettings = (updater) => {
-    setSettings((currentSettings) => {
-      const nextSettings = typeof updater === "function" ? updater(currentSettings) : updater;
-      setMessage("");
-      setError("");
-      return nextSettings;
-    });
-  };
-
-  const saveSettings = () => {
-    persistSettings(settings);
-    setMessage("Security settings saved.");
-    setError("");
-  };
-
-  const cancelSettings = () => {
-    setSettings(loadSettings(user));
-    setPasswordForm(passwordInitialState);
-    setShowPasswordForm(false);
-    setMessage("Changes cancelled.");
-    setError("");
   };
 
   const updatePasswordField = (field, value) => {
@@ -207,9 +157,9 @@ const SecuritySettings = ({ user }) => {
     setBackupCodes([]);
   };
 
-  const protectedText = Object.values(settings.alerts).some(Boolean)
-    ? "Your account is secure"
-    : "Security needs review";
+  const protectedText = user?.twoFactorEnabled
+    ? "Enhanced protection enabled"
+    : "Basic password protection";
 
   return (
     <div className="space-y-5">
@@ -226,7 +176,7 @@ const SecuritySettings = ({ user }) => {
       </header>
 
       {(message || error) && (
-        <div className={`rounded-xl border px-4 py-3 text-sm font-black ${
+        <div role={error ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-black ${
           error ? "border-red-100 bg-red-50 text-red-500" : "border-emerald-100 bg-emerald-50 text-emerald-600"
         }`}>
           {error || message}
@@ -271,6 +221,7 @@ const SecuritySettings = ({ user }) => {
                     <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">{label}</span>
                     <input
                       type="password"
+                      autoComplete={field === "currentPassword" ? "current-password" : "new-password"}
                       value={passwordForm[field]}
                       onChange={(event) => updatePasswordField(field, event.target.value)}
                       className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
@@ -290,6 +241,7 @@ const SecuritySettings = ({ user }) => {
                     onClick={() => {
                       setPasswordForm(passwordInitialState);
                       setShowPasswordForm(false);
+                      setError("");
                     }}
                     className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                   >
@@ -302,58 +254,6 @@ const SecuritySettings = ({ user }) => {
 
           <TwoFactorSettings />
 
-          <Card>
-            <div className="flex items-center gap-4">
-              <span className="grid h-14 w-14 place-items-center rounded-full bg-pink-50 text-[#c72fb2]">
-                <Icon name="bell" className="h-7 w-7" />
-              </span>
-              <div>
-                <h3 className="text-sm font-black text-[#10142d] dark:text-white">Login Alerts</h3>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Get notified about important security events.
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 divide-y divide-pink-50">
-              {alertItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
-                      <Icon name={item.icon} className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className="block text-xs font-black text-[#10142d] dark:text-white">{item.label}</span>
-                      <span className="mt-0.5 block text-xs font-semibold text-slate-500">
-                        Get notified when security activity happens.
-                      </span>
-                    </span>
-                  </div>
-                  <Toggle
-                    enabled={Boolean(settings.alerts[item.id])}
-                    onClick={() =>
-                      updateSettings((currentSettings) => ({
-                        ...currentSettings,
-                        alerts: {
-                          ...currentSettings.alerts,
-                          [item.id]: !currentSettings.alerts[item.id],
-                        },
-                      }))
-                    }
-                    label={`Toggle ${item.label}`}
-                  />
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
-            <button type="button" onClick={cancelSettings} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white md:h-9 md:w-auto md:min-w-[120px]">
-              Cancel
-            </button>
-            <button type="button" onClick={saveSettings} className="h-10 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-9 md:w-auto md:min-w-[160px]">
-              Save Changes
-            </button>
-          </div>
         </main>
 
         <aside className="space-y-5">
@@ -369,16 +269,16 @@ const SecuritySettings = ({ user }) => {
                   We are protecting your account and your data.
                 </p>
                 <span className={`mt-3 inline-flex rounded-md px-3 py-1.5 text-xs font-black ${
-                  protectedText === "Your account is secure" ? "bg-emerald-50 text-emerald-500" : "bg-amber-50 text-amber-500"
+                  user?.twoFactorEnabled ? "bg-emerald-50 text-emerald-500" : "bg-amber-50 text-amber-500"
                 }`}>
-                  {protectedText === "Your account is secure" ? "Protected" : "Review"}
+                  {user?.twoFactorEnabled ? "Protected" : "Enable 2FA"}
                 </span>
               </div>
             </div>
             <div className="mt-5 divide-y divide-pink-50">
               {[
-                ["Password Strength", "Strong", "lock"],
-                ["Last Login", formatDateTime(new Date()), "monitor"],
+                ["Password", "Protected", "lock"],
+                ["Last Activity", user?.lastSeen ? formatDateTime(new Date(user.lastSeen)) : "Not available", "monitor"],
                 ["Last Password Change", settings.lastPasswordChange, "calendar"],
               ].map(([label, value, icon]) => (
                 <div key={label} className="flex items-center justify-between gap-3 py-3 text-xs font-bold">
@@ -386,7 +286,7 @@ const SecuritySettings = ({ user }) => {
                     <Icon name={icon} className="h-4 w-4" />
                     {label}
                   </span>
-                  <span className={label === "Password Strength" ? "text-emerald-500" : "text-slate-600"}>{value}</span>
+                  <span className={label === "Password" ? "text-emerald-500" : "text-slate-600"}>{value}</span>
                 </div>
               ))}
             </div>
@@ -406,8 +306,8 @@ const SecuritySettings = ({ user }) => {
                 <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">Verified</span>
               </div>
             </div>
-            <button type="button" onClick={generateCodes} disabled={isGeneratingBackupCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#c72fb2] dark:hover:text-white">
-              {isGeneratingBackupCodes ? "Generating..." : "Generate Backup Codes"}
+            <button type="button" onClick={generateCodes} disabled={isGeneratingBackupCodes || !user?.twoFactorEnabled} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#c72fb2] dark:hover:text-white">
+              {isGeneratingBackupCodes ? "Generating..." : user?.twoFactorEnabled ? "Generate Backup Codes" : "Enable 2FA to Generate Codes"}
             </button>
           </Card>
         </aside>

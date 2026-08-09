@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const AVATAR_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000];
 
 const getInitials = (userOrName, fallback = "U") => {
   const firstName = userOrName?.firstName || "";
@@ -32,15 +34,69 @@ const InitialsAvatar = ({
   user,
 }) => {
   const avatarSrc = src || user?.avatar || "";
-  const [failedSrc, setFailedSrc] = useState("");
-  const imageFailed = failedSrc === avatarSrc;
+  const retryTimerRef = useRef(null);
+  const [failure, setFailure] = useState({
+    src: "",
+    attempt: 0,
+    retryReady: false,
+    exhausted: false,
+  });
+  const isCurrentFailure = failure.src === avatarSrc;
+  const imageFailed =
+    isCurrentFailure && (failure.exhausted || !failure.retryReady);
+  const retrySuffix =
+    isCurrentFailure && failure.attempt > 0
+      ? `${avatarSrc.includes("?") ? "&" : "?"}_avatarRetry=${failure.attempt}`
+      : "";
+  const imageSrc = `${avatarSrc}${retrySuffix}`;
+
+  useEffect(() => () => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+  }, []);
+
+  const handleImageError = () => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+
+    const previousAttempt = isCurrentFailure ? failure.attempt : 0;
+    const nextAttempt = previousAttempt + 1;
+    if (nextAttempt > AVATAR_RETRY_DELAYS_MS.length) {
+      setFailure({
+        src: avatarSrc,
+        attempt: previousAttempt,
+        retryReady: false,
+        exhausted: true,
+      });
+      return;
+    }
+
+    setFailure({
+      src: avatarSrc,
+      attempt: nextAttempt,
+      retryReady: false,
+      exhausted: false,
+    });
+    retryTimerRef.current = window.setTimeout(() => {
+      setFailure((currentFailure) =>
+        currentFailure.src === avatarSrc && currentFailure.attempt === nextAttempt
+          ? { ...currentFailure, retryReady: true }
+          : currentFailure
+      );
+      retryTimerRef.current = null;
+    }, AVATAR_RETRY_DELAYS_MS[nextAttempt - 1]);
+  };
+
+  const handleImageLoad = () => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
+  };
 
   if (avatarSrc && !imageFailed) {
     return (
       <img
-        src={avatarSrc}
+        src={imageSrc}
         alt={alt}
-        onError={() => setFailedSrc(avatarSrc)}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
         className={`${className} shrink-0 rounded-full object-cover`}
       />
     );

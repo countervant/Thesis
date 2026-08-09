@@ -8,6 +8,7 @@ const defaultSkills = {
   "Soft Skills": ["Leadership", "Communication", "Problem Solving", "Time Management", "Teamwork", "Adaptability"],
   "Other Expertise": ["System Administration", "Database Management", "Cybersecurity Basics", "Agile Methodology"],
 };
+const todayInputValue = new Date().toISOString().slice(0, 10);
 
 const getStorageKey = (user) => `clientraProfileSettings:${user?._id || user?.id || user?.email || "guest"}`;
 
@@ -32,11 +33,11 @@ const getFullName = (user) =>
   "";
 
 const getEmployeeId = (user) =>
-  String(user?._id || user?.id || "69f8b5a1fdf46c3698ba46e3").slice(0, 24);
+  String(user?._id || user?.id || "Not available").slice(0, 24);
 
 const getJoinedDate = (user) => {
-  const date = new Date(user?.createdAt || "2026-05-04T10:44:00");
-  if (Number.isNaN(date.getTime())) return "Joined May 4, 2026";
+  const date = new Date(user?.createdAt || "");
+  if (Number.isNaN(date.getTime())) return "Join date unavailable";
   return `Joined ${date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -83,12 +84,12 @@ const ProfileSettings = ({ user }) => {
   const initialData = useMemo(
     () => ({
       fullName: getFullName(user),
-      email: user?.email || "peejong@gmail.com",
-      phone: user?.phone || "+632313213123",
-      address: user?.country || "Philippines",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      address: user?.country || "",
       birthday: formatBirthday(user?.birthday),
-      gender: localSettings.gender || "Prefer not to say",
-      companyName: user?.companyName || "Clientra",
+      gender: user?.gender || localSettings.gender || "Prefer not to say",
+      companyName: user?.companyName || "",
       role: user?.position || "",
       avatar: user?.avatar || "",
       coverPhoto: user?.coverPhoto || "",
@@ -96,7 +97,13 @@ const ProfileSettings = ({ user }) => {
     [localSettings.gender, user]
   );
   const [formData, setFormData] = useState(initialData);
-  const [skillGroups, setSkillGroups] = useState(() => localSettings.skills || defaultSkills);
+  const [skillGroups, setSkillGroups] = useState(() => user?.skillGroups
+    ? {
+        "Technical Skills": user.skillGroups.technical || [],
+        "Soft Skills": user.skillGroups.soft || [],
+        "Other Expertise": user.skillGroups.other || [],
+      }
+    : localSettings.skills || defaultSkills);
   const [newSkill, setNewSkill] = useState("");
   const [newSkillGroup, setNewSkillGroup] = useState("Technical Skills");
   const [showSkillForm, setShowSkillForm] = useState(false);
@@ -130,6 +137,19 @@ const ProfileSettings = ({ user }) => {
     }));
   };
 
+  const loadImage = (field, file) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Please choose an image smaller than 10 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => updateField(field, String(reader.result || ""));
+    reader.onerror = () => setError("Unable to read the selected image.");
+    reader.readAsDataURL(file);
+  };
+
   const saveProfile = async (event) => {
     event.preventDefault();
     if (isSaving) return;
@@ -150,6 +170,12 @@ const ProfileSettings = ({ user }) => {
         phone: formData.phone.trim(),
         country: formData.address.trim(),
         birthday: formData.birthday,
+        gender: formData.gender,
+        skillGroups: {
+          technical: skillGroups["Technical Skills"],
+          soft: skillGroups["Soft Skills"],
+          other: skillGroups["Other Expertise"],
+        },
         companyName: formData.companyName.trim(),
         position: formData.role.trim(),
         avatar: formData.avatar,
@@ -178,11 +204,8 @@ const ProfileSettings = ({ user }) => {
                 accept="image/*"
                 className="sr-only"
                 onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => updateField("coverPhoto", String(reader.result || ""));
-                  reader.readAsDataURL(file);
+                  loadImage("coverPhoto", event.target.files?.[0]);
+                  event.target.value = "";
                 }}
               />
             </label>
@@ -220,11 +243,8 @@ const ProfileSettings = ({ user }) => {
                   accept="image/*"
                   className="sr-only"
                   onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => updateField("avatar", String(reader.result || ""));
-                    reader.readAsDataURL(file);
+                    loadImage("avatar", event.target.files?.[0]);
+                    event.target.value = "";
                   }}
                 />
               </label>
@@ -245,22 +265,22 @@ const ProfileSettings = ({ user }) => {
           </h2>
           <div className="grid gap-3.5 xl:grid-cols-2">
             <Field label="Full Name" icon="person" required>
-              <input type="text" value={formData.fullName} onChange={(event) => updateField("fullName", event.target.value)} className={iconInputClass} />
+              <input type="text" required value={formData.fullName} onChange={(event) => updateField("fullName", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Email Address" icon="mail" required>
-              <input type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} className={iconInputClass} />
+              <input type="email" required value={formData.email} onChange={(event) => updateField("email", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Phone Number" icon="phone" required>
-              <input type="tel" value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} className={iconInputClass} />
+              <input type="tel" required value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Address" icon="location" required>
-              <input type="text" value={formData.address} onChange={(event) => updateField("address", event.target.value)} className={iconInputClass} />
+              <input type="text" required value={formData.address} onChange={(event) => updateField("address", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Birthday" icon="calendar" required>
-              <input type="date" value={formData.birthday} onChange={(event) => updateField("birthday", event.target.value)} className={iconInputClass} />
+              <input type="date" required max={todayInputValue} value={formData.birthday} onChange={(event) => updateField("birthday", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Gender" icon="person" required>
-              <select value={formData.gender} onChange={(event) => updateField("gender", event.target.value)} className={iconInputClass}>
+              <select required value={formData.gender} onChange={(event) => updateField("gender", event.target.value)} className={iconInputClass}>
                 <option>Male</option>
                 <option>Female</option>
                 <option>Prefer not to say</option>
@@ -284,7 +304,7 @@ const ProfileSettings = ({ user }) => {
               <input type="text" value={formData.role} onChange={(event) => updateField("role", event.target.value)} className={iconInputClass} />
             </Field>
             <Field label="Work Status" required>
-              <input type="text" value="Full-time" readOnly className={`${inputClass} bg-slate-50`} />
+              <input type="text" value={user?.isActive === false ? "Inactive" : "Active"} readOnly className={`${inputClass} bg-slate-50`} />
             </Field>
           </div>
         </section>
@@ -305,7 +325,7 @@ const ProfileSettings = ({ user }) => {
           </div>
           {showSkillForm && (
             <div className="mb-4 flex flex-wrap gap-2 rounded-xl bg-pink-50 p-3">
-              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} placeholder="Enter a skill" className={`${inputClass} min-w-[180px] flex-1`} />
+              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-[180px] flex-1`} />
               <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-auto`}>
                 {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
               </select>

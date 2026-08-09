@@ -25,7 +25,7 @@ const privacyItems = [
     description: "Allow others to see your activity.",
     icon: "hide",
     control: "toggle",
-    enabled: false,
+    enabled: true,
   },
   {
     id: "personalInformation",
@@ -47,6 +47,12 @@ const getDefaultSettings = (user) =>
       ...settings,
       [item.id]: item.id === "onlineStatus"
         ? user?.showOnlineStatus !== false
+        : item.id === "profileVisibility"
+          ? user?.privacySettings?.profileVisibility || item.value
+          : item.id === "activityVisibility"
+            ? user?.privacySettings?.activityVisibility ?? item.enabled
+            : item.id === "personalInformation"
+              ? user?.privacySettings?.personalInformation || item.value
         : item.control === "select"
           ? item.value
           : item.enabled,
@@ -61,6 +67,13 @@ const loadSettings = (user) => {
     return {
       ...defaultSettings,
       ...savedSettings,
+      ...(user?.privacySettings
+        ? {
+            profileVisibility: user.privacySettings.profileVisibility,
+            activityVisibility: user.privacySettings.activityVisibility,
+            personalInformation: user.privacySettings.personalInformation,
+          }
+        : {}),
       onlineStatus: user?.showOnlineStatus !== false,
     };
   } catch {
@@ -138,6 +151,14 @@ const PrivacySettings = ({ user }) => {
         Boolean(settings.onlineStatus)
       );
       updateUser(updatedUser);
+      const updatedProfile = await authAPI.updateMe({
+        privacySettings: {
+          profileVisibility: settings.profileVisibility,
+          activityVisibility: Boolean(settings.activityVisibility),
+          personalInformation: settings.personalInformation,
+        },
+      });
+      updateUser(updatedProfile);
       localStorage.setItem(getStorageKey(user), JSON.stringify(settings));
       setMessage("Privacy settings saved.");
     } catch (error) {

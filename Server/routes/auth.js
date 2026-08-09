@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import User from "../model/userModel.js";
+import Client from "../model/Admin/Clientmodel.js";
 import { authorize } from "../middleware/authorize.js";
 import { clearCachedAuthUser, protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
@@ -331,11 +332,47 @@ router.post("/reset-password", async (req, res) => {
           return res.status(400).json({ message: "Invalid user" });
         }
 
-        const loadUser = () =>
-          User.findById(req.params.id)
-            .select("firstName middleInitial lastName companyName email phone country role coverPhoto position isActive updatedAt")
+        const loadUser = async () => {
+          const accountUser = await User.findById(req.params.id)
+            .select("firstName middleInitial lastName companyName email phone country role avatar coverPhoto position birthday gender skillGroups isActive isOnline showOnlineStatus lastSeen privacySettings createdAt updatedAt")
             .maxTimeMS(30000)
             .lean();
+          if (accountUser) return accountUser;
+
+          const managedClient = await Client.findById(req.params.id)
+            .select("companyName contactPerson email phone country service isActive createdAt updatedAt")
+            .maxTimeMS(30000)
+            .lean();
+          if (!managedClient) return null;
+          if (req.user.role !== "admin") {
+            const accessError = new Error("This client profile is restricted to administrators");
+            accessError.status = 403;
+            throw accessError;
+          }
+
+          return {
+            _id: managedClient._id,
+            firstName: managedClient.contactPerson,
+            lastName: "",
+            companyName: managedClient.companyName,
+            email: managedClient.email,
+            phone: managedClient.phone,
+            country: managedClient.country,
+            role: "client",
+            position: managedClient.service,
+            isActive: managedClient.isActive,
+            isOnline: false,
+            privacySettings: {
+              profileVisibility: "Everyone",
+              activityVisibility: true,
+              personalInformation: "Everyone",
+            },
+            skillGroups: { technical: [], soft: [], other: [] },
+            createdAt: managedClient.createdAt,
+            updatedAt: managedClient.updatedAt,
+            isManagedClientProfile: true,
+          };
+        };
 
         let user;
         try {
@@ -350,8 +387,43 @@ router.post("/reset-password", async (req, res) => {
           return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json(withAvatarUrl(user));
+        const currentUserId = String(req.user._id || req.user.id || "");
+        const isOwnProfile = String(user._id) === currentUserId;
+        const privacy = user.privacySettings || {};
+        const isSameTeam =
+          req.user.role === "admin" ||
+          (Boolean(req.user.companyName) && req.user.companyName === user.companyName);
+        const canViewProfile =
+          isOwnProfile ||
+          privacy.profileVisibility !== "Only Me" &&
+            (privacy.profileVisibility !== "Team Only" || isSameTeam);
+
+        if (!canViewProfile) {
+          return res.status(403).json({ message: "This profile is private" });
+        }
+
+        const canViewPersonalInformation =
+          isOwnProfile ||
+          privacy.personalInformation === "Everyone" ||
+          (privacy.personalInformation === "Team Only" && isSameTeam);
+        const publicProfile = { ...user };
+        delete publicProfile.privacySettings;
+        if (!canViewPersonalInformation) {
+          delete publicProfile.email;
+          delete publicProfile.phone;
+          delete publicProfile.country;
+          delete publicProfile.birthday;
+          delete publicProfile.gender;
+        }
+        publicProfile.canViewActivity =
+          isOwnProfile || privacy.activityVisibility !== false;
+        publicProfile.isOnline = isUserOnline(publicProfile);
+
+        res.status(200).json(withAvatarUrl(publicProfile));
       } catch (error) {
+        if (error.status === 403) {
+          return res.status(403).json({ message: error.message });
+        }
         if (isMongoTimeoutError(error)) {
           return res.status(503).json({ message: "Profile is temporarily unavailable" });
         }
@@ -424,10 +496,13 @@ router.post("/reset-password", async (req, res) => {
           country,
           position,
           birthday,
+          gender,
+          skillGroups,
           avatar,
           coverPhoto,
           currentPassword,
           password,
+          privacySettings,
         } = req.body;
 
         if (firstName !== undefined) {
@@ -487,6 +562,24 @@ router.post("/reset-password", async (req, res) => {
             user.birthday = parsedBirthday;
           }
         }
+        if (gender !== undefined) {
+          const genderOptions = new Set(["Male", "Female", "Prefer not to say"]);
+          if (!genderOptions.has(gender)) {
+            return res.status(400).json({ message: "Invalid gender selection" });
+          }
+          user.gender = gender;
+        }
+        if (skillGroups !== undefined) {
+          const normalizeSkills = (skills) =>
+            Array.isArray(skills)
+              ? [...new Set(skills.map((skill) => String(skill).trim()).filter(Boolean))].slice(0, 50)
+              : [];
+          user.skillGroups = {
+            technical: normalizeSkills(skillGroups.technical),
+            soft: normalizeSkills(skillGroups.soft),
+            other: normalizeSkills(skillGroups.other),
+          };
+        }
         if (avatar !== undefined) {
           const isExistingAvatarUrl =
             typeof avatar === "string" &&
@@ -497,9 +590,30 @@ router.post("/reset-password", async (req, res) => {
           }
         }
         if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
+        if (privacySettings !== undefined) {
+          const visibilityOptions = new Set(["Everyone", "Team Only", "Only Me"]);
+          const profileVisibility = privacySettings?.profileVisibility;
+          const personalInformation = privacySettings?.personalInformation;
+          if (
+            !visibilityOptions.has(profileVisibility) ||
+            !visibilityOptions.has(personalInformation) ||
+            typeof privacySettings?.activityVisibility !== "boolean"
+          ) {
+            return res.status(400).json({ message: "Invalid privacy settings" });
+          }
+          user.privacySettings = {
+            profileVisibility,
+            activityVisibility: privacySettings.activityVisibility,
+            personalInformation,
+          };
+        }
 
         if (password) {
-          if (currentPassword && !(await user.matchPassword(currentPassword))) {
+          if (!currentPassword) {
+            return res.status(400).json({ message: "Current password is required" });
+          }
+
+          if (!(await user.matchPassword(currentPassword))) {
             return res.status(400).json({ message: "Current password is incorrect" });
           }
 
@@ -520,6 +634,7 @@ router.post("/reset-password", async (req, res) => {
         }
 
         await user.save();
+        clearCachedAuthUser(user._id);
 
         const updatedProfile = withAvatarUrl({
           id: user._id,
@@ -537,7 +652,15 @@ router.post("/reset-password", async (req, res) => {
           country: user.country,
           position: user.position,
           birthday: user.birthday,
+          gender: user.gender,
+          skillGroups: user.skillGroups,
           isActive: user.isActive,
+          isOnline: user.isOnline,
+          showOnlineStatus: user.showOnlineStatus !== false,
+          privacySettings: user.privacySettings,
+          twoFactorEnabled: Boolean(user.twoFactorEnabled),
+          createdAt: user.createdAt,
+          lastSeen: user.lastSeen,
         });
         res.status(200).json(updatedProfile);
       } catch (error) {
@@ -545,6 +668,35 @@ router.post("/reset-password", async (req, res) => {
         res.status(error.status || 500).json({
           message: error.status ? error.message : "Unable to update profile",
         });
+      }
+    });
+
+    router.patch("/me/deactivate", protect, async (req, res) => {
+      try {
+        const currentPassword = String(req.body?.currentPassword || "");
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required" });
+        }
+
+        const user = await User.findById(req.user._id).select("password isActive isOnline lastSeen +trustedDevices");
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        if (!(await user.matchPassword(currentPassword))) {
+          return res.status(400).json({ message: "Current password is incorrect" });
+        }
+
+        user.isActive = false;
+        user.isOnline = false;
+        user.lastSeen = new Date();
+        user.trustedDevices = [];
+        await user.save({ validateModifiedOnly: true });
+        clearCachedAuthUser(user._id);
+
+        return res.status(200).json({ message: "Account deactivated" });
+      } catch (error) {
+        console.error("Deactivate account error:", error);
+        return res.status(500).json({ message: "Unable to deactivate account" });
       }
     });
 

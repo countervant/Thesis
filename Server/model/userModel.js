@@ -79,6 +79,18 @@ const userSchema = new mongoose.Schema(
       type: Date,
     },
 
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Prefer not to say"],
+      default: "Prefer not to say",
+    },
+
+    skillGroups: {
+      technical: { type: [String], default: [] },
+      soft: { type: [String], default: [] },
+      other: { type: [String], default: [] },
+    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -92,6 +104,23 @@ const userSchema = new mongoose.Schema(
     showOnlineStatus: {
       type: Boolean,
       default: true,
+    },
+
+    privacySettings: {
+      profileVisibility: {
+        type: String,
+        enum: ["Everyone", "Team Only", "Only Me"],
+        default: "Everyone",
+      },
+      activityVisibility: {
+        type: Boolean,
+        default: true,
+      },
+      personalInformation: {
+        type: String,
+        enum: ["Everyone", "Team Only", "Only Me"],
+        default: "Only Me",
+      },
     },
 
     lastSeen: {

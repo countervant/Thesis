@@ -28,10 +28,13 @@ export const countryOptions = [
 
 export const defaultCountry = countryOptions[0].name;
 
-const countryFlagIcons = import.meta.glob("../assets/countryflag/*.png", {
-  eager: true,
-  import: "default",
-});
+const countryFlagIcons = import.meta.glob(
+  "../assets/countryflag/{ph,us,ca,gb,au,jp,kr,sg,my,id,th,vn,in,cn,hk,tw,ae,sa,de,fr,it,es,br,mx,za}.png",
+  {
+    eager: true,
+    import: "default",
+  }
+);
 
 const countryAliases = {
   PH: "Philippines",

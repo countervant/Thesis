@@ -6,7 +6,7 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
-const userPublicFields = "firstName lastName companyName email country role updatedAt";
+const userPublicFields = "firstName lastName companyName role privacySettings updatedAt";
 const isMongoTimeoutError = (error) =>
   error?.name === "MongoNetworkTimeoutError" ||
   error?.name === "MongoNetworkError" ||
@@ -33,17 +33,27 @@ const findPostMediaWithRetry = async (postId) => {
   }
 };
 
+const publicActivityUser = (user) => {
+  if (!user) return user;
+  const publicUser = {
+    ...user,
+    canViewActivity: user.privacySettings?.activityVisibility !== false,
+  };
+  delete publicUser.privacySettings;
+  return withAvatarUrl(publicUser);
+};
+
 const withPostAvatarUrls = (post) => ({
   ...post,
-  author: withAvatarUrl(post.author),
+  author: publicActivityUser(post.author),
   comments: Array.isArray(post.comments)
     ? post.comments.map((comment) => ({
         ...comment,
-        user: withAvatarUrl(comment.user),
+        user: publicActivityUser(comment.user),
         replies: Array.isArray(comment.replies)
           ? comment.replies.map((reply) => ({
               ...reply,
-              user: withAvatarUrl(reply.user),
+              user: publicActivityUser(reply.user),
             }))
           : [],
       }))
@@ -90,8 +100,14 @@ router.get("/", protect, async (req, res) => {
       NewsfeedPost.countDocuments().maxTimeMS(8000),
     ]);
 
+    const visiblePosts = posts.filter(
+      (post) =>
+        String(post.author?._id || "") === String(req.user._id) ||
+        post.author?.canViewActivity !== false
+    );
+
     res.status(200).json(pagedResponse({
-      data: posts.map(withCounts),
+      data: visiblePosts.map(withCounts),
       page,
       limit,
       total,
@@ -118,8 +134,14 @@ router.get("/activity", protect, async (req, res) => {
       NewsfeedPost.countDocuments().maxTimeMS(8000),
     ]);
 
+    const visiblePosts = posts.filter(
+      (post) =>
+        String(post.author?._id || "") === String(req.user._id) ||
+        post.author?.canViewActivity !== false
+    );
+
     res.status(200).json(pagedResponse({
-      data: posts.map(withCounts),
+      data: visiblePosts.map(withCounts),
       page,
       limit,
       total,

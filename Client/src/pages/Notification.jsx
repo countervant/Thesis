@@ -9,6 +9,10 @@ import MainBars from "./MainBars.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getApiErrorMessage, newsfeedAPI, taskAPI } from "../services/api.js";
 import { NotificationSkeleton } from "../components/Skeleton.jsx";
+import {
+  filterNotificationsByPreference,
+  readNotificationSettings,
+} from "../utils/settingsPreferences.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const dashboardPathByRole = {
@@ -94,6 +98,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
           message: postPreview,
           date: post?.updatedAt || post?.createdAt,
           target: { page: "newsfeed", postId },
+          preferenceId: "newsfeedActivity",
         });
       });
     }
@@ -111,6 +116,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
           message: trimText(comment?.text, postPreview),
           date: comment?.createdAt,
           target: { page: "newsfeed", postId, commentId },
+          preferenceId: "newsfeedActivity",
         });
       }
 
@@ -126,6 +132,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
             message: trimText(reply?.text, "New reply on newsfeed"),
             date: reply?.createdAt,
             target: { page: "newsfeed", postId, commentId, replyId: reply?._id || reply?.id },
+            preferenceId: "newsfeedActivity",
           });
         }
       });
@@ -151,6 +158,7 @@ const buildTaskNotifications = (tasks, user) => {
       message: trimText(task?.title, "You have a new task"),
       date: task?.createdAt,
       target: { page: "tasks", taskId: task?._id || task?.id },
+      preferenceId: "taskUpdates",
     }));
 };
 
@@ -185,10 +193,13 @@ const Notification = () => {
         const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
         const failedCount = [postsResult, tasksResult].filter((result) => result.status === "rejected").length;
 
-        const nextNotifications = [
-          ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], currentUserId),
-          ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], user),
-        ].sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
+        const nextNotifications = filterNotificationsByPreference(
+          [
+            ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], currentUserId),
+            ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], user),
+          ],
+          readNotificationSettings(user)
+        ).sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
 
         if (isMounted) {
           setNotifications(nextNotifications);
