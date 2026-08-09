@@ -3,17 +3,21 @@ import { createHmac, randomBytes } from "crypto";
 import User from "../model/userModel.js";
 import { sendTwoFactorCode } from "../utils/email.js";
 import {
+  generateBackupCodes,
   generateOtp,
+  hashBackupCode,
   hashOtp,
   maskEmail,
   OTP_MAX_ATTEMPTS,
   OTP_RESEND_COOLDOWN_MS,
   OTP_TTL_MS,
   verifyOtpHash,
+  verifyBackupCodeHash,
 } from "../utils/otp.js";
 
 const otpFields = "+twoFactorCodeHash +twoFactorExpiresAt +twoFactorAttempts +twoFactorLastSentAt +twoFactorPurpose";
 const trustedDeviceFields = "+trustedDevices";
+const backupCodeFields = "+backupCodeHashes";
 const TRUSTED_DEVICE_COOKIE = "clientra_trusted_device";
 const TRUSTED_DEVICE_DAYS = Math.max(1, Number(process.env.TRUSTED_DEVICE_DAYS) || 30);
 const TRUSTED_DEVICE_TTL_MS = TRUSTED_DEVICE_DAYS * 24 * 60 * 60 * 1000;
@@ -108,6 +112,7 @@ const publicUser = (user) => ({
   id: user._id,
   email: user.email,
   role: user.role,
+  showOnlineStatus: user.showOnlineStatus !== false,
   twoFactorEnabled: Boolean(user.twoFactorEnabled),
   twoFactorSetupRequired: user.role === "admin" && !user.twoFactorEnabled,
 });
@@ -195,13 +200,48 @@ const validateCode = async (user, code, purpose) => {
   return null;
 };
 
+const validateBackupCode = async (user, backupCode) => {
+  if ((user.twoFactorAttempts || 0) >= OTP_MAX_ATTEMPTS) {
+    return { status: 429, message: "Too many incorrect attempts. Request a new email code before trying again." };
+  }
+
+  const matchedHash = (user.backupCodeHashes || []).find((expectedHash) =>
+    verifyBackupCodeHash(backupCode, expectedHash)
+  );
+  const consumeResult = matchedHash
+    ? await User.updateOne(
+        { _id: user._id, backupCodeHashes: matchedHash },
+        { $pull: { backupCodeHashes: matchedHash } }
+      )
+    : null;
+
+  if (!matchedHash || consumeResult.modifiedCount !== 1) {
+    user.twoFactorAttempts = (user.twoFactorAttempts || 0) + 1;
+    await user.save({ validateModifiedOnly: true });
+    logSecurityEvent("2fa_backup_code_rejected", user._id, `attempt=${user.twoFactorAttempts}`);
+    return {
+      status: user.twoFactorAttempts >= OTP_MAX_ATTEMPTS ? 429 : 400,
+      message: user.twoFactorAttempts >= OTP_MAX_ATTEMPTS
+        ? "Too many incorrect attempts. Request a new email code before trying again."
+        : "That backup code is invalid or has already been used.",
+      attemptsRemaining: Math.max(0, OTP_MAX_ATTEMPTS - user.twoFactorAttempts),
+    };
+  }
+
+  user.$locals.backupCodesRemaining = Math.max(
+    0,
+    user.backupCodeHashes.length - 1
+  );
+  return null;
+};
+
 export const login = async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   if (!email || !password) return res.status(400).json({ message: "Please provide email and password" });
 
   try {
-    const user = await User.findOne({ email }).select(`password role email isActive twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
+    const user = await User.findOne({ email }).select(`password role email isActive showOnlineStatus twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
     if (!user || !(await user.matchPassword(password)) || user.isActive === false) {
       logSecurityEvent("login_rejected", user?._id || "unknown");
       return res.status(401).json({ message: "Invalid email or password" });
@@ -210,7 +250,7 @@ export const login = async (req, res) => {
     if (user.twoFactorEnabled) {
       if (useTrustedDevice(req, res, user)) {
         clearOtp(user);
-        user.isOnline = true;
+        user.isOnline = user.showOnlineStatus !== false;
         user.lastSeen = new Date();
         await user.save({ validateModifiedOnly: true });
         logSecurityEvent("login_succeeded", user._id, "trustedDevice=true");
@@ -236,18 +276,27 @@ export const login = async (req, res) => {
 export const verifyLoginTwoFactor = async (req, res) => {
   try {
     const decoded = readTemporaryToken(req.body?.temporaryToken);
-    const user = await User.findById(decoded.id).select(`email role twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
+    const user = await User.findById(decoded.id).select(`email role showOnlineStatus twoFactorEnabled ${otpFields} ${trustedDeviceFields} ${backupCodeFields}`);
     if (!user?.twoFactorEnabled) return res.status(401).json({ message: "Invalid verification session." });
-    const validationError = await validateCode(user, req.body?.code, "login");
+    const usesBackupCode = Boolean(req.body?.backupCode);
+    const validationError = usesBackupCode
+      ? await validateBackupCode(user, req.body.backupCode)
+      : await validateCode(user, req.body?.code, "login");
     if (validationError) return res.status(validationError.status).json(validationError);
 
     clearOtp(user);
     trustCurrentDevice(res, user);
-    user.isOnline = true;
+    user.isOnline = user.showOnlineStatus !== false;
     user.lastSeen = new Date();
     await user.save({ validateModifiedOnly: true });
-    logSecurityEvent("2fa_login_verified", user._id);
-    return res.json({ ...publicUser(user), token: accessToken(user._id) });
+    logSecurityEvent("2fa_login_verified", user._id, `method=${usesBackupCode ? "backup_code" : "email"}`);
+    return res.json({
+      ...publicUser(user),
+      token: accessToken(user._id),
+      backupCodesRemaining: usesBackupCode
+        ? user.$locals.backupCodesRemaining
+        : user.backupCodeHashes?.length || 0,
+    });
   } catch (error) {
     const expired = error?.name === "TokenExpiredError";
     return res.status(expired ? 410 : 401).json({ message: expired ? "Your verification session has expired. Sign in again." : "Invalid verification session." });
@@ -269,7 +318,7 @@ export const resendLoginTwoFactor = async (req, res) => {
 };
 
 export const getTwoFactorStatus = async (req, res) => {
-  const user = await User.findById(req.user._id).select("email role twoFactorEnabled").lean();
+  const user = await User.findById(req.user._id).select(`email role twoFactorEnabled ${backupCodeFields}`).lean();
   if (!user) return res.status(404).json({ message: "User not found" });
   return res.json({
     enabled: Boolean(user.twoFactorEnabled),
@@ -277,7 +326,31 @@ export const getTwoFactorStatus = async (req, res) => {
     method: "Email",
     maskedEmail: maskEmail(user.email),
     trustedDeviceDays: TRUSTED_DEVICE_DAYS,
+    backupCodesRemaining: user.backupCodeHashes?.length || 0,
   });
+};
+
+export const regenerateBackupCodes = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(`twoFactorEnabled ${backupCodeFields}`);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user.twoFactorEnabled) {
+      return res.status(409).json({ message: "Enable two-factor authentication before generating backup codes." });
+    }
+
+    const backupCodes = generateBackupCodes();
+    user.backupCodeHashes = backupCodes.map(hashBackupCode);
+    await user.save({ validateModifiedOnly: true });
+    logSecurityEvent("2fa_backup_codes_regenerated", user._id, `count=${backupCodes.length}`);
+    return res.json({
+      message: "New backup codes generated. Previous codes no longer work.",
+      backupCodes,
+      backupCodesRemaining: backupCodes.length,
+    });
+  } catch (error) {
+    console.error("Generate backup codes error:", error);
+    return res.status(500).json({ message: "Unable to generate backup codes." });
+  }
 };
 
 export const requestEnableTwoFactor = async (req, res) => {
@@ -298,11 +371,12 @@ export const requestEnableTwoFactor = async (req, res) => {
 
 export const verifyEnableTwoFactor = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select(`email role twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
+    const user = await User.findById(req.user._id).select(`email role twoFactorEnabled ${otpFields} ${trustedDeviceFields} ${backupCodeFields}`);
     if (user.twoFactorEnabled) return res.status(409).json({ message: "Two-factor authentication is already enabled." });
     const validationError = await validateCode(user, req.body?.code, "enable");
     if (validationError) return res.status(validationError.status).json(validationError);
     user.twoFactorEnabled = true;
+    user.backupCodeHashes = [];
     clearOtp(user);
     trustCurrentDevice(res, user);
     await user.save({ validateModifiedOnly: true });
@@ -315,13 +389,14 @@ export const verifyEnableTwoFactor = async (req, res) => {
 };
 
 export const disableTwoFactor = async (req, res) => {
-  const user = await User.findById(req.user._id).select(`password role twoFactorEnabled ${otpFields} ${trustedDeviceFields}`);
+  const user = await User.findById(req.user._id).select(`password role twoFactorEnabled ${otpFields} ${trustedDeviceFields} ${backupCodeFields}`);
   if (user.role === "admin") return res.status(403).json({ message: "Two-factor authentication is required for Admin accounts." });
   if (!req.body?.password || !(await user.matchPassword(req.body.password))) {
     return res.status(401).json({ message: "Current password is incorrect." });
   }
   user.twoFactorEnabled = false;
   user.trustedDevices = [];
+  user.backupCodeHashes = [];
   clearOtp(user);
   await user.save({ validateModifiedOnly: true });
   clearTrustedDeviceCookie(res);

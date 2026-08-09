@@ -89,6 +89,11 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    showOnlineStatus: {
+      type: Boolean,
+      default: true,
+    },
+
     lastSeen: {
       type: Date,
     },
@@ -139,6 +144,13 @@ const userSchema = new mongoose.Schema(
     twoFactorPurpose: {
       type: String,
       enum: ["login", "enable"],
+      select: false,
+    },
+
+    // Recovery codes are one-time credentials. Only keyed hashes are persisted.
+    backupCodeHashes: {
+      type: [String],
+      default: [],
       select: false,
     },
 

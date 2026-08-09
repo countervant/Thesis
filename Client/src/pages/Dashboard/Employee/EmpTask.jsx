@@ -186,6 +186,8 @@ const normalizeTask = (task) => {
     finalOutput: task?.finalOutput || null,
     revisionRequests: Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
     clientApproved: task?.activities?.some((activity) => activity?.type === "client_approved") || false,
+    newsfeedPermissionAllowed: Boolean(task?.newsfeedPermission?.allowed),
+    newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
   };
 };
@@ -232,6 +234,11 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             <span className="min-w-0">
               <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.title}</span>
               <span className="mt-1 block text-xs font-bold leading-5 text-slate-500 dark:text-neutral-400">{item.description || "No description"}</span>
+              {item.newsfeedPermissionAllowed && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">
+                  <SmallIcon name="check" className="h-3 w-3" /> Client allowed newsfeed posting
+                </span>
+              )}
             </span>
           </div>
 
@@ -365,6 +372,9 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             <span className="min-w-0">
               <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
               <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
+              {item.newsfeedPermissionAllowed && (
+                <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
+              )}
             </span>
           </div>
           <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.Medium}`}>
@@ -724,7 +734,7 @@ const EmpTask = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, view: "projects" });
+        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
         if (isMounted) setTasks(data.map(normalizeTask));
       } catch (error) {
         if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));

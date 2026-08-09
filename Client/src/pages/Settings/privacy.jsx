@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { authAPI } from "../../services/api.js";
 
 const privacyItems = [
   {
@@ -39,20 +41,28 @@ const selectOptions = ["Everyone", "Team Only", "Only Me"];
 
 const getStorageKey = (user) => `clientraPrivacySettings:${user?._id || user?.id || user?.email || "guest"}`;
 
-const getDefaultSettings = () =>
+const getDefaultSettings = (user) =>
   privacyItems.reduce(
     (settings, item) => ({
       ...settings,
-      [item.id]: item.control === "select" ? item.value : item.enabled,
+      [item.id]: item.id === "onlineStatus"
+        ? user?.showOnlineStatus !== false
+        : item.control === "select"
+          ? item.value
+          : item.enabled,
     }),
     {}
   );
 
 const loadSettings = (user) => {
-  const defaultSettings = getDefaultSettings();
+  const defaultSettings = getDefaultSettings(user);
   try {
     const savedSettings = JSON.parse(localStorage.getItem(getStorageKey(user)) || "{}");
-    return { ...defaultSettings, ...savedSettings };
+    return {
+      ...defaultSettings,
+      ...savedSettings,
+      onlineStatus: user?.showOnlineStatus !== false,
+    };
   } catch {
     return defaultSettings;
   }
@@ -106,22 +116,43 @@ const SelectControl = ({ value, onChange, label }) => (
 );
 
 const PrivacySettings = ({ user }) => {
+  const { updateUser } = useAuth();
   const savedSettings = useMemo(() => loadSettings(user), [user]);
   const [settings, setSettings] = useState(savedSettings);
   const [message, setMessage] = useState("");
+  const [hasError, setHasError] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const updateSetting = (id, value) => {
     setSettings((currentSettings) => ({ ...currentSettings, [id]: value }));
     setMessage("");
+    setHasError(false);
   };
 
-  const saveSettings = () => {
-    localStorage.setItem(getStorageKey(user), JSON.stringify(settings));
-    setMessage("Privacy settings saved.");
+  const saveSettings = async () => {
+    try {
+      setIsSaving(true);
+      setMessage("");
+      setHasError(false);
+      const updatedUser = await authAPI.updateOnlineStatusVisibility(
+        Boolean(settings.onlineStatus)
+      );
+      updateUser(updatedUser);
+      localStorage.setItem(getStorageKey(user), JSON.stringify(settings));
+      setMessage("Privacy settings saved.");
+    } catch (error) {
+      setHasError(true);
+      setMessage(
+        error.response?.data?.message || "Unable to save privacy settings."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const resetSettings = () => {
     setSettings(loadSettings(user));
+    setHasError(false);
     setMessage("Changes cancelled.");
   };
 
@@ -173,10 +204,20 @@ const PrivacySettings = ({ user }) => {
       </section>
 
       <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:items-center md:justify-end">
-        {message && <p className="col-span-2 mr-auto text-xs font-black text-emerald-500">{message}</p>}
+        {message && (
+          <p
+            role={hasError ? "alert" : "status"}
+            className={`col-span-2 mr-auto text-xs font-black ${
+              hasError ? "text-red-600" : "text-emerald-500"
+            }`}
+          >
+            {message}
+          </p>
+        )}
         <button
           type="button"
           onClick={resetSettings}
+          disabled={isSaving}
           className="h-10 w-full rounded-lg border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white md:h-8 md:w-auto md:min-w-[110px]"
         >
           Cancel
@@ -184,10 +225,11 @@ const PrivacySettings = ({ user }) => {
         <button
           type="button"
           onClick={saveSettings}
+          disabled={isSaving}
           className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-8 md:w-auto md:min-w-[132px]"
         >
           <Icon name="save" className="h-4 w-4" />
-          Save Changes
+          {isSaving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>

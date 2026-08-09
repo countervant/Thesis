@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useState, useEffect } from "rea
 import { authAPI } from "../services/api.js";
 
 const AuthContext = createContext(null);
+const PRESENCE_HEARTBEAT_MS = 30 * 1000;
 
 const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 const userForStorage = (userData) => {
@@ -95,36 +96,40 @@ export const AuthProvider = ({ children }) => {
   }, [initialSession]);
 
   const userId = user?.id || user?._id;
+  const showOnlineStatus = user?.showOnlineStatus !== false;
 
   useEffect(() => {
     if (!token || !userId) return undefined;
 
     let isActive = true;
-    const markOnline = () => {
-      if (document.visibilityState === "hidden") return;
-      authAPI.updatePresence(true).catch(() => {});
+    const syncPresence = () => {
+      const shouldBeOnline =
+        showOnlineStatus && document.visibilityState === "visible";
+      authAPI.updatePresence(shouldBeOnline, token).catch(() => {});
     };
 
-    markOnline();
+    syncPresence();
     const intervalId = window.setInterval(() => {
-      if (isActive) markOnline();
-    }, 120000);
+      if (isActive) syncPresence();
+    }, PRESENCE_HEARTBEAT_MS);
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        markOnline();
-      }
-    };
+    const handleVisibilityChange = () => syncPresence();
+    const handlePageHide = () => authAPI.markOfflineOnPageHide(token);
+    const handlePageShow = () => syncPresence();
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
 
     return () => {
       isActive = false;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
       markOffline(token);
     };
-  }, [markOffline, token, userId]);
+  }, [markOffline, showOnlineStatus, token, userId]);
 
   const login = (userData, authToken) => {
     const normalizedUser = normalizeUser(userData);

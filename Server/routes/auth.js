@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
-import { protect } from "../middleware/protectedjwt.js";
+import { clearCachedAuthUser, protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
@@ -19,11 +19,13 @@ import {
   disableTwoFactor,
   getTwoFactorStatus,
   login,
+  regenerateBackupCodes,
   requestEnableTwoFactor,
   resendLoginTwoFactor,
   verifyEnableTwoFactor,
   verifyLoginTwoFactor,
 } from "../controllers/twoFactorController.js";
+import { isUserOnline, PRESENCE_TIMEOUT_MS } from "../utils/presence.js";
 
 const router = express.Router();
 const emailRegex =
@@ -146,6 +148,7 @@ router.post("/register", async (req, res) => {
       role: user.role,
       phone: user.phone,
       country: user.country,
+      showOnlineStatus: user.showOnlineStatus !== false,
       token,
     });
   } catch (error) {
@@ -167,6 +170,7 @@ router.get("/2fa-status", protect, getTwoFactorStatus);
 router.post("/enable-2fa/request", protect, requestEnableTwoFactor);
 router.post("/enable-2fa/verify", protect, verifyEnableTwoFactor);
 router.post("/disable-2fa", protect, disableTwoFactor);
+router.post("/backup-codes/regenerate", protect, regenerateBackupCodes);
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
 
@@ -224,7 +228,7 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Enter a valid email" });
     }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select("+backupCodeHashes");
     if (!user) {
       return res.status(400).json({ message: "Invalid email or OTP" });
     }
@@ -242,6 +246,7 @@ router.post("/reset-password", async (req, res) => {
 
     user.password = password;
     user.trustedDevices = [];
+    user.backupCodeHashes = [];
     user.resetPasswordOTP = undefined;
     user.resetPasswordOTPExpires = undefined;
     await user.save();
@@ -260,19 +265,36 @@ router.post("/reset-password", async (req, res) => {
 
     router.patch("/presence", protect, async (req, res) => {
       try {
-        const isOnline = req.body?.isOnline !== false;
+        const requestedOnline = req.body?.isOnline !== false;
+        const hasVisibilityPreference =
+          typeof req.body?.showOnlineStatus === "boolean";
+        const showOnlineStatus = hasVisibilityPreference
+          ? req.body.showOnlineStatus
+          : { $ifNull: ["$showOnlineStatus", true] };
         const user = await User.findByIdAndUpdate(
           req.user._id,
-          {
-            isOnline,
-            lastSeen: new Date(),
-          },
+          [
+            {
+              $set: {
+                ...(hasVisibilityPreference ? { showOnlineStatus } : {}),
+                isOnline: requestedOnline ? showOnlineStatus : false,
+                lastSeen: "$$NOW",
+              },
+            },
+          ],
           {
             returnDocument: "after",
-            select: "firstName lastName email role companyName isActive isOnline lastSeen",
+            select: "firstName lastName email role companyName isActive isOnline showOnlineStatus lastSeen",
             timestamps: false,
+            updatePipeline: true,
           }
         ).lean();
+
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        if (hasVisibilityPreference) clearCachedAuthUser(req.user._id);
 
         res.status(200).json(user);
       } catch (error) {
@@ -283,14 +305,15 @@ router.post("/reset-password", async (req, res) => {
 
     router.get("/online-team", protect, async (req, res) => {
       try {
-        const onlineSince = new Date(Date.now() - 2 * 60 * 1000);
+        const onlineSince = new Date(Date.now() - PRESENCE_TIMEOUT_MS);
         const users = await User.find({
           role: { $in: ["admin", "employee"] },
           isOnline: true,
+          showOnlineStatus: { $ne: false },
           lastSeen: { $gte: onlineSince },
           isActive: { $ne: false },
         })
-          .select("firstName lastName email role companyName avatar isActive isOnline lastSeen updatedAt")
+          .select("firstName lastName email role companyName avatar isActive isOnline showOnlineStatus lastSeen updatedAt")
           .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
           .maxTimeMS(8000)
           .lean();
@@ -583,7 +606,7 @@ router.post("/reset-password", async (req, res) => {
         };
         const [employees, total] = await Promise.all([
           User.find(query)
-          .select("firstName lastName email phone country position role avatar isActive createdAt updatedAt")
+          .select("firstName lastName email phone country position role avatar isActive isOnline showOnlineStatus lastSeen createdAt updatedAt")
           .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
@@ -593,7 +616,12 @@ router.post("/reset-password", async (req, res) => {
         ]);
 
         res.status(200).json(pagedResponse({
-          data: employees.map(withAvatarUrl),
+          data: employees.map((employee) =>
+            withAvatarUrl({
+              ...employee,
+              isOnline: isUserOnline(employee),
+            })
+          ),
           page,
           limit,
           total,

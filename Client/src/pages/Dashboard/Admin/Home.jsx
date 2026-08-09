@@ -1323,6 +1323,25 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const refreshOnlineTeam = async () => {
+      try {
+        const members = await authAPI.getOnlineTeam();
+        if (isMounted) setOnlineTeam(Array.isArray(members) ? members : []);
+      } catch {
+        // Keep the last successful presence list until the next refresh.
+      }
+    };
+
+    const intervalId = window.setInterval(refreshOnlineTeam, 30000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   if (activeTopTab === "dashboard" && isLoading) {
     return <DashboardSkeleton />;
   }

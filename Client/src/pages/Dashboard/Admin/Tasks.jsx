@@ -169,6 +169,8 @@ const normalizeTask = (task) => {
     finalOutput: task?.finalOutput || null,
     revisionRequests: Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
     clientApproved: task?.activities?.some((activity) => activity?.type === "client_approved") || false,
+    newsfeedPermissionAllowed: Boolean(task?.newsfeedPermission?.allowed),
+    newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
   };
 };
@@ -426,6 +428,11 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             <span className="min-w-0">
               <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.title}</span>
               <span className="mt-1 block text-xs font-bold leading-5 text-slate-500 dark:text-neutral-400">{item.description || "No description"}</span>
+              {item.newsfeedPermissionAllowed && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">
+                  <SmallIcon name="check" className="h-3 w-3" /> Client allowed newsfeed posting
+                </span>
+              )}
             </span>
           </div>
 
@@ -547,6 +554,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             <div className="min-w-0 py-0.5">
               <p className="truncate text-[13px] font-black leading-tight text-[#10142d]">{item.title}</p>
               <p className="mt-1 truncate text-[11px] font-bold text-slate-500">{item.description || "No description"}</p>
+              {item.newsfeedPermissionAllowed && (
+                <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
+              )}
               <p className="mt-4 text-[10px] font-black text-slate-500">Assigned to</p>
               <div className="mt-1 flex min-w-0 items-center gap-2">
                 <InitialsAvatar
@@ -627,6 +637,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             <span className="min-w-0">
               <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
               <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
+              {item.newsfeedPermissionAllowed && (
+                <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
+              )}
             </span>
           </div>
           {!canAccessSubtasks && (

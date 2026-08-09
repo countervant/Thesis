@@ -5,7 +5,11 @@ import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
 import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
-const filters = ["All", "Active", "Inactive"];
+const filters = [
+  { label: "All accounts", value: "All" },
+  { label: "Enabled", value: "Active" },
+  { label: "Disabled", value: "Inactive" },
+];
 
 const getInitials = (name = "") => {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -19,6 +23,10 @@ const normalizeClient = (client) => ({
   name: client.contactPerson || "",
   avatar: client.avatar || "",
   status: client.isActive ? "Active" : "Inactive",
+  isActive: client.isActive !== false,
+  isOnline: client.isOnline === true,
+  hasLoginAccount: client.hasLoginAccount === true || client.source === "user",
+  lastSeen: client.lastSeen || "",
   company: client.companyName || "",
   email: client.email || "",
   country: client.country || "",
@@ -222,7 +230,14 @@ const FilterButton = ({ active, children, onClick }) => (
 );
 
 const ClientCard = ({ client, onDelete }) => {
-  const isActive = client.status === "Active";
+  const isOnline = client.isOnline;
+  const presenceLabel = !client.hasLoginAccount
+    ? "No login account"
+    : !client.isActive
+      ? "Inactive account"
+      : isOnline
+        ? "Online"
+        : "Offline";
   const countryFlag = getCountryFlag(client.country);
 
   return (
@@ -258,13 +273,14 @@ const ClientCard = ({ client, onDelete }) => {
           </div>
           <span
             className={`mt-2 inline-flex h-6 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${
-              isActive
+              isOnline
                 ? "bg-[#d8ffe3] text-[#1d9a4f]"
                 : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             }`}
+            title="Current presence"
           >
-            <span className={`h-2 w-2 rounded-full ${isActive ? "bg-[#20bd5a]" : "bg-neutral-400"}`} />
-            {client.status}
+            <span className={`h-2 w-2 rounded-full ${isOnline ? "bg-[#20bd5a]" : "bg-neutral-400"}`} />
+            {presenceLabel}
           </span>
         </div>
       </div>
@@ -312,30 +328,34 @@ const AdminClients = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const loadClients = async () => {
+    const loadClients = async (showLoading = false) => {
       try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await clientAPI.getAll();
+        if (showLoading) {
+          setIsLoading(true);
+          setErrorMessage("");
+        }
+        const data = await clientAPI.getAllFresh({ limit: 100 });
 
         if (isMounted) {
           setClients(data.map(normalizeClient));
         }
       } catch (error) {
-        if (isMounted) {
+        if (isMounted && showLoading) {
           setErrorMessage(getApiErrorMessage(error, "Unable to load clients."));
         }
       } finally {
-        if (isMounted) {
+        if (isMounted && showLoading) {
           setIsLoading(false);
         }
       }
     };
 
-    loadClients();
+    loadClients(true);
+    const intervalId = window.setInterval(() => loadClients(false), 30000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -467,11 +487,11 @@ const AdminClients = () => {
             <div className="flex flex-wrap gap-2">
               {filters.map((filter) => (
                 <FilterButton
-                  key={filter}
-                  active={selectedFilter === filter}
-                  onClick={() => setSelectedFilter(filter)}
+                  key={filter.value}
+                  active={selectedFilter === filter.value}
+                  onClick={() => setSelectedFilter(filter.value)}
                 >
-                  {filter} ({countFor(filter)})
+                  {filter.label} ({countFor(filter.value)})
                 </FilterButton>
               ))}
             </div>

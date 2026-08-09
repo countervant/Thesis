@@ -14,7 +14,6 @@ const defaultSettings = {
     newDeviceAlerts: true,
     suspiciousActivityAlerts: true,
   },
-  backupCodes: [],
   lastPasswordChange: "May 10, 2026 - 2:15 PM",
 };
 
@@ -31,7 +30,12 @@ const formatDateTime = (date = new Date()) =>
 
 const loadSettings = (user) => {
   try {
-    const savedSettings = JSON.parse(localStorage.getItem(getStorageKey(user)) || "{}");
+    const storageKey = getStorageKey(user);
+    const savedSettings = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    if (Object.hasOwn(savedSettings, "backupCodes")) {
+      delete savedSettings.backupCodes;
+      localStorage.setItem(storageKey, JSON.stringify(savedSettings));
+    }
     return {
       ...defaultSettings,
       ...savedSettings,
@@ -41,11 +45,6 @@ const loadSettings = (user) => {
     return defaultSettings;
   }
 };
-
-const generateBackupCodes = () =>
-  Array.from({ length: 6 }, () =>
-    Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase()
-  );
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = { viewBox: "0 0 24 24", fill: "none", className, "aria-hidden": "true" };
@@ -96,6 +95,8 @@ const SecuritySettings = ({ user }) => {
   const [passwordForm, setPasswordForm] = useState(passwordInitialState);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
+  const [backupCodes, setBackupCodes] = useState([]);
+  const [isGeneratingBackupCodes, setIsGeneratingBackupCodes] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -186,13 +187,24 @@ const SecuritySettings = ({ user }) => {
     }
   };
 
-  const showCodes = () => {
-    const nextSettings = settings.backupCodes?.length
-      ? settings
-      : { ...settings, backupCodes: generateBackupCodes() };
-    setSettings(nextSettings);
-    persistSettings(nextSettings);
-    setShowBackupCodes(true);
+  const generateCodes = async () => {
+    try {
+      setIsGeneratingBackupCodes(true);
+      setMessage("");
+      setError("");
+      const data = await authAPI.regenerateBackupCodes();
+      setBackupCodes(Array.isArray(data.backupCodes) ? data.backupCodes : []);
+      setShowBackupCodes(true);
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, "Unable to generate backup codes."));
+    } finally {
+      setIsGeneratingBackupCodes(false);
+    }
+  };
+
+  const closeBackupCodes = () => {
+    setShowBackupCodes(false);
+    setBackupCodes([]);
   };
 
   const protectedText = Object.values(settings.alerts).some(Boolean)
@@ -394,8 +406,8 @@ const SecuritySettings = ({ user }) => {
                 <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-500">Verified</span>
               </div>
             </div>
-            <button type="button" onClick={showCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:bg-[#c72fb2] dark:hover:text-white">
-              View Backup Codes
+            <button type="button" onClick={generateCodes} disabled={isGeneratingBackupCodes} className="mt-4 h-10 w-full rounded-lg border border-[#d86bc4] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#c72fb2] dark:hover:text-white">
+              {isGeneratingBackupCodes ? "Generating..." : "Generate Backup Codes"}
             </button>
           </Card>
         </aside>
@@ -406,13 +418,14 @@ const SecuritySettings = ({ user }) => {
           <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-black text-[#10142d] dark:text-white">Backup Codes</h3>
-              <button type="button" onClick={() => setShowBackupCodes(false)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
+              <button type="button" onClick={closeBackupCodes} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
                 <Icon name="x" className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-2 text-sm font-semibold text-slate-500">Use these codes when you cannot access your authenticator.</p>
+            <p className="mt-2 text-sm font-semibold text-slate-500">Save these somewhere safe. Each code can be used once when you cannot access your email.</p>
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">These codes are shown only now. Generating another set will invalidate this set.</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {settings.backupCodes.map((code) => (
+              {backupCodes.map((code) => (
                 <span key={code} className="rounded-lg border border-pink-100 bg-pink-50 px-3 py-2 text-center text-sm font-black text-[#c72fb2]">
                   {code}
                 </span>
@@ -420,14 +433,11 @@ const SecuritySettings = ({ user }) => {
             </div>
             <button
               type="button"
-              onClick={() => {
-                const nextSettings = { ...settings, backupCodes: generateBackupCodes() };
-                setSettings(nextSettings);
-                persistSettings(nextSettings);
-              }}
+              onClick={generateCodes}
+              disabled={isGeneratingBackupCodes}
               className="mt-4 h-9 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
             >
-              Generate New Codes
+              {isGeneratingBackupCodes ? "Generating..." : "Replace With New Codes"}
             </button>
           </section>
         </div>
