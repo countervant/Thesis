@@ -32,6 +32,11 @@ const budgetSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+
+    sourceTask: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+    },
   },
   {
     timestamps: true,
@@ -41,6 +46,7 @@ const budgetSchema = new mongoose.Schema(
 budgetSchema.index({ date: -1, createdAt: -1 });
 budgetSchema.index({ type: 1, date: -1 });
 budgetSchema.index({ category: 1, date: -1 });
+budgetSchema.index({ sourceTask: 1 }, { unique: true, sparse: true });
 
 const Budget = mongoose.model("Budget", budgetSchema);
 

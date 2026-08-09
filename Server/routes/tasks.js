@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import Budget from "../model/Admin/budgetmodel.js";
 import Task from "../model/Admin/taskmodel.js";
 import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
@@ -41,7 +42,8 @@ const fullTaskFields = [
 
 const taskFieldsByView = {
   projects: [
-    "title", "description", "status", "priority", "startDate", "dueDate", "assignedTo",
+    "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
+    "assignedTo", "assignees", "requestedBy", "requestedByName",
     "subtasks._id", "subtasks.title", "subtasks.completed",
     "activities.type", "revisionRequests._id", "finalOutput.submittedAt",
     "finalOutput.fileName", "finalOutput.fileUrl", "finalOutput.link", "finalOutput.watermarked",
@@ -157,7 +159,12 @@ const isClientReviewSubtask = (subtask) =>
     String(subtask?.title || "")
   );
 
+const isSubmitOutputSubtask = (subtask) =>
+  String(subtask?.title || "").trim().toLowerCase() === "submit output";
+
 const getSubmissionSubtaskIndex = (subtasks) => {
+  const submitOutputIndex = subtasks.findIndex(isSubmitOutputSubtask);
+  if (submitOutputIndex >= 0) return submitOutputIndex;
   const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
   return reviewIndex >= 0 ? reviewIndex : subtasks.length - 1;
 };
@@ -173,6 +180,7 @@ const hasClientApproval = (task) =>
   task.activities?.some((activity) => activity.type === "client_approved");
 
 const validateClientReviewGate = (task, subtasks) => {
+  if (subtasks.some(isSubmitOutputSubtask)) return "";
   const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
   if (reviewIndex < 0 || hasClientApproval(task)) return "";
 
@@ -449,7 +457,10 @@ router.get("/", protect, async (req, res) => {
         .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role updatedAt");
     } else if (view === "projects") {
       taskRequest = taskRequest
-        .populate("assignedTo", "firstName lastName email role updatedAt");
+        .populate("assignedTo", "firstName lastName email role updatedAt")
+        .populate("assignees", "firstName lastName email role updatedAt")
+        .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
+        .populate("requestedBy", "firstName lastName companyName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role updatedAt")
@@ -513,6 +524,7 @@ router.post("/", protect, async (req, res) => {
           ? req.body.requestedByName
           : [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email,
     });
+    payload.paid = 0;
 
     if (!payload.title) {
       return res.status(400).json({ message: "Task title is required" });
@@ -667,7 +679,7 @@ router.put("/:id", protect, async (req, res) => {
         status: req.body.status ?? task.status,
         priority: req.body.priority ?? task.priority,
         amount: req.body.amount ?? task.amount ?? task.budget,
-        paid: req.body.paid ?? task.paid,
+        paid: task.paid,
         assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
         assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
         requestedBy:
@@ -775,6 +787,65 @@ router.put("/:id", protect, async (req, res) => {
   } catch (error) {
     console.error("Update task error:", error);
     res.status(500).json({ message: "Unable to update task" });
+  }
+});
+
+router.post("/:id/mark-paid", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can mark projects as paid" });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const projectAmount = Number(task.amount || 0);
+    if (!Number.isFinite(projectAmount) || projectAmount <= 0) {
+      return res.status(400).json({ message: "Set a project amount before marking it as paid" });
+    }
+
+    const paymentDate = new Date();
+    try {
+      await Budget.findOneAndUpdate(
+        { sourceTask: task._id },
+        {
+          $set: {
+            type: "income",
+            description: `Project payment: ${task.title}`,
+            category: "Project Income",
+            date: paymentDate,
+            amount: projectAmount,
+            sourceTask: task._id,
+          },
+        },
+        {
+          returnDocument: "after",
+          runValidators: true,
+          setDefaultsOnInsert: true,
+          upsert: true,
+        }
+      );
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+    }
+
+    task.paid = projectAmount;
+    await task.save();
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .lean();
+
+    return res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Mark project paid error:", error);
+    return res.status(500).json({ message: "Unable to mark this project as paid" });
   }
 });
 

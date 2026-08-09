@@ -16,8 +16,6 @@ const taskTemplates = [
       "Create prompt concepts",
       "Generate initial image drafts",
       "Select and enhance best output",
-      "Client review and revisions",
-      "completed/paid",
     ],
   },
   {
@@ -27,7 +25,6 @@ const taskTemplates = [
       "Write scene prompts",
       "Generate video clips",
       "Edit clips, audio, and captions",
-      "Client review and revisions",
       "Export final video",
     ],
   },
@@ -38,7 +35,6 @@ const taskTemplates = [
       "Write UGC script and shot list",
       "Record raw clips",
       "Edit video and add captions",
-      "Client review and revisions",
       "Export final video",
     ],
   },
@@ -49,7 +45,6 @@ const taskTemplates = [
       "Cut and arrange clips",
       "Add transitions and effects",
       "Improve audio and color",
-      "Client review and revisions",
       "Final render and export",
     ],
   },
@@ -60,7 +55,6 @@ const taskTemplates = [
       "Create design concept",
       "Design first draft",
       "Apply branding and ad copy",
-      "Client review and revisions",
       "Export final ad assets",
     ],
   },
@@ -71,7 +65,6 @@ const taskTemplates = [
       "Create script outline",
       "Write the first draft",
       "Review tone and clarity",
-      "Apply client revisions",
       "Finalize script",
     ],
   },
@@ -82,7 +75,6 @@ const taskTemplates = [
       "Create user flow and wireframe",
       "Design high-fidelity screens",
       "Build prototype",
-      "Client review and revisions",
       "Prepare final design handoff",
     ],
   },
@@ -102,11 +94,18 @@ const createSubmitOutputSubtask = () => ({
 const isSubmitOutputSubtask = (subtask) =>
   String(subtask?.title || "").trim().toLowerCase() ===
   submitOutputTaskTitle.toLowerCase();
+const isClientReviewSubtask = (subtask) =>
+  /client\s+(?:review.*revision|revision)|review.*revision/i.test(
+    String(subtask?.title || "")
+  );
 
 const ensureSubmitOutputSubtask = (subtasks = []) => {
   const submitOutputSubtask = subtasks.find(isSubmitOutputSubtask);
   return [
-    ...subtasks.filter((subtask) => !isSubmitOutputSubtask(subtask)),
+    ...subtasks.filter(
+      (subtask) =>
+        !isSubmitOutputSubtask(subtask) && !isClientReviewSubtask(subtask)
+    ),
     submitOutputSubtask || createSubmitOutputSubtask(),
   ];
 };
@@ -210,7 +209,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     startDate: todayInputDate(),
     dueDate: todayInputDate(),
     amount: "",
-    paid: "0",
     priority: "medium",
     requestedBy: isAdmin ? "" : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
@@ -320,7 +318,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
       dueDate: toInputDate(task.dueDate),
       amount: task.amount ?? task.budget ?? "",
-      paid: task.paid ?? "0",
       priority: task.priority || "medium",
       requestedBy:
         getEntityId(task.requestedBy) ||
@@ -332,9 +329,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
         .map(getEntityId)
         .filter(Boolean),
-      subtasks: taskTemplates.some((template) => template.title === task.title)
-        ? normalizeSubtasks(task.subtasks)
-        : ensureSubmitOutputSubtask(normalizeSubtasks(task.subtasks)),
+      subtasks: ensureSubmitOutputSubtask(normalizeSubtasks(task.subtasks)),
     });
   }, [task, user]);
 
@@ -427,7 +422,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     setFormData((currentData) => ({
       ...currentData,
       title: template.title,
-      subtasks: template.subtasks.map((title) => ({ title, completed: false, assignedTo: "" })),
+      subtasks: ensureSubmitOutputSubtask(
+        template.subtasks.map((title) => ({ title, completed: false, assignedTo: "" }))
+      ),
     }));
   };
 
@@ -484,16 +481,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    if (formData.paid === "" || Number(formData.paid) < 0) {
-      setErrorMessage("Please enter a valid paid amount.");
-      return;
-    }
-
-    if (Number(formData.paid) > Number(formData.amount)) {
-      setErrorMessage("Paid amount cannot be greater than the total amount.");
-      return;
-    }
-
     if (isAdmin && !formData.requestedBy) {
       setErrorMessage("Please choose which client requested this project.");
       return;
@@ -514,15 +501,12 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         assignedTo: subtask.assignedTo || undefined,
       }))
       .filter((subtask) => subtask.title);
-    const isCustomProject = selectedTemplateTitle === "custom";
-    const customProjectTasks = normalizedFormSubtasks.filter(
+    const subtasks = ensureSubmitOutputSubtask(normalizedFormSubtasks);
+    const projectTasks = subtasks.filter(
       (subtask) => !isSubmitOutputSubtask(subtask)
     );
-    const subtasks = isCustomProject
-      ? ensureSubmitOutputSubtask(normalizedFormSubtasks)
-      : normalizedFormSubtasks;
 
-    if ((isCustomProject && customProjectTasks.length === 0) || subtasks.length === 0) {
+    if (projectTasks.length === 0) {
       setErrorMessage("At least one task is required.");
       return;
     }
@@ -537,7 +521,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         startDate: formData.startDate,
         dueDate: formData.dueDate,
         amount: Number(formData.amount),
-        paid: Number(formData.paid),
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
         assignedTo: formData.assignees[0],
@@ -738,7 +721,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div className="space-y-1">
               <FieldLabel>Priority</FieldLabel>
               <select
@@ -763,20 +746,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                 value={formData.amount}
                 onChange={(event) => updateField("amount", event.target.value)}
                 placeholder="Enter total amount"
-                className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
-              />
-            </div>
-            <div className="space-y-1">
-              <FieldLabel>Paid (₱)</FieldLabel>
-              <input
-                type="number"
-                min="0"
-                max={formData.amount || undefined}
-                step="0.01"
-                required
-                value={formData.paid}
-                onChange={(event) => updateField("paid", event.target.value)}
-                placeholder="Enter amount paid"
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
               />
             </div>

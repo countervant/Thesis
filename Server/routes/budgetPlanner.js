@@ -59,7 +59,7 @@ router.put("/settings", async (req, res) => {
     const settings = await BudgetPlannerSettings.findOneAndUpdate(
       { owner: req.user._id },
       { monthlyLimit },
-      { new: true, upsert: true, runValidators: true }
+      { returnDocument: "after", upsert: true, runValidators: true }
     ).lean();
 
     res.status(200).json({ monthlyLimit: settings.monthlyLimit });
@@ -92,7 +92,7 @@ router.put("/:id", async (req, res) => {
     const savedEntry = await BudgetPlannerEntry.findOneAndUpdate(
       { _id: req.params.id, owner: req.user._id },
       entry,
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
     if (!savedEntry) return res.status(404).json({ message: "Budget entry not found" });
     res.status(200).json(savedEntry);

@@ -58,7 +58,12 @@ const isClientReviewSubtask = (subtask) =>
     String(subtask?.title || "")
   );
 
+const isSubmitOutputSubtask = (subtask) =>
+  String(subtask?.title || "").trim().toLowerCase() === "submit output";
+
 const getSubmissionSubtaskIndex = (subtasks = []) => {
+  const submitOutputIndex = subtasks.findIndex(isSubmitOutputSubtask);
+  if (submitOutputIndex >= 0) return submitOutputIndex;
   const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
   return reviewIndex >= 0 ? reviewIndex : subtasks.length - 1;
 };
@@ -129,6 +134,13 @@ const progressColors = {
   Pending: "bg-orange-400",
   Done: "bg-emerald-500",
 };
+
+const formatProjectAmount = (amount) =>
+  new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+  }).format(Number(amount || 0));
 
 const normalizeSubtasks = (subtasks = []) => {
   if (!Array.isArray(subtasks)) return [];
@@ -388,7 +400,37 @@ const SelectControl = ({ label, onChange, options, value }) => (
   </label>
 );
 
-const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, isOverlay = false, item, onDelete, onEdit, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
+const ProjectPaymentButton = ({ isMarkingPaid, item, onMarkPaid }) => {
+  if (!onMarkPaid) return null;
+
+  const amount = Number(item.amount || 0);
+  const isPaid = amount > 0 && Number(item.paid || 0) >= amount;
+  const isDisabled = isPaid || amount <= 0 || isMarkingPaid;
+  const label = isPaid
+    ? "Paid"
+    : amount <= 0
+      ? "Set amount first"
+      : isMarkingPaid
+        ? "Recording payment..."
+        : "Mark as Paid";
+
+  return (
+    <button
+      type="button"
+      disabled={isDisabled}
+      onClick={() => onMarkPaid(item)}
+      className={`mt-2 inline-flex min-h-7 items-center rounded-lg px-2.5 py-1 text-[9px] font-black transition ${
+        isPaid
+          ? "bg-emerald-100 text-emerald-700"
+          : "bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
+      }`}
+    >
+      {label}
+    </button>
+  );
+};
+
+const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, isMarkingPaid = false, isOverlay = false, item, onDelete, onEdit, onMarkPaid, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
   const effectiveExpanded = isOverlay || (canAccessSubtasks && isExpanded);
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
@@ -423,7 +465,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
       tabIndex={!effectiveExpanded ? 0 : undefined}
     >
       {effectiveExpanded ? (
-        <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
+        <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_112px] lg:items-start">
           <div className="flex min-w-0 items-center gap-3 text-left">
             {!isOverlay && (
               <button
@@ -467,12 +509,25 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                 {item.subtasks.map((subtask, index) => {
                   const clientReviewIndex = item.subtasks.findIndex(isClientReviewSubtask);
                   const submissionSubtaskIndex = getSubmissionSubtaskIndex(item.subtasks);
+                  const submitOutputIndex = item.subtasks.findIndex(isSubmitOutputSubtask);
                   const isWaitingForClientApproval =
-                    clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
+                    submitOutputIndex < 0 &&
+                    clientReviewIndex >= 0 &&
+                    index > clientReviewIndex &&
+                    !item.clientApproved;
                   const isLocked = !canAccessSubtasks || isDone || isWaitingForClientApproval || (subtask.completed
                     ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
                     : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed));
-                  const isSubmissionSubtask = index === submissionSubtaskIndex;
+                  const isReviewSubtask = isClientReviewSubtask(subtask);
+                  const isFinalOutputSubtask = isSubmitOutputSubtask(subtask);
+                  const isLegacyCustomSubmission =
+                    clientReviewIndex < 0 &&
+                    submitOutputIndex < 0 &&
+                    index === submissionSubtaskIndex;
+                  const isSubmissionSubtask = submitOutputIndex >= 0
+                    ? isFinalOutputSubtask
+                    : isReviewSubtask || isLegacyCustomSubmission;
+                  const isClientReviewStatusSubtask = isSubmissionSubtask;
                   const canSubmitOutput =
                     canAccessSubtasks &&
                     !isDone &&
@@ -481,6 +536,8 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                   const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
                   const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
                   const isApproved = hasSubmittedOutput && item.clientApproved;
+                  const isSubmissionBlockedByReview =
+                    isClientReviewStatusSubtask && (isUnderReview || isApproved);
                   const needsRevision =
                     hasSubmittedOutput &&
                     item.apiStatus === "pending" &&
@@ -504,17 +561,17 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                           </span>
                         )}
                       </label>
-                      {isSubmissionSubtask && isApproved && (
+                      {isClientReviewStatusSubtask && isApproved && (
                         <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">
                           Approved
                         </span>
                       )}
-                      {isSubmissionSubtask && isUnderReview && (
+                      {isClientReviewStatusSubtask && isUnderReview && (
                         <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[9px] font-black text-amber-700">
                           Under Review
                         </span>
                       )}
-                      {canSubmitOutput && !isUnderReview && !isApproved && (
+                      {canSubmitOutput && !isSubmissionBlockedByReview && (
                         <button type="button" onClick={() => onSubmitOutput(item, index)} className="shrink-0 rounded-lg bg-[#c72fb2] px-2.5 py-1.5 text-[9px] font-black text-white transition hover:brightness-105">
                           {needsRevision ? "Needs Revision" : "Submit Output"}
                         </button>
@@ -559,13 +616,20 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             </span>
           </div>
 
-          <span className="flex items-center gap-1 lg:justify-end lg:pt-8">
-            <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-              <SmallIcon name="edit" />
-            </button>
-            <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
-              <SmallIcon name="delete" />
-            </button>
+          <span className="flex flex-col items-end lg:pt-8">
+            <span className="flex items-center gap-1">
+              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                <SmallIcon name="edit" />
+              </button>
+              <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+                <SmallIcon name="delete" />
+              </button>
+            </span>
+            <ProjectPaymentButton
+              isMarkingPaid={isMarkingPaid}
+              item={item}
+              onMarkPaid={onMarkPaid}
+            />
           </span>
         </div>
       ) : (
@@ -625,13 +689,20 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
                 {item.status}
               </span>
-              <span className="flex items-center gap-1">
-                <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-                  <SmallIcon name="edit" className="h-4 w-4" />
-                </button>
-                <button type="button" onClick={() => onDelete(item)} className="grid h-7 w-7 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
-                  <SmallIcon name="delete" className="h-4 w-4" />
-                </button>
+              <span className="flex flex-col items-end">
+                <span className="flex items-center gap-1">
+                  <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                    <SmallIcon name="edit" className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => onDelete(item)} className="grid h-7 w-7 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+                    <SmallIcon name="delete" className="h-4 w-4" />
+                  </button>
+                </span>
+                <ProjectPaymentButton
+                  isMarkingPaid={isMarkingPaid}
+                  item={item}
+                  onMarkPaid={onMarkPaid}
+                />
               </span>
             </div>
           </div>
@@ -639,8 +710,8 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
 
         <div className={`hidden gap-3 md:grid md:gap-4 ${
           canAccessSubtasks
-            ? "lg:grid-cols-[28px_1.35fr_100px_130px_150px_112px_72px]"
-            : "lg:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_72px]"
+            ? "lg:grid-cols-[28px_1.35fr_100px_130px_150px_112px_112px]"
+            : "lg:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_112px]"
         } lg:items-center`}>
           {canAccessSubtasks && (
             <button
@@ -697,13 +768,20 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
           <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black md:px-4 md:text-xs ${statusStyles[item.status] || getStatusTone(item.status)}`}>
             {item.status}
           </span>
-          <span className="flex items-center gap-1 justify-end lg:justify-start">
-            <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
-              <SmallIcon name="edit" />
-            </button>
-            <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
-              <SmallIcon name="delete" />
-            </button>
+          <span className="flex flex-col items-end lg:items-start">
+            <span className="flex items-center gap-1">
+              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                <SmallIcon name="edit" />
+              </button>
+              <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+                <SmallIcon name="delete" />
+              </button>
+            </span>
+            <ProjectPaymentButton
+              isMarkingPaid={isMarkingPaid}
+              item={item}
+              onMarkPaid={onMarkPaid}
+            />
           </span>
         </div>
         </>
@@ -714,10 +792,12 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
 
 const ProjectDetailsModal = ({
   canAccessTasks,
+  isMarkingPaid,
   item,
   onClose,
   onDelete,
   onEdit,
+  onMarkPaid,
   onSubmitOutput,
   onToggleTask,
 }) => {
@@ -776,6 +856,7 @@ const ProjectDetailsModal = ({
             canAccessSubtasks={canAccessTasks}
             isExpanded
             isFocused={false}
+            isMarkingPaid={isMarkingPaid}
             isOverlay
             item={item}
             onDelete={(task) => {
@@ -786,6 +867,7 @@ const ProjectDetailsModal = ({
               onClose();
               onEdit(task);
             }}
+            onMarkPaid={onMarkPaid}
             onSubmitOutput={onSubmitOutput}
             onToggleExpand={onClose}
             onToggleSubtask={onToggleTask}
@@ -797,7 +879,11 @@ const ProjectDetailsModal = ({
 };
 
 const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
-  const [message, setMessage] = useState(`Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`);
+  const [message, setMessage] = useState(
+    completion.finalize
+      ? `Hi, we've completed ${completion.task.title}. Please find the final output attached.`
+      : `Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`
+  );
   const [outputMethod, setOutputMethod] = useState("file");
   const [link, setLink] = useState("");
   const [file, setFile] = useState(null);
@@ -835,7 +921,9 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           <span className="grid h-5 w-5 place-items-center rounded-full border border-[#c72fb2]">
             <SmallIcon name="check" className="h-3.5 w-3.5" />
           </span>
-          You are about to submit this task for client review.
+          {completion.finalize
+            ? "You are about to submit the final project output."
+            : "You are about to submit this task for client review."}
         </p>
 
         <div className="mt-4 rounded-xl border border-pink-100 bg-white p-4 text-xs font-bold text-slate-600 dark:border-neutral-800 dark:bg-neutral-950">
@@ -941,7 +1029,9 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </section>
 
           <p className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-xs font-bold text-[#c72fb2]">
-            What happens next? The client will be notified and can review, request revisions, or approve this task.
+            {completion.finalize
+              ? "What happens next? The final output will be saved and the project will be marked as done."
+              : "What happens next? The client will be notified and can review, request revisions, or approve this task."}
           </p>
         </div>
 
@@ -951,7 +1041,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </button>
           <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-8 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105">
             <SmallIcon name="send" />
-            Submit to Client
+            {completion.finalize ? "Submit Final Output" : "Submit to Client"}
           </button>
         </div>
       </form>
@@ -967,7 +1057,9 @@ const Tasks = ({
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMarkingPaidId, setIsMarkingPaidId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [noticeMessage, setNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
@@ -1119,9 +1211,11 @@ const Tasks = ({
         canAccessSubtasks={isOwnedByCurrentUser(task)}
         isExpanded={false}
         isFocused={false}
+        isMarkingPaid={isMarkingPaidId === task.id}
         item={task}
         onDelete={requestDeleteTask}
         onEdit={handleEditTask}
+        onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
         onSubmitOutput={handleSubmitOutput}
         onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
         onToggleSubtask={handleToggleSubtask}
@@ -1178,7 +1272,10 @@ const Tasks = ({
     }
 
     const toggledSubtask = task.subtasks[subtaskIndex];
-    const clientReviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
+    const submitOutputIndex = task.subtasks.findIndex(isSubmitOutputSubtask);
+    const clientReviewIndex = submitOutputIndex >= 0
+      ? -1
+      : task.subtasks.findIndex(isClientReviewSubtask);
     if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
       setErrorMessage("Wait for the client to approve the review before continuing to the final task.");
       return;
@@ -1196,8 +1293,11 @@ const Tasks = ({
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const isSubmissionSubtask =
-      subtaskIndex === getSubmissionSubtaskIndex(task.subtasks);
+    const isFinalOutputSubtask = isSubmitOutputSubtask(toggledSubtask);
+    const isSubmissionSubtask = submitOutputIndex >= 0
+      ? isFinalOutputSubtask
+      : isClientReviewSubtask(toggledSubtask) ||
+        subtaskIndex === getSubmissionSubtaskIndex(task.subtasks);
 
     if (isCompletingSubtask && isSubmissionSubtask) {
       setSelectedTaskId("");
@@ -1267,6 +1367,43 @@ const Tasks = ({
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete task.");
     }
+  };
+
+  const handleMarkPaid = async (task) => {
+    if (isMarkingPaidId) return;
+
+    try {
+      setIsMarkingPaidId(task.id);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = normalizeTask(await taskAPI.markPaid(task.id));
+      setTasks((currentTasks) =>
+        currentTasks.map((item) => (item.id === task.id ? updatedTask : item))
+      );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === task.id ? updatedTask : currentTask
+      );
+      setNoticeMessage(
+        `${task.title} was marked as paid and added to Budget Planner income.`
+      );
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to record this project payment."));
+    } finally {
+      setIsMarkingPaidId("");
+    }
+  };
+
+  const requestMarkPaid = (task) => {
+    const amount = Number(task.amount || 0);
+    if (amount <= 0 || Number(task.paid || 0) >= amount) return;
+
+    setConfirmAction({
+      icon: "done",
+      title: "Mark as Paid",
+      message: `Record ${formatProjectAmount(amount)} from “${task.title}” as Budget Planner income? This will also unlock the original output without a watermark.`,
+      confirmLabel: "Yes, mark paid",
+      onConfirm: () => handleMarkPaid(task),
+    });
   };
 
   const requestDeleteTask = (task) => {
@@ -1363,6 +1500,11 @@ const Tasks = ({
                 {errorMessage}
               </p>
             )}
+            {noticeMessage && (
+              <p className="rounded-md bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-100">
+                {noticeMessage}
+              </p>
+            )}
 
             {isLoading && (
               <TaskListSkeleton rows={5} />
@@ -1388,10 +1530,12 @@ const Tasks = ({
           {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
             <ProjectDetailsModal
               canAccessTasks={isOwnedByCurrentUser(selectedTask)}
+              isMarkingPaid={isMarkingPaidId === selectedTask.id}
               item={selectedTask}
               onClose={() => setSelectedTaskId("")}
               onDelete={requestDeleteTask}
               onEdit={handleEditTask}
+              onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
               onSubmitOutput={handleSubmitOutput}
               onToggleTask={handleToggleSubtask}
             />

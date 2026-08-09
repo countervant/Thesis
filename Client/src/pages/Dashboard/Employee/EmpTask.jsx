@@ -33,7 +33,12 @@ const isClientReviewSubtask = (subtask) =>
     String(subtask?.title || "")
   );
 
+const isSubmitOutputSubtask = (subtask) =>
+  String(subtask?.title || "").trim().toLowerCase() === "submit output";
+
 const getSubmissionSubtaskIndex = (subtasks = []) => {
+  const submitOutputIndex = subtasks.findIndex(isSubmitOutputSubtask);
+  if (submitOutputIndex >= 0) return submitOutputIndex;
   const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
   return reviewIndex >= 0 ? reviewIndex : subtasks.length - 1;
 };
@@ -273,6 +278,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                 {item.subtasks.map((subtask, index) => {
                   const clientReviewIndex = item.subtasks.findIndex(isClientReviewSubtask);
                   const submissionSubtaskIndex = getSubmissionSubtaskIndex(item.subtasks);
+                  const submitOutputIndex = item.subtasks.findIndex(isSubmitOutputSubtask);
                   const isAssignedToCurrentUser = subtask.assignedTo
                     ? getEntityId(subtask.assignedTo) === currentUserId
                     : item.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
@@ -280,9 +286,21 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                     ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
                     : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed);
                   const isWaitingForClientApproval =
-                    clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
+                    submitOutputIndex < 0 &&
+                    clientReviewIndex >= 0 &&
+                    index > clientReviewIndex &&
+                    !item.clientApproved;
                   const isLocked = isSequenceLocked || isWaitingForClientApproval || !isAssignedToCurrentUser;
-                  const isSubmissionSubtask = index === submissionSubtaskIndex;
+                  const isReviewSubtask = isClientReviewSubtask(subtask);
+                  const isFinalOutputSubtask = isSubmitOutputSubtask(subtask);
+                  const isLegacyCustomSubmission =
+                    clientReviewIndex < 0 &&
+                    submitOutputIndex < 0 &&
+                    index === submissionSubtaskIndex;
+                  const isSubmissionSubtask = submitOutputIndex >= 0
+                    ? isFinalOutputSubtask
+                    : isReviewSubtask || isLegacyCustomSubmission;
+                  const isClientReviewStatusSubtask = isSubmissionSubtask;
                   const canSubmitOutput =
                     item.status !== "Done" &&
                     isAssignedToCurrentUser &&
@@ -291,6 +309,8 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                   const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
                   const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
                   const isApproved = hasSubmittedOutput && item.clientApproved;
+                  const isSubmissionBlockedByReview =
+                    isClientReviewStatusSubtask && (isUnderReview || isApproved);
                   const needsRevision =
                     hasSubmittedOutput &&
                     item.apiStatus === "pending" &&
@@ -314,17 +334,17 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                           </span>
                         )}
                       </label>
-                      {isSubmissionSubtask && isApproved && (
+                      {isClientReviewStatusSubtask && isApproved && (
                         <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">
                           Approved
                         </span>
                       )}
-                      {isSubmissionSubtask && isUnderReview && (
+                      {isClientReviewStatusSubtask && isUnderReview && (
                         <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[9px] font-black text-amber-700">
                           Under Review
                         </span>
                       )}
-                      {canSubmitOutput && !isUnderReview && !isApproved && (
+                      {canSubmitOutput && !isSubmissionBlockedByReview && (
                         <button type="button" onClick={() => onSubmitOutput(item, index)} className="shrink-0 rounded-lg bg-[#c72fb2] px-2.5 py-1.5 text-[9px] font-black text-white transition hover:brightness-105">
                           {needsRevision ? "Needs Revision" : "Submit Output"}
                         </button>
@@ -501,7 +521,11 @@ const ProjectDetailsModal = ({
 };
 
 const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
-  const [message, setMessage] = useState(`Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`);
+  const [message, setMessage] = useState(
+    completion.finalize
+      ? `Hi, we've completed ${completion.task.title}. Please find the final output attached.`
+      : `Hi, we've completed ${completion.task.title}. Please check the attached file and let us know your feedback.`
+  );
   const [outputMethod, setOutputMethod] = useState("file");
   const [link, setLink] = useState("");
   const [file, setFile] = useState(null);
@@ -544,7 +568,9 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           <span className="grid h-5 w-5 place-items-center rounded-full border border-[#c72fb2]">
             <SmallIcon name="check" className="h-3.5 w-3.5" />
           </span>
-          You are about to submit this task for client review.
+          {completion.finalize
+            ? "You are about to submit the final project output."
+            : "You are about to submit this task for client review."}
         </p>
 
         <div className="mt-4 rounded-xl border border-pink-100 bg-white p-4 text-xs font-bold text-slate-600 dark:border-neutral-800 dark:bg-neutral-950">
@@ -671,7 +697,9 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </section>
 
           <p className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-xs font-bold text-[#c72fb2]">
-            What happens next? The client will be notified and can review, request revisions, or approve this task.
+            {completion.finalize
+              ? "What happens next? The final output will be saved and the project will be marked as done."
+              : "What happens next? The client will be notified and can review, request revisions, or approve this task."}
           </p>
         </div>
 
@@ -681,7 +709,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </button>
           <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-8 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105">
             <SmallIcon name="send" />
-            Submit to Client
+            {completion.finalize ? "Submit Final Output" : "Submit to Client"}
           </button>
         </div>
       </form>
@@ -899,7 +927,10 @@ const EmpTask = () => {
 
   const handleToggleSubtask = async (task, subtaskIndex) => {
     const toggledSubtask = task.subtasks[subtaskIndex];
-    const clientReviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
+    const submitOutputIndex = task.subtasks.findIndex(isSubmitOutputSubtask);
+    const clientReviewIndex = submitOutputIndex >= 0
+      ? -1
+      : task.subtasks.findIndex(isClientReviewSubtask);
     if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
       setErrorMessage("Wait for the client to approve the review before continuing to the final task.");
       return;
@@ -924,8 +955,11 @@ const EmpTask = () => {
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const isSubmissionSubtask =
-      subtaskIndex === getSubmissionSubtaskIndex(task.subtasks);
+    const isFinalOutputSubtask = isSubmitOutputSubtask(toggledSubtask);
+    const isSubmissionSubtask = submitOutputIndex >= 0
+      ? isFinalOutputSubtask
+      : isClientReviewSubtask(toggledSubtask) ||
+        subtaskIndex === getSubmissionSubtaskIndex(task.subtasks);
 
     if (isCompletingSubtask && isSubmissionSubtask) {
       setSelectedTaskId("");
@@ -1016,7 +1050,11 @@ const EmpTask = () => {
         currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
       );
       setCompletionDraft(null);
-      setNoticeMessage(`${draft.task.title} was submitted to the client for review.`);
+      setNoticeMessage(
+        draft.finalize
+          ? `${draft.task.title} final output was submitted.`
+          : `${draft.task.title} was submitted to the client for review.`
+      );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
     }
