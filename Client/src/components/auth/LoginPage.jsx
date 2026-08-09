@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/CLIENTRA.png";
 import mobileLogo from "../../assets/CLIENTRA2.png";
@@ -18,10 +18,11 @@ const dashboardPathByRole = {
 
 const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 
-const LoginPage = ({ order, order1 }) => {
+const LoginPage = () => {
   const formRef = useRef(null);
-  const emailFieldNameRef = useRef(`login_contact_${Date.now()}`);
-  const passwordFieldNameRef = useRef(`login_secret_${Date.now()}`);
+  const credentialFieldId = useId().replaceAll(":", "");
+  const emailFieldName = `login_contact_${credentialFieldId}`;
+  const passwordFieldName = `login_secret_${credentialFieldId}`;
   const [suppressCredentialAutofill] = useState(
     () => sessionStorage.getItem("clientraSuppressLoginAutofillOnce") === "true"
   );
@@ -171,13 +172,13 @@ const LoginPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`con order-${order} md:order-${order1} relative z-20 -mt-20 flex w-full flex-1 flex-col items-center justify-start bg-transparent px-3 pb-5 pt-0 sm:px-10 md:mt-0 md:min-h-screen md:w-1/2 md:justify-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
+        className="relative z-20 flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 px-3 py-8 sm:px-10 md:px-12 dark:bg-[#111111]"
       >
         <form
           ref={formRef}
           onSubmit={handleSubmit}
           noValidate
-          className="min-h-[500px] w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:border dark:md:border-[#DA70D6]/90 dark:md:px-10 dark:md:py-12 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="login-panel min-h-[500px] w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:px-10 dark:md:py-12"
           autoComplete={suppressCredentialAutofill ? "new-password" : "on"}
           data-form-type="other"
         >
@@ -213,7 +214,7 @@ const LoginPage = ({ order, order1 }) => {
               <input
                 ref={emailInputRef}
                 type="email"
-                name={suppressCredentialAutofill ? emailFieldNameRef.current : "username"}
+                name={suppressCredentialAutofill ? emailFieldName : "username"}
                 placeholder="Email"
                 value={email}
                 onChange={handleEmailChange}
@@ -244,7 +245,7 @@ const LoginPage = ({ order, order1 }) => {
               <input
                 ref={passwordInputRef}
                 type={showPassword ? "text" : "password"}
-                name={suppressCredentialAutofill ? passwordFieldNameRef.current : "password"}
+                name={suppressCredentialAutofill ? passwordFieldName : "password"}
                 placeholder="Password"
                 value={password}
                 onChange={handlePasswordChange}

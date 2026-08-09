@@ -62,7 +62,7 @@ const mobileInputBox =
 const mobileInput =
   "w-full border-none bg-transparent px-0 text-sm font-medium text-gray-800 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-white/85";
 
-const RegisterPage = ({ order, order1 }) => {
+const RegisterPage = () => {
   const formRef = useRef(null);
   const hasUserInteractedRef = useRef(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -241,7 +241,7 @@ const RegisterPage = ({ order, order1 }) => {
   return (
     <>
       <div
-        className={`order-${order} md:order-${order1} relative z-20 -mt-16 flex w-full flex-col items-center justify-start bg-transparent px-3 pb-8 pt-0 md:mt-0 md:w-1/2 md:justify-center md:bg-gray-100 md:px-12 md:py-0 dark:md:bg-[#111111]`}
+        className="relative z-20 flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 px-3 py-8 md:px-12 dark:bg-[#111111]"
       >
         {successMessage && (
           <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
@@ -269,7 +269,7 @@ const RegisterPage = ({ order, order1 }) => {
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className="w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-lg sm:space-y-8 md:max-w-2xl md:-translate-y-4 md:bg-transparent md:px-10 md:py-7 md:shadow-none dark:bg-[#141414] dark:md:border-[#DA70D6]/90 dark:md:shadow-[0_0_42px_rgba(219,39,119,0.22)]"
+          className="login-panel w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:space-y-8 md:max-w-2xl md:px-10 md:py-7 dark:bg-[#141414]"
           autoComplete="new-password"
           data-form-type="other"
         >

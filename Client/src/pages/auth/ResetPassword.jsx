@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Welcome from "../../components/auth/Welcome.jsx";
 import { authAPI } from "../../services/api.js";
 import AuthenticationHelper from "../../components/auth/AuthenticationHelper.jsx";
 import hideIcon from "../../assets/hide.png";
@@ -10,7 +9,7 @@ import { validateEmail } from "../../utils/emailValidation.js";
 const ResetPassword = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => searchParams.get("email") || "");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,11 +20,6 @@ const ResetPassword = () => {
   const [resendMessage, setResendMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  useEffect(() => {
-    const prefill = searchParams.get("email") || "";
-    if (prefill) setEmail(prefill);
-  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -88,9 +82,8 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col-reverse md:flex-row">
-      <Welcome order="2" order1="1" text="Reset Password" />
-      <div className="w-full md:w-1/2 bg-gray-100 flex flex-col items-center justify-center px-6 sm:px-10 md:px-12 py-12 md:py-0">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-[#111111]">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center px-6 py-12 sm:px-10 md:px-12">
         <h2
           className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase"
           style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
@@ -98,7 +91,7 @@ const ResetPassword = () => {
           Set New Password
         </h2>
 
-        <form onSubmit={handleSubmit} className="w-full max-w-sm sm:max-w-md space-y-6 sm:space-y-8">
+        <form onSubmit={handleSubmit} className="login-panel w-full max-w-sm space-y-6 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 dark:bg-[#141414] dark:text-white">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}

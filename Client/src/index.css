@@ -142,6 +142,11 @@ textarea,
   --tw-ring-color: rgba(218, 112, 214, 0.72) !important;
 }
 
+.dark .login-panel {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
 .dark .shadow-sm,
 .dark .shadow-lg,
 .dark .shadow-2xl,
