@@ -34,6 +34,7 @@ const fullTaskFields = [
   "feedback.timelinessRating", "feedback.overallSatisfaction", "feedback.comment",
   "feedback.wouldRecommend", "feedback.submittedAt", "feedback.reply.message",
   "feedback.reply.repliedBy", "feedback.reply.repliedAt",
+  "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
   "attachments.fileName", "attachments.fileUrl", "archived", "archivedAt", "archivedBy",
   "createdAt", "updatedAt",
 ].join(" ");
@@ -46,6 +47,7 @@ const taskFieldsByView = {
     "finalOutput.fileName", "finalOutput.fileUrl", "finalOutput.link", "finalOutput.watermarked",
     "attachments.fileName", "attachments.fileUrl", "feedback.rating", "feedback.overallRating",
     "feedback.comment", "feedback.submittedAt", "feedback.reply.message", "archived", "archivedAt",
+    "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
     "createdAt", "updatedAt",
   ].join(" "),
   notification: [
@@ -253,6 +255,12 @@ const addTaskAvatarUrls = (task) => ({
           : task.feedback.reply,
       }
     : task.feedback,
+  newsfeedPermission: task.newsfeedPermission
+    ? {
+        ...task.newsfeedPermission,
+        grantedBy: withAvatarUrl(task.newsfeedPermission.grantedBy),
+      }
+    : task.newsfeedPermission,
 });
 
 const recordSubtaskActivities = (task, previousSubtasks, nextSubtasks, user) => {
@@ -430,7 +438,8 @@ router.get("/", protect, async (req, res) => {
       .populate("requestedBy", "firstName lastName companyName email role updatedAt")
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
-        .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt");
+        .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
+        .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role updatedAt");
     } else if (view === "projects") {
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role updatedAt");
@@ -467,6 +476,7 @@ router.get("/:id", protect, async (req, res) => {
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
       .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
+      .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role updatedAt")
       .maxTimeMS(8000)
       .lean();
 
@@ -985,6 +995,64 @@ router.post("/:id/approve", protect, async (req, res) => {
   } catch (error) {
     console.error("Approve project error:", error);
     res.status(500).json({ message: "Unable to approve the project" });
+  }
+});
+
+router.patch("/:id/newsfeed-permission", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "client") {
+      return res.status(403).json({ message: "Only clients can manage newsfeed posting permission" });
+    }
+
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (!hasClientApproval(task) || !task.finalOutput?.submittedAt) {
+      return res.status(400).json({ message: "Posting permission is only available for an approved submitted output" });
+    }
+
+    const allowed = req.body?.allowed === true;
+    const permissionChanged = Boolean(task.newsfeedPermission?.allowed) !== allowed;
+
+    if (permissionChanged) {
+      task.newsfeedPermission = allowed
+        ? {
+            allowed: true,
+            grantedAt: new Date(),
+            grantedBy: req.user._id,
+          }
+        : { allowed: false };
+      addActivity(task, {
+        type: allowed ? "newsfeed_permission_granted" : "newsfeed_permission_revoked",
+        title: allowed ? "Client allowed newsfeed posting" : "Client removed newsfeed posting permission",
+        details: allowed
+          ? "The approved project output may now be posted to the newsfeed"
+          : "The approved project output may no longer be posted to the newsfeed",
+        actor: req.user._id,
+        actorName: getActorName(req.user),
+      });
+      await task.save();
+    }
+
+    const updatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "firstName lastName email role")
+      .populate("assignees", "firstName lastName email role")
+      .populate("subtasks.assignedTo", "firstName lastName email role")
+      .populate("createdBy", "firstName lastName companyName email role")
+      .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role")
+      .lean();
+
+    return res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Update newsfeed permission error:", error);
+    return res.status(500).json({ message: "Unable to update newsfeed posting permission" });
   }
 });
 

@@ -197,6 +197,10 @@ const normalizeProject = (task) => {
     feedback: hasSubmittedFeedback ? feedback : null,
     archived: Boolean(task?.archived),
     archivedAt: task?.archivedAt,
+    clientApproved: Array.isArray(task?.activities)
+      && task.activities.some((activity) => activity?.type === "client_approved"),
+    newsfeedPermissionAllowed: Boolean(task?.newsfeedPermission?.allowed),
+    newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
   };
 };
 
@@ -391,7 +395,7 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   </div>
 );
 
-const ProjectDetails = ({ errorMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onViewOutput, project }) => {
+const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
   const [openActivityPanel, setOpenActivityPanel] = useState(null);
   const outputCandidates = [
     ...(project.finalOutput?.link
@@ -564,6 +568,7 @@ const ProjectDetails = ({ errorMessage, onApprove, onBack, onDownloadOutput, onF
         </span>
       </header>
       {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
+      {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
 
       <Card className="p-5">
         <h1 className="page-title text-2xl">Project Overview</h1>
@@ -641,6 +646,33 @@ const ProjectDetails = ({ errorMessage, onApprove, onBack, onDownloadOutput, onF
             ))}
           </div>
           <button type="button" className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Files</button>
+          {project.clientApproved && project.finalOutput?.submittedAt && (
+            <div className={`mt-5 rounded-xl border p-4 ${project.newsfeedPermissionAllowed ? "border-emerald-200 bg-emerald-50/80" : "border-pink-100 bg-pink-50/40"}`}>
+              <div className="flex items-start gap-3">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${project.newsfeedPermissionAllowed ? "bg-emerald-500 text-white" : "bg-pink-100 text-[#c72fb2]"}`}>
+                  <Icon name={project.newsfeedPermissionAllowed ? "check" : "send"} className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black text-[#10142d] dark:text-white">Permission to post this work</span>
+                  <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500">
+                    {project.newsfeedPermissionAllowed
+                      ? "Admin and assigned employees have been informed that they may post this approved work to the newsfeed."
+                      : "Allow the admin and assigned employees to post this approved work to the newsfeed. This will not post it automatically."}
+                  </span>
+                  {project.newsfeedPermissionGrantedAt && project.newsfeedPermissionAllowed && (
+                    <span className="mt-1 block text-[10px] font-bold text-emerald-600">Granted {formatDateTime(project.newsfeedPermissionGrantedAt)}</span>
+                  )}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSetNewsfeedPermission(project, !project.newsfeedPermissionAllowed)}
+                className={`mt-3 h-10 w-full rounded-lg text-xs font-black transition ${project.newsfeedPermissionAllowed ? "border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" : "bg-[#c72fb2] text-white hover:brightness-105"}`}
+              >
+                {project.newsfeedPermissionAllowed ? "Remove Permission" : "Allow Newsfeed Posting"}
+              </button>
+            </div>
+          )}
         </Card>
 
         <Card className="p-5">
@@ -1135,6 +1167,8 @@ const ClientProjects = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [archiveAction, setArchiveAction] = useState(null);
   const [noticeMessage, setNoticeMessage] = useState("");
+  const [permissionAction, setPermissionAction] = useState(null);
+  const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -1337,6 +1371,35 @@ const ClientProjects = () => {
     }
   };
 
+  const handleUpdateNewsfeedPermission = async () => {
+    const action = permissionAction;
+    if (!action) return;
+
+    try {
+      setIsUpdatingPermission(true);
+      setErrorMessage("");
+      const updatedProject = normalizeProject(
+        await taskAPI.setNewsfeedPermission(action.project.id, action.allowed)
+      );
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => project.id === updatedProject.id ? updatedProject : project)
+      );
+      setSelectedProject((project) => project?.id === updatedProject.id ? updatedProject : project);
+      setPermissionAction(null);
+      setNoticeMessage(
+        action.allowed
+          ? `Admin and assigned employees may now post ${action.project.title} to the newsfeed.`
+          : `Newsfeed posting permission was removed for ${action.project.title}.`
+      );
+      window.setTimeout(() => setNoticeMessage(""), 4000);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to update newsfeed posting permission."));
+      setPermissionAction(null);
+    } finally {
+      setIsUpdatingPermission(false);
+    }
+  };
+
   const handleSubmitFeedback = async (project, form) => {
     try {
       const updatedTask = await taskAPI.submitFeedback(project.id, form);
@@ -1370,6 +1433,7 @@ const ClientProjects = () => {
       <>
         <ProjectDetails
           errorMessage={errorMessage}
+          noticeMessage={noticeMessage}
           onApprove={setApproveProject}
           onBack={() => setSelectedProjectId("")}
           onDownloadOutput={handleDownloadOutput}
@@ -1378,6 +1442,7 @@ const ClientProjects = () => {
             setRevisionMessage("");
             setRevisionProject(project);
           }}
+          onSetNewsfeedPermission={(project, allowed) => setPermissionAction({ project, allowed })}
           onViewOutput={handleViewOutput}
           project={selectedProject}
         />
@@ -1407,6 +1472,19 @@ const ClientProjects = () => {
           onCancel={() => setApproveProject(null)}
           onConfirm={handleApproveProject}
           title="Approve Project"
+        />
+        <ConfirmDialog
+          confirmLabel={permissionAction?.allowed ? "Allow" : "Remove"}
+          confirmingLabel="Saving..."
+          icon="done"
+          isConfirming={isUpdatingPermission}
+          isOpen={Boolean(permissionAction)}
+          message={permissionAction?.allowed
+            ? `Allow admin and assigned employees to post “${permissionAction?.project.title}” to the newsfeed? This will not post it automatically.`
+            : `Remove newsfeed posting permission for “${permissionAction?.project.title}”?`}
+          onCancel={() => setPermissionAction(null)}
+          onConfirm={handleUpdateNewsfeedPermission}
+          title={permissionAction?.allowed ? "Allow Newsfeed Posting" : "Remove Permission"}
         />
       </>
     );

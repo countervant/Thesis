@@ -577,6 +577,12 @@ export const taskAPI = {
     return response.data;
   },
 
+  setNewsfeedPermission: async (id, allowed) => {
+    const response = await api.patch(`/tasks/${id}/newsfeed-permission`, { allowed });
+    clearCache("/tasks", "/dashboard");
+    return response.data;
+  },
+
   submitFeedback: async (id, feedback) => {
     const response = await api.post(`/tasks/${id}/feedback`, feedback);
     clearCache("/tasks", "/dashboard");
