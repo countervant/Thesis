@@ -107,9 +107,12 @@ const getPersonName = (person) => {
 };
 
 const getClientName = (task) => {
-  if (task?.requestedByName) return task.requestedByName;
-  if (task?.requestedBy) return getPersonName(task.requestedBy);
-  return getPersonName(task?.createdBy);
+  if (String(task?.requestedByName || "").trim()) return task.requestedByName;
+  if (task?.requestedBy && typeof task.requestedBy !== "string") {
+    return getPersonName(task.requestedBy);
+  }
+  if (task?.createdBy?.role === "client") return getPersonName(task.createdBy);
+  return "Unassigned client";
 };
 
 const SelectControl = ({ label, onChange, options, value }) => (
@@ -234,6 +237,9 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             <span className="min-w-0">
               <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.title}</span>
               <span className="mt-1 block text-xs font-bold leading-5 text-slate-500 dark:text-neutral-400">{item.description || "No description"}</span>
+              <span className="mt-1.5 block truncate text-[10px] font-black text-[#c72fb2]">
+                Client: {getClientName(item)}
+              </span>
               {item.newsfeedPermissionAllowed && (
                 <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">
                   <SmallIcon name="check" className="h-3 w-3" /> Client allowed newsfeed posting
@@ -372,6 +378,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             <span className="min-w-0">
               <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
               <p className="mt-1 truncate text-xs font-bold text-slate-500">{item.description || "No description"}</p>
+              <p className="mt-1 truncate text-[10px] font-black text-[#c72fb2]">Client: {getClientName(item)}</p>
               {item.newsfeedPermissionAllowed && (
                 <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
               )}
