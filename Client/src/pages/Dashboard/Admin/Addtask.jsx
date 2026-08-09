@@ -88,6 +88,29 @@ const taskTemplates = [
   },
 ];
 
+const submitOutputTaskTitle = "Submit Output";
+const createBlankSubtask = () => ({
+  title: "",
+  completed: false,
+  assignedTo: "",
+});
+const createSubmitOutputSubtask = () => ({
+  title: submitOutputTaskTitle,
+  completed: false,
+  assignedTo: "",
+});
+const isSubmitOutputSubtask = (subtask) =>
+  String(subtask?.title || "").trim().toLowerCase() ===
+  submitOutputTaskTitle.toLowerCase();
+
+const ensureSubmitOutputSubtask = (subtasks = []) => {
+  const submitOutputSubtask = subtasks.find(isSubmitOutputSubtask);
+  return [
+    ...subtasks.filter((subtask) => !isSubmitOutputSubtask(subtask)),
+    submitOutputSubtask || createSubmitOutputSubtask(),
+  ];
+};
+
 const statusToApi = {
   Pending: "pending",
   "In progress": "in_progress",
@@ -191,7 +214,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     priority: "medium",
     requestedBy: isAdmin ? "" : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
-    subtasks: [{ title: "", completed: false, assignedTo: "" }],
+    subtasks: [createBlankSubtask(), createSubmitOutputSubtask()],
   });
   const [assignees, setAssignees] = useState([]);
   const [clients, setClients] = useState([]);
@@ -309,7 +332,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
         .map(getEntityId)
         .filter(Boolean),
-      subtasks: normalizeSubtasks(task.subtasks),
+      subtasks: taskTemplates.some((template) => template.title === task.title)
+        ? normalizeSubtasks(task.subtasks)
+        : ensureSubmitOutputSubtask(normalizeSubtasks(task.subtasks)),
     });
   }, [task, user]);
 
@@ -353,20 +378,35 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   };
 
   const addSubtask = () => {
-    setFormData((currentData) => ({
-      ...currentData,
-      subtasks: [...currentData.subtasks, { title: "", completed: false, assignedTo: "" }],
-    }));
+    setFormData((currentData) => {
+      const submitOutputIndex = currentData.subtasks.findIndex(isSubmitOutputSubtask);
+      const subtasks = [...currentData.subtasks];
+
+      if (submitOutputIndex >= 0) {
+        subtasks.splice(submitOutputIndex, 0, createBlankSubtask());
+      } else {
+        subtasks.push(createBlankSubtask());
+      }
+
+      return { ...currentData, subtasks };
+    });
   };
 
   const removeSubtask = (index) => {
-    setFormData((currentData) => ({
-      ...currentData,
-      subtasks:
-        currentData.subtasks.length > 1
-          ? currentData.subtasks.filter((_, currentIndex) => currentIndex !== index)
-          : [{ title: "", completed: false, assignedTo: "" }],
-    }));
+    setFormData((currentData) => {
+      if (isSubmitOutputSubtask(currentData.subtasks[index])) return currentData;
+
+      const editableTaskCount = currentData.subtasks.filter(
+        (subtask) => !isSubmitOutputSubtask(subtask)
+      ).length;
+      const subtasks = editableTaskCount > 1
+        ? currentData.subtasks.filter((_, currentIndex) => currentIndex !== index)
+        : currentData.subtasks.map((subtask, currentIndex) =>
+            currentIndex === index ? createBlankSubtask() : subtask
+          );
+
+      return { ...currentData, subtasks };
+    });
   };
 
   const handleCancel = () => {
@@ -379,7 +419,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       setFormData((currentData) => ({
         ...currentData,
         title: "",
-        subtasks: [{ title: "", completed: false, assignedTo: "" }],
+        subtasks: [createBlankSubtask(), createSubmitOutputSubtask()],
       }));
       return;
     }
@@ -467,15 +507,22 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    const subtasks = formData.subtasks
+    const normalizedFormSubtasks = formData.subtasks
       .map((subtask) => ({
         title: subtask.title.trim(),
         completed: Boolean(subtask.completed),
         assignedTo: subtask.assignedTo || undefined,
       }))
       .filter((subtask) => subtask.title);
+    const isCustomProject = selectedTemplateTitle === "custom";
+    const customProjectTasks = normalizedFormSubtasks.filter(
+      (subtask) => !isSubmitOutputSubtask(subtask)
+    );
+    const subtasks = isCustomProject
+      ? ensureSubmitOutputSubtask(normalizedFormSubtasks)
+      : normalizedFormSubtasks;
 
-    if (subtasks.length === 0) {
+    if ((isCustomProject && customProjectTasks.length === 0) || subtasks.length === 0) {
       setErrorMessage("At least one task is required.");
       return;
     }
@@ -633,8 +680,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                     type="text"
                     value={subtask.title}
                     onChange={(event) => updateSubtask(index, "title", event.target.value)}
+                    disabled={isSubmitOutputSubtask(subtask)}
                     placeholder={`Task ${index + 1}`}
-                    className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+                    className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-pink-50 disabled:font-black disabled:text-[#c72fb2] dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-600 dark:disabled:bg-pink-950/20 dark:disabled:text-pink-400 dark:focus:ring-pink-950"
                   />
                   <select
                     value={subtask.assignedTo || ""}
@@ -652,7 +700,8 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                   <button
                     type="button"
                     onClick={() => removeSubtask(index)}
-                    className="grid h-9 w-9 place-items-center rounded-lg text-pink-600 transition hover:bg-pink-50"
+                    disabled={isSubmitOutputSubtask(subtask)}
+                    className="grid h-9 w-9 place-items-center rounded-lg text-pink-600 transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-25"
                     aria-label={`Remove task ${index + 1}`}
                   >
                     <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
