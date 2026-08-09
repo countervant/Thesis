@@ -76,7 +76,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "revision_started", "output_submitted", "client_approved", "newsfeed_permission_granted", "newsfeed_permission_revoked", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
+          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "revision_started", "output_submitted", "client_approved", "employee_paid", "newsfeed_permission_granted", "newsfeed_permission_revoked", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 
@@ -142,6 +142,39 @@ const taskSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+
+    employeePayments: [
+      {
+        employee: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        amount: {
+          type: Number,
+          required: true,
+          min: 0.01,
+        },
+        paidAt: {
+          type: Date,
+          default: Date.now,
+        },
+        paidBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        budgetEntry: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Budget",
+          required: true,
+        },
+        employeeBudgetEntry: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "BudgetPlannerEntry",
+        },
+      },
+    ],
 
     comments: [
       {
@@ -342,6 +375,7 @@ taskSchema.index({ assignees: 1, createdAt: -1 });
 taskSchema.index({ "subtasks.assignedTo": 1, createdAt: -1 });
 taskSchema.index({ createdBy: 1, createdAt: -1 });
 taskSchema.index({ requestedBy: 1, createdAt: -1 });
+taskSchema.index({ "employeePayments.employee": 1, createdAt: -1 });
 taskSchema.index({ status: 1, dueDate: 1 });
 taskSchema.index({ priority: 1, dueDate: 1 });
 taskSchema.index({ createdAt: -1 });

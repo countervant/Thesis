@@ -37,6 +37,21 @@ const budgetSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Task",
     },
+
+    sourceEmployeePayment: {
+      type: String,
+      trim: true,
+    },
+
+    relatedTask: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+    },
+
+    paidEmployee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   {
     timestamps: true,
@@ -47,6 +62,8 @@ budgetSchema.index({ date: -1, createdAt: -1 });
 budgetSchema.index({ type: 1, date: -1 });
 budgetSchema.index({ category: 1, date: -1 });
 budgetSchema.index({ sourceTask: 1 }, { unique: true, sparse: true });
+budgetSchema.index({ sourceEmployeePayment: 1 }, { unique: true, sparse: true });
+budgetSchema.index({ paidEmployee: 1, date: -1 });
 
 const Budget = mongoose.model("Budget", budgetSchema);
 

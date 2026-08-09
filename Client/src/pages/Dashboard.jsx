@@ -14,7 +14,7 @@ import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton.jsx";
-import { getApiErrorMessage, messageAPI } from "../services/api.js";
+import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const AdminDashboard = lazy(() => import("./Dashboard/Admin/Home.jsx"));
 const AdminTasks = lazy(() => import("./Dashboard/Admin/Tasks.jsx"));
@@ -33,6 +33,7 @@ const EmpDashboard = lazy(() => import("./Dashboard/Employee/EmpDashboard.jsx"))
 const EmpCalendar = lazy(() => import("./Dashboard/Employee/EmpCalendar.jsx"));
 const EmpLeaverequest = lazy(() => import("./Dashboard/Employee/EmpLeaverequest.jsx"));
 const EmpTask = lazy(() => import("./Dashboard/Employee/EmpTask.jsx"));
+const EmpBudgetPlanner = lazy(() => import("./Dashboard/Employee/EmpBudgetPlanner.jsx"));
 const Newsfeed = lazy(() => import("./newsfeed.jsx"));
 const Profile = lazy(() => import("./Profile.jsx"));
 const Settings = lazy(() => import("./Settings/settings.jsx"));
@@ -1500,7 +1501,7 @@ const Dashboard = () => {
       : "dashboard";
   const localPages = new Set([
     "dashboard", "projects", "newsfeed", "feedback", "messages", "profile", "settings",
-    "tasks", "add-task", "edit-task", "calendar", "leave-request",
+    "tasks", "add-task", "edit-task", "calendar", "budget", "add-budget", "edit-budget", "leave-request",
   ]);
   const requestedLocalPage = searchParams.get("page") || location.state?.page;
   const localPage = localPages.has(requestedLocalPage) ? requestedLocalPage : "dashboard";
@@ -1572,17 +1573,29 @@ const Dashboard = () => {
   const handleBudgetSaved = () => {
     setBudgetRefreshKey((currentKey) => currentKey + 1);
     setEditingBudgetEntry(null);
-    handleAdminNavigate("budget", { replace: true });
+    if (role === "admin") {
+      handleAdminNavigate("budget", { replace: true });
+    } else {
+      handleLocalNavigate("budget", { replace: true });
+    }
   };
 
   const handleAddBudgetEntry = () => {
     setEditingBudgetEntry(null);
-    handleAdminNavigate("add-budget");
+    if (role === "admin") {
+      handleAdminNavigate("add-budget");
+    } else {
+      handleLocalNavigate("add-budget");
+    }
   };
 
   const handleEditBudgetEntry = (entry) => {
     setEditingBudgetEntry(entry);
-    handleAdminNavigate("edit-budget");
+    if (role === "admin") {
+      handleAdminNavigate("edit-budget");
+    } else {
+      handleLocalNavigate("edit-budget");
+    }
   };
 
   const handleEmployeeSaved = () => {
@@ -1725,6 +1738,22 @@ const Dashboard = () => {
       <EmpTask />
     ) : role === "employee" && localPage === "calendar" ? (
       <EmpCalendar />
+    ) : role === "employee" && ["budget", "add-budget", "edit-budget"].includes(localPage) ? (
+      <>
+        <EmpBudgetPlanner
+          onAddEntry={handleAddBudgetEntry}
+          onEditEntry={handleEditBudgetEntry}
+          refreshKey={budgetRefreshKey}
+        />
+        {(localPage === "add-budget" || localPage === "edit-budget") && (
+          <AdminAddBudget
+            dataAPI={budgetPlannerAPI}
+            entry={localPage === "edit-budget" ? editingBudgetEntry : null}
+            onBudgetSaved={handleBudgetSaved}
+            onNavigate={handleLocalNavigate}
+          />
+        )}
+      </>
     ) : role === "employee" && localPage === "leave-request" ? (
       <EmpLeaverequest />
     ) : localPage === "newsfeed" ? (
@@ -1789,7 +1818,13 @@ const Dashboard = () => {
   return (
     <>
       <MainBars
-        activePage={["add-task", "edit-task"].includes(localPage) ? "tasks" : localPage}
+        activePage={
+          ["add-task", "edit-task"].includes(localPage)
+            ? "tasks"
+            : ["add-budget", "edit-budget"].includes(localPage)
+              ? "budget"
+              : localPage
+        }
         onLogout={handleLogout}
         onNavigate={handleLocalNavigate}
       >

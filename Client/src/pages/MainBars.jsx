@@ -78,7 +78,7 @@ const roleNavItems = {
     "leave-request",
     "settings",
   ],
-  employee: ["dashboard", "newsfeed", "feedback", "tasks", "calendar", "leave-request", "settings"],
+  employee: ["dashboard", "newsfeed", "feedback", "tasks", "calendar", "budget", "leave-request", "settings"],
   client: ["dashboard", "projects", "newsfeed", "settings"],
 };
 

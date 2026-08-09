@@ -54,6 +54,20 @@ const getPersonName = (person) => {
   );
 };
 
+const getAssignedEmployees = (task) => {
+  const employees = [...(task?.assignees || []), task?.assignedTo].filter(Boolean);
+  const uniqueEmployees = new Map();
+
+  employees.forEach((employee) => {
+    const employeeId = getEntityId(employee);
+    if (employeeId && !uniqueEmployees.has(employeeId)) uniqueEmployees.set(employeeId, employee);
+  });
+
+  return [...uniqueEmployees.values()].filter(
+    (employee) => typeof employee === "string" || !employee?.role || employee.role === "employee"
+  );
+};
+
 const isClientReviewSubtask = (subtask) =>
   /client\s+(?:review.*revision|revision)|review.*revision/i.test(
     String(subtask?.title || "")
@@ -198,6 +212,7 @@ const normalizeTask = (task) => {
     newsfeedPermissionAllowed: Boolean(task?.newsfeedPermission?.allowed),
     newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
+    employeePayments: Array.isArray(task?.employeePayments) ? task.employeePayments : [],
   };
 };
 
@@ -431,7 +446,45 @@ const ProjectPaymentButton = ({ isMarkingPaid, item, onMarkPaid }) => {
   );
 };
 
-const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, isMarkingPaid = false, isOverlay = false, item, onDelete, onEdit, onMarkPaid, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
+const EmployeePaymentButton = ({ isPayingEmployee, item, onPayEmployee }) => {
+  if (!onPayEmployee) return null;
+
+  const assignedEmployees = getAssignedEmployees(item);
+  const paidEmployeeIds = new Set(
+    (item.employeePayments || []).map((payment) => getEntityId(payment.employee))
+  );
+  const unpaidCount = assignedEmployees.filter(
+    (employee) => !paidEmployeeIds.has(getEntityId(employee))
+  ).length;
+  const hasAssignees = assignedEmployees.length > 0;
+  const allPaid = hasAssignees && unpaidCount === 0;
+  const label = !hasAssignees
+    ? "No employee assigned"
+    : allPaid
+      ? assignedEmployees.length > 1 ? "Team paid" : "Employee paid"
+      : isPayingEmployee
+        ? "Recording..."
+        : assignedEmployees.length > 1
+          ? `Pay employee (${unpaidCount})`
+          : "Pay employee";
+
+  return (
+    <button
+      type="button"
+      disabled={!hasAssignees || allPaid || isPayingEmployee}
+      onClick={() => onPayEmployee(item)}
+      className={`mt-1.5 inline-flex min-h-7 items-center rounded-lg px-2.5 py-1 text-[9px] font-black transition ${
+        allPaid
+          ? "bg-emerald-100 text-emerald-700"
+          : "bg-pink-100 text-[#b524a2] hover:bg-pink-200 disabled:cursor-not-allowed disabled:opacity-60"
+      }`}
+    >
+      {label}
+    </button>
+  );
+};
+
+const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, isMarkingPaid = false, isOverlay = false, isPayingEmployee = false, item, onDelete, onEdit, onMarkPaid, onPayEmployee, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
   const effectiveExpanded = isOverlay || (canAccessSubtasks && isExpanded);
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
@@ -631,6 +684,11 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               item={item}
               onMarkPaid={onMarkPaid}
             />
+            <EmployeePaymentButton
+              isPayingEmployee={isPayingEmployee}
+              item={item}
+              onPayEmployee={onPayEmployee}
+            />
           </span>
         </div>
       ) : (
@@ -703,6 +761,11 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                   isMarkingPaid={isMarkingPaid}
                   item={item}
                   onMarkPaid={onMarkPaid}
+                />
+                <EmployeePaymentButton
+                  isPayingEmployee={isPayingEmployee}
+                  item={item}
+                  onPayEmployee={onPayEmployee}
                 />
               </span>
             </div>
@@ -783,6 +846,11 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               item={item}
               onMarkPaid={onMarkPaid}
             />
+            <EmployeePaymentButton
+              isPayingEmployee={isPayingEmployee}
+              item={item}
+              onPayEmployee={onPayEmployee}
+            />
           </span>
         </div>
         </>
@@ -791,14 +859,151 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
   );
 };
 
+const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
+  const assignedEmployees = getAssignedEmployees(task);
+  const paidEmployeeIds = new Set(
+    (task.employeePayments || []).map((payment) => getEntityId(payment.employee))
+  );
+  const unpaidEmployees = assignedEmployees.filter(
+    (employee) => !paidEmployeeIds.has(getEntityId(employee))
+  );
+  const [employeeId, setEmployeeId] = useState(getEntityId(unpaidEmployees[0]));
+  const [amount, setAmount] = useState("");
+  const numericAmount = Number(amount);
+  const selectedEmployee = unpaidEmployees.find(
+    (employee) => getEntityId(employee) === employeeId
+  );
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !isSubmitting) onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSubmitting, onClose]);
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!employeeId || !Number.isFinite(numericAmount) || numericAmount <= 0) return;
+    onSubmit({ employeeId, amount: numericAmount });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-[2px]"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSubmitting) onClose();
+      }}
+      role="presentation"
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-lg overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-pink-100 px-6 py-5 dark:border-neutral-800">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">Project Payroll</p>
+            <h2 className="mt-1 text-xl font-black text-[#10142d] dark:text-white">Pay Assigned Employee</h2>
+            <p className="mt-1 truncate text-xs font-bold text-slate-500">{task.title}</p>
+          </div>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={onClose}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-pink-50 hover:text-pink-600 disabled:opacity-50"
+            aria-label="Close employee payment"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="space-y-5 px-6 py-6">
+          <div className="rounded-2xl border border-pink-100 bg-pink-50/60 p-4 dark:border-pink-900/30 dark:bg-pink-950/20">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Employee to pay</p>
+            {unpaidEmployees.length > 1 ? (
+              <select
+                value={employeeId}
+                onChange={(event) => setEmployeeId(event.target.value)}
+                className="mt-2 h-11 w-full rounded-xl border border-pink-100 bg-white px-3 text-sm font-black text-[#10142d] outline-none focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white"
+              >
+                {unpaidEmployees.map((employee) => (
+                  <option key={getEntityId(employee)} value={getEntityId(employee)}>
+                    {getPersonName(employee)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="mt-2 flex items-center gap-3">
+                <InitialsAvatar className="h-10 w-10" textClassName="text-xs" user={selectedEmployee} />
+                <span>
+                  <span className="block text-sm font-black text-[#10142d] dark:text-white">{getPersonName(selectedEmployee)}</span>
+                  <span className="mt-0.5 block text-[10px] font-bold text-slate-400">Assigned to this project</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <label className="block">
+            <span className="text-xs font-black text-slate-600 dark:text-neutral-300">Payment amount</span>
+            <span className="relative mt-2 block">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">₱</span>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                placeholder="0.00"
+                autoFocus
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-base font-black text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white"
+              />
+            </span>
+          </label>
+
+          <div className="flex items-start gap-3 rounded-xl bg-violet-50 px-4 py-3 text-[11px] font-bold leading-5 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+            <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            This payment will be recorded automatically as an Employee Payment expense in the Admin Budget Planner.
+          </div>
+        </div>
+
+        <footer className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-neutral-800">
+          <button type="button" disabled={isSubmitting} onClick={onClose} className="h-10 rounded-xl border border-slate-200 px-5 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!employeeId || !Number.isFinite(numericAmount) || numericAmount <= 0 || isSubmitting}
+            className="h-10 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSubmitting ? "Recording payment..." : `Pay ${getPersonName(selectedEmployee)}`}
+          </button>
+        </footer>
+      </form>
+    </div>
+  );
+};
+
 const ProjectDetailsModal = ({
   canAccessTasks,
   isMarkingPaid,
+  isPayingEmployee,
   item,
   onClose,
   onDelete,
   onEdit,
   onMarkPaid,
+  onPayEmployee,
   onSubmitOutput,
   onToggleTask,
 }) => {
@@ -858,6 +1063,7 @@ const ProjectDetailsModal = ({
             isExpanded
             isFocused={false}
             isMarkingPaid={isMarkingPaid}
+            isPayingEmployee={isPayingEmployee}
             isOverlay
             item={item}
             onDelete={(task) => {
@@ -869,6 +1075,7 @@ const ProjectDetailsModal = ({
               onEdit(task);
             }}
             onMarkPaid={onMarkPaid}
+            onPayEmployee={onPayEmployee}
             onSubmitOutput={onSubmitOutput}
             onToggleExpand={onClose}
             onToggleSubtask={onToggleTask}
@@ -1062,6 +1269,8 @@ const Tasks = ({
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMarkingPaidId, setIsMarkingPaidId] = useState("");
+  const [isPayingEmployeeId, setIsPayingEmployeeId] = useState("");
+  const [employeePaymentTask, setEmployeePaymentTask] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1216,10 +1425,12 @@ const Tasks = ({
         isExpanded={false}
         isFocused={false}
         isMarkingPaid={isMarkingPaidId === task.id}
+        isPayingEmployee={isPayingEmployeeId === task.id}
         item={task}
         onDelete={requestDeleteTask}
         onEdit={handleEditTask}
         onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
+        onPayEmployee={user?.role === "admin" ? setEmployeePaymentTask : undefined}
         onSubmitOutput={handleSubmitOutput}
         onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
         onToggleSubtask={handleToggleSubtask}
@@ -1410,6 +1621,32 @@ const Tasks = ({
     });
   };
 
+  const handlePayEmployee = async ({ amount, employeeId }) => {
+    const task = employeePaymentTask;
+    if (!task || isPayingEmployeeId) return;
+
+    try {
+      setIsPayingEmployeeId(task.id);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = normalizeTask(await taskAPI.payEmployee(task.id, { amount, employeeId }));
+      setTasks((currentTasks) =>
+        currentTasks.map((item) => (item.id === task.id ? updatedTask : item))
+      );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === task.id ? updatedTask : currentTask
+      );
+      setEmployeePaymentTask(null);
+      setNoticeMessage(
+        `${getPersonName(updatedTask.employeePayments.find((payment) => getEntityId(payment.employee) === employeeId)?.employee)} was paid ${formatProjectAmount(amount)}. The payment was added to Budget Planner expenses.`
+      );
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to record the employee payment."));
+    } finally {
+      setIsPayingEmployeeId("");
+    }
+  };
+
   const requestDeleteTask = (task) => {
     setConfirmAction({
       icon: "delete",
@@ -1535,11 +1772,13 @@ const Tasks = ({
             <ProjectDetailsModal
               canAccessTasks={isOwnedByCurrentUser(selectedTask)}
               isMarkingPaid={isMarkingPaidId === selectedTask.id}
+              isPayingEmployee={isPayingEmployeeId === selectedTask.id}
               item={selectedTask}
               onClose={() => setSelectedTaskId("")}
               onDelete={requestDeleteTask}
               onEdit={handleEditTask}
               onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
+              onPayEmployee={user?.role === "admin" ? setEmployeePaymentTask : undefined}
               onSubmitOutput={handleSubmitOutput}
               onToggleTask={handleToggleSubtask}
             />
@@ -1558,6 +1797,16 @@ const Tasks = ({
               completion={completionDraft}
               onClose={() => setCompletionDraft(null)}
               onSubmit={submitCompletedTask}
+            />
+          )}
+          {employeePaymentTask && (
+            <EmployeePaymentModal
+              isSubmitting={isPayingEmployeeId === employeePaymentTask.id}
+              onClose={() => {
+                if (!isPayingEmployeeId) setEmployeePaymentTask(null);
+              }}
+              onSubmit={handlePayEmployee}
+              task={employeePaymentTask}
             />
           )}
         </div>

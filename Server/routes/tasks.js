@@ -1,9 +1,10 @@
 import express from "express";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import Budget from "../model/Admin/budgetmodel.js";
+import { BudgetPlannerEntry } from "../model/Employee/budgetPlannerModel.js";
 import Task from "../model/Admin/taskmodel.js";
 import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
@@ -37,6 +38,8 @@ const fullTaskFields = [
   "feedback.reply.repliedBy", "feedback.reply.repliedAt",
   "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
   "attachments.fileName", "attachments.fileUrl", "archived", "archivedAt", "archivedBy",
+  "employeePayments.employee", "employeePayments.amount", "employeePayments.paidAt",
+  "employeePayments.paidBy", "employeePayments.budgetEntry", "employeePayments.employeeBudgetEntry",
   "createdAt", "updatedAt",
 ].join(" ");
 
@@ -50,6 +53,8 @@ const taskFieldsByView = {
     "attachments.fileName", "attachments.fileUrl", "feedback.rating", "feedback.overallRating",
     "feedback.comment", "feedback.submittedAt", "feedback.reply.message", "archived", "archivedAt",
     "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
+    "employeePayments.employee", "employeePayments.amount", "employeePayments.paidAt",
+    "employeePayments.paidBy", "employeePayments.budgetEntry", "employeePayments.employeeBudgetEntry",
     "createdAt", "updatedAt",
   ].join(" "),
   notification: [
@@ -251,6 +256,13 @@ const addTaskAvatarUrls = (task) => ({
     : [],
   createdBy: withAvatarUrl(task.createdBy),
   requestedBy: withAvatarUrl(task.requestedBy),
+  employeePayments: Array.isArray(task.employeePayments)
+    ? task.employeePayments.map((payment) => ({
+        ...payment,
+        employee: withAvatarUrl(payment.employee),
+        paidBy: withAvatarUrl(payment.paidBy),
+      }))
+    : [],
   activities: Array.isArray(task.activities)
     ? task.activities.map((activity) => ({
         ...activity,
@@ -451,6 +463,8 @@ router.get("/", protect, async (req, res) => {
       .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
       .populate("createdBy", "firstName lastName companyName email role updatedAt")
       .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("employeePayments.employee", "firstName lastName email role updatedAt")
+      .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
         .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
@@ -460,7 +474,9 @@ router.get("/", protect, async (req, res) => {
         .populate("assignedTo", "firstName lastName email role updatedAt")
         .populate("assignees", "firstName lastName email role updatedAt")
         .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
-        .populate("requestedBy", "firstName lastName companyName email role updatedAt");
+        .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+        .populate("employeePayments.employee", "firstName lastName email role updatedAt")
+        .populate("employeePayments.paidBy", "firstName lastName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role updatedAt")
@@ -491,6 +507,8 @@ router.get("/:id", protect, async (req, res) => {
       .populate("activities.actor", "firstName lastName companyName email role updatedAt")
       .populate("createdBy", "firstName lastName companyName email role updatedAt")
       .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("employeePayments.employee", "firstName lastName email role updatedAt")
+      .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
       .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
@@ -846,6 +864,159 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
   } catch (error) {
     console.error("Mark project paid error:", error);
     return res.status(500).json({ message: "Unable to mark this project as paid" });
+  }
+});
+
+router.post("/:id/pay-employee", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can pay assigned employees" });
+    }
+
+    const amount = Number(req.body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Payment amount must be greater than 0" });
+    }
+
+    const task = await Task.findById(req.params.id)
+      .select("title assignedTo assignees employeePayments")
+      .maxTimeMS(8000);
+    if (!task) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const assignedEmployeeIds = taskAssigneeIds(task);
+    if (!assignedEmployeeIds.length) {
+      return res.status(400).json({ message: "Assign an employee to this project before recording payment" });
+    }
+
+    const employeeId = String(
+      req.body?.employeeId || (assignedEmployeeIds.length === 1 ? assignedEmployeeIds[0] : "")
+    );
+    if (!employeeId) {
+      return res.status(400).json({ message: "Select one of the employees assigned to this project" });
+    }
+    if (!assignedEmployeeIds.includes(employeeId)) {
+      return res.status(400).json({ message: "Only an employee assigned to this project can be paid" });
+    }
+
+    const employee = await User.findOne({ _id: employeeId, role: "employee" })
+      .select("firstName lastName email role")
+      .maxTimeMS(8000);
+    if (!employee) {
+      return res.status(400).json({ message: "The selected project assignee is not an employee" });
+    }
+
+    const hasExistingPayment = task.employeePayments?.some(
+      (payment) => String(payment.employee?._id || payment.employee) === employeeId
+    );
+    if (hasExistingPayment) {
+      return res.status(409).json({ message: "This employee has already been paid for this project" });
+    }
+
+    const paidAt = new Date();
+    const employeeName = getActorName(employee);
+    const sourceEmployeePayment = `${task._id}:${employee._id}`;
+    const budgetEntryId = createHash("sha256")
+      .update(`employee-payment:${sourceEmployeePayment}`)
+      .digest("hex")
+      .slice(0, 24);
+    const budgetEntry = await Budget.findOneAndUpdate(
+      { _id: budgetEntryId },
+      {
+        $setOnInsert: {
+          type: "expense",
+          description: `Employee payment: ${employeeName} — ${task.title}`,
+          category: "Employee Payment",
+          date: paidAt,
+          amount,
+          sourceEmployeePayment,
+          relatedTask: task._id,
+          paidEmployee: employee._id,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+        setDefaultsOnInsert: true,
+        upsert: true,
+      }
+    );
+
+    const employeeIncomeEntryId = createHash("sha256")
+      .update(`employee-budget-income:${sourceEmployeePayment}`)
+      .digest("hex")
+      .slice(0, 24);
+    const employeeIncomeEntry = await BudgetPlannerEntry.findOneAndUpdate(
+      { _id: employeeIncomeEntryId },
+      {
+        $setOnInsert: {
+          owner: employee._id,
+          type: "income",
+          description: `Project income: ${task.title}`,
+          category: "Project Income",
+          date: budgetEntry.date,
+          amount: budgetEntry.amount,
+          sourceEmployeePayment,
+          relatedTask: task._id,
+          paidBy: req.user._id,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+        setDefaultsOnInsert: true,
+        upsert: true,
+      }
+    );
+
+    const updatedTaskId = await Task.findOneAndUpdate(
+      {
+        _id: task._id,
+        "employeePayments.employee": { $ne: employee._id },
+      },
+      {
+        $push: {
+          employeePayments: {
+            employee: employee._id,
+            amount: budgetEntry.amount,
+            paidAt: budgetEntry.date,
+            paidBy: req.user._id,
+            budgetEntry: budgetEntry._id,
+            employeeBudgetEntry: employeeIncomeEntry._id,
+          },
+          activities: {
+            type: "employee_paid",
+            title: `Paid employee: ${employeeName}`,
+            details: `${employeeName} was paid ₱${Number(budgetEntry.amount).toFixed(2)} for this project`,
+            actor: req.user._id,
+            actorName: getActorName(req.user),
+            createdAt: budgetEntry.date,
+          },
+        },
+      },
+      { returnDocument: "after", runValidators: true }
+    ).select("_id");
+
+    if (!updatedTaskId) {
+      return res.status(409).json({ message: "This employee has already been paid for this project" });
+    }
+
+    const updatedTask = await Task.findById(task._id)
+      .select(fullTaskFields)
+      .populate("assignedTo", "firstName lastName email role updatedAt")
+      .populate("assignees", "firstName lastName email role updatedAt")
+      .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
+      .populate("createdBy", "firstName lastName companyName email role updatedAt")
+      .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("employeePayments.employee", "firstName lastName email role updatedAt")
+      .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
+      .lean();
+
+    return res.status(201).json(addTaskAvatarUrls(updatedTask));
+  } catch (error) {
+    console.error("Pay employee error:", error);
+    return res.status(500).json({ message: "Unable to record the employee payment" });
   }
 });
 

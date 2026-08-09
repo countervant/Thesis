@@ -17,11 +17,15 @@ const budgetPlannerEntrySchema = new mongoose.Schema(
     category: { type: String, required: true, trim: true, maxlength: 60 },
     date: { type: Date, required: true },
     amount: { type: Number, required: true, min: 0.01 },
+    sourceEmployeePayment: { type: String, trim: true },
+    relatedTask: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
 
 budgetPlannerEntrySchema.index({ owner: 1, date: -1, createdAt: -1 });
+budgetPlannerEntrySchema.index({ sourceEmployeePayment: 1 }, { unique: true, sparse: true });
 
 const budgetPlannerSettingsSchema = new mongoose.Schema(
   {

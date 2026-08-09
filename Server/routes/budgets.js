@@ -43,7 +43,7 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
 
     const [budgets, total, summary] = await Promise.all([
       Budget.find(query)
-        .select("type description category date amount createdAt updatedAt")
+        .select("type description category date amount sourceTask sourceEmployeePayment relatedTask paidEmployee createdAt updatedAt")
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -97,6 +97,10 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       return res.status(404).json({ message: "Budget entry not found" });
     }
 
+    if (budget.sourceEmployeePayment) {
+      return res.status(400).json({ message: "Employee payment expenses can only be managed from Projects" });
+    }
+
     const payload = normalizeBudgetPayload({
       type: req.body.type ?? budget.type,
       description: req.body.description ?? budget.description,
@@ -126,11 +130,17 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
 
 router.delete("/:id", protect, authorize("admin"), async (req, res) => {
   try {
-    const budget = await Budget.findByIdAndDelete(req.params.id);
+    const budget = await Budget.findById(req.params.id);
 
     if (!budget) {
       return res.status(404).json({ message: "Budget entry not found" });
     }
+
+    if (budget.sourceEmployeePayment) {
+      return res.status(400).json({ message: "Employee payment expenses can only be managed from Projects" });
+    }
+
+    await budget.deleteOne();
 
     res.status(200).json({ message: "Budget entry deleted" });
   } catch (error) {

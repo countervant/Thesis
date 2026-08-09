@@ -633,6 +633,12 @@ export const taskAPI = {
     return response.data;
   },
 
+  payEmployee: async (id, payment) => {
+    const response = await api.post(`/tasks/${id}/pay-employee`, payment);
+    clearCache("/tasks", "/budgets", "/budget-planner", "/dashboard");
+    return response.data;
+  },
+
   setNewsfeedPermission: async (id, allowed) => {
     const response = await api.patch(`/tasks/${id}/newsfeed-permission`, { allowed });
     clearCache("/tasks", "/dashboard");

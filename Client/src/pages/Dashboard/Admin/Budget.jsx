@@ -52,6 +52,7 @@ const normalizeEntry = (entry) => ({
     entry.type === "expense"
       ? -Math.abs(Number(entry.amount) || 0)
       : Math.abs(Number(entry.amount) || 0),
+  isEmployeePayment: Boolean(entry.sourceEmployeePayment),
 });
 
 const formatPeso = (amount, { signed = false } = {}) => {
@@ -565,12 +566,6 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
     );
   }, [budgetEntries]);
 
-  useEffect(() => {
-    if (!monthOptions.includes(selectedMonth)) {
-      setSelectedMonth(getCurrentMonthKey());
-    }
-  }, [monthOptions, selectedMonth]);
-
   const filteredBudgetEntries = useMemo(
     () =>
       budgetEntries.filter(
@@ -605,10 +600,6 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
   const safePage = Math.min(currentPage, totalPages);
   const paginatedBudgetEntries = visibleBudgetEntries.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedMonth, sortOrder, typeFilter]);
-
   const totals = useMemo(
     () => getTotalsForEntries(filteredBudgetEntries),
     [filteredBudgetEntries]
@@ -641,6 +632,11 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete budget entry.");
     }
+  };
+
+  const handleMonthChange = (month) => {
+    setSelectedMonth(month);
+    setCurrentPage(1);
   };
 
   return (
@@ -692,13 +688,13 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                   income={totals.income}
                   monthLabel={formatMonthLabel(selectedMonth)}
                   monthOptions={monthOptions}
-                  onMonthChange={setSelectedMonth}
+                  onMonthChange={handleMonthChange}
                   selectedMonth={selectedMonth}
                 />
                 <ExpenseCategories
                   entries={filteredBudgetEntries}
                   monthOptions={monthOptions}
-                  onMonthChange={setSelectedMonth}
+                  onMonthChange={handleMonthChange}
                   selectedMonth={selectedMonth}
                 />
               </>
@@ -724,14 +720,20 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                   <input
                     type="search"
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setCurrentPage(1);
+                    }}
                     placeholder="Search transactions..."
                     className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:w-64"
                   />
                 </label>
                 <select
                   value={typeFilter}
-                  onChange={(event) => setTypeFilter(event.target.value)}
+                  onChange={(event) => {
+                    setTypeFilter(event.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:w-auto md:px-4"
                 >
                   <option>All Types</option>
@@ -740,7 +742,10 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                 </select>
                 <select
                   value={sortOrder}
-                  onChange={(event) => setSortOrder(event.target.value)}
+                  onChange={(event) => {
+                    setSortOrder(event.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-[#10142d] outline-none focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:w-auto md:px-4"
                 >
                   <option>Newest</option>
@@ -789,24 +794,32 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
                       {formatCurrency(entry.amount)}
                     </td>
                     <td className="px-5 py-3">
-                      <div className="flex justify-end gap-4">
-                        <button
-                          type="button"
-                          onClick={() => onEditEntry?.(entry)}
-                          className="text-neutral-900 transition hover:text-[#c72fb2] dark:text-neutral-300"
-                          aria-label={`Edit ${entry.description}`}
-                        >
-                          <Icon name="edit" className="h-5 w-5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEntryToDelete(entry)}
-                          className="text-red-600 transition hover:text-red-700"
-                          aria-label={`Delete ${entry.description}`}
-                        >
-                          <Icon name="trash" className="h-5 w-5" />
-                        </button>
-                      </div>
+                      {entry.isEmployeePayment ? (
+                        <div className="flex justify-end">
+                          <span className="rounded-full bg-violet-50 px-3 py-1 text-[9px] font-black text-violet-600" title="Recorded from the assigned project">
+                            Project payment
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-4">
+                          <button
+                            type="button"
+                            onClick={() => onEditEntry?.(entry)}
+                            className="text-neutral-900 transition hover:text-[#c72fb2] dark:text-neutral-300"
+                            aria-label={`Edit ${entry.description}`}
+                          >
+                            <Icon name="edit" className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEntryToDelete(entry)}
+                            className="text-red-600 transition hover:text-red-700"
+                            aria-label={`Delete ${entry.description}`}
+                          >
+                            <Icon name="trash" className="h-5 w-5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
