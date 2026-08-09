@@ -11,6 +11,7 @@ import { sendPasswordResetCode } from "../utils/email.js";
 import {
   getCachedAvatar,
   isValidAvatarSignature,
+  optimizeAvatarDataUrl,
   setCachedAvatar,
   withAvatarUrl,
 } from "../utils/avatar.js";
@@ -309,7 +310,7 @@ router.post("/reset-password", async (req, res) => {
 
         const loadUser = () =>
           User.findById(req.params.id)
-            .select("firstName middleInitial lastName companyName email phone country role avatar coverPhoto position isActive")
+            .select("firstName middleInitial lastName companyName email phone country role coverPhoto position isActive updatedAt")
             .maxTimeMS(30000)
             .lean();
 
@@ -326,7 +327,7 @@ router.post("/reset-password", async (req, res) => {
           return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json(user);
+        res.status(200).json(withAvatarUrl(user));
       } catch (error) {
         if (isMongoTimeoutError(error)) {
           return res.status(503).json({ message: "Profile is temporarily unavailable" });
@@ -371,6 +372,12 @@ router.post("/reset-password", async (req, res) => {
         });
         return res.status(200).send(avatar.buffer);
       } catch (error) {
+        if (isMongoTimeoutError(error)) {
+          console.warn(`[avatar] Database timeout for user ${req.params.id}`);
+          res.set("Retry-After", "2");
+          return res.status(503).end();
+        }
+
         console.error("Get user avatar error:", error);
         return res.status(500).end();
       }
@@ -457,7 +464,15 @@ router.post("/reset-password", async (req, res) => {
             user.birthday = parsedBirthday;
           }
         }
-        if (avatar !== undefined) user.avatar = avatar;
+        if (avatar !== undefined) {
+          const isExistingAvatarUrl =
+            typeof avatar === "string" &&
+            /\/api\/auth\/users\/[a-f\d]{24}\/avatar\?/i.test(avatar);
+
+          if (!isExistingAvatarUrl) {
+            user.avatar = await optimizeAvatarDataUrl(avatar);
+          }
+        }
         if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
 
         if (password) {
@@ -483,7 +498,7 @@ router.post("/reset-password", async (req, res) => {
 
         await user.save();
 
-        res.status(200).json({
+        const updatedProfile = withAvatarUrl({
           id: user._id,
           _id: user._id,
           firstName: user.firstName,
@@ -493,6 +508,7 @@ router.post("/reset-password", async (req, res) => {
           email: user.email,
           role: user.role,
           avatar: user.avatar,
+          updatedAt: user.updatedAt,
           coverPhoto: user.coverPhoto,
           phone: user.phone,
           country: user.country,
@@ -500,9 +516,12 @@ router.post("/reset-password", async (req, res) => {
           birthday: user.birthday,
           isActive: user.isActive,
         });
+        res.status(200).json(updatedProfile);
       } catch (error) {
         console.error("Update profile error:", error);
-        res.status(500).json({ message: "Unable to update profile" });
+        res.status(error.status || 500).json({
+          message: error.status ? error.message : "Unable to update profile",
+        });
       }
     });
 

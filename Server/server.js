@@ -18,6 +18,8 @@ import messages from "./routes/messages.js";
 import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
+import User from "./model/userModel.js";
+import { MAX_STORED_AVATAR_BYTES, withAvatarUrl } from "./utils/avatar.js";
 
 // Resolve .env relative to this file so it works regardless of cwd
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +29,25 @@ const app = express();
 const port = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === "production";
 const clientDistPath = path.resolve(__dirname, "../Client/dist");
+
+const warmAvatarCache = async () => {
+  const profiles = await User.aggregate([
+    {
+      $match: {
+        $expr: {
+          $lte: [
+            { $strLenBytes: { $ifNull: ["$avatar", ""] } },
+            Math.ceil((MAX_STORED_AVATAR_BYTES * 4) / 3) + 64,
+          ],
+        },
+      },
+    },
+    { $project: { avatar: 1, updatedAt: 1 } },
+  ]).option({ maxTimeMS: 8000 });
+
+  profiles.forEach(withAvatarUrl);
+  console.log(`[avatar] Cached ${profiles.length} profile image records`);
+};
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
@@ -217,6 +238,12 @@ app.use((error, req, res, next) => {
 
 try {
   await dbConnect();
+
+  try {
+    await warmAvatarCache();
+  } catch (error) {
+    console.warn(`[avatar] Initial cache warmup skipped: ${error.message}`);
+  }
 
   app.listen(port, () => {
     console.log(`Server running on port ${port}`);

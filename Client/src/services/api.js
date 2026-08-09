@@ -541,6 +541,12 @@ export const taskAPI = {
     return asArray(await cachedGet(url), "tasks");
   },
 
+  getById: async (id, options = {}) => {
+    const url = `/tasks/${id}`;
+    if (options.refresh) cache.delete(url);
+    return cachedGet(url);
+  },
+
   create: async (task) => {
     const response = await api.post("/tasks", task);
     clearCache("/tasks", "/dashboard");

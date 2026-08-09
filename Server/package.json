@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch --use-system-ca server.js",
     "start": "node --use-system-ca server.js",
+    "optimize:avatars": "node --use-system-ca scripts/optimizeAvatars.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -22,7 +23,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.1.2"
+    "mongoose": "^9.1.2",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

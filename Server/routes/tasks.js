@@ -16,7 +16,7 @@ const privateUploadsRoot = path.resolve(__dirname, "../private_uploads/tasks");
 
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
-const allowedTaskViews = new Set(["calendar", "dashboard", "employee", "notification"]);
+const allowedTaskViews = new Set(["calendar", "dashboard", "employee", "notification", "projects"]);
 
 const fullTaskFields = [
   "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
@@ -39,6 +39,15 @@ const fullTaskFields = [
 ].join(" ");
 
 const taskFieldsByView = {
+  projects: [
+    "title", "description", "status", "priority", "startDate", "dueDate", "assignedTo",
+    "subtasks._id", "subtasks.title", "subtasks.completed",
+    "activities.type", "revisionRequests._id", "finalOutput.submittedAt",
+    "finalOutput.fileName", "finalOutput.fileUrl", "finalOutput.link", "finalOutput.watermarked",
+    "attachments.fileName", "attachments.fileUrl", "feedback.rating", "feedback.overallRating",
+    "feedback.comment", "feedback.submittedAt", "feedback.reply.message", "archived", "archivedAt",
+    "createdAt", "updatedAt",
+  ].join(" "),
   notification: [
     "title", "assignedTo", "assignees", "subtasks.assignedTo", "createdBy",
     "activities._id", "activities.type", "activities.actor", "activities.actorName",
@@ -124,7 +133,7 @@ const normalizeSubtasks = (subtasks = []) => {
 };
 
 const validateSubtaskSequence = (subtasks) => {
-  if (!subtasks.length) return "At least one subtask is required";
+  if (!subtasks.length) return "At least one task is required";
 
   const firstIncompleteIndex = subtasks.findIndex((subtask) => !subtask.completed);
   const hasCompletedTaskAfterGap =
@@ -132,7 +141,7 @@ const validateSubtaskSequence = (subtasks) => {
     subtasks.slice(firstIncompleteIndex + 1).some((subtask) => subtask.completed);
 
   if (hasCompletedTaskAfterGap) {
-    return "Subtasks must be completed in order";
+    return "Tasks must be completed in order";
   }
 
   return "";
@@ -159,7 +168,7 @@ const validateClientReviewGate = (task, subtasks) => {
   if (reviewIndex < 0 || hasClientApproval(task)) return "";
 
   return subtasks.slice(reviewIndex + 1).some((subtask) => subtask.completed)
-    ? "Wait for the client to approve the review before completing the remaining subtasks"
+    ? "Wait for the client to approve the review before completing the remaining tasks"
     : "";
 };
 
@@ -168,7 +177,7 @@ const validateSubtaskAssignees = (subtasks, assignees) => {
   return subtasks.some(
     (subtask) => subtask.assignedTo && !teamIds.has(String(subtask.assignedTo))
   )
-    ? "Every subtask assignee must also be assigned to the task"
+    ? "Every task assignee must also be assigned to the project"
     : "";
 };
 
@@ -225,6 +234,12 @@ const addTaskAvatarUrls = (task) => ({
     : [],
   createdBy: withAvatarUrl(task.createdBy),
   requestedBy: withAvatarUrl(task.requestedBy),
+  activities: Array.isArray(task.activities)
+    ? task.activities.map((activity) => ({
+        ...activity,
+        actor: withAvatarUrl(activity.actor),
+      }))
+    : [],
   feedback: task.feedback
     ? {
         ...task.feedback,
@@ -255,7 +270,7 @@ const recordSubtaskActivities = (task, previousSubtasks, nextSubtasks, user) => 
 
     addActivity(task, {
       type: completed ? "subtask_completed" : "subtask_reopened",
-      title: `${completed ? "Completed" : "Reopened"} subtask: ${subtask.title}`,
+      title: `${completed ? "Completed" : "Reopened"} task: ${subtask.title}`,
       details: completed ? "Marked as done" : "Marked as pending again",
       subtaskId: subtaskKey(subtask, index),
       actor: user._id,
@@ -416,6 +431,9 @@ router.get("/", protect, async (req, res) => {
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
         .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt");
+    } else if (view === "projects") {
+      taskRequest = taskRequest
+        .populate("assignedTo", "firstName lastName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role updatedAt")
@@ -430,6 +448,36 @@ router.get("/", protect, async (req, res) => {
   } catch (error) {
     console.error("Get tasks error:", error);
     res.status(500).json({ message: "Unable to fetch tasks" });
+  }
+});
+
+router.get("/:id", protect, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    })
+      .select(fullTaskFields)
+      .populate("assignedTo", "firstName lastName email role updatedAt")
+      .populate("assignees", "firstName lastName email role updatedAt")
+      .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
+      .populate("activities.actor", "firstName lastName companyName email role updatedAt")
+      .populate("createdBy", "firstName lastName companyName email role updatedAt")
+      .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("feedback.user", "firstName lastName companyName email role updatedAt")
+      .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
+      .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
+      .maxTimeMS(8000)
+      .lean();
+
+    if (!task) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    return res.status(200).json(addTaskAvatarUrls(task));
+  } catch (error) {
+    console.error("Get project details error:", error);
+    return res.status(500).json({ message: "Unable to fetch project details" });
   }
 });
 
@@ -471,7 +519,7 @@ router.post("/", protect, async (req, res) => {
     }
 
     if (req.body.status === "done" && !allSubtasksCompleted(payload.subtasks)) {
-      return res.status(400).json({ message: "Complete every subtask before completing the task" });
+      return res.status(400).json({ message: "Complete every task before completing the project" });
     }
 
     if (payload.paid > payload.amount) {
@@ -479,7 +527,7 @@ router.post("/", protect, async (req, res) => {
     }
 
     if (!payload.subtasks.length) {
-      return res.status(400).json({ message: "At least one subtask is required" });
+      return res.status(400).json({ message: "At least one task is required" });
     }
 
     if (req.user.role === "admin" && !payload.requestedBy && !payload.requestedByName) {
@@ -545,7 +593,7 @@ router.put("/:id", protect, async (req, res) => {
       const previousSubtasks = task.subtasks.toObject();
       const requestedSubtasks = normalizeSubtasks(req.body.subtasks ?? task.subtasks);
       if (requestedSubtasks.length !== previousSubtasks.length) {
-        return res.status(403).json({ message: "Employees cannot add or remove subtasks" });
+        return res.status(403).json({ message: "Employees cannot add or remove tasks" });
       }
 
       const subtasks = previousSubtasks.map((subtask, index) => {
@@ -565,7 +613,7 @@ router.put("/:id", protect, async (req, res) => {
       });
 
       if (subtasks.some((subtask) => !subtask)) {
-        return res.status(403).json({ message: "You can only update subtasks assigned to you" });
+        return res.status(403).json({ message: "You can only update tasks assigned to you" });
       }
       const subtaskValidationMessage = validateSubtaskSequence(subtasks);
       if (subtaskValidationMessage) {
@@ -653,7 +701,7 @@ router.put("/:id", protect, async (req, res) => {
     }
 
     if (req.body.status === "done" && !allSubtasksCompleted(payload.subtasks)) {
-      return res.status(400).json({ message: "Complete every subtask before completing the task" });
+      return res.status(400).json({ message: "Complete every task before completing the project" });
     }
 
     if (payload.paid > payload.amount) {
@@ -1175,7 +1223,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     if (req.user.role === "employee") {
       if (subtasks.length !== previousSubtasks.length) {
-        return res.status(403).json({ message: "Employees cannot add or remove subtasks" });
+        return res.status(403).json({ message: "Employees cannot add or remove tasks" });
       }
 
       const mergedSubtasks = previousSubtasks.map((subtask, index) => {
@@ -1193,7 +1241,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       });
 
       if (mergedSubtasks.some((subtask) => !subtask)) {
-        return res.status(403).json({ message: "You can only update subtasks assigned to you" });
+        return res.status(403).json({ message: "You can only update tasks assigned to you" });
       }
       subtasks = mergedSubtasks;
     }
@@ -1210,7 +1258,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     if (finalize && !allSubtasksCompleted(subtasks)) {
       return res.status(400).json({
-        message: "Complete every subtask before submitting the final output",
+        message: "Complete every task before submitting the final output",
       });
     }
 

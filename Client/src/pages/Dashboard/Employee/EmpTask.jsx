@@ -195,8 +195,8 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
   const progressSummary =
     item.subtasks.length > 0
-      ? `${completedSubtasks} of ${item.subtasks.length} subtasks completed`
-      : "No subtasks yet";
+      ? `${completedSubtasks} of ${item.subtasks.length} tasks completed`
+      : "No tasks yet";
 
   return (
     <article
@@ -236,7 +236,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
           </div>
 
           <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
-            <p className="mb-1 text-[10px] font-black text-slate-500">Subtasks</p>
+            <p className="mb-1 text-[10px] font-black text-slate-500">Tasks</p>
             <p className="mb-2 text-[10px] font-bold text-slate-400">Complete each step in order.</p>
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
@@ -268,7 +268,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                     item.revisionRequests.length > 0;
                   return (
                     <div key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2">
-                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={!isAssignedToCurrentUser ? "This subtask is assigned to another employee" : isWaitingForClientApproval ? "Wait for the client to approve the review first" : isSequenceLocked ? "Complete the previous subtask first" : undefined}>
+                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={!isAssignedToCurrentUser ? "This task is assigned to another employee" : isWaitingForClientApproval ? "Wait for the client to approve the review first" : isSequenceLocked ? "Complete the previous task first" : undefined}>
                         <input
                           type="checkbox"
                           checked={subtask.completed}
@@ -305,7 +305,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                 })}
               </div>
             ) : (
-              <p className="text-xs font-bold text-slate-400">Ask your admin to add subtasks for this task.</p>
+              <p className="text-xs font-bold text-slate-400">Ask your admin to add tasks for this project.</p>
             )}
           </div>
 
@@ -714,6 +714,8 @@ const EmpTask = () => {
   const [revisionDraft, setRevisionDraft] = useState(null);
   const [isStartingRevision, setIsStartingRevision] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
+  const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -722,7 +724,7 @@ const EmpTask = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100 });
+        const data = await taskAPI.getAll({ limit: 100, view: "projects" });
         if (isMounted) setTasks(data.map(normalizeTask));
       } catch (error) {
         if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));
@@ -763,6 +765,34 @@ const EmpTask = () => {
     return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
   }, [isLoading, tasks]);
 
+  useEffect(() => {
+    if (!selectedTaskId) return undefined;
+
+    let isCurrent = true;
+    const loadTaskDetails = async () => {
+      setSelectedTaskDetails(null);
+      setIsLoadingTaskDetails(true);
+      setErrorMessage("");
+
+      try {
+        const task = await taskAPI.getById(selectedTaskId, { refresh: true });
+        if (isCurrent) setSelectedTaskDetails(normalizeTask(task));
+      } catch (error) {
+        if (!isCurrent) return;
+        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
+        setSelectedTaskId("");
+      } finally {
+        if (isCurrent) setIsLoadingTaskDetails(false);
+      }
+    };
+
+    loadTaskDetails();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedTaskId]);
+
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -794,7 +824,7 @@ const EmpTask = () => {
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
   ];
-  const selectedTask = tasks.find((task) => String(task.id) === String(selectedTaskId)) || null;
+  const selectedTask = selectedTaskDetails;
 
   const renderTaskRows = (items) => {
     if (items.length === 0) {
@@ -826,8 +856,11 @@ const EmpTask = () => {
       setTasks((currentTasks) =>
         currentTasks.map((item) => (item.id === task.id ? normalizeTask(updatedTask) : item))
       );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === task.id ? normalizeTask(updatedTask) : currentTask
+      );
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to update subtask."));
+      setErrorMessage(getApiErrorMessage(error, "Unable to update task."));
     }
   };
 
@@ -837,21 +870,21 @@ const EmpTask = () => {
       /client\s+(?:review.*revision|revision)/i.test(subtask.title)
     );
     if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
-      setErrorMessage("Wait for the client to approve the review before continuing to the final subtask.");
+      setErrorMessage("Wait for the client to approve the review before continuing to the final task.");
       return;
     }
     const isAssignedToCurrentUser = toggledSubtask?.assignedTo
       ? getEntityId(toggledSubtask.assignedTo) === currentUserId
       : task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
     if (!isAssignedToCurrentUser) {
-      setErrorMessage("This subtask is assigned to another employee.");
+      setErrorMessage("This task is assigned to another employee.");
       return;
     }
     const isLocked = toggledSubtask?.completed
       ? task.subtasks.slice(subtaskIndex + 1).some((subtask) => subtask.completed)
       : task.subtasks.slice(0, subtaskIndex).some((subtask) => !subtask.completed);
     if (isLocked) {
-      setErrorMessage("Complete the subtasks in order before moving to the next one.");
+      setErrorMessage("Complete the tasks in order before moving to the next one.");
       return;
     }
     const nextSubtasks = task.subtasks.map((subtask, index) =>
@@ -910,6 +943,9 @@ const EmpTask = () => {
       setTasks((currentTasks) =>
         currentTasks.map((item) => (item.id === revisionDraft.task.id ? normalizeTask(updatedTask) : item))
       );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === revisionDraft.task.id ? normalizeTask(updatedTask) : currentTask
+      );
       setRevisionDraft(null);
       setNoticeMessage(`${revisionDraft.task.title} revision is now in progress.`);
     } catch (error) {
@@ -943,6 +979,9 @@ const EmpTask = () => {
       });
       setTasks((currentTasks) =>
         currentTasks.map((item) => (item.id === draft.task.id ? normalizeTask(updatedTask) : item))
+      );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
       );
       setCompletionDraft(null);
       setNoticeMessage(`${draft.task.title} was submitted to the client for review.`);
@@ -1031,7 +1070,14 @@ const EmpTask = () => {
           </div>
         </Card>
       )}
-      {selectedTask && (
+      {selectedTaskId && isLoadingTaskDetails && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/65 p-4 backdrop-blur-[2px]">
+          <div className="rounded-2xl border border-pink-100 bg-white px-6 py-5 text-sm font-black text-[#10142d] shadow-2xl">
+            Loading project details...
+          </div>
+        </div>
+      )}
+      {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
         <ProjectDetailsModal
           currentUserId={currentUserId}
           item={selectedTask}

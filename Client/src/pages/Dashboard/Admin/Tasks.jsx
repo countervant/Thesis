@@ -373,8 +373,8 @@ const SelectControl = ({ label, onChange, options, value }) => (
   </label>
 );
 
-const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, item, onDelete, onEdit, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
-  const effectiveExpanded = canAccessSubtasks && isExpanded;
+const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, isFocused, isOverlay = false, item, onDelete, onEdit, onSubmitOutput, onToggleExpand, onToggleSubtask }) => {
+  const effectiveExpanded = isOverlay || (canAccessSubtasks && isExpanded);
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
   const isDone = item.status === "Done";
@@ -384,39 +384,53 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
     : getPersonName(primaryAssignee);
   const progressSummary =
     item.subtasks.length > 0
-      ? `${completedSubtasks} of ${item.subtasks.length} subtasks completed`
-      : "No subtasks yet";
+      ? `${completedSubtasks} of ${item.subtasks.length} tasks completed`
+      : "No tasks yet";
 
   return (
     <article
       id={`task-card-${item.id}`}
       className={`rounded-xl border border-pink-50 bg-white px-3 py-3 shadow-sm md:rounded-none md:border-x-0 md:border-t-0 md:px-4 md:py-4 md:shadow-none md:last:border-b-0 ${
         isFocused ? "bg-pink-50/60 ring-2 ring-inset ring-pink-200" : ""
-      }`}
+      } ${!effectiveExpanded ? "cursor-pointer transition hover:bg-pink-50/60 focus-visible:bg-pink-50/60 focus-visible:outline-none" : ""}`}
+      onClick={!effectiveExpanded ? (event) => {
+        if (event.target.closest("button, input, a, select, label")) return;
+        onToggleExpand(item.id);
+      } : undefined}
+      onKeyDown={!effectiveExpanded ? (event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onToggleExpand(item.id);
+        }
+      } : undefined}
+      role={!effectiveExpanded ? "button" : undefined}
+      tabIndex={!effectiveExpanded ? 0 : undefined}
     >
       {effectiveExpanded ? (
         <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
-          <button
-            type="button"
-            onClick={() => onToggleExpand(item.id)}
-            className="flex min-w-0 items-center gap-3 text-left"
-            aria-expanded={isExpanded}
-            aria-label={`Hide subtasks for ${item.title}`}
-          >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600">
-              <span className="rotate-90 transition-transform">
-                <SmallIcon name="chevron" />
-              </span>
-            </span>
+          <div className="flex min-w-0 items-center gap-3 text-left">
+            {!isOverlay && (
+              <button
+                type="button"
+                onClick={() => onToggleExpand(item.id)}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                aria-label={`Close details for ${item.title}`}
+              >
+                <span className="rotate-90 transition-transform">
+                  <SmallIcon name="chevron" />
+                </span>
+              </button>
+            )}
             <span className="h-10 w-1 shrink-0 rounded-full bg-pink-500" aria-hidden="true" />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-black text-[#10142d]">{item.title}</span>
-              <span className="mt-1 block truncate text-xs font-bold text-slate-500">{item.description || "No description"}</span>
+              <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.title}</span>
+              <span className="mt-1 block text-xs font-bold leading-5 text-slate-500 dark:text-neutral-400">{item.description || "No description"}</span>
             </span>
-          </button>
+          </div>
 
           <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
-            <p className="mb-1 text-[10px] font-black text-slate-500">Subtasks</p>
+            <p className="mb-1 text-[10px] font-black text-slate-500">Tasks</p>
             <p className="mb-2 text-[10px] font-bold text-slate-400">Complete each step in order.</p>
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
@@ -426,11 +440,12 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                   );
                   const isWaitingForClientApproval =
                     clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
-                  const isLocked = isDone || isWaitingForClientApproval || (subtask.completed
+                  const isLocked = !canAccessSubtasks || isDone || isWaitingForClientApproval || (subtask.completed
                     ? item.subtasks.slice(index + 1).some((nextSubtask) => nextSubtask.completed)
                     : item.subtasks.slice(0, index).some((previousSubtask) => !previousSubtask.completed));
                   const isClientReviewSubtask = /client\s+(?:review.*revision|revision)/i.test(subtask.title);
                   const canSubmitOutput =
+                    canAccessSubtasks &&
                     !isDone &&
                     isClientReviewSubtask &&
                     item.subtasks.slice(0, index).every((previousSubtask) => previousSubtask.completed);
@@ -443,7 +458,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                     item.revisionRequests.length > 0;
                   return (
                     <div key={subtask.id || `${item.id}-${index}`} className="flex min-w-0 items-center gap-2">
-                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={isWaitingForClientApproval ? "Wait for the client to approve the review first" : isLocked && !isDone ? "Complete the previous subtask first" : undefined}>
+                      <label className={`flex min-w-0 flex-1 items-center gap-2 text-xs font-bold ${isLocked ? "cursor-not-allowed text-slate-400" : "text-slate-600"}`} title={isWaitingForClientApproval ? "Wait for the client to approve the review first" : isLocked && !isDone ? "Complete the previous task first" : undefined}>
                         <input
                           type="checkbox"
                           checked={subtask.completed}
@@ -480,7 +495,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                 })}
               </div>
             ) : (
-              <p className="text-xs font-bold text-slate-400">Add subtasks by editing this task.</p>
+              <p className="text-xs font-bold text-slate-400">Add tasks by editing this project.</p>
             )}
           </div>
 
@@ -555,7 +570,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
                 type="button"
                 onClick={canAccessSubtasks ? () => onToggleExpand(item.id) : undefined}
                 className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-50"
-                aria-label={canAccessSubtasks ? `Show subtasks for ${item.title}` : `More options for ${item.title}`}
+                aria-label={canAccessSubtasks ? `Show tasks for ${item.title}` : `More options for ${item.title}`}
               >
                 <SmallIcon className="h-4 w-4" />
               </button>
@@ -657,6 +672,90 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
         </>
       )}
     </article>
+  );
+};
+
+const ProjectDetailsModal = ({
+  canAccessTasks,
+  item,
+  onClose,
+  onDelete,
+  onEdit,
+  onSubmitOutput,
+  onToggleTask,
+}) => {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="admin-project-details-title"
+        aria-modal="true"
+        className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        role="dialog"
+      >
+        <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800 sm:px-7">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">
+              Project Management
+            </p>
+            <h2 id="admin-project-details-title" className="mt-1 text-xl font-black text-[#10142d] dark:text-white">
+              Project Details
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            aria-label="Close project details"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="max-h-[calc(92vh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
+          <TaskRow
+            canAccessSubtasks={canAccessTasks}
+            isExpanded
+            isFocused={false}
+            isOverlay
+            item={item}
+            onDelete={(task) => {
+              onClose();
+              onDelete(task);
+            }}
+            onEdit={(task) => {
+              onClose();
+              onEdit(task);
+            }}
+            onSubmitOutput={onSubmitOutput}
+            onToggleExpand={onClose}
+            onToggleSubtask={onToggleTask}
+          />
+        </div>
+      </section>
+    </div>
   );
 };
 
@@ -836,8 +935,9 @@ const Tasks = ({
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
   const [completionDraft, setCompletionDraft] = useState(null);
-  const [focusedTaskId, setFocusedTaskId] = useState("");
-  const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
+  const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
   const currentUserId = getEntityId(user);
 
   useEffect(() => {
@@ -847,7 +947,7 @@ const Tasks = ({
       try {
         setIsLoading(true);
         setErrorMessage("");
-        const data = await taskAPI.getAll({ refresh: true });
+        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
         if (isMounted) {
           setTasks(normalizeTasks(data).map(normalizeTask));
         }
@@ -879,15 +979,8 @@ const Tasks = ({
         if (target?.page !== "tasks" || !target?.taskId) return;
 
         setVisibleGroup("All");
-        setFocusedTaskId(target.taskId);
-
-        window.setTimeout(() => {
-          document.getElementById(`task-card-${target.taskId}`)?.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-          sessionStorage.removeItem(notificationTargetKey);
-        }, 160);
+        setSelectedTaskId(String(target.taskId));
+        sessionStorage.removeItem(notificationTargetKey);
       } catch {
         sessionStorage.removeItem(notificationTargetKey);
       }
@@ -900,6 +993,34 @@ const Tasks = ({
     window.addEventListener("clientra:notification-target", focusTarget);
     return () => window.removeEventListener("clientra:notification-target", focusTarget);
   }, [isLoading, tasks]);
+
+  useEffect(() => {
+    if (!selectedTaskId) return undefined;
+
+    let isCurrent = true;
+    const loadTaskDetails = async () => {
+      setSelectedTaskDetails(null);
+      setIsLoadingTaskDetails(true);
+      setErrorMessage("");
+
+      try {
+        const task = await taskAPI.getById(selectedTaskId, { refresh: true });
+        if (isCurrent) setSelectedTaskDetails(normalizeTask(task));
+      } catch (error) {
+        if (!isCurrent) return;
+        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
+        setSelectedTaskId("");
+      } finally {
+        if (isCurrent) setIsLoadingTaskDetails(false);
+      }
+    };
+
+    loadTaskDetails();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedTaskId]);
 
   const visibleTasks = useMemo(() => {
     const filteredTasks = tasks.filter((task) => {
@@ -938,6 +1059,7 @@ const Tasks = ({
     { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
     { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
   ];
+  const selectedTask = selectedTaskDetails;
 
   const renderTaskRows = (items, accentClass = "bg-pink-500") => {
     if (items.length === 0) {
@@ -958,13 +1080,13 @@ const Tasks = ({
         key={task.id}
         accentClass={accentClass}
         canAccessSubtasks={isOwnedByCurrentUser(task)}
-        isExpanded={expandedTaskIds.has(task.id)}
-        isFocused={focusedTaskId === task.id}
+        isExpanded={false}
+        isFocused={false}
         item={task}
         onDelete={requestDeleteTask}
         onEdit={handleEditTask}
         onSubmitOutput={handleSubmitOutput}
-        onToggleExpand={handleToggleExpand}
+        onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
         onToggleSubtask={handleToggleSubtask}
       />
     ));
@@ -974,21 +1096,17 @@ const Tasks = ({
     onNavigate?.("add-task");
   };
 
-  const handleEditTask = (task) => {
-    onEditTask?.(task);
+  const handleEditTask = async (task) => {
+    try {
+      setErrorMessage("");
+      const completeTask = selectedTaskDetails?.id === task.id
+        ? selectedTaskDetails
+        : normalizeTask(await taskAPI.getById(task.id, { refresh: true }));
+      onEditTask?.(completeTask);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to load project for editing."));
+    }
   };
-
-  function handleToggleExpand(taskId) {
-    setExpandedTaskIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-      if (nextIds.has(taskId)) {
-        nextIds.delete(taskId);
-      } else {
-        nextIds.add(taskId);
-      }
-      return nextIds;
-    });
-  }
 
   const updateTaskSubtasks = async (task, nextSubtasks) => {
     try {
@@ -1009,8 +1127,11 @@ const Tasks = ({
           currentTask.id === task.id ? normalizeTask(updatedTask) : currentTask
         )
       );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === task.id ? normalizeTask(updatedTask) : currentTask
+      );
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to update subtask.");
+      setErrorMessage(error.response?.data?.message || "Unable to update task.");
     }
   };
 
@@ -1024,14 +1145,14 @@ const Tasks = ({
       /client\s+(?:review.*revision|revision)/i.test(subtask.title)
     );
     if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
-      setErrorMessage("Wait for the client to approve the review before continuing to the final subtask.");
+      setErrorMessage("Wait for the client to approve the review before continuing to the final task.");
       return;
     }
     const isLocked = toggledSubtask?.completed
       ? task.subtasks.slice(subtaskIndex + 1).some((subtask) => subtask.completed)
       : task.subtasks.slice(0, subtaskIndex).some((subtask) => !subtask.completed);
     if (isLocked) {
-      setErrorMessage("Complete the subtasks in order before moving to the next one.");
+      setErrorMessage("Complete the tasks in order before moving to the next one.");
       return;
     }
     const nextSubtasks = task.subtasks.map((subtask, index) =>
@@ -1043,6 +1164,7 @@ const Tasks = ({
     const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
 
     if (isCompletingSubtask && isClientReviewSubtask) {
+      setSelectedTaskId("");
       setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
@@ -1060,6 +1182,7 @@ const Tasks = ({
     const nextSubtasks = task.subtasks.map((subtask, index) =>
       index === subtaskIndex ? { ...subtask, completed: true } : subtask
     );
+    setSelectedTaskId("");
     setCompletionDraft({ task, nextSubtasks, finalize: false });
   };
 
@@ -1088,6 +1211,9 @@ const Tasks = ({
         currentTasks.map((currentTask) =>
           currentTask.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
         )
+      );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
       );
       setCompletionDraft(null);
     } catch (error) {
@@ -1216,6 +1342,24 @@ const Tasks = ({
 
           </section>
 
+          {selectedTaskId && isLoadingTaskDetails && (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/65 p-4 backdrop-blur-[2px]">
+              <div className="rounded-2xl border border-pink-100 bg-white px-6 py-5 text-sm font-black text-[#10142d] shadow-2xl">
+                Loading project details...
+              </div>
+            </div>
+          )}
+          {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
+            <ProjectDetailsModal
+              canAccessTasks={isOwnedByCurrentUser(selectedTask)}
+              item={selectedTask}
+              onClose={() => setSelectedTaskId("")}
+              onDelete={requestDeleteTask}
+              onEdit={handleEditTask}
+              onSubmitOutput={handleSubmitOutput}
+              onToggleTask={handleToggleSubtask}
+            />
+          )}
           <ConfirmDialog
             confirmLabel={confirmAction?.confirmLabel}
             icon={confirmAction?.icon}
