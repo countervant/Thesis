@@ -71,7 +71,7 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
       country: employee.country || defaultCountry,
       phone: employee.phone || getCountryDialCode(employee.country || defaultCountry),
       position: employee.position || employee.role || "",
-      isActive: employee.status === "Active",
+      isActive: employee.isActive !== false,
     });
   }, [employee]);
 

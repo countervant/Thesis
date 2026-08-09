@@ -6,7 +6,11 @@ import { withAvatarUrl } from '../utils/avatar.js';
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
 const authUserCache = new Map();
 const authUserFields =
-  "firstName middleInitial lastName companyName email phone country role position birthday isActive isOnline lastSeen twoFactorEnabled createdAt updatedAt";
+  "firstName middleInitial lastName companyName email phone country role position birthday isActive isOnline showOnlineStatus lastSeen twoFactorEnabled createdAt updatedAt";
+
+export const clearCachedAuthUser = (userId) => {
+  if (userId) authUserCache.delete(String(userId));
+};
 
 const isDatabaseTimeout = (error) => {
   const message = String(error?.message || "").toLowerCase();

@@ -614,6 +614,31 @@ const MessagesPanel = () => {
     return () => clearInterval(intervalId);
   }, [refreshThreads]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const refreshParticipantPresence = async () => {
+      const [threadResult, userResult] = await Promise.allSettled([
+        messageAPI.getThreadsFresh(),
+        messageAPI.getUsersFresh({ limit: 100 }),
+      ]);
+      if (!isMounted) return;
+
+      if (threadResult.status === "fulfilled") {
+        setThreads(threadResult.value);
+      }
+      if (userResult.status === "fulfilled") {
+        setUsers(userResult.value);
+      }
+    };
+
+    const intervalId = window.setInterval(refreshParticipantPresence, 30000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const handleSendMessage = async (event) => {
     event.preventDefault();
 

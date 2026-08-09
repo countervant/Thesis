@@ -6,11 +6,12 @@ import Message from "../model/messageModel.js";
 import User from "../model/userModel.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getAvatarUrl } from "../utils/avatar.js";
+import { isUserOnline } from "../utils/presence.js";
 
 const router = express.Router();
 const messageClients = new Map();
 
-const userFields = "firstName lastName email role companyName isActive isOnline lastSeen updatedAt";
+const userFields = "firstName lastName email role companyName isActive isOnline showOnlineStatus lastSeen updatedAt";
 
 const getUserId = (user) => {
   if (!user) return "";
@@ -21,16 +22,9 @@ const getUserId = (user) => {
   return "";
 };
 
-const isPresenceOnline = (user) => {
-  if (!user?.isOnline || !user?.lastSeen) return false;
-
-  const lastSeenTime = new Date(user.lastSeen).getTime();
-  return Number.isFinite(lastSeenTime) && Date.now() - lastSeenTime <= 2 * 60 * 1000;
-};
-
 const toParticipant = (user) => {
   if (!user) return null;
-  const online = isPresenceOnline(user);
+  const online = isUserOnline(user);
 
   return {
     _id: user._id,
@@ -263,7 +257,7 @@ router.get("/threads", protect, async (req, res) => {
                 localField: "_id",
                 foreignField: "_id",
                 as: "participant",
-                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, companyName: 1, isActive: 1, isOnline: 1, lastSeen: 1, updatedAt: 1 } }],
+                pipeline: [{ $project: { firstName: 1, lastName: 1, email: 1, role: 1, companyName: 1, isActive: 1, isOnline: 1, showOnlineStatus: 1, lastSeen: 1, updatedAt: 1 } }],
               },
             },
             { $unwind: "$participant" },
@@ -391,7 +385,7 @@ router.post("/", protect, async (req, res) => {
     const recipients = await User.find({
       _id: { $in: recipientIds },
       isActive: true,
-    }).select("_id isOnline lastSeen").lean();
+    }).select("_id isOnline showOnlineStatus lastSeen").lean();
 
     if (recipients.length === 0) {
       return res.status(404).json({ message: "Recipient not found" });
@@ -409,7 +403,7 @@ router.post("/", protect, async (req, res) => {
         text,
         deliveredAt:
           hasMessageConnection(recipientId) ||
-          isPresenceOnline(recipientById.get(recipientId))
+          isUserOnline(recipientById.get(recipientId))
             ? now
             : null,
       }))

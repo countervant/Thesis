@@ -6,6 +6,7 @@ import { protect } from "../middleware/protectedjwt.js";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
+import { isUserOnline } from "../utils/presence.js";
 
 const router = express.Router();
 const emailRegex =
@@ -54,6 +55,9 @@ const clientUserToClient = (user) => {
     country: user.country || "Philippines",
     service: user.position || "",
     isActive: user.isActive,
+    isOnline: isUserOnline(user),
+    lastSeen: user.lastSeen,
+    hasLoginAccount: true,
     avatar,
     address: "",
     notes: "",
@@ -98,7 +102,7 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
         .maxTimeMS(8000)
       .lean(),
       User.find(userQuery)
-      .select("firstName lastName companyName email phone country position role isActive createdAt updatedAt")
+      .select("firstName lastName companyName email phone country position role isActive isOnline showOnlineStatus lastSeen createdAt updatedAt")
       .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -110,7 +114,12 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
 
     const data = [
       ...clientUsers.map(clientUserToClient),
-      ...clients.map((client) => ({ ...client, source: "client" })),
+      ...clients.map((client) => ({
+        ...client,
+        source: "client",
+        isOnline: false,
+        hasLoginAccount: false,
+      })),
     ].slice(0, limit);
 
     res.status(200).json(pagedResponse({

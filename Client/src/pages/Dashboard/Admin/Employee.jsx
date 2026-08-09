@@ -5,7 +5,11 @@ import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
 import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
 
-const filters = ["All", "Active", "Inactive"];
+const filters = [
+  { label: "All accounts", value: "All" },
+  { label: "Enabled", value: "Active" },
+  { label: "Disabled", value: "Inactive" },
+];
 
 const taskStatusLabels = {
   pending: "Pending",
@@ -76,6 +80,9 @@ const normalizeEmployee = (employee) => ({
   name: [employee.firstName, employee.lastName].filter(Boolean).join(" "),
   avatar: employee.avatar || "",
   status: employee.isActive ? "Active" : "Inactive",
+  isActive: employee.isActive !== false,
+  isOnline: employee.isOnline === true,
+  lastSeen: employee.lastSeen || "",
   role: employee.position || "Employee",
   position: employee.position || "",
   email: employee.email || "",
@@ -284,7 +291,12 @@ const FilterButton = ({ active, children, onClick }) => (
 );
 
 const EmployeeCard = ({ employee, onDelete, onEdit }) => {
-  const isActive = employee.status === "Active";
+  const isOnline = employee.isOnline;
+  const presenceLabel = !employee.isActive
+    ? "Inactive account"
+    : isOnline
+      ? "Online"
+      : "Offline";
   const countryFlag = getCountryFlag(employee.country);
 
   return (
@@ -313,13 +325,14 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
           </div>
           <span
             className={`mt-2 inline-flex h-6 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${
-              isActive
+              isOnline
                 ? "bg-[#d8ffe3] text-[#1d9a4f]"
                 : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             }`}
+            title="Current presence"
           >
-            <span className={`h-2 w-2 rounded-full ${isActive ? "bg-[#20bd5a]" : "bg-neutral-400"}`} />
-            {employee.status}
+            <span className={`h-2 w-2 rounded-full ${isOnline ? "bg-[#20bd5a]" : "bg-neutral-400"}`} />
+            {presenceLabel}
           </span>
         </div>
       </div>
@@ -424,7 +437,7 @@ const AdminEmployees = ({
         setIsLoading(true);
         setErrorMessage("");
         const [employeeData, taskData] = await Promise.all([
-          employeeAPI.getAll({ limit: 100 }),
+          employeeAPI.getAllFresh({ limit: 100 }),
           taskAPI.getAll({ limit: 100, refresh: true, view: "employee" }),
         ]);
 
@@ -471,6 +484,43 @@ const AdminEmployees = ({
       isMounted = false;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const refreshPresence = async () => {
+      try {
+        const employeeData = await employeeAPI.getAllFresh({ limit: 100 });
+        if (!isMounted) return;
+
+        const presenceById = new Map(
+          employeeData.map((employee) => [getEntityId(employee), employee])
+        );
+        setEmployees((currentEmployees) =>
+          currentEmployees.map((employee) => {
+            const freshEmployee = presenceById.get(employee.id);
+            if (!freshEmployee) return employee;
+
+            return {
+              ...employee,
+              isActive: freshEmployee.isActive !== false,
+              status: freshEmployee.isActive ? "Active" : "Inactive",
+              isOnline: freshEmployee.isOnline === true,
+              lastSeen: freshEmployee.lastSeen || "",
+            };
+          })
+        );
+      } catch {
+        // Keep the last known presence until the next refresh.
+      }
+    };
+
+    const intervalId = window.setInterval(refreshPresence, 30000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const visibleEmployees = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -600,11 +650,11 @@ const AdminEmployees = ({
             <div className="flex flex-wrap gap-2">
               {filters.map((filter) => (
                 <FilterButton
-                  key={filter}
-                  active={selectedFilter === filter}
-                  onClick={() => setSelectedFilter(filter)}
+                  key={filter.value}
+                  active={selectedFilter === filter.value}
+                  onClick={() => setSelectedFilter(filter.value)}
                 >
-                  {filter} ({countFor(filter)})
+                  {filter.label} ({countFor(filter.value)})
                 </FilterButton>
               ))}
             </div>

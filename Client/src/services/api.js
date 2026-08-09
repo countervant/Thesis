@@ -473,6 +473,29 @@ export const authAPI = {
     return response.data;
   },
 
+  updateOnlineStatusVisibility: async (showOnlineStatus) => {
+    const response = await api.patch("/auth/presence", {
+      isOnline: showOnlineStatus,
+      showOnlineStatus,
+    });
+    clearCache("/auth/me", "/auth/online-team", "/messages/users", "/messages/threads");
+    return response.data;
+  },
+
+  markOfflineOnPageHide: (authToken = sessionStorage.getItem("token")) => {
+    if (!authToken || typeof fetch !== "function") return;
+
+    fetch(`${API_URL}/auth/presence`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ isOnline: false }),
+      keepalive: true,
+    }).catch(() => {});
+  },
+
   updateMe: async (profile) => {
     const response = await api.put("/auth/me", profile);
     clearCache("/auth/me", "/auth/users", "/auth/employees", "/auth/assignees", "/clients", "/dashboard");
@@ -492,6 +515,16 @@ export const authAPI = {
   verifyTwoFactor: async (temporaryToken, code) => {
     const response = await twoFactorRequest({ method: "post", url: "/auth/verify-2fa", data: { temporaryToken, code } });
     clearCache("/auth/me");
+    return response.data;
+  },
+
+  verifyTwoFactorBackupCode: async (temporaryToken, backupCode) => {
+    const response = await twoFactorRequest({
+      method: "post",
+      url: "/auth/verify-2fa",
+      data: { temporaryToken, backupCode },
+    });
+    clearCache("/auth/me", "/auth/2fa-status");
     return response.data;
   },
 
@@ -519,6 +552,12 @@ export const authAPI = {
   disableTwoFactor: async (password) => {
     const response = await twoFactorRequest({ method: "post", url: "/auth/disable-2fa", data: { password } });
     clearCache("/auth/me", "/auth/2fa-status");
+    return response.data;
+  },
+
+  regenerateBackupCodes: async () => {
+    const response = await api.post("/auth/backup-codes/regenerate");
+    clearCache("/auth/2fa-status");
     return response.data;
   },
 
@@ -757,6 +796,18 @@ export const messageAPI = {
     return asArray(await cachedGet(`/messages/threads${query ? `?${query}` : ""}`), "message threads");
   },
 
+  getUsersFresh: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    const response = await api.get(`/messages/users${query ? `?${query}` : ""}`);
+    return asArray(response.data, "message users");
+  },
+
+  getThreadsFresh: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    const response = await api.get(`/messages/threads${query ? `?${query}` : ""}`);
+    return asArray(response.data, "message threads");
+  },
+
   getUnreadCount: async () => {
     const response = await api.get("/messages/unread-count");
     return Number(response.data?.unreadCount) || 0;
@@ -822,6 +873,12 @@ export const employeeAPI = {
     return asArray(await cachedGet(`/auth/employees${query ? `?${query}` : ""}`), "employees");
   },
 
+  getAllFresh: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    const response = await api.get(`/auth/employees${query ? `?${query}` : ""}`);
+    return asArray(response.data, "employees");
+  },
+
   create: async (employee) => {
     const response = await api.post("/auth/employees", employee);
     clearCache("/auth/employees", "/auth/assignees", "/clients", "/dashboard");
@@ -845,6 +902,12 @@ export const clientAPI = {
   getAll: async (params = "") => {
     const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
     return asArray(await cachedGet(`/clients${query ? `?${query}` : ""}`), "clients");
+  },
+
+  getAllFresh: async (params = "") => {
+    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
+    const response = await api.get(`/clients${query ? `?${query}` : ""}`);
+    return asArray(response.data, "clients");
   },
 
   create: async (client) => {
