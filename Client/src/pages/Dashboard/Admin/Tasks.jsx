@@ -9,6 +9,7 @@ import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
+import ProjectGanttChart from "../../../components/ProjectGanttChart.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -872,6 +873,9 @@ const ProjectDetailsModal = ({
             onToggleExpand={onClose}
             onToggleSubtask={onToggleTask}
           />
+          <div className="mt-4">
+            <ProjectGanttChart item={item} />
+          </div>
         </div>
       </section>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { clientAPI, getApiErrorMessage } from "../../../services/api.js";
+import { clientAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
@@ -12,13 +12,67 @@ const filters = [
   { label: "Disabled", value: "Inactive" },
 ];
 
+const statusLabels = {
+  pending: "Pending",
+  in_progress: "In progress",
+  review: "In review",
+  done: "Done",
+};
+
+const statusStyles = {
+  Pending: "bg-orange-50 text-orange-600",
+  "In progress": "bg-pink-50 text-[#c72fb2]",
+  "In review": "bg-blue-50 text-blue-600",
+  Done: "bg-emerald-50 text-emerald-600",
+};
+
+const getEntityId = (entity) => {
+  if (!entity) return "";
+  if (typeof entity === "string") return entity;
+  return entity._id || entity.id || "";
+};
+
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+const formatProjectDate = (value) => {
+  if (!value) return "No due date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No due date";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
+
+const normalizeProject = (project) => {
+  const subtasks = Array.isArray(project?.subtasks) ? project.subtasks : [];
+  const completedTasks = subtasks.filter((subtask) => subtask?.completed).length;
+
+  return {
+    id: getEntityId(project),
+    title: project?.title || "Untitled project",
+    description: project?.description || "No project brief provided.",
+    status: statusLabels[project?.status] || project?.status || "Pending",
+    priority: project?.priority || "medium",
+    startDate: project?.startDate || project?.createdAt,
+    dueDate: project?.dueDate,
+    createdAt: project?.createdAt,
+    requestedBy: project?.requestedBy,
+    requestedByName: project?.requestedByName || "",
+    subtasks,
+    completedTasks,
+    progress: subtasks.length ? Math.round((completedTasks / subtasks.length) * 100) : 0,
+  };
+};
+
 const getInitials = (name = "") => {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const initials = `${words[0]?.charAt(0) || ""}${words[1]?.charAt(0) || ""}`;
   return initials.toUpperCase() || "CL";
 };
 
-const normalizeClient = (client) => ({
+const normalizeClient = (client, projects = []) => ({
   id: client._id || client.id,
   initials: getInitials(client.contactPerson),
   name: client.contactPerson || "",
@@ -35,7 +89,30 @@ const normalizeClient = (client) => ({
   service: client.service || "",
   address: client.address || "",
   notes: client.notes || "",
+  projects,
 });
+
+const projectBelongsToClient = (project, client) => {
+  const requestedById = getEntityId(project.requestedBy);
+  const clientId = String(client._id || client.id || "");
+  const requestedByEmail = normalizeText(project.requestedBy?.email);
+  const clientEmail = normalizeText(client.email);
+  const requestedByName = normalizeText(project.requestedByName);
+  const clientName = normalizeText(client.contactPerson);
+  const companyName = normalizeText(client.companyName);
+  const clientLabels = new Set([
+    clientName,
+    companyName,
+    clientEmail,
+    normalizeText([client.companyName, client.contactPerson].filter(Boolean).join(" - ")),
+  ].filter(Boolean));
+
+  return Boolean(
+    (requestedById && clientId && requestedById === clientId) ||
+    (requestedByEmail && clientEmail && requestedByEmail === clientEmail) ||
+    (requestedByName && clientLabels.has(requestedByName))
+  );
+};
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = {
@@ -230,7 +307,150 @@ const FilterButton = ({ active, children, onClick }) => (
   </button>
 );
 
-const ClientCard = ({ client, onDelete }) => {
+const ProjectStatus = ({ status }) => (
+  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${statusStyles[status] || statusStyles.Pending}`}>
+    {status}
+  </span>
+);
+
+const ProjectRequestModal = ({ client, onClose }) => {
+  useEffect(() => {
+    if (!client) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [client, onClose]);
+
+  if (!client) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="client-project-requests-title"
+        aria-modal="true"
+        className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        role="dialog"
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-pink-100 px-5 py-5 dark:border-neutral-800 sm:px-7">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">Client Projects</p>
+            <h2 id="client-project-requests-title" className="mt-1 truncate text-xl font-black text-[#10142d] dark:text-white">
+              {client.name}&apos;s Requests
+            </h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">
+              {client.projects.length} {client.projects.length === 1 ? "project" : "projects"} requested
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            aria-label="Close client projects"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="max-h-[calc(92vh-104px)] space-y-4 overflow-y-auto bg-slate-50/60 p-4 dark:bg-neutral-950 sm:p-6">
+          {client.projects.length === 0 ? (
+            <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-pink-200 bg-white px-5 text-center dark:border-neutral-700 dark:bg-neutral-900">
+              <div>
+                <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-pink-50 text-[#c72fb2] dark:bg-pink-950/30">
+                  <Icon name="tasks" className="h-6 w-6" />
+                </span>
+                <p className="mt-3 text-sm font-black text-[#10142d] dark:text-white">No project requests yet</p>
+                <p className="mt-1 text-xs font-bold text-slate-400">Projects assigned to this client will appear here.</p>
+              </div>
+            </div>
+          ) : client.projects.map((project) => (
+            <article key={project.id} className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-[#141414]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-black text-[#10142d] dark:text-white">{project.title}</h3>
+                    <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[9px] font-black capitalize text-slate-500 dark:border-neutral-700">
+                      {project.priority} priority
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-slate-500 dark:text-neutral-400">
+                    {project.description}
+                  </p>
+                </div>
+                <ProjectStatus status={project.status} />
+              </div>
+
+              <div className="mt-4 grid gap-4 border-y border-slate-100 py-4 dark:border-neutral-800 sm:grid-cols-[150px_minmax(0,1fr)]">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Due date</p>
+                  <p className="mt-1.5 flex items-center gap-2 text-xs font-black text-slate-600 dark:text-neutral-300">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c72fb2]" fill="none" aria-hidden="true">
+                      <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                    {formatProjectDate(project.dueDate)}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Progress</p>
+                    <p className="text-[10px] font-black text-slate-500">{project.completedTasks} of {project.subtasks.length} tasks</p>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800">
+                    <div className="h-full rounded-full bg-linear-to-r from-[#df4bb4] to-[#c72fb2]" style={{ width: `${project.progress}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Requested work</p>
+                {project.subtasks.length ? (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {project.subtasks.map((subtask, index) => (
+                      <div key={subtask?._id || subtask?.id || `${project.id}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-neutral-900">
+                        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${subtask?.completed ? "bg-emerald-100 text-emerald-600" : "bg-pink-100 text-[#c72fb2]"}`}>
+                          {subtask?.completed ? (
+                            <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" aria-hidden="true">
+                              <path d="m5 10 3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : <span className="text-[8px] font-black">{index + 1}</span>}
+                        </span>
+                        <span className={`truncate text-[11px] font-bold ${subtask?.completed ? "text-slate-400 line-through" : "text-slate-600 dark:text-neutral-300"}`} title={subtask?.title}>
+                          {subtask?.title || `Task ${index + 1}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs font-bold text-slate-400">No requested tasks were added.</p>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const ClientCard = ({ client, onDelete, onViewProjects }) => {
   const isOnline = client.isOnline;
   const presenceLabel = !client.hasLoginAccount
     ? "No login account"
@@ -309,6 +529,49 @@ const ClientCard = ({ client, onDelete }) => {
         </p>
       </div>
 
+      <div className="mt-5 border-t border-slate-100 pt-4 dark:border-neutral-800">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Client Projects</p>
+          <span className="rounded-full bg-pink-50 px-2.5 py-1 text-[9px] font-black text-[#c72fb2] dark:bg-pink-950/30">
+            {client.projects.length} {client.projects.length === 1 ? "project" : "projects"}
+          </span>
+        </div>
+
+        {client.projects.length ? (
+          <div className="mt-3 space-y-2">
+            {client.projects.slice(0, 2).map((project) => (
+              <button
+                key={project.id}
+                type="button"
+                onClick={() => onViewProjects(client)}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left transition hover:border-pink-200 hover:bg-pink-50 dark:border-neutral-800 dark:bg-neutral-900"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-black text-[#10142d] dark:text-white">{project.title}</span>
+                  <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-400">{project.description}</span>
+                </span>
+                <ProjectStatus status={project.status} />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-xl border border-dashed border-slate-200 px-3 py-3 text-center text-[10px] font-bold text-slate-400 dark:border-neutral-700">
+            No project requests yet
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={() => onViewProjects(client)}
+          className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black text-[#c72fb2] transition hover:text-[#a92298]"
+        >
+          View project requests
+          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+            <path d="m7 4 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+
       <div className="mt-auto flex items-center justify-between border-t border-slate-200 pt-4 text-xs font-semibold text-slate-500 dark:border-neutral-800 dark:text-neutral-400">
         <span className="truncate">{client.service}</span>
         <div className="flex items-center gap-2">
@@ -333,6 +596,7 @@ const AdminClients = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [clientToDelete, setClientToDelete] = useState(null);
+  const [selectedClientProjects, setSelectedClientProjects] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -343,10 +607,17 @@ const AdminClients = () => {
           setIsLoading(true);
           setErrorMessage("");
         }
-        const data = await clientAPI.getAllFresh({ limit: 100 });
+        const [clientData, projectData] = await Promise.all([
+          clientAPI.getAllFresh({ limit: 100 }),
+          taskAPI.getAll({ view: "projects", limit: 100, refresh: true }),
+        ]);
+        const projects = projectData.map(normalizeProject);
 
         if (isMounted) {
-          setClients(data.map(normalizeClient));
+          setClients(clientData.map((client) => normalizeClient(
+            client,
+            projects.filter((project) => projectBelongsToClient(project, client)),
+          )));
         }
       } catch (error) {
         if (isMounted && showLoading) {
@@ -381,6 +652,12 @@ const AdminClients = () => {
         client.country,
         client.phone,
         client.service,
+        ...client.projects.flatMap((project) => [
+          project.title,
+          project.description,
+          project.status,
+          ...project.subtasks.map((subtask) => subtask?.title || ""),
+        ]),
       ]
         .join(" ")
         .toLowerCase()
@@ -421,6 +698,8 @@ const AdminClients = () => {
       "Service",
       "Address",
       "Notes",
+      "Project Count",
+      "Project Requests",
     ];
     const rows = visibleClients.map((client) => [
       client.name,
@@ -432,6 +711,8 @@ const AdminClients = () => {
       client.service,
       client.address,
       client.notes,
+      client.projects.length,
+      client.projects.map((project) => project.title).join("; "),
     ]);
     const csv = [header, ...rows]
       .map((row) =>
@@ -528,9 +809,14 @@ const AdminClients = () => {
                 key={client.id}
                 client={client}
                 onDelete={setClientToDelete}
+                onViewProjects={setSelectedClientProjects}
               />
             ))}
           </section>
+          <ProjectRequestModal
+            client={selectedClientProjects}
+            onClose={() => setSelectedClientProjects(null)}
+          />
           <ConfirmDialog
             confirmLabel="Yes , delete"
             icon="delete"

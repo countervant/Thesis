@@ -7,6 +7,7 @@ import taskIcon from "../../../assets/task.png";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import ProjectGanttChart from "../../../components/ProjectGanttChart.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -514,6 +515,9 @@ const ProjectDetailsModal = ({
             onToggleSubtask={onToggleSubtask}
             onViewCalendar={onViewCalendar}
           />
+          <div className="mt-4">
+            <ProjectGanttChart item={item} />
+          </div>
         </div>
       </section>
     </div>
