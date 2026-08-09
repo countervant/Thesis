@@ -28,6 +28,16 @@ const normalizeSubtasks = (subtasks = []) => {
     .filter((subtask) => subtask.title);
 };
 
+const isClientReviewSubtask = (subtask) =>
+  /client\s+(?:review.*revision|revision)|review.*revision/i.test(
+    String(subtask?.title || "")
+  );
+
+const getSubmissionSubtaskIndex = (subtasks = []) => {
+  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
+  return reviewIndex >= 0 ? reviewIndex : subtasks.length - 1;
+};
+
 const getTaskProgress = (subtasks) => {
   if (!subtasks.length) return 0;
 
@@ -237,9 +247,16 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             <span className="min-w-0">
               <span className="block text-sm font-black text-[#10142d] dark:text-white">{item.title}</span>
               <span className="mt-1 block text-xs font-bold leading-5 text-slate-500 dark:text-neutral-400">{item.description || "No description"}</span>
-              <span className="mt-1.5 block truncate text-[10px] font-black text-[#c72fb2]">
-                Client: {getClientName(item)}
-              </span>
+              {isOverlay ? (
+                <span className="mt-3 block rounded-lg border border-pink-100 bg-pink-50/70 px-3 py-2 dark:border-pink-900/40 dark:bg-pink-950/20">
+                  <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Client</span>
+                  <span className="mt-0.5 block truncate text-xs font-black text-[#c72fb2]">{getClientName(item)}</span>
+                </span>
+              ) : (
+                <span className="mt-1.5 block truncate text-[10px] font-black text-[#c72fb2]">
+                  Client: {getClientName(item)}
+                </span>
+              )}
               {item.newsfeedPermissionAllowed && (
                 <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">
                   <SmallIcon name="check" className="h-3 w-3" /> Client allowed newsfeed posting
@@ -254,9 +271,8 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             {item.subtasks.length > 0 ? (
               <div className="space-y-1.5">
                 {item.subtasks.map((subtask, index) => {
-                  const clientReviewIndex = item.subtasks.findIndex((candidate) =>
-                    /client\s+(?:review.*revision|revision)/i.test(candidate.title)
-                  );
+                  const clientReviewIndex = item.subtasks.findIndex(isClientReviewSubtask);
+                  const submissionSubtaskIndex = getSubmissionSubtaskIndex(item.subtasks);
                   const isAssignedToCurrentUser = subtask.assignedTo
                     ? getEntityId(subtask.assignedTo) === currentUserId
                     : item.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
@@ -266,11 +282,11 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                   const isWaitingForClientApproval =
                     clientReviewIndex >= 0 && index > clientReviewIndex && !item.clientApproved;
                   const isLocked = isSequenceLocked || isWaitingForClientApproval || !isAssignedToCurrentUser;
-                  const isClientReviewSubtask = /client\s+(?:review.*revision|revision)/i.test(subtask.title);
+                  const isSubmissionSubtask = index === submissionSubtaskIndex;
                   const canSubmitOutput =
                     item.status !== "Done" &&
                     isAssignedToCurrentUser &&
-                    isClientReviewSubtask &&
+                    isSubmissionSubtask &&
                     item.subtasks.slice(0, index).every((previousSubtask) => previousSubtask.completed);
                   const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
                   const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
@@ -298,12 +314,12 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
                           </span>
                         )}
                       </label>
-                      {isClientReviewSubtask && isApproved && (
+                      {isSubmissionSubtask && isApproved && (
                         <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">
                           Approved
                         </span>
                       )}
-                      {isClientReviewSubtask && isUnderReview && (
+                      {isSubmissionSubtask && isUnderReview && (
                         <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[9px] font-black text-amber-700">
                           Under Review
                         </span>
@@ -883,9 +899,7 @@ const EmpTask = () => {
 
   const handleToggleSubtask = async (task, subtaskIndex) => {
     const toggledSubtask = task.subtasks[subtaskIndex];
-    const clientReviewIndex = task.subtasks.findIndex((subtask) =>
-      /client\s+(?:review.*revision|revision)/i.test(subtask.title)
-    );
+    const clientReviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
     if (clientReviewIndex >= 0 && subtaskIndex > clientReviewIndex && !task.clientApproved) {
       setErrorMessage("Wait for the client to approve the review before continuing to the final task.");
       return;
@@ -910,9 +924,10 @@ const EmpTask = () => {
         : subtask
     );
     const isCompletingSubtask = toggledSubtask && !toggledSubtask.completed;
-    const isClientReviewSubtask = /client\s+review.*revision|review.*revision/i.test(toggledSubtask?.title || "");
+    const isSubmissionSubtask =
+      subtaskIndex === getSubmissionSubtaskIndex(task.subtasks);
 
-    if (isCompletingSubtask && isClientReviewSubtask) {
+    if (isCompletingSubtask && isSubmissionSubtask) {
       setSelectedTaskId("");
       setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
@@ -922,9 +937,9 @@ const EmpTask = () => {
   };
 
   const handleSubmitOutput = (task, subtaskIndex) => {
-    const reviewSubtask = task.subtasks[subtaskIndex];
-    const isAssignedToCurrentUser = reviewSubtask?.assignedTo
-      ? getEntityId(reviewSubtask.assignedTo) === currentUserId
+    const submissionSubtask = task.subtasks[subtaskIndex];
+    const isAssignedToCurrentUser = submissionSubtask?.assignedTo
+      ? getEntityId(submissionSubtask.assignedTo) === currentUserId
       : task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
     const previousStepsCompleted = task.subtasks
       .slice(0, subtaskIndex)

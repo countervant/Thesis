@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { resolveApiAssetUrl } from "../utils/apiAssets.js";
 
 const AVATAR_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000];
 
@@ -33,7 +34,7 @@ const InitialsAvatar = ({
   textClassName = "text-sm",
   user,
 }) => {
-  const avatarSrc = src || user?.avatar || "";
+  const avatarSrc = resolveApiAssetUrl(src || user?.avatar || "");
   const retryTimerRef = useRef(null);
   const [failure, setFailure] = useState({
     src: "",

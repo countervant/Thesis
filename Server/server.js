@@ -236,19 +236,23 @@ app.use((error, req, res, next) => {
   });
 });
 
+// Bind the HTTP port before waiting on external services. This keeps the Vite
+// proxy connected during development startup; API routes return a controlled
+// 503 through the database guard until MongoDB is ready.
+const httpServer = app.listen(port, () => {
+  console.log(`Server running on port ${port}; waiting for database readiness`);
+});
+
 try {
   await dbConnect();
+  console.log(`Server ready on port ${port}`);
 
-  try {
-    await warmAvatarCache();
-  } catch (error) {
+  // Cache warmup is an optimization and must not delay API availability.
+  warmAvatarCache().catch((error) => {
     console.warn(`[avatar] Initial cache warmup skipped: ${error.message}`);
-  }
-
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
   });
 } catch (error) {
   console.error("[startup] Server failed to start:", error);
-  process.exit(1);
+  httpServer.close();
+  process.exitCode = 1;
 }

@@ -153,12 +153,19 @@ const allSubtasksCompleted = (subtasks) =>
   subtasks.length > 0 && subtasks.every((subtask) => subtask.completed);
 
 const isClientReviewSubtask = (subtask) =>
-  /client\s+(?:review.*revision|revision)/i.test(String(subtask?.title || ""));
+  /client\s+(?:review.*revision|revision)|review.*revision/i.test(
+    String(subtask?.title || "")
+  );
+
+const getSubmissionSubtaskIndex = (subtasks) => {
+  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
+  return reviewIndex >= 0 ? reviewIndex : subtasks.length - 1;
+};
 
 const isClientReviewReady = (subtasks) => {
-  const reviewIndex = subtasks.findIndex(isClientReviewSubtask);
-  return reviewIndex >= 0 && subtasks
-    .slice(0, reviewIndex + 1)
+  const submissionIndex = getSubmissionSubtaskIndex(subtasks);
+  return submissionIndex >= 0 && subtasks
+    .slice(0, submissionIndex + 1)
     .every((subtask) => subtask.completed);
 };
 
@@ -907,10 +914,10 @@ router.post("/:id/revisions/start", protect, async (req, res) => {
       return res.status(403).json({ message: "Only the assigned user can start this revision" });
     }
 
-    const reviewIndex = task.subtasks.findIndex(isClientReviewSubtask);
-    if (reviewIndex >= 0) {
+    const restartIndex = getSubmissionSubtaskIndex(task.subtasks);
+    if (restartIndex >= 0) {
       task.subtasks.forEach((subtask, index) => {
-        if (index >= reviewIndex) {
+        if (index >= restartIndex) {
           subtask.completed = false;
           subtask.completedAt = undefined;
         }
@@ -1332,7 +1339,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     if (!finalize && !isClientReviewReady(subtasks)) {
       return res.status(400).json({
-        message: "Complete the Client review and revisions step before submitting for client review",
+        message: "Complete the review task or final custom task before submitting for client review",
       });
     }
 
