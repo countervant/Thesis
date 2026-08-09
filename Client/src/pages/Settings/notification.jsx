@@ -1,29 +1,14 @@
 import { useMemo, useState } from "react";
+import {
+  readNotificationSettings,
+  writeNotificationSettings,
+} from "../../utils/settingsPreferences.js";
 
 const notificationItems = [
-  { id: "taskUpdates", title: "Task Updates", description: "Get notified about task assignments, updates, and changes.", icon: "bell", enabled: true },
+  { id: "taskUpdates", title: "Task Assignments", description: "Get notified when a new project is assigned to you.", icon: "bell", enabled: true },
   { id: "projectUpdates", title: "Project Updates", description: "Receive updates about project activities and progress.", icon: "clipboard", enabled: true },
-  { id: "announcements", title: "Announcements", description: "Important announcements and system updates.", icon: "megaphone", enabled: true },
-  { id: "mentions", title: "Mentions", description: "When someone mentions you in a comment or message.", icon: "at", enabled: false },
-  { id: "calendarReminders", title: "Calendar Reminders", description: "Reminders for upcoming events and meetings.", icon: "calendar", enabled: true },
-  { id: "systemAlerts", title: "System Alerts", description: "Important system alerts and notifications.", icon: "warning", enabled: true },
-  { id: "reports", title: "Reports", description: "Receive scheduled reports and summaries.", icon: "chart", enabled: false },
+  { id: "newsfeedActivity", title: "Newsfeed Activity", description: "Hearts, comments, and replies on your newsfeed posts.", icon: "megaphone", enabled: true },
 ];
-
-const getStorageKey = (user) => `clientraNotificationSettings:${user?._id || user?.id || user?.email || "guest"}`;
-
-const getDefaultSettings = () =>
-  notificationItems.reduce((settings, item) => ({ ...settings, [item.id]: item.enabled }), {});
-
-const loadSettings = (user) => {
-  const defaultSettings = getDefaultSettings();
-  try {
-    const savedSettings = JSON.parse(localStorage.getItem(getStorageKey(user)) || "{}");
-    return { ...defaultSettings, ...savedSettings };
-  } catch {
-    return defaultSettings;
-  }
-};
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const props = { viewBox: "0 0 24 24", fill: "none", className, "aria-hidden": "true" };
@@ -54,7 +39,7 @@ const Toggle = ({ enabled, onClick, label }) => (
 );
 
 const NotificationSettings = ({ user }) => {
-  const savedSettings = useMemo(() => loadSettings(user), [user]);
+  const savedSettings = useMemo(() => readNotificationSettings(user), [user]);
   const [settings, setSettings] = useState(savedSettings);
   const [message, setMessage] = useState("");
 
@@ -64,12 +49,12 @@ const NotificationSettings = ({ user }) => {
   };
 
   const saveSettings = () => {
-    localStorage.setItem(getStorageKey(user), JSON.stringify(settings));
+    writeNotificationSettings(user, settings);
     setMessage("Notification settings saved.");
   };
 
   const resetSettings = () => {
-    const nextSettings = loadSettings(user);
+    const nextSettings = readNotificationSettings(user);
     setSettings(nextSettings);
     setMessage("Changes cancelled.");
   };
@@ -96,7 +81,9 @@ const NotificationSettings = ({ user }) => {
         </div>
 
         <div className="divide-y divide-pink-50">
-          {notificationItems.map((item) => (
+          {notificationItems
+            .filter((item) => item.id !== "taskUpdates" || user?.role === "employee")
+            .map((item) => (
             <div key={item.id} className="flex items-center justify-between gap-3 py-4 md:gap-5">
               <div className="flex min-w-0 items-start gap-3 md:items-center md:gap-4">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">

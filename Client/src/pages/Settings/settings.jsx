@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import settingsIcon from "../../assets/settings.png";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { authAPI, getApiErrorMessage } from "../../services/api.js";
 import NotificationSettings from "./notification.jsx";
 import PrivacySettings from "./privacy.jsx";
 import ProfileSettings from "./profile.jsx";
@@ -13,22 +15,18 @@ const menuItems = [
   ["Privacy", "lock"],
 ];
 
-const overviewItems = [
-  ["Account Created", "May 08, 2026", "calendar"],
-  ["Last Login", "May 12, 2026 at 10:15 AM", "clock"],
-  ["Active Sessions", "2 sessions", "monitor"],
-  ["Security Status", "Your account is secure", "shield"],
-];
-
 const quickActions = ["Change Password", "Deactivate Account"];
 
-const supportInitialState = {
-  subject: "",
-  category: "Account",
-  message: "",
+const formatAccountDate = (value, includeTime = false) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...(includeTime ? { hour: "numeric", minute: "2-digit" } : {}),
+  });
 };
-
-const getSupportKey = (user) => `clientraSupportTickets:${user?._id || user?.id || user?.email || "guest"}`;
 
 const Icon = ({ name, className = "h-5 w-5" }) => {
   const commonProps = {
@@ -54,17 +52,24 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Profile");
-  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
-  const [supportForm, setSupportForm] = useState(supportInitialState);
-  const [supportMessage, setSupportMessage] = useState("");
-  const [deactivateReason, setDeactivateReason] = useState("");
+  const [deactivatePassword, setDeactivatePassword] = useState("");
+  const [deactivateConfirmation, setDeactivateConfirmation] = useState("");
+  const [deactivateError, setDeactivateError] = useState("");
+  const [isDeactivating, setIsDeactivating] = useState(false);
   const isSecurityTab = activeTab === "Privacy & Security";
   const isNotificationTab = activeTab === "Notifications";
   const isPrivacyTab = activeTab === "Privacy";
   const usesFullContent = isSecurityTab || isNotificationTab || isPrivacyTab;
+  const overviewItems = [
+    ["Account Created", formatAccountDate(user?.createdAt), "calendar"],
+    ["Last Activity", formatAccountDate(user?.lastSeen || user?.updatedAt, true), "clock"],
+    ["Active Session", "This device", "monitor"],
+    ["Security Status", user?.twoFactorEnabled ? "Two-factor enabled" : "Password protected", "shield"],
+  ];
 
   const openPasswordSettings = () => {
     setActiveTab("Privacy & Security");
@@ -76,64 +81,34 @@ const Settings = () => {
       openPasswordSettings();
       return;
     }
-    setDeactivateReason("");
+    setDeactivatePassword("");
+    setDeactivateConfirmation("");
+    setDeactivateError("");
     setIsDeactivateOpen(true);
   };
 
-  const updateSupportField = (field, value) => {
-    setSupportForm((currentForm) => ({ ...currentForm, [field]: value }));
-    setSupportMessage("");
-  };
-
-  const saveSupportTicket = ({ subject, category, message, type = "support" }) => {
-    const ticket = {
-      id: `${type}-${Date.now()}`,
-      subject,
-      category,
-      message,
-      status: "Open",
-      createdAt: new Date().toISOString(),
-      user: user?.email || user?.companyName || "Guest",
-    };
-
-    const storageKey = getSupportKey(user);
-    let currentTickets = [];
-    try {
-      currentTickets = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    } catch {
-      currentTickets = [];
-    }
-    localStorage.setItem(storageKey, JSON.stringify([ticket, ...currentTickets]));
-    return ticket;
-  };
-
-  const submitSupport = (event) => {
+  const submitDeactivateRequest = async (event) => {
     event.preventDefault();
-    if (!supportForm.subject.trim() || !supportForm.message.trim()) {
-      setSupportMessage("Please add a subject and message.");
+    if (deactivateConfirmation.trim().toUpperCase() !== "DEACTIVATE") {
+      setDeactivateError('Type "DEACTIVATE" to confirm.');
       return;
     }
-    saveSupportTicket({
-      subject: supportForm.subject.trim(),
-      category: supportForm.category,
-      message: supportForm.message.trim(),
-    });
-    setSupportForm(supportInitialState);
-    setSupportMessage("Support request submitted.");
-  };
+    if (!deactivatePassword) {
+      setDeactivateError("Enter your current password.");
+      return;
+    }
 
-  const submitDeactivateRequest = (event) => {
-    event.preventDefault();
-    saveSupportTicket({
-      subject: "Deactivate account request",
-      category: "Account",
-      message: deactivateReason.trim() || "User requested account deactivation.",
-      type: "deactivate",
-    });
-    setDeactivateReason("");
-    setIsDeactivateOpen(false);
-    setIsSupportOpen(true);
-    setSupportMessage("Deactivate account request submitted to support.");
+    try {
+      setIsDeactivating(true);
+      setDeactivateError("");
+      await authAPI.deactivateMe(deactivatePassword);
+      await logout();
+      navigate("/", { replace: true });
+    } catch (requestError) {
+      setDeactivateError(getApiErrorMessage(requestError, "Unable to deactivate your account."));
+    } finally {
+      setIsDeactivating(false);
+    }
   };
 
   return (
@@ -169,27 +144,6 @@ const Settings = () => {
                 })}
               </nav>
 
-              <section className="mt-4 hidden rounded-xl border border-pink-200 bg-pink-50/60 p-3 shadow-[0_4px_14px_rgba(199,47,178,0.08)] xl:block">
-                <div className="flex items-start gap-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#c72fb2] bg-white text-sm font-black text-[#c72fb2]">
-                    ?
-                  </span>
-                  <div>
-                    <h2 className="text-xs font-black text-[#c72fb2]">Need Help?</h2>
-                    <p className="mt-1 text-[10px] font-semibold leading-4 text-[#647299]">
-                      If you need assistance, our support team is here to help.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSupportOpen(true)}
-                  className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-pink-200 bg-white text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:bg-[#c72fb2] dark:hover:text-white"
-                >
-                  Contact Support
-                  <span className="text-sm leading-none">&gt;</span>
-                </button>
-              </section>
             </div>
           </aside>
 
@@ -287,119 +241,49 @@ const Settings = () => {
         </div>
       </div>
 
-      {isSupportOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-          <section className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-black text-[#10142d] dark:text-white">Contact Support</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Send your concern to the support team.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSupportOpen(false);
-                  setSupportMessage("");
-                }}
-                className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100"
-              >
-                <Icon name="x" className="h-4 w-4" />
-              </button>
-            </div>
-
-            {supportMessage && (
-              <p className={`mt-4 rounded-xl px-4 py-3 text-sm font-black ${
-                supportMessage.includes("submitted") ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
-              }`}>
-                {supportMessage}
-              </p>
-            )}
-
-            <form onSubmit={submitSupport} className="mt-4 space-y-3">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Category</span>
-                <select
-                  value={supportForm.category}
-                  onChange={(event) => updateSupportField("category", event.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
-                >
-                  <option>Account</option>
-                  <option>Security</option>
-                  <option>Notification</option>
-                  <option>Privacy</option>
-                  <option>Technical Issue</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Subject</span>
-                <input
-                  type="text"
-                  value={supportForm.subject}
-                  onChange={(event) => updateSupportField("subject", event.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Message</span>
-                <textarea
-                  value={supportForm.message}
-                  onChange={(event) => updateSupportField("message", event.target.value)}
-                  rows={5}
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
-                />
-              </label>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSupportOpen(false)}
-                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105"
-                >
-                  Submit Request
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
-
       {isDeactivateOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
           <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
             <h2 className="text-lg font-black text-[#10142d] dark:text-white">Deactivate Account</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              This will send a request to support so they can review the account deactivation.
+              This immediately disables sign-in for this account and signs you out.
             </p>
             <form onSubmit={submitDeactivateRequest} className="mt-4 space-y-3">
+              {deactivateError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600">{deactivateError}</p>}
               <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Reason</span>
-                <textarea
-                  value={deactivateReason}
-                  onChange={(event) => setDeactivateReason(event.target.value)}
-                  rows={4}
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Current Password</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={deactivatePassword}
+                  onChange={(event) => { setDeactivatePassword(event.target.value); setDeactivateError(""); }}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-700 dark:text-white">Type DEACTIVATE to confirm</span>
+                <input
+                  type="text"
+                  value={deactivateConfirmation}
+                  onChange={(event) => { setDeactivateConfirmation(event.target.value); setDeactivateError(""); }}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                 />
               </label>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsDeactivateOpen(false)}
+                  onClick={() => { setIsDeactivateOpen(false); setDeactivateError(""); }}
+                  disabled={isDeactivating}
                   className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="h-9 min-w-[150px] rounded-lg bg-red-500 px-5 text-xs font-black text-white transition hover:bg-red-600"
+                  disabled={isDeactivating}
+                  className="h-9 min-w-[150px] rounded-lg bg-red-500 px-5 text-xs font-black text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Send Request
+                  {isDeactivating ? "Deactivating..." : "Deactivate Account"}
                 </button>
               </div>
             </form>

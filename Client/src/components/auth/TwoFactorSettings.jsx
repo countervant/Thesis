@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
+import { LoaderCircle, Mail, ShieldCheck } from "lucide-react";
 import { authAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import DisableTwoFactorModal from "./DisableTwoFactorModal.jsx";
@@ -20,7 +20,7 @@ const statusFromUser = (user) => user ? ({
 }) : null;
 
 const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [status, setStatus] = useState(() => statusFromUser(user));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,8 +65,8 @@ const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
     const timer = window.setTimeout(loadStatus, 0);
     return () => window.clearTimeout(timer);
   }, [loadStatus]);
-  const enabled = async () => { setEnableOpen(false); await loadStatus(); onEnabled?.(); };
-  const disabled = async () => { setDisableOpen(false); await loadStatus(); };
+  const enabled = async () => { setEnableOpen(false); updateUser({ twoFactorEnabled: true }); await loadStatus(); onEnabled?.(); };
+  const disabled = async () => { setDisableOpen(false); updateUser({ twoFactorEnabled: false }); await loadStatus(); };
 
   return <>
     <section className="rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
@@ -92,7 +92,6 @@ const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
             : <button type="button" onClick={() => setEnableOpen(true)} className="h-10 shrink-0 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Enable 2FA</button>
         )}
       </div>
-      {status?.enabled && <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />Email verification is required on new devices. Verified devices are trusted for {status.trustedDeviceDays || 30} days.</div>}
       {error && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-500">
         <span>{error}</span>
         <button type="button" onClick={loadStatus} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-black text-red-600 transition hover:bg-red-100">Try again</button>

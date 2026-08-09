@@ -6,7 +6,7 @@ import { withAvatarUrl } from '../utils/avatar.js';
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
 const authUserCache = new Map();
 const authUserFields =
-  "firstName middleInitial lastName companyName email phone country role position birthday isActive isOnline showOnlineStatus lastSeen twoFactorEnabled createdAt updatedAt";
+  "firstName middleInitial lastName companyName email phone country role position birthday gender skillGroups isActive isOnline showOnlineStatus privacySettings lastSeen twoFactorEnabled createdAt updatedAt";
 
 export const clearCachedAuthUser = (userId) => {
   if (userId) authUserCache.delete(String(userId));
@@ -83,6 +83,10 @@ export const protect = async (req, res, next) => {
     if (!req.user) {
       console.warn(`[auth] Token user not found for ${req.method} ${req.originalUrl}`);
       return res.status(401).json({ message: 'Not authorized, user not found' });
+    }
+    if (req.user.isActive === false) {
+      clearCachedAuthUser(decoded.id);
+      return res.status(401).json({ message: 'Account is inactive' });
     }
 
     return next();

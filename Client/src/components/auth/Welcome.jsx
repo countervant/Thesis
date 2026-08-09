@@ -1,5 +1,5 @@
 import React from "react";
-import backgroundImage from "../../assets/backround.png";
+import backgroundImage from "../../assets/backround.webp";
 
 const Welcome = ({ order, order1, text, className = "", mobileAuthHero = false }) => {
   return (

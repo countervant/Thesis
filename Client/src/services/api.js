@@ -4,6 +4,7 @@ import clientraWatermarkLogo from "../assets/CLIENTRA2.png";
 // Same-origin by default. Vite proxies /api to Express in development, while the
 // production Express server already serves both the client and API together.
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+const API_DEBUG = import.meta.env.DEV && import.meta.env.VITE_API_DEBUG === "true";
 const isLocalBrowser =
   typeof window !== "undefined" &&
   ["localhost", "127.0.0.1"].includes(window.location.hostname);
@@ -35,7 +36,7 @@ const publicAuthPaths = new Set([
 
 const isPublicRequest = (url = "") => publicAuthPaths.has(String(url).split("?")[0]);
 
-console.info(`[api] Base URL: ${API_URL}`);
+if (API_DEBUG) console.info(`[api] Base URL: ${API_URL}`);
 
 const cache = new Map();
 const CACHE_TIME = 2 * 60 * 1000;
@@ -58,12 +59,12 @@ const cachedGet = async (url) => {
   const now = Date.now();
 
   if (cached?.promise) {
-    console.debug(`[api] GET ${url} using in-flight request`);
+    if (API_DEBUG) console.debug(`[api] GET ${url} using in-flight request`);
     return cached.promise;
   }
 
   if (cached?.data !== undefined && now - cached.time < CACHE_TIME) {
-    console.debug(`[api] GET ${url} served from cache`);
+    if (API_DEBUG) console.debug(`[api] GET ${url} served from cache`);
     return cached.data;
   }
 
@@ -73,7 +74,7 @@ const cachedGet = async (url) => {
       const dataShape = Array.isArray(response.data)
         ? `array(${response.data.length})`
         : typeof response.data;
-      console.debug(`[api] GET ${url} cached ${dataShape}`);
+      if (API_DEBUG) console.debug(`[api] GET ${url} cached ${dataShape}`);
       setCacheEntry(url, {
         data: response.data,
         time: Date.now(),
@@ -342,9 +343,11 @@ api.interceptors.request.use(
       error.config = config;
       return Promise.reject(error);
     }
-    console.debug(
-      `[api] -> ${config.method?.toUpperCase() || "GET"} ${config.baseURL || ""}${config.url || ""}`
-    );
+    if (API_DEBUG) {
+      console.debug(
+        `[api] -> ${config.method?.toUpperCase() || "GET"} ${config.baseURL || ""}${config.url || ""}`
+      );
+    }
     return config;
   },
   (error) => {
@@ -358,9 +361,11 @@ api.interceptors.response.use(
     const dataShape = Array.isArray(response.data)
       ? `array(${response.data.length})`
       : typeof response.data;
-    console.debug(
-      `[api] <- ${response.status} ${response.config?.url || ""} (${dataShape})`
-    );
+    if (API_DEBUG) {
+      console.debug(
+        `[api] <- ${response.status} ${response.config?.url || ""} (${dataShape})`
+      );
+    }
     return response;
   },
   async (error) => {
@@ -498,7 +503,13 @@ export const authAPI = {
 
   updateMe: async (profile) => {
     const response = await api.put("/auth/me", profile);
-    clearCache("/auth/me", "/auth/users", "/auth/employees", "/auth/assignees", "/clients", "/dashboard");
+    clearCache("/auth/me", "/auth/users", "/auth/employees", "/auth/assignees", "/clients", "/dashboard", "/newsfeed");
+    return response.data;
+  },
+
+  deactivateMe: async (currentPassword) => {
+    const response = await api.patch("/auth/me/deactivate", { currentPassword });
+    cache.clear();
     return response.data;
   },
 
@@ -840,15 +851,20 @@ export const messageAPI = {
     return response.data;
   },
 
-  subscribe: ({ onMessage, onError } = {}) => {
+  subscribe: ({ onMessage, onOpen, onError } = {}) => {
     const token = sessionStorage.getItem("token");
     if (!token || typeof EventSource === "undefined") {
+      onError?.("Realtime messaging is unavailable.");
       return () => {};
     }
 
     const events = new EventSource(
       `${API_URL}/messages/events?token=${encodeURIComponent(token)}`
     );
+
+    events.addEventListener("open", () => {
+      onOpen?.();
+    });
 
     events.addEventListener("message", (event) => {
       try {

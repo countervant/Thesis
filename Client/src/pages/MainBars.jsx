@@ -24,6 +24,11 @@ import InitialsAvatar from "../components/InitialsAvatar.jsx";
 import { NotificationSkeleton } from "../components/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getApiErrorMessage, messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
+import {
+  filterNotificationsByPreference,
+  notificationSettingsChangedEvent,
+  readNotificationSettings,
+} from "../utils/settingsPreferences.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const notificationReadKeyPrefix = "clientraReadNotifications";
@@ -166,6 +171,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
             message: preview,
             date: post?.updatedAt || post?.createdAt,
             target: { page: "newsfeed", postId },
+            preferenceId: "newsfeedActivity",
           });
         });
     }
@@ -183,6 +189,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
           message: trimNotificationText(comment?.text, preview),
           date: comment?.createdAt,
           target: { page: "newsfeed", postId, commentId },
+          preferenceId: "newsfeedActivity",
         });
       }
 
@@ -199,6 +206,7 @@ const buildNewsfeedNotifications = (posts, currentUserId) => {
             message: trimNotificationText(reply?.text, "New reply on newsfeed"),
             date: reply?.createdAt,
             target: { page: "newsfeed", postId, commentId, replyId },
+            preferenceId: "newsfeedActivity",
           });
         }
       });
@@ -265,6 +273,7 @@ const buildTaskNotifications = (tasks, user) => {
           ),
           date: activity?.createdAt,
           target: { page: targetPage, taskId },
+          preferenceId: "projectUpdates",
         };
       });
 
@@ -277,6 +286,7 @@ const buildTaskNotifications = (tasks, user) => {
         message: trimNotificationText(task?.title, "You have a new project"),
         date: task?.createdAt,
         target: { page: "tasks", taskId },
+        preferenceId: "taskUpdates",
       });
     }
 
@@ -448,6 +458,9 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [notificationPreferences, setNotificationPreferences] = useState(() =>
+    readNotificationSettings(user)
+  );
   const [readNotificationIds, setReadNotificationIds] = useState([]);
   const [hiddenNotificationIds, setHiddenNotificationIds] = useState([]);
   const [notificationFilter, setNotificationFilter] = useState("all");
@@ -476,6 +489,15 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       !readNotificationSet.has(notification.id) &&
       !hiddenNotificationSet.has(notification.id)
   ).length;
+
+  useEffect(() => {
+    const handleSettingsChanged = (event) => {
+      if (String(event.detail?.userId || "") !== String(userId || "guest")) return;
+      setNotificationPreferences(event.detail.settings || readNotificationSettings(user));
+    };
+    window.addEventListener(notificationSettingsChangedEvent, handleSettingsChanged);
+    return () => window.removeEventListener(notificationSettingsChangedEvent, handleSettingsChanged);
+  }, [user, userId]);
   const mobileNavItems =
     userRole === "employee"
       ? [
@@ -531,6 +553,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     let isMounted = true;
 
     const loadUnreadMessages = async () => {
+      if (document.visibilityState !== "visible") return;
+
       try {
         const count = await messageAPI.getUnreadCount();
         if (isMounted) {
@@ -581,6 +605,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     let isMounted = true;
 
     const loadNotifications = async () => {
+      if (document.visibilityState !== "visible") return;
+
       try {
         setNotificationError("");
         const [postsResult, tasksResult] = await Promise.allSettled([
@@ -591,10 +617,13 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
         const failedCount = [postsResult, tasksResult].filter((result) => result.status === "rejected").length;
 
-        const nextNotifications = [
-          ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], userId),
-          ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], user),
-        ].sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
+        const nextNotifications = filterNotificationsByPreference(
+          [
+            ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], userId),
+            ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], user),
+          ],
+          notificationPreferences
+        ).sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
 
         if (isMounted) {
           setNotifications(nextNotifications);
@@ -622,7 +651,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [token, user, userId]);
+  }, [notificationPreferences, token, user, userId]);
 
   const handleOpenNotification = (notification) => {
     const nextReadIds = Array.from(new Set([...readNotificationIds, notification.id]));
