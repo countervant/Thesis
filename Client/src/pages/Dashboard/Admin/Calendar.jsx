@@ -480,7 +480,7 @@ const AdminCalendar = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
       <section className="mx-auto max-w-[1840px] rounded-2xl border border-pink-100 bg-white px-3 py-4 shadow-[0_8px_24px_rgba(190,65,158,0.08)] md:px-5 md:py-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -505,7 +505,7 @@ const AdminCalendar = () => {
           </div>
         </header>
 
-        <div className="mt-5 grid grid-cols-5 gap-1 md:gap-4">
+        <div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 md:grid-cols-5 md:gap-4">
           {stats.map((item) => (
             <Card key={item.label} className={`min-h-0 px-1.5 py-2 !shadow-sm dark:!shadow-none ring-1 md:min-h-24 md:px-4 md:py-3 ${statCardStyles[item.tone]}`}>
               <div className="flex items-center gap-1.5 md:gap-3">
@@ -522,8 +522,8 @@ const AdminCalendar = () => {
           ))}
         </div>
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(680px,1fr)_370px]">
-          <div className="grid grid-cols-2 gap-2 xl:block xl:space-y-4">
+        <div className="mt-4 grid gap-4 2xl:grid-cols-[220px_minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-2 gap-2 2xl:block 2xl:space-y-4">
             <Card className="p-3 md:p-4">
               <h2 className="mb-3 text-sm font-black md:mb-4 md:text-base">Calendars</h2>
               {calendarChecks.map(([item, color]) => (
@@ -665,7 +665,7 @@ const AdminCalendar = () => {
 
       {showAllEventsPanel && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-6">
-          <section className="flex max-h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
+          <section className="flex max-h-[86dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
               <div>
                 <h2 className="text-lg font-black text-[#10142d]">All Events</h2>
@@ -693,7 +693,7 @@ const AdminCalendar = () => {
 
       {showDayEventsPanel && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-6">
-          <section className="flex max-h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
+          <section className="flex max-h-[86dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
               <div>
                 <h2 className="text-lg font-black text-[#10142d]">Events for {formatDate(selectedDate)}</h2>

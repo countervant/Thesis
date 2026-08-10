@@ -480,7 +480,7 @@ const ProjectDetailsModal = ({
       <section
         aria-labelledby="employee-project-details-title"
         aria-modal="true"
-        className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        className="max-h-[92dvh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
         role="dialog"
       >
         <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800 sm:px-7">
@@ -504,7 +504,7 @@ const ProjectDetailsModal = ({
           </button>
         </header>
 
-        <div className="max-h-[calc(92vh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
+        <div className="max-h-[calc(92dvh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
           <TaskRow
             currentUserId={currentUserId}
             isExpanded
@@ -1070,7 +1070,7 @@ const EmpTask = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1

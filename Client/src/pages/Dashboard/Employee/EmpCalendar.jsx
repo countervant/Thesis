@@ -319,7 +319,7 @@ const EmpCalendar = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <div className="mx-auto max-w-[1840px] space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -474,7 +474,7 @@ const EmpCalendar = () => {
         <Modal title={`Events for ${new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`} onClose={() => setShowDayEventsPanel(false)}>
           <p className="mb-4 text-xs font-bold text-slate-500">{selectedEvents.length} {selectedEvents.length === 1 ? "event" : "events"}</p>
           {selectedEvents.length ? (
-            <div className="max-h-[60vh] space-y-3 overflow-auto">
+            <div className="max-h-[60dvh] space-y-3 overflow-auto">
               {selectedEvents.map((event) => (
                 <div key={event.id} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
                   <span className={`h-3 w-3 shrink-0 rounded-full ${event.dot}`} />

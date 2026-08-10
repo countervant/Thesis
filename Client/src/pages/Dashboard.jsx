@@ -872,7 +872,7 @@ const MessagesPanel = () => {
     .slice(0, 10);
 
   return (
-  <section className="relative -mx-4 -mb-0 -mt-4 flex h-[calc(100dvh-188px)] select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 md:h-[calc(100vh-74px)] lg:-mx-9">
+  <section className="messages-workspace relative -mx-4 -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
     <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#DA70D6]/60 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
       <div className="flex items-center justify-between gap-4">
         <h1 className="page-title text-3xl leading-none md:text-2xl">Messages</h1>
@@ -1782,7 +1782,7 @@ const Dashboard = () => {
     ) : localPage === "settings" ? (
       <Settings embedded />
     ) : (
-      <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+      <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
           <h1
             className="text-3xl uppercase leading-none text-neutral-950"

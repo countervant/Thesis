@@ -409,7 +409,7 @@ const EmpLeaverequest = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header>
         <h1
           className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"

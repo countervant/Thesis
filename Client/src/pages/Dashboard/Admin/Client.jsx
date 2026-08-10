@@ -344,7 +344,7 @@ const ProjectRequestModal = ({ client, onClose }) => {
       <section
         aria-labelledby="client-project-requests-title"
         aria-modal="true"
-        className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        className="max-h-[92dvh] w-full max-w-4xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
         role="dialog"
       >
         <header className="flex items-start justify-between gap-4 border-b border-pink-100 px-5 py-5 dark:border-neutral-800 sm:px-7">
@@ -369,7 +369,7 @@ const ProjectRequestModal = ({ client, onClose }) => {
           </button>
         </header>
 
-        <div className="max-h-[calc(92vh-104px)] space-y-4 overflow-y-auto bg-slate-50/60 p-4 dark:bg-neutral-950 sm:p-6">
+        <div className="max-h-[calc(92dvh-104px)] space-y-4 overflow-y-auto bg-slate-50/60 p-4 dark:bg-neutral-950 sm:p-6">
           {client.projects.length === 0 ? (
             <div className="grid min-h-48 place-items-center rounded-2xl border border-dashed border-pink-200 bg-white px-5 text-center dark:border-neutral-700 dark:bg-neutral-900">
               <div>
@@ -735,7 +735,7 @@ const AdminClients = () => {
   };
 
   return (
-        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
         <div className="mx-auto max-w-[1500px]">
           <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>

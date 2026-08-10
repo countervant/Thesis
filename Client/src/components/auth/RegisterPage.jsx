@@ -244,7 +244,7 @@ const RegisterPage = () => {
         className="relative z-20 flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 px-3 py-8 md:px-12 dark:bg-[#111111]"
       >
         {successMessage && (
-          <div className="fixed top-6 right-6 z-20 w-72 max-w-full rounded-xl bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] border border-pink-100">
+          <div className="fixed inset-x-3 top-3 z-20 mx-auto w-auto max-w-sm rounded-xl border border-pink-100 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.15)] sm:inset-x-auto sm:right-6 sm:top-6 sm:w-72">
             <div className="flex items-start gap-2 p-4">
               <div className="mt-1 h-3 w-3 rounded-full bg-linear-to-br from-pink-500 to-purple-600" aria-hidden="true" />
               <div className="flex-1 text-sm text-gray-800">
@@ -402,7 +402,7 @@ const RegisterPage = () => {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.2fr] md:gap-6">
             <div className={mobileFieldWrap}>
-              <div className="relative flex h-12 w-[45%] items-center border-b-2 border-slate-300 bg-transparent transition focus-within:border-pink-400 dark:border-white/40 md:w-[80%]">
+              <div className="relative flex h-12 w-full items-center border-b-2 border-slate-300 bg-transparent transition focus-within:border-pink-400 dark:border-white/40">
               <CountrySelect
                 value={country}
                 onChange={handleCountryChange}

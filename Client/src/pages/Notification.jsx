@@ -319,7 +319,7 @@ const Notification = () => {
 
       {isAllNotificationsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
-          <section className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
+          <section className="flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.24)]">
             <div className="flex items-center justify-between gap-4 border-b border-neutral-100 px-5 py-4">
               <div>
                 <h2 className="text-xl font-black text-neutral-950">All Notifications</h2>

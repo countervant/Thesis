@@ -773,9 +773,9 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fbf9ff] text-neutral-950 dark:bg-neutral-950 dark:text-white md:bg-[#f8f9fd]">
+    <div className="app-shell bg-[#fbf9ff] text-neutral-950 dark:bg-neutral-950 dark:text-white md:bg-[#f8f9fd]">
       <header
-        className={`fixed right-0 top-0 z-30 flex h-[92px] items-center justify-between gap-3 bg-[#fbf9ff]/95 px-6 transition-[left] duration-300 ease-in-out dark:bg-neutral-950 md:h-14 md:gap-4 md:border-b md:border-neutral-200 md:bg-[#f8f9fd] md:px-4 dark:md:border-neutral-800 dark:md:bg-neutral-950 ${
+        className={`app-header fixed right-0 top-0 z-30 flex items-center justify-between gap-3 bg-[#fbf9ff]/95 px-3 transition-[left] duration-300 ease-in-out dark:bg-neutral-950 sm:px-5 md:gap-4 md:border-b md:border-neutral-200 md:bg-[#f8f9fd] md:px-4 dark:md:border-neutral-800 dark:md:bg-neutral-950 ${
           isSidebarExpanded ? "left-0 md:left-[220px]" : "left-0 md:left-[68px]"
         }`}
       >
@@ -870,7 +870,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             </button>
 
             {isNotificationOpen && (
-              <section className="fixed inset-x-0 bottom-[86px] top-[92px] z-50 flex w-auto max-w-none flex-col overflow-hidden border-y border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-white md:absolute md:bottom-auto md:left-auto md:right-0 md:top-14 md:block md:w-[390px] md:max-w-[calc(100vw-2rem)] md:rounded-2xl md:border">
+              <section className="notification-drawer fixed inset-x-0 z-50 flex w-auto max-w-none flex-col overflow-hidden border-y border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-white md:absolute md:left-auto md:right-0 md:block md:w-[390px] md:max-w-[calc(100vw-2rem)] md:rounded-2xl md:border">
                 <div className="flex shrink-0 items-center justify-between border-b border-neutral-100 px-4 pb-4 pt-5 dark:border-neutral-800 md:border-0 md:px-5 md:pb-0">
                   <h2 className="text-2xl font-bold text-neutral-950 dark:text-white">Notifications</h2>
                   <div className="flex items-center gap-1">
@@ -1191,7 +1191,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
       <aside
         onClick={expandSidebar}
-        className={`fixed left-0 top-0 z-40 flex h-screen flex-col overflow-visible border-r border-neutral-300 bg-[#f8f9fd] shadow-2xl transition-[transform,width] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 md:translate-x-0 md:shadow-none ${
+        className={`app-sidebar fixed left-0 top-0 z-40 flex flex-col overflow-visible border-r border-neutral-300 bg-[#f8f9fd] shadow-2xl transition-[transform,width] duration-300 ease-in-out dark:border-neutral-800 dark:bg-neutral-950 md:translate-x-0 md:shadow-none ${
           isSidebarExpanded ? "w-[260px] translate-x-0 md:w-[220px]" : "w-[260px] -translate-x-full md:w-[68px]"
         }`}
       >
@@ -1319,20 +1319,20 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       </button>
 
       <main
-        className={`px-4 pt-[102px] transition-[margin] duration-300 ease-in-out md:px-5 md:pt-[70px] lg:px-6 ${
+        className={`app-main px-4 transition-[margin] duration-300 ease-in-out md:px-5 lg:px-6 ${
           isMessagesPage ? "pb-0" : "pb-28 md:pb-8"
         } ${
           isSidebarExpanded ? "md:ml-[220px]" : "md:ml-[68px]"
         }`}
       >
-        <div style={{ zoom: isMessagesPage ? 1 : 0.9 }}>
+        <div className="min-w-0 w-full">
           {children}
         </div>
       </main>
-      <nav className={`fixed inset-x-0 bottom-0 z-40 border-t border-neutral-300 bg-[#f8f9fd]/95 px-4 pb-3 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-neutral-800 dark:bg-neutral-950/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] md:hidden ${
+      <nav className={`app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-neutral-300 bg-[#f8f9fd]/95 px-2 pt-1.5 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-neutral-800 dark:bg-neutral-950/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] sm:px-4 md:hidden ${
         isSidebarExpanded ? "translate-y-full" : "translate-y-0"
       }`}>
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        <div className={`mx-auto grid max-w-md gap-1 ${mobileNavItems.length === 4 ? "grid-cols-4" : "grid-cols-5"}`}>
           {mobileNavItems.map((item) => {
             const isActive = activePage === item.id || (activePage === "add-task" && item.id === "tasks");
             return (
@@ -1340,7 +1340,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate?.(item.id)}
-                className={`flex min-h-[66px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-black transition ${
+                className={`flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[10px] font-black transition min-[390px]:text-xs ${
                   isActive
                     ? "bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]"
                     : "text-neutral-900 hover:bg-white hover:text-[#c72fb2] dark:text-white dark:hover:bg-linear-to-b dark:hover:from-[#df4bb4] dark:hover:to-[#c72fb2] dark:hover:text-white"
@@ -1348,7 +1348,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               >
                 <Icon
                   name={item.icon}
-                  className={`h-7 w-7 object-contain ${
+                  className={`h-6 w-6 object-contain min-[390px]:h-7 min-[390px]:w-7 ${
                     isActive ? "brightness-0 invert" : "opacity-70 grayscale dark:brightness-0 dark:invert"
                   }`}
                 />

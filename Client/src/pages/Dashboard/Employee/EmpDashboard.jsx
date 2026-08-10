@@ -55,7 +55,7 @@ const Card = ({ children, className = "" }) => (
 );
 
 const EmpDashboardSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
     <header>
       <Skeleton className="h-9 w-72" />
       <Skeleton className="mt-3 h-4 w-80 max-w-full" />
@@ -327,7 +327,7 @@ const EmpDashboard = () => {
   }
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="page-title text-3xl text-[#10142d]">

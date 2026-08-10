@@ -417,7 +417,7 @@ const LeaveRequest = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1

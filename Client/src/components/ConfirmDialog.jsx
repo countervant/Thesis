@@ -28,8 +28,8 @@ const ConfirmDialog = ({
   const imageIcon = imageIcons[icon];
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-5 text-neutral-950 backdrop-blur-sm">
-      <section className="w-full max-w-[420px] rounded-3xl bg-white px-6 py-8 text-center shadow-[0_24px_60px_rgba(15,23,42,0.28)] ring-1 ring-white/80 sm:px-8 sm:py-9">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-3 text-neutral-950 backdrop-blur-sm sm:p-5">
+      <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-[420px] overflow-y-auto rounded-2xl bg-white px-5 py-6 text-center shadow-[0_24px_60px_rgba(15,23,42,0.28)] ring-1 ring-white/80 sm:max-h-[calc(100dvh-2.5rem)] sm:rounded-3xl sm:px-8 sm:py-9">
         <div className="mx-auto grid h-12 w-12 place-items-center text-neutral-950">
           {imageIcon ? (
             <img src={imageIcon} alt="" className="h-12 w-12 object-contain" />
@@ -50,7 +50,7 @@ const ConfirmDialog = ({
         <p className="mt-3 text-base font-medium text-[#686776] sm:text-lg">{message}</p>
         {errorMessage && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600">{errorMessage}</p>}
 
-        <div className="mx-auto mt-7 grid max-w-[320px] grid-cols-2 gap-3">
+        <div className="mx-auto mt-7 grid max-w-[320px] gap-3 min-[360px]:grid-cols-2">
           <button
             type="button"
             disabled={isConfirming}

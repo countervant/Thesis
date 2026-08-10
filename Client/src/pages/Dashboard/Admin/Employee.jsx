@@ -610,7 +610,7 @@ const AdminEmployees = ({
   };
 
   return (
-        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100vh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
           <div className="mx-auto max-w-[1500px]">
           <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>

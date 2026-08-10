@@ -158,7 +158,7 @@ const SectionHeader = ({ action, title }) => (
 );
 
 const ClientDashboardSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
     <header>
       <Skeleton className="h-9 w-60" />
       <Skeleton className="mt-3 h-4 w-96 max-w-full" />
@@ -382,7 +382,7 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header>
         <h1 className="page-title text-3xl">Client Dashboard</h1>
         <p className="mt-2 text-sm font-semibold text-slate-500">

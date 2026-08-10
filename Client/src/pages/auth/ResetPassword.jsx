@@ -83,15 +83,15 @@ const ResetPassword = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-[#111111]">
-      <div className="flex min-h-screen w-full flex-col items-center justify-center px-6 py-12 sm:px-10 md:px-12">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center px-3 py-8 sm:px-10 sm:py-12 md:px-12">
         <h2
-          className="text-2xl sm:text-3xl font-bold mb-8 sm:mb-10 tracking-wide uppercase"
+          className="mb-6 text-center text-2xl font-bold uppercase tracking-wide sm:mb-10 sm:text-3xl"
           style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
         >
           Set New Password
         </h2>
 
-        <form onSubmit={handleSubmit} className="login-panel w-full max-w-sm space-y-6 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 dark:bg-[#141414] dark:text-white">
+        <form onSubmit={handleSubmit} className="login-panel w-full max-w-sm space-y-5 rounded-3xl bg-white px-5 py-7 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 sm:rounded-[2.25rem] sm:px-6 sm:py-8 dark:bg-[#141414] dark:text-white">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}

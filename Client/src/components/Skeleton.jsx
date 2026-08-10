@@ -32,7 +32,7 @@ export const SkeletonRows = ({ rows = 5, columns = 4 }) => (
 );
 
 export const DashboardSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
     <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <section

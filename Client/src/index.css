@@ -6,6 +6,125 @@
   --font-bruno: 'Bruno Ace SC', sans-serif;
 }
 
+html {
+  min-width: 0;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 0;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-width: 0;
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Use the visible browser viewport on mobile instead of the legacy 100vh box. */
+.min-h-screen {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+.h-screen {
+  height: 100svh;
+  height: 100dvh;
+}
+
+.app-shell {
+  min-width: 0;
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+.app-header {
+  height: calc(4.5rem + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+}
+
+.app-main {
+  min-width: 0;
+  padding-top: calc(5.25rem + env(safe-area-inset-top));
+}
+
+.app-sidebar {
+  height: 100svh;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app-bottom-nav {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.notification-drawer {
+  top: calc(4.5rem + env(safe-area-inset-top));
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+
+.messages-workspace {
+  height: calc(100dvh - 10rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: 0;
+}
+
+@media (min-width: 768px) {
+  .app-header {
+    height: 3.5rem;
+    padding-top: 0;
+  }
+
+  .app-main {
+    padding-top: 4.375rem;
+  }
+
+  .app-sidebar {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .notification-drawer {
+    top: 3.5rem;
+    bottom: auto;
+  }
+
+  .messages-workspace {
+    height: calc(100dvh - 4.625rem);
+  }
+}
+
+@media (max-width: 767px) {
+  /* Inputs smaller than 16px make iOS zoom the entire page on focus. */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  .page-title {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.35rem, 7vw, 1.875rem);
+    line-height: 1.15;
+  }
+}
+
 .page-title {
   font-family: var(--font-bruno);
   font-weight: 400;
@@ -249,7 +368,8 @@ textarea,
 }
 
 .auth-screen {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .auth-screen-exit-register {

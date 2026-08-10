@@ -376,7 +376,7 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
     role="presentation"
   >
     <section
-      className="flex max-h-[min(760px,88vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_24px_70px_rgba(30,20,45,0.28)] dark:border-neutral-800 dark:bg-neutral-900"
+      className="flex max-h-[min(760px,88dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_24px_70px_rgba(30,20,45,0.28)] dark:border-neutral-800 dark:bg-neutral-900"
       role="dialog"
       aria-modal="true"
       aria-labelledby="project-activity-panel-title"
@@ -541,7 +541,7 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
   );
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-black text-slate-600 transition hover:text-[#c72fb2]">
           <Icon name="arrow" className="h-4 w-4" />
@@ -1040,7 +1040,7 @@ const FeedbackSuccessModal = ({ onClose }) => (
 );
 
 const ClientProjectsSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <Skeleton className="h-9 w-44" />
@@ -1491,7 +1491,7 @@ const ClientProjects = () => {
   }
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100vh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="page-title text-3xl">My Projects</h1>
