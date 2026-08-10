@@ -255,6 +255,10 @@ const Newsfeed = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
+        // The newsfeed is shared by all account roles. Always fetch a current
+        // list when opening it so posts made by another user are not hidden by
+        // the short-lived API cache.
+        newsfeedAPI.clearCachedPosts();
         const data = await newsfeedAPI.getAll();
 
         if (isMounted) {
