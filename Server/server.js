@@ -73,7 +73,12 @@ const validateRuntimeConfig = () => {
 
 validateRuntimeConfig();
 
-// CORS – accept origins from env or fall back to common dev ports
+// CORS – always accept the app's canonical domains, plus origins configured by env.
+const applicationOrigins = [
+  "https://clientra.me",
+  "https://www.clientra.me",
+];
+
 const defaultOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -104,6 +109,7 @@ const parseOriginPatterns = (...values) =>
 
 const allowedOrigins = [
   ...new Set([
+    ...applicationOrigins,
     ...parseOrigins(process.env.CORS_ORIGINS, process.env.FRONTEND_URL),
     ...(isProduction ? [] : defaultOrigins),
   ]),
