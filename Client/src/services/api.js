@@ -599,7 +599,7 @@ export const taskAPI = {
 
   create: async (task) => {
     const response = await api.post("/tasks", task);
-    clearCache("/tasks", "/dashboard");
+    clearCache("/tasks", "/budgets", "/dashboard");
     return response.data;
   },
 

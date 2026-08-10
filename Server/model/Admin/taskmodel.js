@@ -48,6 +48,24 @@ const taskSchema = new mongoose.Schema(
       default: 0,
     },
 
+    downPayment: {
+      mode: {
+        type: String,
+        enum: ["percentage", "fixed"],
+      },
+      value: {
+        type: Number,
+        min: 0,
+      },
+      amount: {
+        type: Number,
+        min: 0,
+      },
+      paidAt: {
+        type: Date,
+      },
+    },
+
     subtasks: [
       {
         title: {
@@ -76,7 +94,7 @@ const taskSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["task_created", "subtask_completed", "subtask_reopened", "revision_requested", "revision_started", "output_submitted", "client_approved", "employee_paid", "newsfeed_permission_granted", "newsfeed_permission_revoked", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
+          enum: ["task_created", "down_payment_received", "subtask_completed", "subtask_reopened", "revision_requested", "revision_started", "output_submitted", "client_approved", "employee_paid", "newsfeed_permission_granted", "newsfeed_permission_revoked", "feedback_submitted", "feedback_replied", "project_archived", "project_restored"],
           required: true,
         },
 

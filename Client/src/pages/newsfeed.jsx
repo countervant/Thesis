@@ -302,11 +302,16 @@ const Newsfeed = () => {
     };
 
     loadOnlineTeam();
-    const intervalId = window.setInterval(loadOnlineTeam, 30000);
+    const refreshOnlineTeam = () => {
+      if (document.visibilityState === "visible") loadOnlineTeam();
+    };
+    const intervalId = window.setInterval(refreshOnlineTeam, 30000);
+    document.addEventListener("visibilitychange", refreshOnlineTeam);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshOnlineTeam);
     };
   }, [authLoading, user, userId]);
 

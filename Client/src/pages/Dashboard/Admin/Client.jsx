@@ -631,11 +631,16 @@ const AdminClients = () => {
     };
 
     loadClients(true);
-    const intervalId = window.setInterval(() => loadClients(false), 30000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") loadClients(false);
+    };
+    const intervalId = window.setInterval(refreshWhenVisible, 30000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 

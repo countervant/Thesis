@@ -31,13 +31,21 @@ const validateEntry = (entry) => {
 };
 
 const syncProjectIncomeEntries = async (employeeId) => {
-  const tasks = await Task.find({ "employeePayments.employee": employeeId })
-    .select("title employeePayments.employee employeePayments.amount employeePayments.paidAt employeePayments.paidBy")
-    .maxTimeMS(8000)
-    .lean();
+  const [tasks, existingSourcePayments] = await Promise.all([
+    Task.find({ "employeePayments.employee": employeeId })
+      .select("title employeePayments.employee employeePayments.amount employeePayments.paidAt employeePayments.paidBy")
+      .maxTimeMS(8000)
+      .lean(),
+    BudgetPlannerEntry.distinct("sourceEmployeePayment", {
+      owner: employeeId,
+      sourceEmployeePayment: { $exists: true },
+    }).maxTimeMS(8000),
+  ]);
+  const existingSources = new Set(existingSourcePayments.map(String));
   const operations = tasks.flatMap((task) =>
     (task.employeePayments || [])
       .filter((payment) => String(payment.employee?._id || payment.employee) === String(employeeId))
+      .filter((payment) => !existingSources.has(`${task._id}:${employeeId}`))
       .map((payment) => {
         const sourceEmployeePayment = `${task._id}:${employeeId}`;
         const entryId = createHash("sha256")

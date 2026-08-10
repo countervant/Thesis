@@ -4,12 +4,22 @@ import User from '../model/userModel.js';
 import { withAvatarUrl } from '../utils/avatar.js';
 
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;
+const MAX_AUTH_USER_CACHE_ENTRIES = 500;
 const authUserCache = new Map();
 const authUserFields =
   "firstName middleInitial lastName companyName email phone country role position birthday gender skillGroups isActive isOnline showOnlineStatus privacySettings lastSeen twoFactorEnabled createdAt updatedAt";
 
 export const clearCachedAuthUser = (userId) => {
   if (userId) authUserCache.delete(String(userId));
+};
+
+const setCachedAuthUser = (userId, entry) => {
+  authUserCache.delete(userId);
+  authUserCache.set(userId, entry);
+
+  while (authUserCache.size > MAX_AUTH_USER_CACHE_ENTRIES) {
+    authUserCache.delete(authUserCache.keys().next().value);
+  }
 };
 
 const isDatabaseTimeout = (error) => {
@@ -29,6 +39,7 @@ const getCachedUser = async (userId) => {
   const now = Date.now();
 
   if (cached && cached.expiresAt > now) {
+    setCachedAuthUser(userId, cached);
     return cached.promise || cached.user;
   }
 
@@ -39,7 +50,7 @@ const getCachedUser = async (userId) => {
     .then((user) => {
       if (user) {
         const profile = withAvatarUrl(user);
-        authUserCache.set(userId, {
+        setCachedAuthUser(userId, {
           user: profile,
           expiresAt: Date.now() + AUTH_USER_CACHE_MS,
         });
@@ -54,7 +65,7 @@ const getCachedUser = async (userId) => {
       throw error;
     });
 
-  authUserCache.set(userId, {
+  setCachedAuthUser(userId, {
     promise,
     expiresAt: now + AUTH_USER_CACHE_MS,
   });

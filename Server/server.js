@@ -147,7 +147,13 @@ app.use(
 );
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "30mb" }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    immutable: true,
+    maxAge: "30d",
+  })
+);
 
 app.get("/api/health", (req, res) => {
   res.status(isDbConnected() ? 200 : 503).json({

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, useEffect } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 import { authAPI } from "../services/api.js";
 
 const AuthContext = createContext(null);
@@ -110,7 +110,7 @@ export const AuthProvider = ({ children }) => {
 
     syncPresence();
     const intervalId = window.setInterval(() => {
-      if (isActive) syncPresence();
+      if (isActive && document.visibilityState === "visible") syncPresence();
     }, PRESENCE_HEARTBEAT_MS);
 
     const handleVisibilityChange = () => syncPresence();
@@ -131,16 +131,16 @@ export const AuthProvider = ({ children }) => {
     };
   }, [markOffline, showOnlineStatus, token, userId]);
 
-  const login = (userData, authToken) => {
+  const login = useCallback((userData, authToken) => {
     const normalizedUser = normalizeUser(userData);
     authAPI.clearSessionCache();
     setUser(normalizedUser);
     setToken(authToken);
     persistUser(normalizedUser);
     sessionStorage.setItem("token", authToken);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     const currentToken = token;
     await markOffline(currentToken);
     setUser(null);
@@ -148,7 +148,7 @@ export const AuthProvider = ({ children }) => {
     authAPI.clearSessionCache();
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("token");
-  };
+  }, [markOffline, token]);
 
   const updateUser = useCallback((userData) => {
     setUser((currentUser) => {
@@ -164,28 +164,28 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = Boolean(token && user);
 
   // Check if user has required role(s)
-  const hasRole = (roles) => {
+  const hasRole = useCallback((roles) => {
     if (!user) return false;
     const userRole = normalizeRole(user.role);
     if (typeof roles === "string") {
       return userRole === normalizeRole(roles);
     }
     return roles.map(normalizeRole).includes(userRole);
-  };
+  }, [user]);
+
+  const contextValue = useMemo(() => ({
+    user,
+    token,
+    loading,
+    login,
+    logout,
+    updateUser,
+    isAuthenticated,
+    hasRole,
+  }), [hasRole, isAuthenticated, login, logout, token, updateUser, user]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        login,
-        logout,
-        updateUser,
-        isAuthenticated,
-        hasRole,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

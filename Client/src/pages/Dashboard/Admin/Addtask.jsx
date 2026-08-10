@@ -144,7 +144,7 @@ const getEntityId = (entity) => {
 };
 
 const normalizeSubtasks = (subtasks = []) => {
-  if (!Array.isArray(subtasks)) return [{ title: "", completed: false }];
+  if (!Array.isArray(subtasks)) return [];
 
   const normalizedSubtasks = subtasks.map((subtask) => ({
     title: subtask?.title || "",
@@ -152,9 +152,7 @@ const normalizeSubtasks = (subtasks = []) => {
     assignedTo: getEntityId(subtask?.assignedTo),
   }));
 
-  return normalizedSubtasks.length > 0
-    ? normalizedSubtasks
-    : [{ title: "", completed: false }];
+  return normalizedSubtasks;
 };
 
 const normalizeAssignees = (data) => {
@@ -209,14 +207,22 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     startDate: todayInputDate(),
     dueDate: todayInputDate(),
     amount: "",
+    downPaymentType: "none",
+    downPaymentValue: "",
     priority: "medium",
     requestedBy: isAdmin ? "" : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
-    subtasks: [createBlankSubtask(), createSubmitOutputSubtask()],
+    subtasks: [createSubmitOutputSubtask()],
   });
   const [assignees, setAssignees] = useState([]);
   const [clients, setClients] = useState([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [clientRequestType, setClientRequestType] = useState(
+    task?.requestedByName && !getEntityId(task?.requestedBy) ? "custom" : "existing"
+  );
+  const [customClientName, setCustomClientName] = useState(
+    task?.requestedByName && !getEntityId(task?.requestedBy) ? task.requestedByName : ""
+  );
   const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -229,7 +235,11 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         const data = await authAPI.getAssignees();
         const loadedAssignees = normalizeAssignees(data);
         const availableAssignees = isAdmin
-          ? loadedAssignees.filter((assignee) => assignee?.role === "employee")
+          ? loadedAssignees.filter(
+              (assignee) =>
+                assignee?.role === "employee" ||
+                (assignee?.role === "admin" && assignee?.isSelf)
+            )
           : loadedAssignees;
 
         if (isMounted) {
@@ -318,19 +328,20 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
       dueDate: toInputDate(task.dueDate),
       amount: task.amount ?? task.budget ?? "",
+      downPaymentType: task.downPayment?.mode || "none",
+      downPaymentValue: task.downPayment?.value ?? "",
       priority: task.priority || "medium",
       requestedBy:
         getEntityId(task.requestedBy) ||
-        (task.requestedByName
-          ? "existing-client"
-          : task.createdBy?.role === "client"
-            ? getEntityId(task.createdBy)
-            : ""),
+        (task.createdBy?.role === "client" ? getEntityId(task.createdBy) : ""),
       assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
         .map(getEntityId)
         .filter(Boolean),
       subtasks: ensureSubmitOutputSubtask(normalizeSubtasks(task.subtasks)),
     });
+    const usesCustomClient = Boolean(task.requestedByName && !getEntityId(task.requestedBy));
+    setClientRequestType(usesCustomClient ? "custom" : "existing");
+    setCustomClientName(usesCustomClient ? task.requestedByName : "");
   }, [task, user]);
 
   const updateField = (field, value) => {
@@ -391,14 +402,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     setFormData((currentData) => {
       if (isSubmitOutputSubtask(currentData.subtasks[index])) return currentData;
 
-      const editableTaskCount = currentData.subtasks.filter(
-        (subtask) => !isSubmitOutputSubtask(subtask)
-      ).length;
-      const subtasks = editableTaskCount > 1
-        ? currentData.subtasks.filter((_, currentIndex) => currentIndex !== index)
-        : currentData.subtasks.map((subtask, currentIndex) =>
-            currentIndex === index ? createBlankSubtask() : subtask
-          );
+      const subtasks = currentData.subtasks.filter(
+        (_, currentIndex) => currentIndex !== index
+      );
 
       return { ...currentData, subtasks };
     });
@@ -414,7 +420,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       setFormData((currentData) => ({
         ...currentData,
         title: "",
-        subtasks: [createBlankSubtask(), createSubmitOutputSubtask()],
+        subtasks: [createSubmitOutputSubtask()],
       }));
       return;
     }
@@ -481,15 +487,45 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    if (isAdmin && !formData.requestedBy) {
+    if (isAdmin && !isEditing && formData.downPaymentType !== "none") {
+      const projectAmount = Number(formData.amount);
+      const downPaymentValue = Number(formData.downPaymentValue);
+      const downPaymentAmount = formData.downPaymentType === "percentage"
+        ? projectAmount * (downPaymentValue / 100)
+        : downPaymentValue;
+
+      if (!Number.isFinite(downPaymentValue) || downPaymentValue <= 0) {
+        setErrorMessage("Down payment must be greater than 0.");
+        return;
+      }
+      if (formData.downPaymentType === "percentage" && downPaymentValue > 100) {
+        setErrorMessage("Down payment percentage cannot be greater than 100%.");
+        return;
+      }
+      if (downPaymentAmount > projectAmount) {
+        setErrorMessage("Down payment cannot be greater than the project amount.");
+        return;
+      }
+    }
+
+    if (isAdmin && clientRequestType === "existing" && !formData.requestedBy) {
       setErrorMessage("Please choose which client requested this project.");
+      return;
+    }
+
+    if (isAdmin && clientRequestType === "custom" && !customClientName.trim()) {
+      setErrorMessage("Please enter the custom client's name.");
       return;
     }
 
     const selectedClient = safeClients.find(
       (client) => getEntityId(client) === formData.requestedBy
     );
-    if (isAdmin && (!selectedClient || formatClientName(selectedClient) !== clientSearch.trim())) {
+    if (
+      isAdmin &&
+      clientRequestType === "existing" &&
+      (!selectedClient || formatClientName(selectedClient) !== clientSearch.trim())
+    ) {
       setErrorMessage("Please select a client from the search results.");
       return;
     }
@@ -502,14 +538,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       }))
       .filter((subtask) => subtask.title);
     const subtasks = ensureSubmitOutputSubtask(normalizedFormSubtasks);
-    const projectTasks = subtasks.filter(
-      (subtask) => !isSubmitOutputSubtask(subtask)
-    );
-
-    if (projectTasks.length === 0) {
-      setErrorMessage("At least one task is required.");
-      return;
-    }
 
     try {
       setIsSubmitting(true);
@@ -521,16 +549,29 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         startDate: formData.startDate,
         dueDate: formData.dueDate,
         amount: Number(formData.amount),
+        ...(!isEditing && isAdmin
+          ? {
+              downPaymentType:
+                formData.downPaymentType === "none" ? undefined : formData.downPaymentType,
+              downPaymentValue:
+                formData.downPaymentType === "none"
+                  ? undefined
+                  : Number(formData.downPaymentValue),
+            }
+          : {}),
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
         assignedTo: formData.assignees[0],
         assignees: formData.assignees,
         requestedBy:
-          !isAdmin || isRegisteredClientUser(selectedClient)
+          !isAdmin ||
+          (clientRequestType === "existing" && isRegisteredClientUser(selectedClient))
             ? formData.requestedBy
             : undefined,
         requestedByName: isAdmin
-          ? formatClientName(selectedClient)
+          ? clientRequestType === "custom"
+            ? customClientName.trim()
+            : formatClientName(selectedClient)
           : [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "",
         subtasks,
       };
@@ -553,14 +594,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   };
 
   const safeAssignees = normalizeAssignees(assignees);
-  const existingClientOption =
-    task?.requestedByName && !getEntityId(task?.requestedBy)
-      ? [{ _id: "existing-client", source: "client", contactPerson: task.requestedByName }]
-      : [];
-  const safeClients = [
-    ...existingClientOption,
-    ...normalizeClients(clients).filter((client) => getEntityId(client) !== "existing-client"),
-  ];
+  const safeClients = normalizeClients(clients);
   const currentClient = safeClients.find(
     (client) => getEntityId(client) === formData.requestedBy
   );
@@ -575,12 +609,30 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         return label.includes(normalizedClientSearch) || email.includes(normalizedClientSearch);
       })
     : safeClients;
+  const projectAmount = Math.max(0, Number(formData.amount) || 0);
+  const downPaymentValue = Math.max(0, Number(formData.downPaymentValue) || 0);
+  const calculatedDownPayment = Math.min(
+    projectAmount,
+    Math.round(
+      (formData.downPaymentType === "percentage"
+        ? projectAmount * (downPaymentValue / 100)
+        : formData.downPaymentType === "fixed"
+          ? downPaymentValue
+          : 0) * 100
+    ) / 100
+  );
+  const remainingBalance = Math.max(0, projectAmount - calculatedDownPayment);
+  const formatMoney = (value) =>
+    `₱${Number(value || 0).toLocaleString("en-PH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
 
   useEffect(() => {
-    if (!isClientPickerOpen) {
+    if (clientRequestType === "existing" && !isClientPickerOpen) {
       setClientSearch(formatClientName(currentClient));
     }
-  }, [clients, currentClient, isClientPickerOpen, task?.requestedByName]);
+  }, [clientRequestType, clients, currentClient, isClientPickerOpen]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950 dark:text-white">
@@ -645,7 +697,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               <span>
                 <FieldLabel>Tasks</FieldLabel>
                 <span className="ml-2 text-[10px] font-bold text-neutral-400">
-                  Employees complete these in order
+                  Optional — assignees complete added tasks in order
                 </span>
               </span>
               <button
@@ -673,7 +725,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                     className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-3 text-xs font-medium text-neutral-600 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300"
                     aria-label={`Assign task ${index + 1}`}
                   >
-                    <option value="">Any assigned employee</option>
+                    <option value="">Any project assignee</option>
                     {safeAssignees.map((assignee) => (
                         <option key={getEntityId(assignee)} value={getEntityId(assignee)}>
                           {formatAssigneeName(assignee)}
@@ -751,65 +803,184 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="mt-5 space-y-1">
-              <FieldLabel>Client / Requested by:</FieldLabel>
-              <div className="relative">
-                <input
-                  type="search"
-                  value={clientSearch}
-                  onChange={(event) => handleClientSearchChange(event.target.value)}
-                  onFocus={() => setIsClientPickerOpen(true)}
-                  onBlur={() => window.setTimeout(() => setIsClientPickerOpen(false), 120)}
-                  placeholder="Search client..."
-                  className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 pr-9 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
-                />
-                <svg
-                  viewBox="0 0 20 20"
-                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#d94ab4]"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6" />
-                  <path d="m13 13 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-
-                {isClientPickerOpen && (
-                  <div className="absolute left-0 right-0 top-10 z-20 max-h-48 overflow-y-auto rounded-lg border border-pink-100 bg-white py-1 shadow-xl dark:border-neutral-800 dark:bg-[#111111]">
-                    {filteredClients.length === 0 ? (
-                      <p className="px-4 py-3 text-xs font-semibold text-neutral-500">
-                        No clients found.
-                      </p>
-                    ) : (
-                      filteredClients.map((client) => {
-                        const clientId = getEntityId(client);
-                        const isSelected = clientId === formData.requestedBy;
-
-                        return (
-                          <button
-                            key={clientId}
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => handleClientSelect(client)}
-                            className={`flex w-full flex-col px-4 py-2 text-left transition hover:bg-pink-50 dark:hover:bg-neutral-900 ${
-                              isSelected ? "bg-pink-50 text-[#d94ab4] dark:bg-neutral-900" : "text-neutral-700 dark:text-neutral-300"
-                            }`}
-                          >
-                            <span className="truncate text-xs font-bold">
-                              {formatClientName(client)}
-                            </span>
-                            {client.email && (
-                              <span className="mt-0.5 truncate text-[11px] font-medium text-neutral-400">
-                                {client.email}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+          {isAdmin && !isEditing && (
+            <section className="mt-5 rounded-xl border border-pink-100 bg-pink-50/40 p-4 dark:border-pink-900/30 dark:bg-pink-950/10">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <FieldLabel>Down Payment</FieldLabel>
+                  <p className="mt-1 text-[10px] font-medium text-neutral-400">
+                    Optional payment received when creating this project.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-[#c72fb2] dark:bg-neutral-950">
+                  Budget Income
+                </span>
               </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="block text-[11px] font-bold text-neutral-500 dark:text-neutral-300">Payment type</span>
+                  <select
+                    value={formData.downPaymentType}
+                    onChange={(event) => {
+                      updateField("downPaymentType", event.target.value);
+                      if (event.target.value === "none") updateField("downPaymentValue", "");
+                    }}
+                    className="h-9 w-full rounded-lg border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-600 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:focus:ring-pink-950"
+                  >
+                    <option value="none">No down payment</option>
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed amount (₱)</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="block text-[11px] font-bold text-neutral-500 dark:text-neutral-300">
+                    {formData.downPaymentType === "percentage" ? "Percentage" : "Amount"}
+                  </span>
+                  <span className="relative block">
+                    {formData.downPaymentType === "fixed" && (
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400">₱</span>
+                    )}
+                    <input
+                      type="number"
+                      min="0"
+                      max={formData.downPaymentType === "percentage" ? "100" : formData.amount || undefined}
+                      step="0.01"
+                      disabled={formData.downPaymentType === "none"}
+                      value={formData.downPaymentValue}
+                      onChange={(event) => updateField("downPaymentValue", event.target.value)}
+                      placeholder={formData.downPaymentType === "percentage" ? "e.g. 30" : "e.g. 5000"}
+                      className={`h-9 w-full rounded-lg border border-neutral-300 bg-white pr-8 text-xs font-medium text-neutral-600 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-neutral-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:disabled:bg-neutral-900 ${formData.downPaymentType === "fixed" ? "pl-7" : "pl-3"}`}
+                    />
+                    {formData.downPaymentType === "percentage" && (
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400">%</span>
+                    )}
+                  </span>
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-2 rounded-lg border border-pink-100 bg-white p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950 sm:grid-cols-3">
+                <span>
+                  <span className="block text-[9px] font-black uppercase tracking-wide text-neutral-400">Project Amount</span>
+                  <span className="mt-1 block font-black text-neutral-700 dark:text-white">{formatMoney(projectAmount)}</span>
+                </span>
+                <span>
+                  <span className="block text-[9px] font-black uppercase tracking-wide text-neutral-400">Down Payment</span>
+                  <span className="mt-1 block font-black text-emerald-600">− {formatMoney(calculatedDownPayment)}</span>
+                </span>
+                <span>
+                  <span className="block text-[9px] font-black uppercase tracking-wide text-neutral-400">Remaining Balance</span>
+                  <span className="mt-1 block font-black text-[#c72fb2]">{formatMoney(remainingBalance)}</span>
+                </span>
+              </div>
+            </section>
+          )}
+
+          {isAdmin && (
+            <div className="mt-5 space-y-2">
+              <FieldLabel>Client / Requested by:</FieldLabel>
+              <div className="grid grid-cols-2 rounded-lg border border-neutral-300 bg-white/40 p-1 dark:border-neutral-700 dark:bg-neutral-950">
+                <button
+                  type="button"
+                  onClick={() => setClientRequestType("existing")}
+                  className={`h-8 rounded-md text-xs font-bold transition ${
+                    clientRequestType === "existing"
+                      ? "bg-[#dc4fb2] text-white shadow-sm"
+                      : "text-neutral-500 hover:bg-pink-50 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                  }`}
+                >
+                  Existing Client
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientRequestType("custom");
+                    updateField("requestedBy", "");
+                    setIsClientPickerOpen(false);
+                  }}
+                  className={`h-8 rounded-md text-xs font-bold transition ${
+                    clientRequestType === "custom"
+                      ? "bg-[#dc4fb2] text-white shadow-sm"
+                      : "text-neutral-500 hover:bg-pink-50 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                  }`}
+                >
+                  Custom Client
+                </button>
+              </div>
+
+              {clientRequestType === "custom" ? (
+                <div>
+                  <input
+                    type="text"
+                    value={customClientName}
+                    onChange={(event) => setCustomClientName(event.target.value)}
+                    placeholder="Enter client or company name..."
+                    maxLength={160}
+                    className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+                  />
+                  <p className="mt-1.5 text-[10px] font-medium text-neutral-400">
+                    Use this when the client does not want or need a Clientra account.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="search"
+                    value={clientSearch}
+                    onChange={(event) => handleClientSearchChange(event.target.value)}
+                    onFocus={() => setIsClientPickerOpen(true)}
+                    onBlur={() => window.setTimeout(() => setIsClientPickerOpen(false), 120)}
+                    placeholder="Search client..."
+                    className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 pr-9 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
+                  />
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#d94ab4]"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="m13 13 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+
+                  {isClientPickerOpen && (
+                    <div className="absolute left-0 right-0 top-10 z-20 max-h-48 overflow-y-auto rounded-lg border border-pink-100 bg-white py-1 shadow-xl dark:border-neutral-800 dark:bg-[#111111]">
+                      {filteredClients.length === 0 ? (
+                        <p className="px-4 py-3 text-xs font-semibold text-neutral-500">
+                          No clients found. Choose Custom Client to enter a name directly.
+                        </p>
+                      ) : (
+                        filteredClients.map((client) => {
+                          const clientId = getEntityId(client);
+                          const isSelected = clientId === formData.requestedBy;
+
+                          return (
+                            <button
+                              key={clientId}
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handleClientSelect(client)}
+                              className={`flex w-full flex-col px-4 py-2 text-left transition hover:bg-pink-50 dark:hover:bg-neutral-900 ${
+                                isSelected ? "bg-pink-50 text-[#d94ab4] dark:bg-neutral-900" : "text-neutral-700 dark:text-neutral-300"
+                              }`}
+                            >
+                              <span className="truncate text-xs font-bold">
+                                {formatClientName(client)}
+                              </span>
+                              {client.email && (
+                                <span className="mt-0.5 truncate text-[11px] font-medium text-neutral-400">
+                                  {client.email}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

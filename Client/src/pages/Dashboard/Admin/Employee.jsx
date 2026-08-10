@@ -524,10 +524,15 @@ const AdminEmployees = ({
       }
     };
 
-    const intervalId = window.setInterval(refreshPresence, 30000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshPresence();
+    };
+    const intervalId = window.setInterval(refreshWhenVisible, 30000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 

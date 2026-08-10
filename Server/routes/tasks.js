@@ -22,6 +22,7 @@ const allowedTaskViews = new Set(["calendar", "dashboard", "employee", "notifica
 
 const fullTaskFields = [
   "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
+  "downPayment.mode", "downPayment.value", "downPayment.amount", "downPayment.paidAt",
   "subtasks", "activities", "completedAt", "assignedTo", "assignees", "createdBy",
   "requestedBy", "requestedByName", "revisionRequests.user", "revisionRequests.title",
   "revisionRequests.section", "revisionRequests.priority", "revisionRequests.description",
@@ -46,10 +47,12 @@ const fullTaskFields = [
 const taskFieldsByView = {
   projects: [
     "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
+    "downPayment.mode", "downPayment.value", "downPayment.amount", "downPayment.paidAt",
     "assignedTo", "assignees", "requestedBy", "requestedByName",
     "subtasks._id", "subtasks.title", "subtasks.completed",
-    "activities.type", "revisionRequests._id", "finalOutput.submittedAt",
-    "finalOutput.fileName", "finalOutput.fileUrl", "finalOutput.link", "finalOutput.watermarked",
+    "activities.type", "revisionRequests._id", "finalOutput.submittedBy", "finalOutput.submittedAt",
+    "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName", "finalOutput.fileUrl",
+    "finalOutput.link", "finalOutput.mimeType", "finalOutput.watermarked",
     "attachments.fileName", "attachments.fileUrl", "feedback.rating", "feedback.overallRating",
     "feedback.comment", "feedback.submittedAt", "feedback.reply.message", "archived", "archivedAt",
     "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
@@ -167,6 +170,52 @@ const isClientReviewSubtask = (subtask) =>
 const isSubmitOutputSubtask = (subtask) =>
   String(subtask?.title || "").trim().toLowerCase() === "submit output";
 
+const ensureSubmitOutputSubtask = (subtasks = []) =>
+  subtasks.some(isSubmitOutputSubtask)
+    ? subtasks
+    : [
+        ...subtasks,
+        {
+          title: "Submit Output",
+          completed: false,
+        },
+      ];
+
+const getDownPayment = (body, projectAmount) => {
+  const mode = ["percentage", "fixed"].includes(body.downPaymentType)
+    ? body.downPaymentType
+    : "";
+  if (!mode) return { downPayment: undefined, message: "" };
+
+  const value = Number(body.downPaymentValue);
+  if (!Number.isFinite(value) || value <= 0) {
+    return { message: "Down payment must be greater than 0" };
+  }
+  if (!Number.isFinite(projectAmount) || projectAmount <= 0) {
+    return { message: "Set a project amount before adding a down payment" };
+  }
+  if (mode === "percentage" && value > 100) {
+    return { message: "Down payment percentage cannot be greater than 100%" };
+  }
+
+  const amount = Math.round(
+    (mode === "percentage" ? projectAmount * (value / 100) : value) * 100
+  ) / 100;
+  if (amount > projectAmount) {
+    return { message: "Down payment cannot be greater than the project amount" };
+  }
+
+  return {
+    downPayment: {
+      mode,
+      value,
+      amount,
+      paidAt: new Date(),
+    },
+    message: "",
+  };
+};
+
 const getSubmissionSubtaskIndex = (subtasks) => {
   const submitOutputIndex = subtasks.findIndex(isSubmitOutputSubtask);
   if (submitOutputIndex >= 0) return submitOutputIndex;
@@ -218,16 +267,20 @@ const canUserSubmitTask = (task, userId) =>
     (subtask) => String(subtask?.assignedTo?._id || subtask?.assignedTo || "") === String(userId)
   );
 
-const validateEmployeeAssignees = async (assignees) => {
-  if (!assignees.length) return "Select at least one employee for this task";
+const validateProjectAssignees = async (assignees, adminUserId) => {
+  if (!assignees.length) return "Select at least one project assignee";
+
+  const employeeAssignees = assignees.filter(
+    (assigneeId) => String(assigneeId) !== String(adminUserId)
+  );
   const employeeCount = await User.countDocuments({
-    _id: { $in: assignees },
+    _id: { $in: employeeAssignees },
     role: "employee",
     isActive: true,
   }).maxTimeMS(8000);
-  return employeeCount === assignees.length
+  return employeeCount === employeeAssignees.length
     ? ""
-    : "Tasks can only be assigned to active employees";
+    : "Projects can only be assigned to active employees or yourself";
 };
 
 const getActorName = (user) =>
@@ -256,6 +309,12 @@ const addTaskAvatarUrls = (task) => ({
     : [],
   createdBy: withAvatarUrl(task.createdBy),
   requestedBy: withAvatarUrl(task.requestedBy),
+  finalOutput: task.finalOutput
+    ? {
+        ...task.finalOutput,
+        submittedBy: withAvatarUrl(task.finalOutput.submittedBy),
+      }
+    : task.finalOutput,
   employeePayments: Array.isArray(task.employeePayments)
     ? task.employeePayments.map((payment) => ({
         ...payment,
@@ -331,7 +390,7 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
   const priority = body.priority || "medium";
   const amount = Number(body.amount ?? body.budget ?? 0);
   const paid = Number(body.paid ?? 0);
-  const subtasks = normalizeSubtasks(body.subtasks).map((subtask) => ({
+  const subtasks = ensureSubmitOutputSubtask(normalizeSubtasks(body.subtasks)).map((subtask) => ({
     ...subtask,
     completed: status === "done" ? true : subtask.completed,
   }));
@@ -463,6 +522,7 @@ router.get("/", protect, async (req, res) => {
       .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
       .populate("createdBy", "firstName lastName companyName email role updatedAt")
       .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("finalOutput.submittedBy", "firstName lastName email role updatedAt")
       .populate("employeePayments.employee", "firstName lastName email role updatedAt")
       .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
@@ -475,6 +535,7 @@ router.get("/", protect, async (req, res) => {
         .populate("assignees", "firstName lastName email role updatedAt")
         .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
         .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+        .populate("finalOutput.submittedBy", "firstName lastName email role updatedAt")
         .populate("employeePayments.employee", "firstName lastName email role updatedAt")
         .populate("employeePayments.paidBy", "firstName lastName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
@@ -507,6 +568,7 @@ router.get("/:id", protect, async (req, res) => {
       .populate("activities.actor", "firstName lastName companyName email role updatedAt")
       .populate("createdBy", "firstName lastName companyName email role updatedAt")
       .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+      .populate("finalOutput.submittedBy", "firstName lastName email role updatedAt")
       .populate("employeePayments.employee", "firstName lastName email role updatedAt")
       .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
       .populate("feedback.user", "firstName lastName companyName email role updatedAt")
@@ -542,14 +604,24 @@ router.post("/", protect, async (req, res) => {
           ? req.body.requestedByName
           : [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email,
     });
-    payload.paid = 0;
+    const downPaymentResult = req.user.role === "admin"
+      ? getDownPayment(req.body, payload.amount)
+      : { downPayment: undefined, message: "" };
+    if (downPaymentResult.message) {
+      return res.status(400).json({ message: downPaymentResult.message });
+    }
+    const downPayment = downPaymentResult.downPayment;
+    payload.paid = downPayment?.amount || 0;
 
     if (!payload.title) {
       return res.status(400).json({ message: "Task title is required" });
     }
 
     if (req.user.role === "admin") {
-      const assigneeValidationMessage = await validateEmployeeAssignees(payload.assignees);
+      const assigneeValidationMessage = await validateProjectAssignees(
+        payload.assignees,
+        req.user._id
+      );
       if (assigneeValidationMessage) {
         return res.status(400).json({ message: assigneeValidationMessage });
       }
@@ -597,18 +669,46 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Past dates cannot be selected" });
     }
 
+    const activities = [{
+      type: "task_created",
+      title: "Task created",
+      details: "Project task was created",
+      actor: req.user._id,
+      actorName: getActorName(req.user),
+    }];
+    if (downPayment?.amount > 0) {
+      activities.push({
+        type: "down_payment_received",
+        title: "Down payment received",
+        details: `Received ₱${downPayment.amount.toFixed(2)} down payment`,
+        actor: req.user._id,
+        actorName: getActorName(req.user),
+      });
+    }
+
     const task = await Task.create({
       ...payload,
       createdBy: req.user._id,
+      downPayment,
       completedAt: payload.status === "done" ? new Date() : undefined,
-      activities: [{
-        type: "task_created",
-        title: "Task created",
-        details: "Project task was created",
-        actor: req.user._id,
-        actorName: getActorName(req.user),
-      }],
+      activities,
     });
+
+    if (downPayment?.amount > 0) {
+      try {
+        await Budget.create({
+          type: "income",
+          description: `Project down payment: ${task.title}`,
+          category: "Project Down Payment",
+          date: downPayment.paidAt,
+          amount: downPayment.amount,
+          sourceTask: task._id,
+        });
+      } catch (error) {
+        await task.deleteOne();
+        throw error;
+      }
+    }
 
     const createdTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
@@ -726,7 +826,10 @@ router.put("/:id", protect, async (req, res) => {
     }
 
     if (req.user.role === "admin") {
-      const assigneeValidationMessage = await validateEmployeeAssignees(payload.assignees);
+      const assigneeValidationMessage = await validateProjectAssignees(
+        payload.assignees,
+        req.user._id
+      );
       if (assigneeValidationMessage) {
         return res.status(400).json({ message: assigneeValidationMessage });
       }
@@ -799,6 +902,7 @@ router.put("/:id", protect, async (req, res) => {
       .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("finalOutput.submittedBy", "firstName lastName email role")
       .lean();
 
     res.status(200).json(updatedTask);
@@ -1199,7 +1303,7 @@ router.post("/:id/revisions/start", protect, async (req, res) => {
 
 router.post("/:id/approve", protect, async (req, res) => {
   try {
-    if (req.user.role !== "client") {
+    if (!["admin", "client"].includes(req.user.role)) {
       return res.status(403).json({ message: "Only clients can approve projects" });
     }
 
@@ -1210,6 +1314,12 @@ router.post("/:id/approve", protect, async (req, res) => {
 
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (req.user.role === "admin" && task.requestedBy) {
+      return res.status(403).json({
+        message: "A project linked to a client account must be approved by that client",
+      });
     }
 
     if (task.status !== "review" || !task.finalOutput?.submittedAt) {
@@ -1224,8 +1334,12 @@ router.post("/:id/approve", protect, async (req, res) => {
     task.completedAt = hasRemainingSubtasks ? undefined : new Date();
     addActivity(task, {
       type: "client_approved",
-      title: "Client approved the project",
-      details: "Submitted output was approved",
+      title: req.user.role === "admin"
+        ? "Admin recorded custom client approval"
+        : "Client approved the project",
+      details: req.user.role === "admin"
+        ? `${task.requestedByName || "Custom client"} approved the submitted output offline`
+        : "Submitted output was approved",
       actor: req.user._id,
       actorName: getActorName(req.user),
     });
@@ -1655,6 +1769,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("finalOutput.submittedBy", "firstName lastName email role")
       .lean();
 
     res.status(200).json(updatedTask);

@@ -107,6 +107,32 @@ const formatReadableDate = (date) => {
   });
 };
 
+const formatSubmittedDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const getSafeOutputLink = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+};
+
 const getStatusTone = (status) => {
   if (status === "Done") return "bg-[#eafbed] text-[#28b84c]";
   if (status === "Pending") return "bg-[#ffeaf5] text-[#e347a8]";
@@ -199,6 +225,7 @@ const normalizeTask = (task) => {
     priority: task?.priority || "medium",
     amount: Number(task?.amount ?? task?.budget ?? 0),
     paid: Number(task?.paid ?? 0),
+    downPayment: task?.downPayment || null,
     assignedTo: task?.assignedTo,
     assignees: task?.assignees?.length ? task.assignees : [task?.assignedTo].filter(Boolean),
     createdBy: task?.createdBy,
@@ -398,6 +425,8 @@ const SmallIcon = ({ name, className = "h-4 w-4" }) => {
   if (name === "check") return <svg {...props}><path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "send") return <svg {...props}><path d="m20 4-8 16-2-7-6-3 16-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "upload") return <svg {...props}><path d="M12 16V5M8 9l4-4 4 4M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "download") return <svg {...props}><path d="M12 4v11M8 11l4 4 4-4M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "external") return <svg {...props}><path d="M13 5h6v6M19 5l-8 8M17 13v6H5V7h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   return <svg {...props}><circle cx="12" cy="12" r="1.8" fill="currentColor" /><circle cx="12" cy="5" r="1.8" fill="currentColor" /><circle cx="12" cy="19" r="1.8" fill="currentColor" /></svg>;
 };
 
@@ -421,6 +450,7 @@ const ProjectPaymentButton = ({ isMarkingPaid, item, onMarkPaid }) => {
 
   const amount = Number(item.amount || 0);
   const isPaid = amount > 0 && Number(item.paid || 0) >= amount;
+  const remainingBalance = Math.max(0, amount - Number(item.paid || 0));
   const isDisabled = isPaid || amount <= 0 || isMarkingPaid;
   const label = isPaid
     ? "Paid"
@@ -428,7 +458,9 @@ const ProjectPaymentButton = ({ isMarkingPaid, item, onMarkPaid }) => {
       ? "Set amount first"
       : isMarkingPaid
         ? "Recording payment..."
-        : "Mark as Paid";
+        : Number(item.paid || 0) > 0
+          ? `Pay ${formatProjectAmount(remainingBalance)} balance`
+          : "Mark as Paid";
 
   return (
     <button
@@ -550,6 +582,16 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               {item.newsfeedPermissionAllowed && (
                 <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">
                   <SmallIcon name="check" className="h-3 w-3" /> Client allowed newsfeed posting
+                </span>
+              )}
+              {item.finalOutput?.submittedAt && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-[9px] font-black text-blue-700">
+                  <SmallIcon name="download" className="h-3 w-3" /> Employee output available
+                </span>
+              )}
+              {Number(item.paid || 0) > 0 && (
+                <span className="mt-2 block text-[10px] font-black text-emerald-600">
+                  Down payment: {formatProjectAmount(item.paid)} • Balance: {formatProjectAmount(Math.max(0, item.amount - item.paid))}
                 </span>
               )}
             </span>
@@ -703,6 +745,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               {item.newsfeedPermissionAllowed && (
                 <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
               )}
+              {item.finalOutput?.submittedAt && (
+                <p className="mt-1 text-[9px] font-black text-blue-600">Employee output available</p>
+              )}
               <p className="mt-4 text-[10px] font-black text-slate-500">Assigned to</p>
               <div className="mt-1 flex min-w-0 items-center gap-2">
                 <InitialsAvatar
@@ -798,6 +843,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               <p className="mt-1 truncate text-[10px] font-black text-[#c72fb2]">Client: {getClientName(item)}</p>
               {item.newsfeedPermissionAllowed && (
                 <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
+              )}
+              {item.finalOutput?.submittedAt && (
+                <p className="mt-1 text-[9px] font-black text-blue-600">Employee output available</p>
               )}
             </span>
           </div>
@@ -996,14 +1044,18 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
 
 const ProjectDetailsModal = ({
   canAccessTasks,
+  isApprovingCustomClient,
+  isDownloadingOutput,
   isMarkingPaid,
   isPayingEmployee,
   item,
   onClose,
   onDelete,
+  onDownloadOutput,
   onEdit,
   onMarkPaid,
   onPayEmployee,
+  onApproveCustomClient,
   onSubmitOutput,
   onToggleTask,
 }) => {
@@ -1080,6 +1132,67 @@ const ProjectDetailsModal = ({
             onToggleExpand={onClose}
             onToggleSubtask={onToggleTask}
           />
+          {item.finalOutput?.submittedAt && (
+            <section className="mt-4 rounded-2xl border border-pink-100 bg-pink-50/40 p-4 dark:border-pink-900/30 dark:bg-pink-950/10 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#c72fb2]">
+                    Submitted Output
+                  </p>
+                  <h3 className="mt-1 text-base font-black text-[#10142d] dark:text-white">
+                    {item.finalOutput.fileName || (item.finalOutput.link ? "Project output link" : "Employee submission")}
+                  </h3>
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    Submitted by {getPersonName(item.finalOutput.submittedBy || item.assignedTo)}
+                    {formatSubmittedDate(item.finalOutput.submittedAt)
+                      ? ` • ${formatSubmittedDate(item.finalOutput.submittedAt)}`
+                      : ""}
+                  </p>
+                  {item.finalOutput.message && (
+                    <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-600 dark:text-neutral-300">
+                      {item.finalOutput.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {item.finalOutput.fileName && (
+                    <button
+                      type="button"
+                      disabled={isDownloadingOutput}
+                      onClick={() => onDownloadOutput(item)}
+                      className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#c72fb2] px-4 text-xs font-black text-white transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <SmallIcon name="download" />
+                      {isDownloadingOutput ? "Downloading..." : "Download File"}
+                    </button>
+                  )}
+                  {getSafeOutputLink(item.finalOutput.link) && (
+                    <a
+                      href={getSafeOutputLink(item.finalOutput.link)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#c72fb2]/40 bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-neutral-950"
+                    >
+                      Open Link
+                      <SmallIcon name="external" />
+                    </a>
+                  )}
+                  {item.apiStatus === "review" && !getEntityId(item.requestedBy) && (
+                    <button
+                      type="button"
+                      disabled={isApprovingCustomClient}
+                      onClick={() => onApproveCustomClient(item)}
+                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <SmallIcon name="check" />
+                      {isApprovingCustomClient ? "Recording..." : "Record Offline Approval"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
           <div className="mt-4">
             <ProjectGanttChart item={item} />
           </div>
@@ -1267,7 +1380,9 @@ const Tasks = ({
 }) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
+  const [isApprovingCustomClientId, setIsApprovingCustomClientId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
   const [isMarkingPaidId, setIsMarkingPaidId] = useState("");
   const [isPayingEmployeeId, setIsPayingEmployeeId] = useState("");
   const [employeePaymentTask, setEmployeePaymentTask] = useState(null);
@@ -1572,6 +1687,52 @@ const Tasks = ({
     }
   };
 
+  const handleDownloadOutput = async (task) => {
+    if (!task?.finalOutput?.fileName) return;
+
+    try {
+      setIsDownloadingOutputId(task.id);
+      setErrorMessage("");
+      await taskAPI.downloadOutput(task.id, task.finalOutput.fileName);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to download the submitted output."));
+    } finally {
+      setIsDownloadingOutputId("");
+    }
+  };
+
+  const handleApproveCustomClient = async (task) => {
+    try {
+      setIsApprovingCustomClientId(task.id);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = normalizeTask(await taskAPI.approve(task.id));
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === task.id ? updatedTask : currentTask
+        )
+      );
+      setSelectedTaskDetails((currentTask) =>
+        currentTask?.id === task.id ? updatedTask : currentTask
+      );
+      setNoticeMessage(`Offline approval was recorded for ${getClientName(task)}.`);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to record the custom client's approval."));
+    } finally {
+      setIsApprovingCustomClientId("");
+    }
+  };
+
+  const requestCustomClientApproval = (task) => {
+    setConfirmAction({
+      icon: "done",
+      title: "Record Offline Approval",
+      message: `Confirm that ${getClientName(task)} approved the submitted output outside Clientra?`,
+      confirmLabel: "Yes, record approval",
+      onConfirm: () => handleApproveCustomClient(task),
+    });
+  };
+
   const handleDeleteTask = async (task) => {
     try {
       setErrorMessage("");
@@ -1610,12 +1771,13 @@ const Tasks = ({
 
   const requestMarkPaid = (task) => {
     const amount = Number(task.amount || 0);
+    const remainingBalance = Math.max(0, amount - Number(task.paid || 0));
     if (amount <= 0 || Number(task.paid || 0) >= amount) return;
 
     setConfirmAction({
       icon: "done",
       title: "Mark as Paid",
-      message: `Record ${formatProjectAmount(amount)} from “${task.title}” as Budget Planner income? This will also unlock the original output without a watermark.`,
+      message: `Record the remaining ${formatProjectAmount(remainingBalance)} from “${task.title}”? Budget Planner project income will update to the full ${formatProjectAmount(amount)}, and the original output will be unlocked.`,
       confirmLabel: "Yes, mark paid",
       onConfirm: () => handleMarkPaid(task),
     });
@@ -1771,14 +1933,18 @@ const Tasks = ({
           {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
             <ProjectDetailsModal
               canAccessTasks={isOwnedByCurrentUser(selectedTask)}
+              isApprovingCustomClient={isApprovingCustomClientId === selectedTask.id}
+              isDownloadingOutput={isDownloadingOutputId === selectedTask.id}
               isMarkingPaid={isMarkingPaidId === selectedTask.id}
               isPayingEmployee={isPayingEmployeeId === selectedTask.id}
               item={selectedTask}
               onClose={() => setSelectedTaskId("")}
               onDelete={requestDeleteTask}
+              onDownloadOutput={handleDownloadOutput}
               onEdit={handleEditTask}
               onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
               onPayEmployee={user?.role === "admin" ? setEmployeePaymentTask : undefined}
+              onApproveCustomClient={requestCustomClientApproval}
               onSubmitOutput={handleSubmitOutput}
               onToggleTask={handleToggleSubtask}
             />
