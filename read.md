@@ -49,6 +49,14 @@ CORS_ORIGINS=https://your-client-domain.example
 VITE_API_URL=https://your-api-domain.example/api
 ```
 
+For the current Clientra deployment, the API allowlist includes both the apex
+domain and its `www` variant:
+
+```bash
+FRONTEND_URL=https://clientra.me
+CORS_ORIGINS=https://clientra.me,https://www.clientra.me
+```
+
 Password reset and email two-factor authentication use Brevo's HTTPS email API:
 
 ```bash
