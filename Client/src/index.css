@@ -60,7 +60,10 @@ select {
 }
 
 .app-main {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow-x: clip;
   padding-top: calc(5.25rem + env(safe-area-inset-top));
 }
 
@@ -72,7 +75,19 @@ select {
 }
 
 .app-bottom-nav {
+  right: 0;
+  left: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.app-bottom-nav > div {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
 }
 
 .notification-drawer {
@@ -92,6 +107,8 @@ select {
   }
 
   .app-main {
+    width: auto;
+    max-width: none;
     padding-top: 4.375rem;
   }
 
@@ -111,6 +128,13 @@ select {
 }
 
 @media (max-width: 767px) {
+  /* Dashboard pages used desktop-only negative offsets that pushed their
+     headings underneath the fixed mobile header. */
+  .app-main .\-mt-4,
+  .app-main .\-mt-8 {
+    margin-top: 0 !important;
+  }
+
   /* Inputs smaller than 16px make iOS zoom the entire page on focus. */
   input,
   textarea,

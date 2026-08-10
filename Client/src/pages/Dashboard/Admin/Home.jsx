@@ -370,20 +370,20 @@ const StatCard = ({ item }) => {
   const style = statStyles[item.key] || statStyles.in_progress;
 
   return (
-  <section className={`relative flex min-h-[86px] flex-col items-start justify-between rounded-xl border border-b-2 bg-white px-3 py-3 shadow-[0_3px_4px_rgba(15,23,42,0.08),0_8px_24px_rgba(15,23,42,0.04)] ring-1 md:min-h-0 md:h-24 md:flex-row md:items-center md:justify-start md:gap-4 md:rounded-2xl md:px-5 md:py-0 dark:bg-[#141414] ${style.card}`}>
-    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg md:h-14 md:w-14 md:rounded-2xl ${style.tile}`}>
-      <Icon name={item.icon} className={`h-6 w-6 md:h-9 md:w-9 ${style.text}`} />
+  <section className={`relative flex min-h-[92px] min-w-0 items-center gap-3 rounded-xl border border-b-2 bg-white px-3 py-3 shadow-[0_3px_4px_rgba(15,23,42,0.08),0_8px_24px_rgba(15,23,42,0.04)] ring-1 md:h-24 md:gap-4 md:rounded-2xl md:px-5 md:py-0 dark:bg-[#141414] ${style.card}`}>
+    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl md:h-14 md:w-14 md:rounded-2xl ${style.tile}`}>
+      <Icon name={item.icon} className={`h-7 w-7 md:h-9 md:w-9 ${style.text}`} />
     </span>
-    <div className="leading-tight">
-      <p className="text-sm font-extrabold text-[#10172a] md:text-2xl dark:text-white">{item.value}</p>
-      <p className="mt-1 text-[9px] font-semibold leading-tight text-slate-500 md:mt-1.5 md:text-xs dark:text-neutral-100">{item.label}</p>
+    <div className="min-w-0 leading-tight">
+      <p className="text-xl font-extrabold text-[#10172a] md:text-2xl dark:text-white">{item.value}</p>
+      <p className="mt-1 text-xs font-bold leading-tight text-slate-600 md:mt-1.5 dark:text-neutral-100">{item.label}</p>
     </div>
   </section>
   );
 };
 
 const ProgressRing = ({ value }) => (
-  <span className="grid h-5 min-w-7 place-items-center rounded-full border border-[#a8a2ff] px-1 text-[8px] font-semibold text-[#9b91ff] md:h-6 md:min-w-9 md:border-2 md:px-1.5 md:text-[9px]">
+  <span className="grid h-6 min-w-8 place-items-center rounded-full border border-[#a8a2ff] px-1 text-[10px] font-semibold text-[#7567e8] md:min-w-9 md:border-2 md:px-1.5">
     {value}
   </span>
 );
@@ -477,7 +477,7 @@ const MonthlyChart = ({ tasks }) => {
       style={shouldScrollRows ? { maxHeight: `${32 + chartRowsMaxHeight}px` } : undefined}
     >
       <div className="border-r border-slate-200 pr-2 md:pr-4">
-        <p className="h-8 text-[8px] font-extrabold uppercase text-slate-500 md:h-10 md:text-[11px] dark:text-white">
+        <p className="h-8 text-[10px] font-extrabold uppercase text-slate-600 md:h-10 md:text-[11px] dark:text-white">
           Tasks
         </p>
         {visibleTasks.map((task, index) => {
@@ -486,7 +486,7 @@ const MonthlyChart = ({ tasks }) => {
           return (
             <div
               key={task.id || task.name}
-              className="grid h-7 grid-cols-[1fr_18px] items-center gap-1 text-[9px] text-[#10172a] md:h-10 md:grid-cols-[1fr_28px_42px] md:gap-2 md:text-xs dark:text-white"
+              className="grid h-7 grid-cols-[1fr_22px] items-center gap-1.5 text-[11px] text-[#10172a] md:h-10 md:grid-cols-[1fr_28px_42px] md:gap-2 md:text-xs dark:text-white"
             >
               <span className="flex min-w-0 items-center gap-2 font-semibold">
                 <span
@@ -515,10 +515,10 @@ const MonthlyChart = ({ tasks }) => {
         >
           {chartWeeks.map((week) => (
             <div key={week} className="border-r border-neutral-100 last:border-r-0">
-              <p className="text-center text-[8px] font-semibold text-[#10172a] md:text-xs dark:text-white">
+              <p className="text-center text-[10px] font-semibold text-[#10172a] md:text-xs dark:text-white">
                 {week}
               </p>
-              <div className="mt-1 grid grid-cols-7 text-center text-[8px] font-bold text-slate-500 md:mt-2 md:text-[10px] dark:text-white">
+              <div className="mt-1 grid grid-cols-7 text-center text-[9px] font-bold text-slate-600 md:mt-2 md:text-[10px] dark:text-white">
                 {timelineDays.map((day, index) => (
                   <span key={`${week}-${day}-${index}`}>{day}</span>
                 ))}
@@ -665,14 +665,14 @@ const ExpenseChart = ({ budgetEntries }) => {
         >
           <div className="grid h-16 w-16 place-items-center rounded-full bg-white text-center shadow-[0_12px_28px_rgba(35,42,72,0.1)] md:h-24 md:w-24 dark:bg-neutral-950">
             <span>
-              <span className="block text-[7px] font-semibold text-slate-500 md:text-[10px] dark:text-white">Total Expenses</span>
-              <span className="mt-0.5 block text-xs font-extrabold text-[#10172a] md:mt-1 md:text-lg dark:text-white">
+              <span className="block text-[10px] font-semibold text-slate-600 dark:text-white">Total Expenses</span>
+              <span className="mt-0.5 block text-sm font-extrabold text-[#10172a] md:mt-1 md:text-lg dark:text-white">
                 {formatPeso(total)}
               </span>
             </span>
           </div>
         </div>
-        <div className="space-y-2 text-[9px] text-[#10172a] md:mt-4 md:text-xs dark:text-white">
+        <div className="space-y-2 text-[11px] text-[#10172a] md:mt-4 md:text-xs dark:text-white">
         {expenseCategories.length === 0 && (
             <span className="flex items-center gap-3">
               <span className="h-2 w-2 rounded-full bg-[#d64ab2]" />
@@ -762,19 +762,19 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
         <div key={`${title}-mobile-${index}`} className="flex items-center gap-2">
           <Avatar name={employee.name} />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[10px] font-black text-[#10172a] dark:text-white">
+            <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
               {employee.name}
             </span>
-            <span className="mt-0.5 block truncate text-[9px] font-semibold text-slate-500 dark:text-white">
+            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-600 dark:text-white">
               {employee.job}
             </span>
           </span>
           {employee.date === "Available" ? (
-            <span className="rounded-full bg-green-100 px-2 py-1 text-[8px] font-bold text-green-600">
+            <span className="rounded-full bg-green-100 px-2 py-1 text-[10px] font-bold text-green-700">
               Available
             </span>
           ) : (
-            <span className="max-w-12 truncate text-[8px] font-bold text-slate-500 dark:text-white">
+            <span className="max-w-16 truncate text-[10px] font-bold text-slate-600 dark:text-white">
               {employee.date}
             </span>
           )}
@@ -787,7 +787,7 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
     <>
       <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white md:rounded-2xl ${dashboardCardShadow}`}>
         <div className="flex items-center justify-between gap-2 px-3 py-3 md:gap-4 md:px-5 md:pt-4 md:pb-0">
-          <h2 className="flex min-w-0 items-center gap-1.5 text-[11px] font-extrabold text-[#10172a] md:gap-2 md:text-base dark:text-white">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-[#10172a] md:gap-2 md:text-base dark:text-white">
             {title}
             <span
               className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[9px] md:h-6 md:min-w-6 md:px-2 md:text-xs ${
@@ -928,10 +928,10 @@ const RecentActivities = ({
   const modalListMaxHeight = modalListVisibleRows * 58;
 
   const ActivityRow = ({ activity, index }) => (
-    <div key={activity.id || `${activity.name}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-      <Avatar name={activity.name} />
+    <div key={activity.id || `${activity.name}-${index}`} className="flex w-full min-w-0 items-center gap-3 overflow-hidden py-2.5 first:pt-0 last:pb-0">
+      <span className="shrink-0"><Avatar name={activity.name} /></span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+        <span className="block w-full truncate text-xs font-black text-[#10172a] dark:text-white" title={`${activity.name} ${activity.text}`}>
           {activity.name} <span className="font-semibold">{activity.text}</span>
         </span>
         <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-white">
@@ -943,7 +943,7 @@ const RecentActivities = ({
 
   return (
     <>
-      <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-4 md:rounded-2xl ${dashboardCardShadow}`}>
+      <section className={`min-w-0 overflow-hidden rounded-3xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 ${dashboardCardShadow}`}>
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
             <span className="text-[#c72fb2]">
@@ -1044,7 +1044,7 @@ const UpcomingEvents = ({ events }) => {
   const modalListMaxHeight = modalListVisibleRows * 58;
 
   return (
-    <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-4 md:rounded-2xl ${dashboardCardShadow}`}>
+    <section className={`min-w-0 overflow-hidden rounded-3xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
           <span className="text-[#c72fb2]">
@@ -1131,7 +1131,7 @@ const OnlineTeam = ({ members }) => {
   const modalListMaxHeight = modalListVisibleRows * 54;
 
   const MemberRow = ({ member, index }) => (
-    <div key={member._id || member.id || `${member.email}-${index}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+    <div key={member._id || member.id || `${member.email}-${index}`} className="flex w-full min-w-0 items-center gap-3 overflow-hidden py-2.5 first:pt-0 last:pb-0">
       <span className="relative shrink-0">
         <Avatar name={getUserName(member)} />
         <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
@@ -1148,7 +1148,7 @@ const OnlineTeam = ({ members }) => {
   );
 
   return (
-    <section className={`rounded-3xl border border-pink-100 bg-white px-5 py-4 md:rounded-2xl ${dashboardCardShadow}`}>
+    <section className={`min-w-0 overflow-hidden rounded-3xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="flex items-center gap-2 text-base font-extrabold text-[#10172a] dark:text-white">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -1352,7 +1352,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }
 
   return (
-        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] space-y-3 bg-[#fbf9ff] px-3 py-3 dark:bg-neutral-950 md:-mx-5 md:space-y-4 md:bg-[#f8f9fd] md:px-5 md:py-4 lg:-mx-6 lg:px-6">
+        <div className="-mx-4 -mb-8 mt-0 min-h-[calc(100dvh-4rem)] space-y-3 bg-[#fbf9ff] px-3 py-3 dark:bg-neutral-950 md:-mx-5 md:-mt-4 md:space-y-4 md:bg-[#f8f9fd] md:px-5 md:py-4 lg:-mx-6 lg:px-6">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}
@@ -1385,12 +1385,12 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
                 <ExpenseChart budgetEntries={budgetEntries} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 md:gap-4">
                 <EmployeeTable title="Working" employees={workingEmployees} />
                 <EmployeeTable title="Not Working" employees={notWorkingEmployees} tone="pink" />
               </div>
 
-              <div className="grid gap-3 md:gap-4 xl:grid-cols-3">
+              <div className="grid min-w-0 gap-3 md:gap-4 xl:grid-cols-3">
                 <UpcomingEvents events={calendarEvents} />
                 <OnlineTeam members={onlineTeam} />
                 <RecentActivities

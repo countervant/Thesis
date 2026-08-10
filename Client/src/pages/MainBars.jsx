@@ -1325,14 +1325,14 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
           isSidebarExpanded ? "md:ml-[220px]" : "md:ml-[68px]"
         }`}
       >
-        <div className="min-w-0 w-full">
+        <div className="w-full min-w-0 max-w-full">
           {children}
         </div>
       </main>
-      <nav className={`app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-neutral-300 bg-[#f8f9fd]/95 px-2 pt-1.5 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-neutral-800 dark:bg-neutral-950/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] sm:px-4 md:hidden ${
+      <nav className={`app-bottom-nav fixed inset-x-0 bottom-0 z-40 overflow-hidden border-t border-neutral-300 bg-[#f8f9fd]/95 px-1.5 pt-1.5 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur transition-transform duration-300 dark:border-neutral-800 dark:bg-neutral-950/95 dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)] sm:px-3 md:hidden ${
         isSidebarExpanded ? "translate-y-full" : "translate-y-0"
       }`}>
-        <div className={`mx-auto grid max-w-md gap-1 ${mobileNavItems.length === 4 ? "grid-cols-4" : "grid-cols-5"}`}>
+        <div className={`grid w-full gap-1 ${mobileNavItems.length === 4 ? "grid-cols-4" : "grid-cols-5"}`}>
           {mobileNavItems.map((item) => {
             const isActive = activePage === item.id || (activePage === "add-task" && item.id === "tasks");
             return (
@@ -1340,7 +1340,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate?.(item.id)}
-                className={`flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[10px] font-black transition min-[390px]:text-xs ${
+                className={`flex min-h-[58px] min-w-0 overflow-hidden flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[10px] font-black transition min-[390px]:text-xs ${
                   isActive
                     ? "bg-linear-to-b from-[#df4bb4] to-[#c72fb2] text-white shadow-[0_4px_8px_rgba(219,74,181,0.35)]"
                     : "text-neutral-900 hover:bg-white hover:text-[#c72fb2] dark:text-white dark:hover:bg-linear-to-b dark:hover:from-[#df4bb4] dark:hover:to-[#c72fb2] dark:hover:text-white"
@@ -1352,7 +1352,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                     isActive ? "brightness-0 invert" : "opacity-70 grayscale dark:brightness-0 dark:invert"
                   }`}
                 />
-                <span>{item.label}</span>
+                <span className="block w-full truncate text-center">{item.label}</span>
               </button>
             );
           })}

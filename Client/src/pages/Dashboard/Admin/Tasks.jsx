@@ -461,19 +461,29 @@ const ProjectPaymentButton = ({ isMarkingPaid, item, onMarkPaid }) => {
         : Number(item.paid || 0) > 0
           ? `Pay ${formatProjectAmount(remainingBalance)} balance`
           : "Mark as Paid";
+  const compactLabel = isPaid
+    ? "Paid"
+    : amount <= 0
+      ? "Set amount"
+      : isMarkingPaid
+        ? "Saving..."
+        : Number(item.paid || 0) > 0
+          ? "Pay balance"
+          : "Mark paid";
 
   return (
     <button
       type="button"
       disabled={isDisabled}
       onClick={() => onMarkPaid(item)}
-      className={`mt-2 inline-flex min-h-7 items-center rounded-lg px-2.5 py-1 text-[9px] font-black transition ${
+      title={label}
+      className={`mt-2 inline-flex h-9 w-full max-w-[120px] items-center justify-center whitespace-nowrap rounded-lg px-2 text-[10px] font-black transition ${
         isPaid
           ? "bg-emerald-100 text-emerald-700"
           : "bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
       }`}
     >
-      {label}
+      {compactLabel}
     </button>
   );
 };
@@ -499,19 +509,29 @@ const EmployeePaymentButton = ({ isPayingEmployee, item, onPayEmployee }) => {
         : assignedEmployees.length > 1
           ? `Pay employee (${unpaidCount})`
           : "Pay employee";
+  const compactLabel = !hasAssignees
+    ? "Unassigned"
+    : allPaid
+      ? assignedEmployees.length > 1 ? "Team paid" : "Employee paid"
+      : isPayingEmployee
+        ? "Saving..."
+        : assignedEmployees.length > 1
+          ? `Pay team (${unpaidCount})`
+          : "Pay employee";
 
   return (
     <button
       type="button"
       disabled={!hasAssignees || allPaid || isPayingEmployee}
       onClick={() => onPayEmployee(item)}
-      className={`mt-1.5 inline-flex min-h-7 items-center rounded-lg px-2.5 py-1 text-[9px] font-black transition ${
+      title={label}
+      className={`mt-1.5 inline-flex h-9 w-full max-w-[120px] items-center justify-center whitespace-nowrap rounded-lg px-2 text-[10px] font-black transition ${
         allPaid
           ? "bg-emerald-100 text-emerald-700"
           : "bg-pink-100 text-[#b524a2] hover:bg-pink-200 disabled:cursor-not-allowed disabled:opacity-60"
       }`}
     >
-      {label}
+      {compactLabel}
     </button>
   );
 };
@@ -735,7 +755,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
         </div>
       ) : (
         <>
-        <div className="grid grid-cols-[1fr_43%] gap-3 md:hidden">
+        <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3 md:hidden">
           <div className="flex min-w-0 gap-3">
             <span className={`min-h-28 w-1 shrink-0 rounded-full ${accentClass}`} />
             <div className="min-w-0 py-0.5">
@@ -743,10 +763,10 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               <p className="mt-1 truncate text-[11px] font-bold text-slate-500">{item.description || "No description"}</p>
               <p className="mt-1 truncate text-[10px] font-black text-[#c72fb2]">Client: {getClientName(item)}</p>
               {item.newsfeedPermissionAllowed && (
-                <p className="mt-1 text-[9px] font-black text-emerald-600">Newsfeed posting allowed</p>
+                <p className="mt-1 text-[10px] font-black text-emerald-600">Newsfeed posting allowed</p>
               )}
               {item.finalOutput?.submittedAt && (
-                <p className="mt-1 text-[9px] font-black text-blue-600">Employee output available</p>
+                <p className="mt-1 text-[10px] font-black text-blue-600">Employee output available</p>
               )}
               <p className="mt-4 text-[10px] font-black text-slate-500">Assigned to</p>
               <div className="mt-1 flex min-w-0 items-center gap-2">
@@ -789,12 +809,12 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               </span>
             </span>
 
-            <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-              <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
+            <div className="mt-auto flex flex-col items-stretch gap-2 pt-3">
+              <span className={`inline-flex h-8 w-full items-center justify-center rounded-lg px-2 text-center text-[10px] font-black ${statusStyles[item.status] || getStatusTone(item.status)}`}>
                 {item.status}
               </span>
-              <span className="flex flex-col items-end">
-                <span className="flex items-center gap-1">
+              <span className="flex w-full flex-col items-stretch">
+                <span className="flex items-center justify-end gap-1">
                   <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                     <SmallIcon name="edit" className="h-4 w-4" />
                   </button>
@@ -1829,7 +1849,7 @@ const Tasks = ({
   };
 
   return (
-        <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-3 py-4 text-[#111936] md:-mx-6 md:space-y-5 md:px-6 md:py-5 lg:-mx-8 lg:px-8">
+        <div className="-mx-4 -mb-10 mt-0 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-3 py-4 text-[#111936] md:-mx-6 md:-mt-8 md:space-y-5 md:px-6 md:py-5 lg:-mx-8 lg:px-8">
           <header className="flex items-center justify-between gap-3 md:flex-wrap md:gap-4">
             <div>
               <h1
@@ -1864,7 +1884,7 @@ const Tasks = ({
                   </span>
                   <div className="min-w-0">
                     <p className="text-base font-black leading-none text-[#10142d] md:text-4xl">{item.value}</p>
-                    <p className="mt-1 truncate text-[9px] font-black text-slate-600 md:text-sm">{item.label}</p>
+                    <p className="mt-1 truncate text-[11px] font-black text-slate-600 md:text-sm">{item.label}</p>
                   </div>
                 </div>
               </Card>
