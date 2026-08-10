@@ -195,8 +195,8 @@ const TrendChart = ({ feedback }) => {
 const FeedbackDetails = ({ item, onClose }) => {
   if (!item) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <article className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <article className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-pink-500">Client Feedback</p>
@@ -204,10 +204,10 @@ const FeedbackDetails = ({ item, onClose }) => {
           </div>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 hover:bg-pink-50" aria-label="Close feedback details"><X className="h-5 w-5" /></button>
         </div>
-        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800">
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800">
           <InitialsAvatar user={item.client} name={item.clientName} alt={item.clientName} className="h-11 w-11" />
           <div><p className="font-black text-[#10142d] dark:text-white">{item.clientName}</p><p className="text-xs font-bold text-slate-500">{formatDate(item.submittedAt)}</p></div>
-          <span className="ml-auto"><Stars rating={item.rating} /></span>
+          <span className="min-[390px]:ml-auto"><Stars rating={item.rating} /></span>
         </div>
         <p className="mt-5 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">“{item.comment || "The client submitted a rating without an additional comment."}”</p>
         {item.reply?.message && (
@@ -262,8 +262,8 @@ const ReplyModal = ({ item, onClose, onSent }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && !isSending && onClose()}>
-      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6" onMouseDown={(event) => event.target === event.currentTarget && !isSending && onClose()}>
+      <form onSubmit={handleSubmit} className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-xs font-black uppercase tracking-[0.18em] text-pink-500">Reply to Client</p><h2 className="mt-1 text-xl font-black text-[#10142d] dark:text-white">{item.clientName}</h2><p className="mt-1 text-xs font-bold text-slate-500">Feedback for {item.project}</p></div>
           <button type="button" disabled={isSending} onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 hover:bg-pink-50 disabled:opacity-50" aria-label="Close reply form"><X className="h-5 w-5" /></button>
@@ -271,9 +271,9 @@ const ReplyModal = ({ item, onClose, onSent }) => {
         <div className="mt-5 rounded-xl bg-slate-50 p-4 dark:bg-neutral-800"><Stars rating={item.rating} /><p className="mt-2 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">“{item.comment || "Rating submitted without a comment."}”</p></div>
         <label className="mt-5 block"><span className="text-xs font-black text-slate-600 dark:text-slate-300">Your reply</span><textarea autoFocus maxLength={1000} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write a helpful response to the client..." className="mt-2 h-36 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" /><span className="mt-1 block text-right text-[10px] font-bold text-slate-400">{message.length}/1000</span></label>
         {errorMessage && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{errorMessage}</p>}
-        <div className="mt-5 flex justify-end gap-3">
-          <button type="button" disabled={isSending} onClick={onClose} className={`${secondaryButtonClass} h-10 px-5 text-xs`}>Cancel</button>
-          <button type="submit" disabled={isSending || !message.trim()} className={`${primaryButtonClass} h-10 px-5 text-xs`}>
+        <div className="mt-5 grid gap-3 min-[380px]:flex min-[380px]:justify-end">
+          <button type="button" disabled={isSending} onClick={onClose} className={`${secondaryButtonClass} h-10 w-full px-5 text-xs min-[380px]:w-auto`}>Cancel</button>
+          <button type="submit" disabled={isSending || !message.trim()} className={`${primaryButtonClass} h-10 w-full px-5 text-xs min-[380px]:w-auto`}>
             <Mail className="h-4 w-4" />
             {isSending ? "Sending..." : item.reply?.message ? "Update Reply" : "Send Reply"}
           </button>
@@ -474,11 +474,11 @@ const Feedback = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-pink-100 bg-white p-2 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-1 md:gap-3 md:p-3">
+          <div className="grid grid-cols-1 gap-2 rounded-2xl border border-pink-100 bg-white p-2 shadow-[0_8px_28px_rgba(148,46,123,0.07)] dark:border-neutral-800 dark:bg-neutral-900 md:gap-3 md:p-3">
             {isLoading ? (
-              <div className="col-span-2 grid grid-cols-2 gap-2 md:col-span-1 md:grid-cols-1 md:gap-3">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-neutral-800 md:h-24" />)}</div>
+              <div className="grid grid-cols-1 gap-2 md:gap-3">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-neutral-800 md:h-24" />)}</div>
             ) : visibleFeedback.length === 0 ? (
-              <div className="col-span-2 grid min-h-72 place-items-center px-5 text-center md:col-span-1"><div><MessageCircle className="mx-auto h-10 w-10 text-pink-300" /><h2 className="mt-3 font-black text-[#10142d] dark:text-white">No feedback found</h2><p className="mt-1 text-sm font-semibold text-slate-500">Submitted client feedback will appear here.</p></div></div>
+              <div className="grid min-h-72 place-items-center px-5 text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-pink-300" /><h2 className="mt-3 font-black text-[#10142d] dark:text-white">No feedback found</h2><p className="mt-1 text-sm font-semibold text-slate-500">Submitted client feedback will appear here.</p></div></div>
             ) : visibleFeedback.map((item) => (
               <article key={item.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-pink-100 p-3 dark:border-neutral-800 md:grid md:grid-cols-[minmax(220px,1.2fr)_minmax(170px,.8fr)_auto] md:items-center md:gap-4 md:p-4">
                 <div className="flex min-w-0 gap-3">

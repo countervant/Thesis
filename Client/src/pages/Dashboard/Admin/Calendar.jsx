@@ -219,8 +219,8 @@ const emptyEventForm = (date) => ({
 });
 
 const Modal = ({ title, children, onClose }) => (
-  <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
-    <section className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
+  <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-3 sm:p-4">
+    <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-2rem)] sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-lg font-black text-[#10142d]">{title}</h2>
         <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500">
@@ -484,7 +484,7 @@ const AdminCalendar = () => {
       <section className="mx-auto max-w-[1840px] rounded-2xl border border-pink-100 bg-white px-3 py-4 shadow-[0_8px_24px_rgba(190,65,158,0.08)] md:px-5 md:py-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white" style={{ fontFamily: "var(--font-bruno)" }}>
+            <h1 className="page-title text-3xl leading-none text-neutral-950 dark:text-white" style={{ fontFamily: "var(--font-bruno)" }}>
               Calendar
             </h1>
             <p className="mt-2 text-sm font-semibold text-slate-500">

@@ -178,7 +178,7 @@ const LoginPage = () => {
           ref={formRef}
           onSubmit={handleSubmit}
           noValidate
-          className="login-panel min-h-[500px] w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:max-w-md sm:space-y-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:px-10 dark:md:py-12"
+          className="login-panel w-full max-w-lg space-y-5 rounded-[2.25rem] bg-white px-5 py-7 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:min-h-[500px] sm:max-w-md sm:space-y-8 sm:px-6 sm:py-8 md:min-h-0 md:max-w-sm md:bg-transparent md:px-0 md:py-0 md:shadow-none dark:bg-[#141414] dark:md:max-w-[528px] dark:md:rounded-2xl dark:md:px-10 dark:md:py-12"
           autoComplete={suppressCredentialAutofill ? "new-password" : "on"}
           data-form-type="other"
         >

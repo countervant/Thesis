@@ -324,9 +324,9 @@ const ProfileSettings = ({ user }) => {
             </button>
           </div>
           {showSkillForm && (
-            <div className="mb-4 flex flex-wrap gap-2 rounded-xl bg-pink-50 p-3">
-              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-[180px] flex-1`} />
-              <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-auto`}>
+            <div className="mb-4 grid gap-2 rounded-xl bg-pink-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-0 w-full`} />
+              <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-full sm:w-auto`}>
                 {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
               </select>
               <button type="button" onClick={addSkill} className="h-10 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Add</button>

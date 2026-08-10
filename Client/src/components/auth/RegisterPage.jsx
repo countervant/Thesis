@@ -269,7 +269,7 @@ const RegisterPage = () => {
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className="login-panel w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-6 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:space-y-8 md:max-w-2xl md:px-10 md:py-7 dark:bg-[#141414]"
+          className="login-panel w-full max-w-lg space-y-5 rounded-[2.25rem] border border-transparent bg-white px-5 py-8 shadow-[0_18px_35px_rgba(15,23,42,0.16)] sm:space-y-8 sm:px-6 md:max-w-2xl md:px-10 md:py-7 dark:bg-[#141414]"
           autoComplete="new-password"
           data-form-type="other"
         >
@@ -283,7 +283,7 @@ const RegisterPage = () => {
               />
             </picture>
             <h2
-              className="mb-1 mt-4 text-2xl font-bold uppercase tracking-wide sm:mb-10 sm:mt-5 sm:text-3xl md:mt-0 dark:text-white"
+              className="page-title mb-1 mt-4 text-center text-xl font-bold tracking-wide min-[360px]:text-2xl sm:mb-10 sm:mt-5 sm:text-3xl md:mt-0 dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
             >
               Create Account

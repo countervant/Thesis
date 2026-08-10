@@ -228,11 +228,11 @@ const SecuritySettings = ({ user }) => {
                     />
                   </label>
                 ))}
-                <div className="flex items-end gap-2 md:col-span-3">
+                <div className="grid gap-2 min-[380px]:flex min-[380px]:items-end md:col-span-3">
                   <button
                     type="submit"
                     disabled={isSavingPassword}
-                    className="h-9 min-w-[150px] rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 disabled:opacity-60"
+                    className="h-9 w-full rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 disabled:opacity-60 min-[380px]:w-auto min-[380px]:min-w-[150px]"
                   >
                     {isSavingPassword ? "Saving..." : "Save Password"}
                   </button>
@@ -243,7 +243,7 @@ const SecuritySettings = ({ user }) => {
                       setShowPasswordForm(false);
                       setError("");
                     }}
-                    className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 min-[380px]:w-auto min-[380px]:min-w-[100px] dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                   >
                     Cancel
                   </button>
@@ -314,8 +314,8 @@ const SecuritySettings = ({ user }) => {
       </div>
 
       {showBackupCodes && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-          <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
+        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-3 sm:p-4">
+          <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-5 dark:bg-[#141414]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-black text-[#10142d] dark:text-white">Backup Codes</h3>
               <button type="button" onClick={closeBackupCodes} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
@@ -324,7 +324,7 @@ const SecuritySettings = ({ user }) => {
             </div>
             <p className="mt-2 text-sm font-semibold text-slate-500">Save these somewhere safe. Each code can be used once when you cannot access your email.</p>
             <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">These codes are shown only now. Generating another set will invalidate this set.</p>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid gap-2 min-[360px]:grid-cols-2">
               {backupCodes.map((code) => (
                 <span key={code} className="rounded-lg border border-pink-100 bg-pink-50 px-3 py-2 text-center text-sm font-black text-[#c72fb2]">
                   {code}

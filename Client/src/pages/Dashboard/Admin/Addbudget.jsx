@@ -129,9 +129,9 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950 dark:text-white">
-      <section className="max-h-full w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl dark:bg-[#070707] dark:ring-1 dark:ring-neutral-800">
-        <header className="border-b border-neutral-300 px-8 py-11 dark:border-neutral-800 sm:px-11">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/65 p-3 text-neutral-950 sm:p-6 dark:text-white">
+      <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl sm:max-h-[calc(100dvh-3rem)] dark:bg-[#070707] dark:ring-1 dark:ring-neutral-800">
+        <header className="border-b border-neutral-300 px-5 py-7 dark:border-neutral-800 sm:px-11 sm:py-11">
           <h1
             className="text-2xl uppercase leading-none text-neutral-950 dark:text-white sm:text-3xl"
             style={{ fontFamily: "var(--font-bruno)" }}
@@ -142,7 +142,7 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
 
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col px-8 py-10 sm:px-11 sm:py-12"
+          className="flex flex-col px-5 py-7 sm:px-11 sm:py-12"
         >
           {errorMessage && (
             <p className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">

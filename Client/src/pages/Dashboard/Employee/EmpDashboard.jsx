@@ -464,18 +464,18 @@ const EmpDashboard = () => {
             {dashboardData.upcomingTasks.map((event) => {
               const dueDate = parseDate(event.dueDate);
               return (
-                <div key={event.id} className="grid grid-cols-[58px_1fr_auto] items-center gap-4 border-b border-pink-50 py-4 last:border-b-0">
+                <div key={event.id} className="grid grid-cols-[58px_minmax(0,1fr)] items-center gap-3 border-b border-pink-50 py-4 last:border-b-0 min-[420px]:grid-cols-[58px_minmax(0,1fr)_auto] min-[420px]:gap-4">
                   <span className="grid h-14 w-14 place-items-center rounded-xl bg-slate-50 text-center text-xs font-black text-slate-600">
                     <span>
                       {dueDate ? dueDate.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : "N/A"}
                       <span className="block text-lg text-[#10142d]">{dueDate ? String(dueDate.getDate()).padStart(2, "0") : "--"}</span>
                     </span>
                   </span>
-                  <span>
+                  <span className="min-w-0">
                     <span className="block text-sm font-black">{event.title}</span>
                     <span className="text-xs font-bold text-slate-500">{formatDate(event.dueDate)}</span>
                   </span>
-                  <span className={`rounded-full px-4 py-1 text-xs font-black ${eventTones[event.status] || eventTones.Pending}`}>{event.status}</span>
+                  <span className={`col-span-2 w-fit justify-self-end rounded-full px-4 py-1 text-xs font-black min-[420px]:col-span-1 ${eventTones[event.status] || eventTones.Pending}`}>{event.status}</span>
                 </div>
               );
             })}

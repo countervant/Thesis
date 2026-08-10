@@ -303,10 +303,10 @@ const IncomeExpenseChart = ({ expenses, income, monthLabel, monthOptions, onMont
   );
 
   return (
-  <section className="flex min-h-[300px] flex-col rounded-2xl border border-pink-100 bg-white px-6 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 dark:bg-[#141414] dark:ring-neutral-800">
-    <div className="flex items-center justify-between gap-3">
+  <section className="flex min-h-[300px] flex-col rounded-2xl border border-pink-100 bg-white px-4 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 sm:px-6 dark:bg-[#141414] dark:ring-neutral-800">
+    <div className="flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
       <h2 className="text-base font-black text-[#10142d] dark:text-white">Income vs Expense</h2>
-      <label className="relative">
+      <label className="relative self-start">
         <span className="sr-only">Filter income and expense by month</span>
         <select
           value={selectedMonth}
@@ -330,7 +330,7 @@ const IncomeExpenseChart = ({ expenses, income, monthLabel, monthOptions, onMont
           <span key={`${label}-${index}`}>{label}</span>
         ))}
       </div>
-      <div className="relative flex h-44 flex-1 items-end justify-center gap-14 border-b border-slate-200 bg-[repeating-linear-gradient(to_bottom,#e5e7eb_0,#e5e7eb_1px,transparent_1px,transparent_44px)] px-6">
+      <div className="relative flex h-44 min-w-0 flex-1 items-end justify-center gap-4 border-b border-slate-200 bg-[repeating-linear-gradient(to_bottom,#e5e7eb_0,#e5e7eb_1px,transparent_1px,transparent_44px)] px-2 sm:gap-14 sm:px-6">
         <div
           className="w-24 max-w-[38%] rounded-t-md bg-[#ff1f14]"
           style={{ height: expenseHeight }}
@@ -344,7 +344,7 @@ const IncomeExpenseChart = ({ expenses, income, monthLabel, monthOptions, onMont
         <span className="absolute -bottom-6 text-xs font-bold text-slate-500">{monthLabel}</span>
       </div>
     </div>
-    <div className="mt-9 flex justify-center gap-10 text-xs font-bold text-[#10142d] dark:text-neutral-300">
+    <div className="mt-9 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-bold text-[#10142d] sm:gap-x-10 dark:text-neutral-300">
       <span className="flex items-center gap-2">
         <span className="h-3 w-3 rounded-full bg-[#ff1f14]" />
         Expenses ({formatPeso(expenses)})
@@ -400,10 +400,10 @@ const ExpenseCategories = ({
   ).stops;
 
   return (
-  <section className="rounded-2xl border border-pink-100 bg-white px-6 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 dark:bg-[#141414] dark:ring-neutral-800">
-    <div className="mb-4 flex items-center justify-between gap-3">
+  <section className="rounded-2xl border border-pink-100 bg-white px-4 py-5 shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 sm:px-6 dark:bg-[#141414] dark:ring-neutral-800">
+    <div className="mb-4 flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
       <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">Expense Categories</h2>
-      <label className="relative">
+      <label className="relative self-start">
         <span className="sr-only">Filter expense categories by month</span>
         <select
           value={selectedMonth}
@@ -644,7 +644,7 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
           <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <h1
-                className="text-3xl uppercase leading-none text-neutral-950 dark:text-white"
+                className="page-title text-3xl leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Budget Planner

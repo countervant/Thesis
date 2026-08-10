@@ -105,7 +105,7 @@ const ForgotPasswordcom = () => {
               className="h-20 w-20 object-contain sm:h-32 sm:w-32 md:h-36 md:w-36"
             />
             <h1
-              className="mt-2 text-center text-2xl font-bold uppercase tracking-wide text-neutral-950 sm:text-3xl dark:text-white"
+              className="page-title mt-2 text-center text-xl font-bold tracking-wide text-neutral-950 min-[360px]:text-2xl sm:text-3xl dark:text-white"
               style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
             >
               Forgot Password?

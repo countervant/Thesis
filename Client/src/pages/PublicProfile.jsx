@@ -815,7 +815,7 @@ const PublicProfile = () => {
                         href={getEmailComposeUrl(profileUser.email)}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-3 transition hover:text-[#c72fb2]"
+                        className="flex min-w-0 items-center gap-3 break-all transition hover:text-[#c72fb2]"
                       >
                         <img src={emailIcon} alt="" className="h-4 w-4 object-contain" />
                         {profileUser.email}

@@ -15,7 +15,6 @@ html {
 body {
   min-width: 0;
   margin: 0;
-  overflow-x: hidden;
 }
 
 #root {
@@ -63,7 +62,6 @@ select {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: clip;
   padding-top: calc(5.25rem + env(safe-area-inset-top));
 }
 

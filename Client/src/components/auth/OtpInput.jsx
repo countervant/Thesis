@@ -39,7 +39,7 @@ const OtpInput = ({ value, onChange, disabled = false, hasError = false, autoFoc
   };
 
   return (
-    <div className="flex justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
+    <div className="grid w-full grid-cols-6 gap-1.5 sm:flex sm:justify-center sm:gap-3" onPaste={handlePaste}>
       {digits.map((digit, index) => (
         <input
           key={index}
@@ -54,7 +54,7 @@ const OtpInput = ({ value, onChange, disabled = false, hasError = false, autoFoc
           onChange={(event) => setDigit(index, event.target.value)}
           onKeyDown={(event) => handleKeyDown(event, index)}
           onFocus={(event) => event.target.select()}
-          className={`h-12 w-10 rounded-xl border bg-white text-center text-xl font-extrabold text-slate-900 outline-none transition sm:h-14 sm:w-12 sm:text-2xl dark:bg-[#1a1a1d] dark:text-white ${
+          className={`h-11 min-w-0 w-full rounded-lg border bg-white text-center text-lg font-extrabold text-slate-900 outline-none transition sm:h-14 sm:w-12 sm:rounded-xl sm:text-2xl dark:bg-[#1a1a1d] dark:text-white ${
             hasError
               ? "border-red-300 ring-2 ring-red-100"
               : "border-slate-200 focus:border-pink-400 focus:ring-4 focus:ring-pink-100 dark:border-neutral-700"

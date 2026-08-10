@@ -220,12 +220,12 @@ const DetailSection = ({ children, icon, title }) => (
 );
 
 const DetailLine = ({ icon, label, value }) => (
-  <div className="grid grid-cols-[28px_1fr_1.25fr] items-center gap-3 border-b border-slate-100 py-3 text-xs last:border-b-0">
+  <div className="grid grid-cols-[28px_minmax(0,1fr)_minmax(0,1.25fr)] items-center gap-3 border-b border-slate-100 py-3 text-xs last:border-b-0">
     <span className="grid h-7 w-7 place-items-center rounded-md bg-pink-50 text-pink-500">
       <DetailIcon name={icon} />
     </span>
     <span className="font-bold text-slate-500">{label}</span>
-    <span className="font-black text-[#111936]">{value || "-"}</span>
+    <span className="min-w-0 break-words font-black text-[#111936] [overflow-wrap:anywhere]">{value || "-"}</span>
   </div>
 );
 

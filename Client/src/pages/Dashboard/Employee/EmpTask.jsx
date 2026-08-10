@@ -235,7 +235,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
       tabIndex={!isExpanded ? 0 : undefined}
     >
       {isExpanded ? (
-        <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] lg:items-start">
+        <div className="grid gap-5 min-[1280px]:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_44px] min-[1280px]:items-start">
           <div className="flex min-w-0 items-center gap-3 text-left">
             {!isOverlay && (
               <button
@@ -271,7 +271,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             </span>
           </div>
 
-          <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
+          <div className="min-w-0 min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
             <p className="mb-1 text-[10px] font-black text-slate-500">Tasks</p>
             <p className="mb-2 text-[10px] font-bold text-slate-400">Complete each step in order.</p>
             {item.subtasks.length > 0 ? (
@@ -359,14 +359,14 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             )}
           </div>
 
-          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+          <div className="min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
             <p className="mb-5 text-[10px] font-black text-slate-500">Priority</p>
             <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.Medium}`}>
               {item.priority}
             </span>
           </div>
 
-          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+          <div className="min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
             <p className="mb-5 text-[10px] font-black text-slate-500">Due Date</p>
             <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
               <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
@@ -390,12 +390,12 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             </span>
           </div>
 
-          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50 lg:mt-7" aria-label={`View ${item.title} date`}>
+          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50 min-[1280px]:mt-7" aria-label={`View ${item.title} date`}>
             <SmallIcon name="calendar" />
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[28px_1.35fr_100px_120px_150px_110px_44px] lg:items-center">
+        <div className="grid gap-4 min-[1280px]:grid-cols-[28px_1.35fr_100px_120px_150px_110px_44px] min-[1280px]:items-center">
           <button
             type="button"
             onClick={(event) => {
@@ -551,10 +551,10 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 p-3 backdrop-blur-[2px] sm:p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
+        className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
@@ -707,11 +707,11 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </p>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-600 transition hover:bg-slate-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">
+        <div className="mt-6 grid gap-3 min-[400px]:flex min-[400px]:justify-end">
+          <button type="button" onClick={onClose} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-600 transition hover:bg-slate-50 min-[400px]:w-auto min-[400px]:px-8 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">
             Cancel
           </button>
-          <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-8 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105">
+          <button type="submit" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 min-[400px]:w-auto min-[400px]:px-8">
             <SmallIcon name="send" />
             {completion.finalize ? "Submit Final Output" : "Submit to Client"}
           </button>
@@ -728,8 +728,8 @@ const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
     : "Medium";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
-      <section className="w-full max-w-2xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 p-3 backdrop-blur-[2px] sm:p-6">
+      <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800">
         <div className="flex items-start justify-between gap-4">
           <div>
             <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-rose-600">Needs Revision</span>
@@ -1074,7 +1074,7 @@ const EmpTask = () => {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1
-            className="text-4xl uppercase leading-none text-neutral-950 dark:text-white"
+            className="page-title text-3xl leading-none text-neutral-950 md:text-4xl dark:text-white"
             style={{ fontFamily: "var(--font-bruno)" }}
           >
             My Projects

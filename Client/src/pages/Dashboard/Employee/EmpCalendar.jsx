@@ -195,8 +195,8 @@ const emptyPersonalForm = (date) => ({
 });
 
 const Modal = ({ title, children, onClose }) => (
-  <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4">
-    <section className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
+  <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-3 sm:p-4">
+    <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-2rem)] sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-lg font-black text-[#10142d]">{title}</h2>
         <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500">
@@ -323,7 +323,7 @@ const EmpCalendar = () => {
       <div className="mx-auto max-w-[1840px] space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl uppercase leading-none text-neutral-950 dark:text-white md:text-4xl" style={{ fontFamily: "var(--font-bruno)" }}>
+            <h1 className="page-title text-3xl leading-none text-neutral-950 dark:text-white md:text-4xl" style={{ fontFamily: "var(--font-bruno)" }}>
               Calendar
             </h1>
             <p className="mt-2 text-sm font-semibold text-slate-500 md:text-base">
@@ -366,7 +366,7 @@ const EmpCalendar = () => {
           ))}
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[310px_minmax(760px,1fr)]">
+        <div className="grid gap-5 min-[1400px]:grid-cols-[310px_minmax(760px,1fr)]">
           <div className="space-y-5">
             <Card className="p-6">
               <div className="mb-5 flex items-center justify-between">

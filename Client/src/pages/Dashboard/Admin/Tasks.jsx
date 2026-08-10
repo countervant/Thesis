@@ -571,7 +571,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
       tabIndex={!effectiveExpanded ? 0 : undefined}
     >
       {effectiveExpanded ? (
-        <div className="grid gap-5 lg:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_112px] lg:items-start">
+        <div className="grid gap-5 min-[1280px]:grid-cols-[1.45fr_1.35fr_100px_130px_150px_112px_112px] min-[1280px]:items-start">
           <div className="flex min-w-0 items-center gap-3 text-left">
             {!isOverlay && (
               <button
@@ -617,7 +617,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             </span>
           </div>
 
-          <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
+          <div className="min-w-0 min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
             <p className="mb-1 text-[10px] font-black text-slate-500">Tasks</p>
             <p className="mb-2 text-[10px] font-bold text-slate-400">Complete each step in order.</p>
             {item.subtasks.length > 0 ? (
@@ -701,14 +701,14 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             )}
           </div>
 
-          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+          <div className="min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
             <p className="mb-5 text-[10px] font-black text-slate-500">Priority</p>
             <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${priorityStyles[item.priority] || priorityStyles.medium}`}>
               {item.priority}
             </span>
           </div>
 
-          <div className="lg:border-r lg:border-pink-50 lg:pr-5">
+          <div className="min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
             <p className="mb-5 text-[10px] font-black text-slate-500">Due Date</p>
             <span className="flex items-center gap-2 text-xs font-bold text-slate-600">
               <SmallIcon name="calendar" className="h-4 w-4 text-slate-500" />
@@ -732,7 +732,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             </span>
           </div>
 
-          <span className="flex flex-col items-end lg:pt-8">
+          <span className="flex flex-col items-end min-[1280px]:pt-8">
             <span className="flex items-center gap-1">
               <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                 <SmallIcon name="edit" />
@@ -839,9 +839,9 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
 
         <div className={`hidden gap-3 md:grid md:gap-4 ${
           canAccessSubtasks
-            ? "lg:grid-cols-[28px_1.35fr_100px_130px_150px_112px_112px]"
-            : "lg:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_112px]"
-        } lg:items-center`}>
+            ? "min-[1280px]:grid-cols-[28px_1.35fr_100px_130px_150px_112px_112px]"
+            : "min-[1280px]:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_112px]"
+        } min-[1280px]:items-center`}>
           {canAccessSubtasks && (
             <button
               type="button"
@@ -855,7 +855,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               </span>
             </button>
           )}
-          <div className={`flex min-w-0 items-start gap-3 ${!canAccessSubtasks ? "lg:border-r lg:border-pink-50 lg:pr-5" : ""}`}>
+          <div className={`flex min-w-0 items-start gap-3 ${!canAccessSubtasks ? "min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5" : ""}`}>
             <span className={`mt-1 h-16 w-1 shrink-0 rounded-full md:mt-1.5 md:h-8 ${accentClass}`} />
             <span className="min-w-0">
               <p className="truncate text-sm font-black text-[#10142d]">{item.title}</p>
@@ -870,7 +870,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
             </span>
           </div>
           {!canAccessSubtasks && (
-            <div className="min-w-0 lg:border-r lg:border-pink-50 lg:pr-5">
+            <div className="min-w-0 min-[1280px]:border-r min-[1280px]:border-pink-50 min-[1280px]:pr-5">
               <p className="mb-2 text-[10px] font-black text-slate-500">Assigned to</p>
               <div className="flex min-w-0 items-center gap-3">
                 <InitialsAvatar
@@ -900,7 +900,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
           <span className={`w-fit rounded-full px-3 py-1 text-[10px] font-black md:px-4 md:text-xs ${statusStyles[item.status] || getStatusTone(item.status)}`}>
             {item.status}
           </span>
-          <span className="flex flex-col items-end lg:items-start">
+          <span className="flex flex-col items-end min-[1280px]:items-start">
             <span className="flex items-center gap-1">
               <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                 <SmallIcon name="edit" />
@@ -964,7 +964,7 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-3 backdrop-blur-[2px] sm:p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isSubmitting) onClose();
       }}
@@ -972,7 +972,7 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
     >
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-lg overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-3xl border border-pink-100 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)] dark:border-neutral-800 dark:bg-neutral-950"
       >
         <header className="flex items-start justify-between gap-4 border-b border-pink-100 px-6 py-5 dark:border-neutral-800">
           <div className="min-w-0">
@@ -1045,14 +1045,14 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
           </div>
         </div>
 
-        <footer className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-neutral-800">
-          <button type="button" disabled={isSubmitting} onClick={onClose} className="h-10 rounded-xl border border-slate-200 px-5 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
+        <footer className="grid gap-3 border-t border-slate-100 px-5 py-4 min-[400px]:flex min-[400px]:justify-end sm:px-6 dark:border-neutral-800">
+          <button type="button" disabled={isSubmitting} onClick={onClose} className="h-10 w-full rounded-xl border border-slate-200 px-5 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 min-[400px]:w-auto">
             Cancel
           </button>
           <button
             type="submit"
             disabled={!employeeId || !Number.isFinite(numericAmount) || numericAmount <= 0 || isSubmitting}
-            className="h-10 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-10 w-full rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 min-[400px]:w-auto"
           >
             {isSubmitting ? "Recording payment..." : `Pay ${getPersonName(selectedEmployee)}`}
           </button>
@@ -1249,10 +1249,10 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 p-3 backdrop-blur-[2px] sm:p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
+        className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
@@ -1379,11 +1379,11 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </p>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white px-8 text-sm font-black text-slate-600 transition hover:bg-slate-50">
+        <div className="mt-6 grid gap-3 min-[400px]:flex min-[400px]:justify-end">
+          <button type="button" onClick={onClose} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-600 transition hover:bg-slate-50 min-[400px]:w-auto min-[400px]:px-8">
             Cancel
           </button>
-          <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-8 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105">
+          <button type="submit" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 min-[400px]:w-auto min-[400px]:px-8">
             <SmallIcon name="send" />
             {completion.finalize ? "Submit Final Output" : "Submit to Client"}
           </button>
@@ -1853,7 +1853,7 @@ const Tasks = ({
           <header className="flex items-center justify-between gap-3 md:flex-wrap md:gap-4">
             <div>
               <h1
-                className="text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-4xl"
+                className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-4xl"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Projects

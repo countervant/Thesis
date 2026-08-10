@@ -257,12 +257,12 @@ const Notification = () => {
         onNavigate={handleNavigate}
       >
         <div className="mx-auto max-w-[1100px]">
-          <section className="rounded-lg bg-white px-6 py-6 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
-            <div className="flex items-center gap-3">
-              <img src={notificationIcon} alt="" className="h-9 w-9 object-contain" />
-              <div>
+          <section className="rounded-lg bg-white px-4 py-5 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100 sm:px-6 sm:py-6">
+            <div className="flex items-start gap-3 sm:items-center">
+              <img src={notificationIcon} alt="" className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9" />
+              <div className="min-w-0">
                 <h1
-                  className="text-3xl uppercase leading-none text-neutral-950"
+                  className="page-title text-2xl leading-none text-neutral-950 sm:text-3xl"
                   style={{ fontFamily: "var(--font-bruno)" }}
                 >
                   Notifications

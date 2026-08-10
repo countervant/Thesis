@@ -307,7 +307,7 @@ const Profile = ({ embedded = false }) => {
     <main className={embedded ? "w-full" : "w-full px-4 py-6 md:px-5 md:py-10"}>
       <div className="mb-4">
         <h1
-          className="text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-3xl"
+          className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-3xl"
           style={{ fontFamily: "var(--font-bruno)" }}
         >
         Profile
@@ -326,7 +326,7 @@ const Profile = ({ embedded = false }) => {
           onSubmit={handleSubmit}
           autoComplete="off"
           data-form-type="other"
-          className="grid gap-4 xl:grid-cols-[300px_1fr]"
+          className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]"
         >
           <input type="text" name="username" autoComplete="username" tabIndex={-1} aria-hidden="true" className="hidden" />
           <input type="password" name="password" autoComplete="current-password" tabIndex={-1} aria-hidden="true" className="hidden" />
@@ -371,7 +371,7 @@ const Profile = ({ embedded = false }) => {
                 </p>
 
                 <div className="mt-4 space-y-3 border-y border-pink-50 py-4 text-left text-xs font-bold text-slate-600">
-                  <p className="flex items-center gap-3"><FormIcon name="mail" />{formData.email || "email@example.com"}</p>
+                  <p className="flex min-w-0 items-center gap-3 break-all"><FormIcon name="mail" />{formData.email || "email@example.com"}</p>
                   <p className="flex items-center gap-3"><FormIcon name="phone" />{formData.phone || "Phone number"}</p>
                   <p className="flex items-center gap-3"><FormIcon name="location" />{formData.companyName || formData.country || "Manila, Philippines"}</p>
                   <p className="flex items-center gap-3"><FormIcon name="calendar" />Joined {joinedDate}</p>

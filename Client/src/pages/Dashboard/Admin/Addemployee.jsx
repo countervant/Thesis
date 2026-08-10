@@ -159,9 +159,9 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-8 text-neutral-950">
-      <section className="max-h-full w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl">
-        <header className="border-b border-neutral-300 px-8 py-11 sm:px-11">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/65 p-3 text-neutral-950 sm:p-6">
+      <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-[690px] overflow-y-auto bg-[#f1f1f1] shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+        <header className="border-b border-neutral-300 px-5 py-7 sm:px-11 sm:py-11">
           <h1
             className="text-2xl uppercase leading-none text-neutral-950 sm:text-3xl"
             style={{ fontFamily: "var(--font-bruno)" }}
@@ -174,7 +174,7 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
           onSubmit={handleSubmit}
           autoComplete="off"
           data-form-type="other"
-          className="flex flex-col px-8 py-10 sm:px-11 sm:py-12"
+          className="flex flex-col px-5 py-7 sm:px-11 sm:py-12"
         >
           <input
             type="text"

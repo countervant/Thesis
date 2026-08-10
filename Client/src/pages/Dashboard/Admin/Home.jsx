@@ -848,8 +848,8 @@ const PlaceholderPanel = ({ title, children }) => (
 );
 
 const FloatingListPanel = ({ children, onClose, title }) => (
-  <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
-    <section className={`w-full max-w-3xl rounded-2xl border border-pink-100 bg-white px-5 py-4 ${dashboardCardShadow}`}>
+  <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 p-3 backdrop-blur-sm sm:p-5">
+    <section className={`my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-pink-100 bg-white px-4 py-4 sm:max-h-[calc(100dvh-2.5rem)] sm:px-5 ${dashboardCardShadow}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="text-base font-extrabold text-[#10172a] dark:text-white">{title}</h2>
         <button
@@ -1367,7 +1367,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
                   Welcome back, {getUserName(user)}!
                 </p>
                 <h1
-                  className="mt-1 text-2xl uppercase leading-none text-neutral-950 dark:text-white md:text-3xl"
+                  className="page-title mt-1 text-2xl leading-none text-neutral-950 dark:text-white md:text-3xl"
                   style={{ fontFamily: "var(--font-bruno)" }}
                 >
                   Dashboard

@@ -85,7 +85,7 @@ const ResetPassword = () => {
     <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-[#111111]">
       <div className="flex min-h-screen w-full flex-col items-center justify-center px-3 py-8 sm:px-10 sm:py-12 md:px-12">
         <h2
-          className="mb-6 text-center text-2xl font-bold uppercase tracking-wide sm:mb-10 sm:text-3xl"
+          className="page-title mb-6 text-center text-xl font-bold tracking-wide min-[360px]:text-2xl sm:mb-10 sm:text-3xl"
           style={{ fontFamily: "'Bruno Ace SC', sans-serif" }}
         >
           Set New Password

@@ -306,7 +306,7 @@ const ProjectCard = ({ onApprove, onFeedback, onRequestRevision, onToggleArchive
           </button>
         </div>
       ) : project.awaitingClientDecision ? (
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="mt-5 grid gap-2 min-[400px]:grid-cols-2">
             <button
               type="button"
               onClick={() => onRequestRevision(project)}
@@ -363,9 +363,9 @@ const ProjectCard = ({ onApprove, onFeedback, onRequestRevision, onToggleArchive
 };
 
 const DetailRow = ({ label, value }) => (
-  <p className="grid grid-cols-[150px_1fr] gap-4 py-2 text-sm font-bold">
+  <p className="grid min-w-0 gap-1 py-2 text-sm font-bold sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
     <span className="text-slate-500">{label}</span>
-    <span className="text-[#10142d] dark:text-white">{value || "N/A"}</span>
+    <span className="min-w-0 break-words text-[#10142d] [overflow-wrap:anywhere] dark:text-white">{value || "N/A"}</span>
   </p>
 );
 
@@ -609,7 +609,7 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
             {outputItems.length === 0 ? (
               <p className="py-8 text-center text-sm font-bold text-slate-500">No submitted output yet.</p>
             ) : outputItems.map((output) => (
-              <div key={output.id} className="grid grid-cols-[52px_1fr_auto] items-center gap-3 py-3">
+              <div key={output.id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3 py-3 min-[420px]:grid-cols-[52px_minmax(0,1fr)_auto]">
                 <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
                   <Icon name={output.type === "link" ? "external" : "file"} className="h-6 w-6" />
                 </span>
@@ -752,8 +752,8 @@ const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
-      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] dark:border-neutral-800 dark:bg-[#141414]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 p-3 backdrop-blur-[2px] sm:p-6">
+      <form onSubmit={handleSubmit} className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.28)] sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-[#141414]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Share your feedback</h2>
@@ -764,9 +764,9 @@ const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
 
         <fieldset className="mt-6">
           <legend className="text-sm font-black text-[#10142d] dark:text-white">Your rating</legend>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 grid grid-cols-5 gap-1.5 sm:gap-2">
             {[1, 2, 3, 4, 5].map((value) => (
-              <button key={value} type="button" onClick={() => setRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} className={`grid h-11 w-11 place-items-center rounded-lg text-xl transition ${value <= rating ? "bg-pink-50 text-[#c72fb2]" : "bg-slate-50 text-slate-300 hover:text-[#e347a8] dark:bg-neutral-900"}`}>
+              <button key={value} type="button" onClick={() => setRating(value)} aria-label={`${value} star${value === 1 ? "" : "s"}`} className={`grid h-11 min-w-0 w-full place-items-center rounded-lg text-xl transition ${value <= rating ? "bg-pink-50 text-[#c72fb2]" : "bg-slate-50 text-slate-300 hover:text-[#e347a8] dark:bg-neutral-900"}`}>
                 ★
               </button>
             ))}
@@ -809,10 +809,10 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 p-3 backdrop-blur-[2px] sm:p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-2xl rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
+        className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-[#141414] dark:ring-neutral-800"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -934,17 +934,17 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
 };
 
 const RatingStars = ({ label, onChange, required = false, value }) => (
-  <div className="flex items-center justify-between gap-4">
+  <div className="grid gap-2 min-[400px]:flex min-[400px]:items-center min-[400px]:justify-between min-[400px]:gap-4">
     <span className="text-xs font-black text-slate-600 dark:text-slate-300">
       {label} {required && <span className="text-pink-500">*</span>}
     </span>
-    <span className="flex items-center gap-1.5">
+    <span className="grid grid-cols-5 gap-1.5">
       {[1, 2, 3, 4, 5].map((rating) => (
         <button
           key={rating}
           type="button"
           onClick={() => onChange(rating)}
-          className={`flex h-9 w-7 items-center justify-center rounded-md transition ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
+          className={`flex h-9 min-w-0 w-full items-center justify-center rounded-md transition min-[400px]:w-7 ${rating <= value ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-400"}`}
           aria-label={`${rating} star rating`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill={rating <= value ? "currentColor" : "none"} aria-hidden="true">
@@ -980,8 +980,8 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 px-4 py-8 backdrop-blur-[2px]">
-      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 dark:border-neutral-800 dark:bg-[#141414]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/45 p-3 backdrop-blur-[2px] sm:p-6">
+      <form onSubmit={handleSubmit} className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,23,42,0.28)] ring-1 ring-pink-50 sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-[#141414]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Give Feedback</h2>

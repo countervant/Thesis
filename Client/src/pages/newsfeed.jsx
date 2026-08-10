@@ -42,7 +42,7 @@ const EmojiPicker = ({ onSelect }) => {
   const category = emojiCategories.find((item) => item.label === activeCategory) || emojiCategories[0];
 
   return (
-    <div className="w-72 rounded-xl border border-pink-100 bg-white p-2 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] w-auto rounded-xl border border-pink-100 bg-white p-2 shadow-xl sm:static sm:w-72 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="mb-2 flex items-center gap-1 border-b border-pink-50 pb-2 dark:border-neutral-800">
         {emojiCategories.map((item) => (
           <button
@@ -766,7 +766,7 @@ const Newsfeed = () => {
         <div className="min-w-0 space-y-4">
           <header>
             <h1
-              className="text-2xl uppercase leading-none text-neutral-950 md:text-3xl"
+              className="page-title text-2xl leading-none text-neutral-950 md:text-3xl"
               style={{ fontFamily: "var(--font-bruno)" }}
             >
               <span className="text-[#dc4fb2]">Clientra</span> Newsfeed
@@ -966,7 +966,7 @@ const Newsfeed = () => {
                 </div>
 
                   <div className="mt-3 pl-12">
-                  <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-800">
+                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800 [overflow-wrap:anywhere]">
                     {post.content}
                   </p>
                   {post.media?.url && (
@@ -1085,7 +1085,7 @@ const Newsfeed = () => {
                                 {formatDateTime(comment.createdAt)}
                               </span>
                             </div>
-                            <p className="mt-1 text-sm font-semibold leading-6 text-neutral-800">{comment.text}</p>
+                            <p className="mt-1 break-words text-sm font-semibold leading-6 text-neutral-800 [overflow-wrap:anywhere]">{comment.text}</p>
                             <div className="mt-1 flex items-center gap-3">
                               <button
                                 type="button"
@@ -1129,7 +1129,7 @@ const Newsfeed = () => {
                         {areRepliesVisible && (
                           <>
                             {comment.replies.length > 0 && (
-                              <div className="ml-11 space-y-3">
+                              <div className="ml-8 space-y-3 sm:ml-11">
                                 {comment.replies.map((reply) => {
                                   const replyId = reply._id || reply.id;
 
@@ -1162,7 +1162,7 @@ const Newsfeed = () => {
                                           {formatDateTime(reply.createdAt)}
                                         </span>
                                       </div>
-                                      <p className="mt-1 text-sm text-neutral-800">{reply.text}</p>
+                                      <p className="mt-1 break-words text-sm text-neutral-800 [overflow-wrap:anywhere]">{reply.text}</p>
                                     </div>
                                   </div>
                                   );
@@ -1172,7 +1172,7 @@ const Newsfeed = () => {
 
                             <form
                               onSubmit={(event) => handleAddReply(event, post.id, commentId)}
-                              className="ml-11 flex gap-3"
+                              className="ml-8 flex min-w-0 gap-2 sm:ml-11 sm:gap-3"
                             >
                               <Avatar user={user} size="h-7 w-7" />
                               <div className="relative flex-1">

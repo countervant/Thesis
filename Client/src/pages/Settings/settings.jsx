@@ -147,7 +147,7 @@ const Settings = () => {
             </div>
           </aside>
 
-          <main className="space-y-3">
+          <main className="min-w-0 space-y-3">
             {isSecurityTab ? (
               <SecuritySettings user={user} />
             ) : isNotificationTab ? (
@@ -242,8 +242,8 @@ const Settings = () => {
       </div>
 
       {isDeactivateOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-          <section className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-[#141414]">
+        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-3 sm:p-4">
+          <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-5 dark:bg-[#141414]">
             <h2 className="text-lg font-black text-[#10142d] dark:text-white">Deactivate Account</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
               This immediately disables sign-in for this account and signs you out.
@@ -269,19 +269,19 @@ const Settings = () => {
                   className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-[#10142d] outline-none transition focus:border-[#c72fb2] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                 />
               </label>
-              <div className="flex justify-end gap-2">
+              <div className="grid gap-2 min-[380px]:flex min-[380px]:justify-end">
                 <button
                   type="button"
                   onClick={() => { setIsDeactivateOpen(false); setDeactivateError(""); }}
                   disabled={isDeactivating}
-                  className="h-9 min-w-[100px] rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 min-[380px]:w-auto min-[380px]:min-w-[100px] dark:bg-[#141414] dark:text-slate-200 dark:hover:bg-[#c72fb2] dark:hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isDeactivating}
-                  className="h-9 min-w-[150px] rounded-lg bg-red-500 px-5 text-xs font-black text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-9 w-full rounded-lg bg-red-500 px-5 text-xs font-black text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60 min-[380px]:w-auto min-[380px]:min-w-[150px]"
                 >
                   {isDeactivating ? "Deactivating..." : "Deactivate Account"}
                 </button>
