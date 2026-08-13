@@ -386,7 +386,7 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
           <h2 id="project-activity-panel-title" className="text-lg font-black text-[#10142d] dark:text-white">{title}</h2>
           <p className="mt-0.5 text-xs font-bold text-slate-500">{count} {count === 1 ? "item" : "items"}</p>
         </div>
-        <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-pink-100 text-sm font-black text-[#c72fb2] transition hover:bg-pink-50" aria-label={`Close ${title}`}>x</button>
+        <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full border border-pink-100 text-sm font-black text-[#c72fb2] transition hover:bg-pink-50" aria-label={`Close ${title}`}>x</button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-5 pr-3">
         {children}
@@ -541,7 +541,7 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
   );
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:px-6 lg:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-black text-slate-600 transition hover:text-[#c72fb2]">
           <Icon name="arrow" className="h-4 w-4" />
@@ -759,7 +759,7 @@ const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
             <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Share your feedback</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">How was the completed work on <span className="text-[#10142d] dark:text-white">{project.title}</span>?</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback form">x</button>
+          <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback form">x</button>
         </div>
 
         <fieldset className="mt-6">
@@ -987,7 +987,7 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
             <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Give Feedback</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">Tell us about your experience with this project.</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback">x</button>
+          <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback">x</button>
         </div>
 
         <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/30 p-4">
@@ -1040,7 +1040,7 @@ const FeedbackSuccessModal = ({ onClose }) => (
 );
 
 const ClientProjectsSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:px-6 lg:px-8">
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <Skeleton className="h-9 w-44" />
@@ -1491,7 +1491,7 @@ const ClientProjects = () => {
   }
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:px-6 lg:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="page-title text-3xl">My Projects</h1>
@@ -1595,9 +1595,9 @@ const ClientProjects = () => {
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
           <span>Showing {visibleProjects.length ? 1 : 0} to {visibleProjects.length} of {projectsInCurrentSection} projects</span>
           <span className="flex items-center gap-2">
-            <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Previous page">‹</button>
+            <button type="button" className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Previous page">‹</button>
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#c72fb2] text-white">1</span>
-            <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Next page">›</button>
+            <button type="button" className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Next page">›</button>
           </span>
         </div>
       </Card>

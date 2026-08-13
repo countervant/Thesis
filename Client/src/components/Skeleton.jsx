@@ -32,14 +32,14 @@ export const SkeletonRows = ({ rows = 5, columns = 4 }) => (
 );
 
 export const DashboardSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-6 bg-[#f8f9fd] px-4 py-5 dark:bg-neutral-950 md:px-6 lg:px-8">
     <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <section
           key={index}
-          className={`flex h-32 items-center gap-7 rounded-2xl border border-pink-100 bg-white px-8 ${dashboardCardShadow}`}
+          className={`flex h-32 min-w-0 items-center gap-4 rounded-2xl border border-pink-100 bg-white px-4 sm:gap-7 sm:px-8 ${dashboardCardShadow}`}
         >
-          <Skeleton className="h-20 w-20 shrink-0 rounded-3xl" />
+          <Skeleton className="h-16 w-16 shrink-0 rounded-2xl sm:h-20 sm:w-20 sm:rounded-3xl" />
           <div className="min-w-0 flex-1">
             <Skeleton className="h-9 w-12" />
             <Skeleton className="mt-2 h-4 w-28" />
@@ -49,9 +49,10 @@ export const DashboardSkeleton = () => (
     </div>
 
     <div className="grid gap-6 xl:grid-cols-[1.85fr_0.98fr]">
-      <section className={`h-[500px] overflow-hidden rounded-2xl border border-pink-100 bg-white px-7 py-7 ${dashboardCardShadow}`}>
+      <section className={`h-[500px] min-w-0 overflow-hidden rounded-2xl border border-pink-100 bg-white px-4 py-7 sm:px-7 ${dashboardCardShadow}`}>
         <Skeleton className="mb-6 h-5 w-44" />
-        <div className="grid grid-cols-[190px_1fr]">
+          <div className="overflow-x-auto overscroll-x-contain">
+            <div className="grid min-w-[910px] grid-cols-[190px_720px]">
           <div className="border-r border-neutral-200 pr-3">
             <div className="h-13" />
             {Array.from({ length: 4 }).map((_, index) => (
@@ -68,7 +69,7 @@ export const DashboardSkeleton = () => (
               </div>
             ))}
           </div>
-          <div className="min-w-[720px]">
+          <div>
             <div className="grid h-13 grid-cols-3 border-b border-neutral-100">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="border-r border-neutral-100 px-8 last:border-r-0">
@@ -96,12 +97,13 @@ export const DashboardSkeleton = () => (
               <Skeleton className="mt-2 h-3 w-2/3 rounded-full" />
             </div>
           </div>
+          </div>
         </div>
       </section>
 
-      <section className={`h-[500px] rounded-2xl border border-pink-100 bg-white px-8 py-7 ${dashboardCardShadow}`}>
+      <section className={`h-[500px] min-w-0 rounded-2xl border border-pink-100 bg-white px-4 py-7 sm:px-8 ${dashboardCardShadow}`}>
         <Skeleton className="mb-6 h-5 w-44" />
-        <div className="mx-auto h-64 w-64 rounded-full bg-neutral-200 dark:bg-neutral-800" />
+        <div className="mx-auto h-48 w-48 rounded-full bg-neutral-200 dark:bg-neutral-800 sm:h-64 sm:w-64" />
         <div className="mt-7 space-y-3">
           {Array.from({ length: 4 }).map((_, index) => (
             <span key={index} className="flex items-center gap-3">
@@ -117,8 +119,9 @@ export const DashboardSkeleton = () => (
       {["Working", "Not Working"].map((title) => (
         <section
           key={title}
-          className={`h-[260px] overflow-hidden rounded-2xl border border-pink-100 bg-white ${dashboardCardShadow}`}
+          className={`h-[260px] min-w-0 overflow-x-auto overflow-y-hidden rounded-2xl border border-pink-100 bg-white overscroll-x-contain ${dashboardCardShadow}`}
         >
+          <div className="min-w-[520px]">
           <div className="px-7 pt-5">
             <Skeleton className="h-5 w-32" />
           </div>
@@ -139,6 +142,7 @@ export const DashboardSkeleton = () => (
                 <Skeleton className="h-4 w-24" />
               </div>
             ))}
+          </div>
           </div>
         </section>
       ))}
@@ -218,7 +222,7 @@ export const PersonCardSkeleton = ({ type = "employee" }) => (
     <div className="flex items-center gap-4">
       <Skeleton className="h-13 w-13 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1">
-        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-5 w-full max-w-40" />
         <Skeleton className="mt-2 h-5 w-24 rounded-full" />
       </div>
     </div>
@@ -251,12 +255,12 @@ export const BudgetSummarySkeleton = () => (
     {Array.from({ length: 3 }).map((_, index) => (
       <section
         key={index}
-        className="flex h-24 items-center justify-center gap-8 rounded-lg border-b-2 border-[#e347b3] bg-white px-6 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800"
+        className="flex h-24 min-w-0 flex-col items-start justify-center gap-2 rounded-lg border-b-2 border-[#e347b3] bg-white p-3 shadow-[0_3px_4px_rgba(219,39,119,0.22)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800 md:flex-row md:items-center md:gap-4 md:px-5"
       >
-        <Skeleton className="h-16 w-16 rounded-md" />
-        <div className="min-w-[110px] text-center">
-          <Skeleton className="mx-auto h-8 w-28" />
-          <Skeleton className="mx-auto mt-2 h-4 w-24" />
+        <Skeleton className="h-9 w-9 shrink-0 rounded-md md:h-14 md:w-14" />
+        <div className="min-w-0 flex-1 text-left md:text-center">
+          <Skeleton className="h-5 w-full max-w-28 md:mx-auto md:h-7" />
+          <Skeleton className="mt-2 h-3 w-full max-w-24 md:mx-auto" />
         </div>
       </section>
     ))}
@@ -265,28 +269,28 @@ export const BudgetSummarySkeleton = () => (
 
 export const BudgetChartsSkeleton = () => (
   <>
-    <section className="flex min-h-[315px] flex-col rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <section className="flex min-h-[315px] min-w-0 flex-col rounded-lg bg-white px-4 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800 sm:px-6">
       <Skeleton className="h-5 w-44" />
-      <div className="mt-6 flex flex-1 items-end gap-4">
-        <div className="flex h-52 w-12 flex-col justify-between">
+      <div className="mt-6 flex min-w-0 flex-1 items-end gap-2 sm:gap-4">
+        <div className="flex h-52 w-10 shrink-0 flex-col justify-between sm:w-12">
           {Array.from({ length: 5 }).map((_, index) => (
             <Skeleton key={index} className="h-3 w-10" />
           ))}
         </div>
-        <div className="flex h-52 flex-1 items-end justify-center gap-8 border-b border-neutral-300 px-8">
-          <Skeleton className="h-36 w-24 rounded-t-sm" />
-          <Skeleton className="h-44 w-24 rounded-t-sm" />
+        <div className="flex h-52 min-w-0 flex-1 items-end justify-center gap-4 border-b border-neutral-300 px-2 sm:gap-8 sm:px-8">
+          <Skeleton className="h-36 min-w-0 flex-1 rounded-t-sm sm:max-w-24" />
+          <Skeleton className="h-44 min-w-0 flex-1 rounded-t-sm sm:max-w-24" />
         </div>
       </div>
-      <div className="mt-9 flex justify-center gap-16">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-4 w-24" />
+      <div className="mt-9 grid grid-cols-2 gap-4 sm:gap-16">
+        <Skeleton className="h-4 w-full max-w-24 justify-self-end" />
+        <Skeleton className="h-4 w-full max-w-24" />
       </div>
     </section>
-    <section className="rounded-lg bg-white px-6 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800">
+    <section className="min-w-0 rounded-lg bg-white px-4 py-5 shadow-[0_3px_4px_rgba(219,39,119,0.3)] ring-1 ring-pink-50 dark:bg-[#141414] dark:shadow-none dark:ring-neutral-800 sm:px-6">
       <Skeleton className="h-5 w-44" />
       <div className="mt-4 flex flex-col items-center">
-        <div className="h-52 w-52 rounded-full bg-neutral-200 dark:bg-neutral-800" />
+        <div className="h-40 w-40 rounded-full bg-neutral-200 dark:bg-neutral-800 sm:h-52 sm:w-52" />
         <div className="mt-5 grid w-full grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <span key={index} className="flex items-center gap-2">

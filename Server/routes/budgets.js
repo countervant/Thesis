@@ -41,7 +41,7 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
       if (req.query.dateTo) query.date.$lte = new Date(req.query.dateTo);
     }
 
-    const [budgets, total, summary] = await Promise.all([
+    const [budgets, summary] = await Promise.all([
       Budget.find(query)
         .select("type description category date amount sourceTask sourceEmployeePayment relatedTask paidEmployee createdAt updatedAt")
         .sort({ date: -1, createdAt: -1 })
@@ -49,12 +49,18 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
         .limit(limit)
         .maxTimeMS(8000)
         .lean(),
-      Budget.countDocuments(query).maxTimeMS(8000),
       Budget.aggregate([
         { $match: query },
-        { $group: { _id: "$type", total: { $sum: "$amount" } } },
+        {
+          $group: {
+            _id: "$type",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
       ]).option({ maxTimeMS: 8000 }),
     ]);
+    const total = summary.reduce((count, item) => count + item.count, 0);
     const totalIncome = summary.find((item) => item._id === "income")?.total || 0;
     const totalExpense = summary.find((item) => item._id === "expense")?.total || 0;
 

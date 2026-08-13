@@ -18,7 +18,7 @@ const DisableTwoFactorModal = ({ open, onClose, onDisabled }) => {
 
   return <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true">
     <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-pink-100 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-6 dark:border-[#DA70D6]/60 dark:bg-[#141414]">
-      <button type="button" onClick={onClose} className="ml-auto grid h-9 w-9 place-items-center rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
+      <button type="button" onClick={onClose} className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-red-50 text-red-500"><ShieldAlert /></div>
       <h2 className="mt-4 text-center text-xl font-black text-[#10142d] dark:text-white">Disable Two-Factor Authentication?</h2>
       <p className="mt-2 text-center text-sm font-medium leading-6 text-slate-500">Your account will no longer require an email code when signing in.</p>

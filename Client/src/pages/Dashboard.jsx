@@ -657,12 +657,12 @@ const MessagesPanel = () => {
       if (document.visibilityState !== "visible") return;
 
       const [threadResult, userResult] = await Promise.allSettled([
-        messageAPI.getThreadsFresh(),
+        isRealtimeConnected ? Promise.resolve(null) : messageAPI.getThreadsFresh(),
         messageAPI.getUsersFresh({ limit: 100 }),
       ]);
       if (!isMounted) return;
 
-      if (threadResult.status === "fulfilled") {
+      if (threadResult.status === "fulfilled" && Array.isArray(threadResult.value)) {
         setThreads(
           threadResult.value.map((thread) =>
             getEntityId(thread.participant) === activeUserIdRef.current
@@ -687,7 +687,7 @@ const MessagesPanel = () => {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [isRealtimeConnected]);
 
   const handleSendMessage = async (event) => {
     event.preventDefault();
@@ -850,29 +850,45 @@ const MessagesPanel = () => {
   };
 
   const activeName = activeParticipant ? getDisplayName(activeParticipant) : "";
-  const latestOutgoingId = [...messages]
-    .reverse()
-    .map((message) => (getEntityId(message.sender) === currentUserId ? getEntityId(message) : ""))
-    .find(Boolean);
-  const modalUsers = users.filter((participant) => {
+  const latestOutgoingId = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .map((message) =>
+          getEntityId(message.sender) === currentUserId ? getEntityId(message) : ""
+        )
+        .find(Boolean),
+    [currentUserId, messages]
+  );
+  const modalUsers = useMemo(() => {
     const term = newMessageSearch.trim().toLowerCase();
-    if (!term) return true;
+    if (!term) return users;
 
-    return [
-      getDisplayName(participant),
-      participant.email,
-      participant.role,
-      participant.companyName,
-    ]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(term));
-  });
-  const mobileContactUsers = users
-    .filter((participant) => participant.isOnline || participant.online)
-    .slice(0, 10);
+    return users.filter((participant) =>
+      [
+        getDisplayName(participant),
+        participant.email,
+        participant.role,
+        participant.companyName,
+      ]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(term))
+    );
+  }, [newMessageSearch, users]);
+  const mobileContactUsers = useMemo(
+    () =>
+      users
+        .filter((participant) => participant.isOnline || participant.online)
+        .slice(0, 10),
+    [users]
+  );
+  const unreadThreadCount = useMemo(
+    () => threads.reduce((total, thread) => total + (thread.unreadCount || 0), 0),
+    [threads]
+  );
 
   return (
-  <section className="messages-workspace relative -mx-4 -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white md:-mx-7 lg:-mx-9">
+  <section className="messages-workspace relative -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white">
     <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#DA70D6]/60 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
       <div className="flex items-center justify-between gap-4">
         <h1 className="page-title text-3xl leading-none md:text-2xl">Messages</h1>
@@ -951,9 +967,9 @@ const MessagesPanel = () => {
           }`}
         >
           Unread
-          {threads.some((thread) => thread.unreadCount > 0) && (
+          {unreadThreadCount > 0 && (
             <span className="ml-1 rounded-full bg-[#ff3faf] px-1.5 py-0.5 text-[10px] text-white">
-              {threads.reduce((total, thread) => total + (thread.unreadCount || 0), 0)}
+              {unreadThreadCount}
             </span>
           )}
         </button>
@@ -1305,7 +1321,7 @@ const MessagesPanel = () => {
         {editingMessageId && (
           <div className="mb-2 flex items-center justify-between gap-3 rounded-xl bg-pink-50 px-3 py-2 text-xs font-bold text-[#c72fb2] dark:bg-neutral-900 dark:text-pink-300">
             <span className="min-w-0 truncate">Editing message</span>
-            <button type="button" onClick={handleCancelEditMessage} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm hover:bg-pink-100 dark:hover:bg-neutral-800" aria-label="Cancel editing">
+            <button type="button" onClick={handleCancelEditMessage} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm hover:bg-pink-100 dark:hover:bg-neutral-800" aria-label="Cancel editing">
               <span aria-hidden="true">×</span>
             </button>
           </div>
@@ -1638,6 +1654,7 @@ const Dashboard = () => {
           />
           {(adminPage === "add-task" || adminPage === "edit-task") && (
             <AdminAddTask
+              key={adminPage === "edit-task" ? editingTask?.id || "edit-task" : "new-task"}
               onNavigate={handleAdminNavigate}
               onTaskCreated={handleTaskCreated}
               task={adminPage === "edit-task" ? editingTask : null}
@@ -1659,6 +1676,7 @@ const Dashboard = () => {
           />
           {(adminPage === "add-budget" || adminPage === "edit-budget") && (
             <AdminAddBudget
+              key={adminPage === "edit-budget" ? editingBudgetEntry?.id || "edit-budget" : "new-budget"}
               entry={adminPage === "edit-budget" ? editingBudgetEntry : null}
               onBudgetSaved={handleBudgetSaved}
               onNavigate={handleAdminNavigate}
@@ -1696,6 +1714,7 @@ const Dashboard = () => {
           />
           {(adminPage === "add-employee" || adminPage === "edit-employee") && (
             <AdminAddEmployee
+              key={adminPage === "edit-employee" ? editingEmployee?.id || "edit-employee" : "new-employee"}
               employee={adminPage === "edit-employee" ? editingEmployee : null}
               onEmployeeSaved={handleEmployeeSaved}
               onNavigate={handleAdminNavigate}
@@ -1747,6 +1766,7 @@ const Dashboard = () => {
         />
         {(localPage === "add-budget" || localPage === "edit-budget") && (
           <AdminAddBudget
+            key={localPage === "edit-budget" ? editingBudgetEntry?.id || "edit-budget" : "new-budget"}
             dataAPI={budgetPlannerAPI}
             entry={localPage === "edit-budget" ? editingBudgetEntry : null}
             onBudgetSaved={handleBudgetSaved}
@@ -1769,6 +1789,7 @@ const Dashboard = () => {
         />
         {(localPage === "add-task" || localPage === "edit-task") && (
           <AdminAddTask
+            key={localPage === "edit-task" ? editingTask?.id || "edit-task" : "new-task"}
             onNavigate={handleLocalNavigate}
             onTaskCreated={handleTaskCreated}
             task={localPage === "edit-task" ? editingTask : null}
@@ -1782,7 +1803,7 @@ const Dashboard = () => {
     ) : localPage === "settings" ? (
       <Settings embedded />
     ) : (
-      <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+      <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] bg-[#f1f1f1] px-4 py-5 dark:bg-neutral-950 md:px-6 lg:px-8">
         <section className="rounded-lg bg-white px-8 py-8 shadow-[0_2px_6px_rgba(219,39,119,0.25)] ring-1 ring-pink-100">
           <h1
             className="page-title text-3xl leading-none text-neutral-950"

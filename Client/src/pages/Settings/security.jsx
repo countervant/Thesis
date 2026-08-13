@@ -318,7 +318,7 @@ const SecuritySettings = ({ user }) => {
           <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-5 dark:bg-[#141414]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-black text-[#10142d] dark:text-white">Backup Codes</h3>
-              <button type="button" onClick={closeBackupCodes} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
+              <button type="button" onClick={closeBackupCodes} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close backup codes">
                 <Icon name="x" className="h-4 w-4" />
               </button>
             </div>

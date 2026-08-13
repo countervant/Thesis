@@ -640,14 +640,14 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
   };
 
   return (
-        <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+        <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:px-5 lg:px-6">
           <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <h1
                 className="page-title text-3xl leading-none text-neutral-950 dark:text-white"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
-                Budget Planner
+                Budget Management
               </h1>
               <p className="mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
                 Track your income and expenses
@@ -673,7 +673,7 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
               <>
                 <SummaryCard icon="income" label="Total Income" note={summaryNotes.income} noteClass={totals.income >= previousMonthTotals.income ? "text-emerald-600" : "text-pink-600"} value={formatPeso(totals.income)} />
                 <SummaryCard icon="expense" label="Total Expense" note={summaryNotes.expense} noteClass={totals.expenses <= previousMonthTotals.expenses ? "text-emerald-600" : "text-pink-600"} value={formatPeso(totals.expenses)} />
-                <SummaryCard icon="balance" label="Balance" note="Available to spend" value={formatPeso(totals.balance)} />
+                <SummaryCard icon="balance" label="Profit" note="Income minus expenses" value={formatPeso(totals.balance)} />
               </>
             )}
           </section>

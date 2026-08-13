@@ -1065,13 +1065,13 @@ export const leaveRequestAPI = {
 
   create: async (leaveRequest) => {
     const response = await api.post("/leave-requests", leaveRequest);
-    clearCache("/leave-requests", "/dashboard");
+    clearCache("/leave-requests", "/auth/assignees", "/dashboard");
     return response.data;
   },
 
   updateStatus: async (id, status, comment = "") => {
     const response = await api.patch(`/leave-requests/${id}/status`, { status, comment });
-    clearCache("/leave-requests", "/dashboard");
+    clearCache("/leave-requests", "/auth/assignees", "/dashboard");
     return response.data;
   },
 

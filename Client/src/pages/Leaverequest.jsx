@@ -27,6 +27,7 @@ const statusStyles = {
   Pending: "bg-orange-50 text-orange-600 ring-orange-100",
   Approved: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   Rejected: "bg-red-50 text-red-600 ring-red-100",
+  Returned: "bg-sky-50 text-sky-600 ring-sky-100",
 };
 
 const typeColors = {
@@ -121,6 +122,20 @@ const formatDateTime = (value) => {
     hour: "numeric",
     minute: "2-digit",
   });
+};
+
+const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+const isCurrentApprovedLeave = (request) => {
+  if (request?.status !== "Approved") return false;
+
+  const start = new Date(request.startDate);
+  const end = new Date(request.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+
+  const manilaNow = Date.now() + MANILA_OFFSET_MS;
+  const endExclusive = end.getTime() + 24 * 60 * 60 * 1000;
+  return start.getTime() <= manilaNow && manilaNow < endExclusive;
 };
 
 const formatMonth = (value) => {
@@ -247,7 +262,7 @@ const monthMatches = (request, monthDate) => {
 
 const LeaveRequest = () => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const tabs = ["All", "Pending", "Approved", "Rejected"];
+  const tabs = ["All", "Pending", "Approved", "Returned", "Rejected"];
   const [requests, setRequests] = useState([]);
   const [roles, setRoles] = useState([]);
   const [summary, setSummary] = useState({});
@@ -274,31 +289,28 @@ const LeaveRequest = () => {
       if (roleFilter) params.role = roleFilter;
 
       const response = await leaveRequestAPI.getAll(params);
-      setRequests(response.leaveRequests.map(normalizeRequest));
+      const nextRequests = response.leaveRequests.map(normalizeRequest);
+      setRequests(nextRequests);
+      setSelectedRequestId((currentId) =>
+        nextRequests.some((request) => getRequestId(request) === currentId)
+          ? currentId
+          : getRequestId(nextRequests[0])
+      );
       setRoles(response.roles || []);
       setSummary(response.summary || {});
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
       setRequests([]);
+      setSelectedRequestId("");
     } finally {
       setIsLoading(false);
     }
   }, [roleFilter, monthFilter, statusFilter]);
 
   useEffect(() => {
-    loadLeaveRequests();
+    const timer = window.setTimeout(loadLeaveRequests, 0);
+    return () => window.clearTimeout(timer);
   }, [loadLeaveRequests]);
-
-  useEffect(() => {
-    if (requests.length === 0) {
-      setSelectedRequestId("");
-      return;
-    }
-
-    if (!requests.some((request) => getRequestId(request) === selectedRequestId)) {
-      setSelectedRequestId(getRequestId(requests[0]));
-    }
-  }, [requests, selectedRequestId]);
 
   const selectedRequest =
     requests.find((request) => getRequestId(request) === selectedRequestId) || requests[0] || null;
@@ -376,7 +388,10 @@ const LeaveRequest = () => {
 
   const handleStatusUpdate = async (request, status, comment = "") => {
     const requestId = getRequestId(request);
-    if (!requestId || request.status !== "Pending" || busyRequestId) return;
+    const canReviewPending = request.status === "Pending" && ["Approved", "Rejected"].includes(status);
+    const canMarkReturned = request.status === "Approved" && status === "Returned";
+    const canReactivate = request.status === "Returned" && status === "Approved";
+    if (!requestId || (!canReviewPending && !canMarkReturned && !canReactivate) || busyRequestId) return;
 
     try {
       setBusyRequestId(requestId);
@@ -417,7 +432,7 @@ const LeaveRequest = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 text-[#111936] md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+    <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 text-[#111936] md:px-5 lg:px-6">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1
@@ -538,6 +553,26 @@ const LeaveRequest = () => {
                         >
                           <ImageIcon src={check} className="h-5 w-5" />
                         </button>
+                        {isCurrentApprovedLeave(request) && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusUpdate(request, "Returned")}
+                            disabled={busyRequestId === getRequestId(request)}
+                            className="h-9 rounded-xl border border-sky-100 bg-sky-50 px-3 text-xs font-black text-sky-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Returned
+                          </button>
+                        )}
+                        {request.status === "Returned" && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusUpdate(request, "Approved")}
+                            disabled={busyRequestId === getRequestId(request)}
+                            className="h-9 rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Reactivate
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleStatusUpdate(request, "Rejected")}
@@ -640,6 +675,26 @@ const LeaveRequest = () => {
                   >
                     View Details
                   </button>
+                  {isCurrentApprovedLeave(selectedRequest) && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(selectedRequest, "Returned")}
+                      disabled={busyRequestId === getRequestId(selectedRequest)}
+                      className="h-10 rounded-xl bg-sky-500 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Mark as Returned
+                    </button>
+                  )}
+                  {selectedRequest.status === "Returned" && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(selectedRequest, "Approved")}
+                      disabled={busyRequestId === getRequestId(selectedRequest)}
+                      className="h-10 rounded-xl bg-emerald-500 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Reactivate Leave
+                    </button>
+                  )}
                 </div>
               </>
             ) : (
@@ -717,7 +772,7 @@ const LeaveRequest = () => {
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between px-5 py-5">
             <h2 className="text-base font-black">Recent Leave History</h2>
-            <button type="button" onClick={() => setStatusFilter("All")} className="text-sm font-black text-pink-600">View all</button>
+            <button type="button" onClick={() => setStatusFilter("All")} className="inline-flex min-h-11 items-center px-2 text-sm font-black text-pink-600">View all</button>
           </div>
           <div className="overflow-x-auto px-5 pb-5">
             <table className="w-full min-w-[620px] text-left text-sm">
@@ -836,12 +891,15 @@ const LeaveRequest = () => {
                             complete: true,
                             rejected: detailRequest.status === "Rejected",
                           },
+                          ...(detailRequest.status === "Returned"
+                            ? [{ label: "Returned early", date: formatDateTime(detailRequest.returnedAt || detailRequest.updatedAt), complete: true, returned: true }]
+                            : []),
                         ]),
                   ].map((item, index, items) => (
                     <div key={item.label} className="grid grid-cols-[28px_1fr_auto] gap-3">
                       <span className="relative flex justify-center">
                         <span className={`mt-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white ${
-                          item.rejected ? "bg-rose-500" : item.complete ? "bg-emerald-500" : "bg-orange-500"
+                          item.rejected ? "bg-rose-500" : item.returned ? "bg-sky-500" : item.complete ? "bg-emerald-500" : "bg-orange-500"
                         }`}>
                           {item.complete ? (item.rejected ? "x" : "✓") : ""}
                         </span>
@@ -852,9 +910,9 @@ const LeaveRequest = () => {
                         <span className="mt-1 block text-xs font-bold text-slate-500">{item.date}</span>
                       </span>
                       <span className={`mt-0.5 h-fit rounded-full px-3 py-1 text-[11px] font-black ${
-                        item.rejected ? "bg-rose-50 text-rose-600" : item.complete ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+                        item.rejected ? "bg-rose-50 text-rose-600" : item.returned ? "bg-sky-50 text-sky-600" : item.complete ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
                       }`}>
-                        {item.rejected ? "Rejected" : item.complete ? "Completed" : "Pending"}
+                        {item.rejected ? "Rejected" : item.returned ? "Returned" : item.complete ? "Completed" : "Pending"}
                       </span>
                     </div>
                   ))}
@@ -947,6 +1005,26 @@ const LeaveRequest = () => {
               >
                 Approve
               </button>
+              {isCurrentApprovedLeave(detailRequest) && (
+                <button
+                  type="button"
+                  onClick={() => handleStatusUpdate(detailRequest, "Returned", commentText.trim())}
+                  disabled={busyRequestId === getRequestId(detailRequest)}
+                  className="h-11 rounded-xl bg-sky-500 px-8 text-sm font-black text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Mark as Returned
+                </button>
+              )}
+              {detailRequest.status === "Returned" && (
+                <button
+                  type="button"
+                  onClick={() => handleStatusUpdate(detailRequest, "Approved", commentText.trim())}
+                  disabled={busyRequestId === getRequestId(detailRequest)}
+                  className="h-11 rounded-xl bg-emerald-500 px-8 text-sm font-black text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Reactivate Leave
+                </button>
+              )}
             </div>
           </div>
         </div>

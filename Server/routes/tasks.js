@@ -10,6 +10,7 @@ import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
+import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -267,7 +268,7 @@ const canUserSubmitTask = (task, userId) =>
     (subtask) => String(subtask?.assignedTo?._id || subtask?.assignedTo || "") === String(userId)
   );
 
-const validateProjectAssignees = async (assignees, adminUserId) => {
+const validateProjectAssignees = async (assignees, adminUserId, existingAssignees = []) => {
   if (!assignees.length) return "Select at least one project assignee";
 
   const employeeAssignees = assignees.filter(
@@ -278,9 +279,26 @@ const validateProjectAssignees = async (assignees, adminUserId) => {
     role: "employee",
     isActive: true,
   }).maxTimeMS(8000);
-  return employeeCount === employeeAssignees.length
-    ? ""
-    : "Projects can only be assigned to active employees or yourself";
+  if (employeeCount !== employeeAssignees.length) {
+    return "Projects can only be assigned to active employees or yourself";
+  }
+
+  const existingAssigneeIds = new Set(existingAssignees.map(String));
+  const newlyAssignedEmployeeIds = employeeAssignees.filter(
+    (employeeId) => !existingAssigneeIds.has(String(employeeId))
+  );
+  const approvedLeaves = await getEmployeesOnApprovedLeave(newlyAssignedEmployeeIds);
+
+  if (approvedLeaves.length === 0) return "";
+
+  const employeeNames = approvedLeaves
+    .map((leaveRequest) => leaveRequest.employeeName)
+    .filter(Boolean)
+    .join(", ");
+
+  return employeeNames
+    ? `${employeeNames} cannot be assigned because ${approvedLeaves.length === 1 ? "this employee is" : "these employees are"} currently on approved leave`
+    : "Employees currently on approved leave cannot be assigned to a project";
 };
 
 const getActorName = (user) =>
@@ -828,7 +846,8 @@ router.put("/:id", protect, async (req, res) => {
     if (req.user.role === "admin") {
       const assigneeValidationMessage = await validateProjectAssignees(
         payload.assignees,
-        req.user._id
+        req.user._id,
+        taskAssigneeIds(task)
       );
       if (assigneeValidationMessage) {
         return res.status(400).json({ message: assigneeValidationMessage });

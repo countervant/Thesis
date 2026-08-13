@@ -199,7 +199,7 @@ const Modal = ({ title, children, onClose }) => (
     <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-2rem)] sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-lg font-black text-[#10142d]">{title}</h2>
-        <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500">
+        <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 text-sm font-black text-slate-500" aria-label={`Close ${title}`}>
           x
         </button>
       </div>
@@ -319,7 +319,7 @@ const EmpCalendar = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-5 text-[#111936] md:px-6 lg:px-8">
       <div className="mx-auto max-w-[1840px] space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -371,7 +371,7 @@ const EmpCalendar = () => {
             <Card className="p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-lg font-black">Upcoming Events</h2>
-                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="text-sm font-black text-pink-600">{showAllUpcoming ? "This week" : "View all"}</button>
+                <button type="button" onClick={() => setShowAllUpcoming((value) => !value)} className="inline-flex min-h-11 items-center px-2 text-sm font-black text-pink-600">{showAllUpcoming ? "This week" : "View all"}</button>
               </div>
               <div className="space-y-1">
                 {sortedUpcoming.slice(0, 5).map((event) => (
@@ -390,7 +390,7 @@ const EmpCalendar = () => {
             <Card className="p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-lg font-black">My Calendars</h2>
-                <button type="button" onClick={addPersonalEvent} className="grid h-7 w-7 place-items-center rounded-lg text-lg font-black text-slate-500">+</button>
+                <button type="button" onClick={addPersonalEvent} className="grid h-11 w-11 place-items-center rounded-lg text-lg font-black text-slate-500" aria-label="Add personal event">+</button>
               </div>
               {calendars.map(([item, accent]) => (
                 <label key={item} className="mb-3 flex items-center gap-3 text-sm font-bold text-slate-600">
@@ -444,7 +444,7 @@ const EmpCalendar = () => {
         <Card className="overflow-hidden p-4 md:p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-black">{activeView === "Month" ? "Today's Schedule" : `${activeView} Schedule`}</h2>
-            <button type="button" onClick={goToday} className="text-sm font-black text-pink-600">View full day</button>
+            <button type="button" onClick={goToday} className="inline-flex min-h-11 items-center px-2 text-sm font-black text-pink-600">View full day</button>
           </div>
           <div className="overflow-x-auto">
           <div className="min-w-[760px] divide-y divide-slate-100">
@@ -459,7 +459,7 @@ const EmpCalendar = () => {
                 </span>
                 <span className={`rounded-full px-3 py-1 text-center text-xs font-black ${row.tagClass}`}>{row.type}</span>
                 {row.readOnly ? <span className="text-[10px] font-black text-slate-400">SYNCED</span> : (
-                  <button type="button" onClick={() => updateEvent(row)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500" aria-label={`${row.title} options`}>
+                  <button type="button" onClick={() => updateEvent(row)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500" aria-label={`${row.title} options`}>
                     <Icon name="more" className="h-5 w-5" />
                   </button>
                 )}

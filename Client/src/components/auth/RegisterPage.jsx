@@ -461,7 +461,7 @@ const RegisterPage = () => {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? "Hide password" : "Show password"}
-              className="pl-4 text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
+              className="grid h-11 w-11 shrink-0 place-items-center text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
             >
               {showPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
@@ -494,7 +494,7 @@ const RegisterPage = () => {
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-              className="pl-4 text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
+              className="grid h-11 w-11 shrink-0 place-items-center text-pink-500 hover:text-pink-600 focus:outline-none dark:opacity-70 dark:hover:opacity-100"
             >
               {showConfirmPassword ? (
                 <img src={hide} alt="Hide" className="w-5 h-5 dark:invert" />
@@ -515,7 +515,7 @@ const RegisterPage = () => {
 
           <div className="text-center text-sm font-bold text-slate-500">
             Already have an account?{" "}
-            <button type="button" onClick={handleLoginClick} className="text-pink-500 hover:text-pink-600">
+            <button type="button" onClick={handleLoginClick} className="inline-flex min-h-11 items-center px-1 text-pink-500 hover:text-pink-600">
               Log In
             </button>
           </div>

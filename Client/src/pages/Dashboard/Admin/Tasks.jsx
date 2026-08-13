@@ -577,7 +577,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               <button
                 type="button"
                 onClick={() => onToggleExpand(item.id)}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
                 aria-label={`Close details for ${item.title}`}
               >
                 <span className="rotate-90 transition-transform">
@@ -734,10 +734,10 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
 
           <span className="flex flex-col items-end min-[1280px]:pt-8">
             <span className="flex items-center gap-1">
-              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+              <button type="button" onClick={() => onEdit(item)} className="grid h-11 w-11 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                 <SmallIcon name="edit" />
               </button>
-              <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+              <button type="button" onClick={() => onDelete(item)} className="grid h-11 w-11 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
                 <SmallIcon name="delete" />
               </button>
             </span>
@@ -790,7 +790,7 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               <button
                 type="button"
                 onClick={canAccessSubtasks ? () => onToggleExpand(item.id) : undefined}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-50"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-50"
                 aria-label={canAccessSubtasks ? `Show tasks for ${item.title}` : `More options for ${item.title}`}
               >
                 <SmallIcon className="h-4 w-4" />
@@ -815,10 +815,10 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
               </span>
               <span className="flex w-full flex-col items-stretch">
                 <span className="flex items-center justify-end gap-1">
-                  <button type="button" onClick={() => onEdit(item)} className="grid h-7 w-7 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+                  <button type="button" onClick={() => onEdit(item)} className="grid h-11 w-11 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                     <SmallIcon name="edit" className="h-4 w-4" />
                   </button>
-                  <button type="button" onClick={() => onDelete(item)} className="grid h-7 w-7 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+                  <button type="button" onClick={() => onDelete(item)} className="grid h-11 w-11 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
                     <SmallIcon name="delete" className="h-4 w-4" />
                   </button>
                 </span>
@@ -839,14 +839,14 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
 
         <div className={`hidden gap-3 md:grid md:gap-4 ${
           canAccessSubtasks
-            ? "min-[1280px]:grid-cols-[28px_1.35fr_100px_130px_150px_112px_112px]"
+            ? "min-[1280px]:grid-cols-[44px_1.35fr_100px_130px_150px_112px_112px]"
             : "min-[1280px]:grid-cols-[1.2fr_1.25fr_100px_130px_150px_112px_112px]"
         } min-[1280px]:items-center`}>
           {canAccessSubtasks && (
             <button
               type="button"
               onClick={() => onToggleExpand(item.id)}
-              className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+              className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
               aria-expanded={effectiveExpanded}
               aria-label={`Show subtasks for ${item.title}`}
             >
@@ -902,10 +902,10 @@ const TaskRow = ({ accentClass = "bg-pink-500", canAccessSubtasks, isExpanded, i
           </span>
           <span className="flex flex-col items-end min-[1280px]:items-start">
             <span className="flex items-center gap-1">
-              <button type="button" onClick={() => onEdit(item)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
+              <button type="button" onClick={() => onEdit(item)} className="grid h-11 w-11 place-items-center rounded-lg text-blue-600 hover:bg-blue-50" aria-label={`Edit ${item.title}`}>
                 <SmallIcon name="edit" />
               </button>
-              <button type="button" onClick={() => onDelete(item)} className="grid h-8 w-8 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
+              <button type="button" onClick={() => onDelete(item)} className="grid h-11 w-11 place-items-center rounded-lg text-pink-600 hover:bg-pink-50" aria-label={`Delete ${item.title}`}>
                 <SmallIcon name="delete" />
               </button>
             </span>
@@ -984,7 +984,7 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
             type="button"
             disabled={isSubmitting}
             onClick={onClose}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-pink-50 hover:text-pink-600 disabled:opacity-50"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-pink-50 hover:text-pink-600 disabled:opacity-50"
             aria-label="Close employee payment"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -1041,7 +1041,7 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
               <path d="M12 11v5M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            This payment will be recorded automatically as an Employee Payment expense in the Admin Budget Planner.
+            This payment will be recorded automatically as an Employee Payment expense in Admin Budget Management.
           </div>
         </div>
 
@@ -1256,7 +1256,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
       >
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close submit completed task">
+          <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close submit completed task">
             x
           </button>
         </div>
@@ -1780,7 +1780,7 @@ const Tasks = ({
         currentTask?.id === task.id ? updatedTask : currentTask
       );
       setNoticeMessage(
-        `${task.title} was marked as paid and added to Budget Planner income.`
+        `${task.title} was marked as paid and added to Budget Management income.`
       );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to record this project payment."));
@@ -1797,7 +1797,7 @@ const Tasks = ({
     setConfirmAction({
       icon: "done",
       title: "Mark as Paid",
-      message: `Record the remaining ${formatProjectAmount(remainingBalance)} from “${task.title}”? Budget Planner project income will update to the full ${formatProjectAmount(amount)}, and the original output will be unlocked.`,
+      message: `Record the remaining ${formatProjectAmount(remainingBalance)} from “${task.title}”? Budget Management project income will update to the full ${formatProjectAmount(amount)}, and the original output will be unlocked.`,
       confirmLabel: "Yes, mark paid",
       onConfirm: () => handleMarkPaid(task),
     });
@@ -1820,7 +1820,7 @@ const Tasks = ({
       );
       setEmployeePaymentTask(null);
       setNoticeMessage(
-        `${getPersonName(updatedTask.employeePayments.find((payment) => getEntityId(payment.employee) === employeeId)?.employee)} was paid ${formatProjectAmount(amount)}. The payment was added to Budget Planner expenses.`
+        `${getPersonName(updatedTask.employeePayments.find((payment) => getEntityId(payment.employee) === employeeId)?.employee)} was paid ${formatProjectAmount(amount)}. The payment was added to Budget Management expenses.`
       );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to record the employee payment."));
@@ -1849,7 +1849,7 @@ const Tasks = ({
   };
 
   return (
-        <div className="-mx-4 -mb-10 mt-0 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-3 py-4 text-[#111936] md:-mx-6 md:-mt-8 md:space-y-5 md:px-6 md:py-5 lg:-mx-8 lg:px-8">
+        <div className="-mb-10 mt-0 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-3 py-4 text-[#111936] md:-mt-8 md:space-y-5 md:px-6 md:py-5 lg:px-8">
           <header className="flex items-center justify-between gap-3 md:flex-wrap md:gap-4">
             <div>
               <h1

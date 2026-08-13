@@ -459,38 +459,34 @@ const PublicProfile = () => {
     let isMounted = true;
 
     const loadMissingMedia = async () => {
-      for (const post of postsMissingMedia) {
-        try {
-          const media = await newsfeedAPI.getMedia(post.id);
+      const mediaResults = await Promise.allSettled(
+        postsMissingMedia.map((post) => newsfeedAPI.getMedia(post.id))
+      );
+      if (!isMounted) return;
 
-          if (!isMounted) return;
+      const mediaByPostId = new Map(
+        postsMissingMedia.map((post, index) => {
+          const result = mediaResults[index];
+          const media = result.status === "fulfilled" ? result.value : null;
 
-          setPosts((currentPosts) =>
-            currentPosts.map((currentPost) =>
-              currentPost.id === post.id
-                ? {
-                    ...currentPost,
-                    media: {
-                      type: media?.type || "",
-                      url: media?.url || "",
-                      name: media?.name || "",
-                    },
-                  }
-                : currentPost
-            )
-          );
-        } catch {
-          if (!isMounted) return;
+          return [
+            post.id,
+            {
+              type: media?.type || "",
+              url: media?.url || "",
+              name: media?.name || "",
+            },
+          ];
+        })
+      );
 
-          setPosts((currentPosts) =>
-            currentPosts.map((currentPost) =>
-              currentPost.id === post.id
-                ? { ...currentPost, media: { type: "", url: "", name: "" } }
-                : currentPost
-            )
-          );
-        }
-      }
+      setPosts((currentPosts) =>
+        currentPosts.map((currentPost) =>
+          mediaByPostId.has(currentPost.id)
+            ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
+            : currentPost
+        )
+      );
     };
 
     loadMissingMedia();

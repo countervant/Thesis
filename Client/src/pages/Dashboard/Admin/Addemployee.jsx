@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { employeeAPI } from "../../../services/api.js";
 import { isValidEmail } from "../../../utils/emailValidation.js";
 import {
@@ -49,31 +49,27 @@ const preventAutofill = (event) => {
   event.currentTarget.removeAttribute("readOnly");
 };
 
+const createInitialForm = (employee) => {
+  if (!employee) return emptyForm;
+
+  const [firstName = "", ...lastNameParts] = employee.name.split(" ");
+  return {
+    firstName,
+    lastName: lastNameParts.join(" "),
+    email: employee.email || "",
+    password: "",
+    country: employee.country || defaultCountry,
+    phone: employee.phone || getCountryDialCode(employee.country || defaultCountry),
+    position: employee.position || employee.role || "",
+    isActive: employee.isActive !== false,
+  };
+};
+
 const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
   const isEditing = Boolean(employee?.id);
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState(() => createInitialForm(employee));
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!employee) {
-      setFormData(emptyForm);
-      return;
-    }
-
-    const [firstName = "", ...lastNameParts] = employee.name.split(" ");
-
-    setFormData({
-      firstName,
-      lastName: lastNameParts.join(" "),
-      email: employee.email || "",
-      password: "",
-      country: employee.country || defaultCountry,
-      phone: employee.phone || getCountryDialCode(employee.country || defaultCountry),
-      position: employee.position || employee.role || "",
-      isActive: employee.isActive !== false,
-    });
-  }, [employee]);
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({

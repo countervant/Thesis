@@ -202,7 +202,7 @@ const FeedbackDetails = ({ item, onClose }) => {
             <p className="text-xs font-black uppercase tracking-[0.18em] text-pink-500">Client Feedback</p>
             <h2 className="mt-1 text-xl font-black text-[#10142d] dark:text-white">{item.project}</h2>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 hover:bg-pink-50" aria-label="Close feedback details"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-pink-50" aria-label="Close feedback details"><X className="h-5 w-5" /></button>
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-neutral-800">
           <InitialsAvatar user={item.client} name={item.clientName} alt={item.clientName} className="h-11 w-11" />
@@ -232,13 +232,6 @@ const ReplyModal = ({ item, onClose, onSent }) => {
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    setMessage(item?.reply?.message || "");
-    setErrorMessage("");
-  }, [item]);
-
-  if (!item) return null;
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     const reply = message.trim();
@@ -266,7 +259,7 @@ const ReplyModal = ({ item, onClose, onSent }) => {
       <form onSubmit={handleSubmit} className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-pink-100 bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6 dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-xs font-black uppercase tracking-[0.18em] text-pink-500">Reply to Client</p><h2 className="mt-1 text-xl font-black text-[#10142d] dark:text-white">{item.clientName}</h2><p className="mt-1 text-xs font-bold text-slate-500">Feedback for {item.project}</p></div>
-          <button type="button" disabled={isSending} onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 hover:bg-pink-50 disabled:opacity-50" aria-label="Close reply form"><X className="h-5 w-5" /></button>
+          <button type="button" disabled={isSending} onClick={onClose} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-pink-50 disabled:opacity-50" aria-label="Close reply form"><X className="h-5 w-5" /></button>
         </div>
         <div className="mt-5 rounded-xl bg-slate-50 p-4 dark:bg-neutral-800"><Stars rating={item.rating} /><p className="mt-2 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">“{item.comment || "Rating submitted without a comment."}”</p></div>
         <label className="mt-5 block"><span className="text-xs font-black text-slate-600 dark:text-slate-300">Your reply</span><textarea autoFocus maxLength={1000} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write a helpful response to the client..." className="mt-2 h-36 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" /><span className="mt-1 block text-right text-[10px] font-bold text-slate-400">{message.length}/1000</span></label>
@@ -390,16 +383,19 @@ const Feedback = () => {
       });
   }, [feedback, projectFilter, ratingFilter, search, sortBy]);
 
-  useEffect(() => setPage(1), [projectFilter, ratingFilter, search, sortBy]);
   const totalPages = Math.max(1, Math.ceil(filteredFeedback.length / pageSize));
-  useEffect(() => setPage((currentPage) => Math.min(currentPage, totalPages)), [totalPages]);
-  const visibleFeedback = filteredFeedback.slice((page - 1) * pageSize, page * pageSize);
+  const currentPage = Math.min(page, totalPages);
+  const visibleFeedback = filteredFeedback.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const resetFilters = () => {
     setSearch("");
     setRatingFilter("all");
     setProjectFilter("all");
     setSortBy("newest");
+    setPage(1);
   };
 
   const handleReplySent = (updatedTask, wasEditing) => {
@@ -459,15 +455,15 @@ const Feedback = () => {
             <div className="flex gap-1.5 overflow-x-auto pb-1 min-[520px]:grid min-[520px]:grid-cols-[minmax(130px,1.4fr)_minmax(82px,.75fr)_minmax(88px,.8fr)_minmax(92px,.85fr)_minmax(92px,.8fr)] min-[520px]:overflow-visible">
               <label className="relative min-w-[180px] flex-1 min-[520px]:min-w-0">
                 <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search feedback..." className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" />
+                <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search feedback..." className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-neutral-950" />
               </label>
-              <select value={ratingFilter} onChange={(event) => setRatingFilter(event.target.value)} className="h-10 min-w-[110px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
+              <select value={ratingFilter} onChange={(event) => { setRatingFilter(event.target.value); setPage(1); }} className="h-10 min-w-[110px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
                 <option value="all">All Ratings</option>{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} Stars</option>)}
               </select>
-              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="h-10 min-w-[115px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
+              <select value={projectFilter} onChange={(event) => { setProjectFilter(event.target.value); setPage(1); }} className="h-10 min-w-[115px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
                 <option value="all">All Projects</option>{projects.map((project) => <option key={project} value={project}>{project}</option>)}
               </select>
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="h-10 min-w-[115px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
+              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value); setPage(1); }} className="h-10 min-w-[115px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-slate-300 min-[520px]:min-w-0">
                 <option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="highest">Highest Rated</option><option value="lowest">Lowest Rated</option>
               </select>
               <button type="button" onClick={resetFilters} className={`${secondaryButtonClass} h-10 min-w-[110px] shrink-0 px-2 text-[11px] min-[520px]:min-w-0`}><SlidersHorizontal className="h-4 w-4" />Reset</button>
@@ -489,7 +485,7 @@ const Feedback = () => {
                 <div className="mt-auto flex flex-nowrap items-center gap-1.5 md:mt-0 md:justify-end">
                   {user?.role === "admin" && <button type="button" onClick={() => setReplyTarget(item)} className={`${primaryButtonClass} h-9 min-w-0 flex-1 px-2 text-xs`}><Mail className="h-3.5 w-3.5" /><span className="hidden min-[520px]:inline">{item.reply?.message ? "Edit" : "Reply"}</span></button>}
                   <button type="button" onClick={() => setSelectedFeedback(item)} className={`${primaryButtonClass} h-9 min-w-0 flex-1 px-2 text-xs`}><Eye className="h-3.5 w-3.5" /><span className="hidden min-[520px]:inline">View</span></button>
-                  {user?.role === "admin" && <button type="button" onClick={() => { setDeleteError(""); setDeleteTarget(item); }} className="grid h-9 w-9 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50" aria-label={`Delete feedback from ${item.clientName}`}><Trash2 className="h-3.5 w-3.5" /></button>}
+                  {user?.role === "admin" && <button type="button" onClick={() => { setDeleteError(""); setDeleteTarget(item); }} className="grid h-11 w-11 place-items-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50" aria-label={`Delete feedback from ${item.clientName}`}><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
               </article>
             ))}
@@ -497,8 +493,8 @@ const Feedback = () => {
 
           {!isLoading && filteredFeedback.length > 0 && (
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-pink-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
-              <p className="text-xs font-bold text-slate-500">Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredFeedback.length)} of {filteredFeedback.length}</p>
-              <div className="flex items-center gap-2"><button type="button" disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><span className="text-xs font-black text-[#10142d] dark:text-white">{page} / {totalPages}</span><button type="button" disabled={page === totalPages} onClick={() => setPage((value) => value + 1)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
+              <p className="text-xs font-bold text-slate-500">Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredFeedback.length)} of {filteredFeedback.length}</p>
+              <div className="flex items-center gap-2"><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 disabled:opacity-40" aria-label="Previous feedback page"><ChevronLeft className="h-4 w-4" /></button><span className="text-xs font-black text-[#10142d] dark:text-white">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 disabled:opacity-40" aria-label="Next feedback page"><ChevronRight className="h-4 w-4" /></button></div>
             </div>
           )}
         </section>
@@ -509,7 +505,7 @@ const Feedback = () => {
         </aside>
       </div>
       <FeedbackDetails item={selectedFeedback} onClose={() => setSelectedFeedback(null)} />
-      <ReplyModal key={`${replyTarget?.id || "closed"}-${replyTarget?.reply?.repliedAt || ""}`} item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />
+      {replyTarget && <ReplyModal key={`${replyTarget.id}-${replyTarget.reply?.repliedAt || ""}`} item={replyTarget} onClose={() => setReplyTarget(null)} onSent={handleReplySent} />}
       <ConfirmDialog
         confirmLabel="Yes, delete"
         confirmingLabel="Deleting..."

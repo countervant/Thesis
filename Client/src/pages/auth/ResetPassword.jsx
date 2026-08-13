@@ -142,7 +142,7 @@ const ResetPassword = () => {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 p-1"
+              className="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center"
             >
               <img
                 src={showPassword ? hideIcon : viewIcon}
@@ -164,7 +164,7 @@ const ResetPassword = () => {
             <button
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 p-1"
+              className="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center"
             >
               <img
                 src={showConfirmPassword ? hideIcon : viewIcon}

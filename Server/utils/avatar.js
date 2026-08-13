@@ -2,7 +2,7 @@ import crypto from "crypto";
 import sharp from "sharp";
 
 const avatarCache = new Map();
-const MAX_AVATAR_CACHE_ENTRIES = 100;
+export const MAX_AVATAR_CACHE_ENTRIES = 100;
 const MAX_AVATAR_CACHE_BYTES = 24 * 1024 * 1024;
 const MAX_AVATAR_UPLOAD_BYTES = 6 * 1024 * 1024;
 export const MAX_STORED_AVATAR_BYTES = 512 * 1024;

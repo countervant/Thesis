@@ -89,6 +89,7 @@ const birthdayEventsForMonth = async (user, year, monthIndex) => {
     role: { $in: ["admin", "employee"] },
     isActive: { $ne: false },
     birthday: { $exists: true, $ne: null },
+    $expr: { $eq: [{ $month: "$birthday" }, monthIndex + 1] },
   })
     .select("firstName lastName birthday")
     .sort({ firstName: 1, lastName: 1 })

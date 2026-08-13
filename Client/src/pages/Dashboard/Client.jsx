@@ -158,7 +158,7 @@ const SectionHeader = ({ action, title }) => (
 );
 
 const ClientDashboardSkeleton = () => (
-  <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+  <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:px-6 lg:px-8">
     <header>
       <Skeleton className="h-9 w-60" />
       <Skeleton className="mt-3 h-4 w-96 max-w-full" />
@@ -382,7 +382,7 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:px-6 lg:px-8">
       <header>
         <h1 className="page-title text-3xl">Client Dashboard</h1>
         <p className="mt-2 text-sm font-semibold text-slate-500">
@@ -446,7 +446,7 @@ const ClientDashboard = () => {
                 <span className={`w-fit rounded-full px-3 py-1 text-[11px] font-black ${statusStyles[project.status] || statusStyles.Pending}`}>
                   {project.status}
                 </span>
-                <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label={`More options for ${project.title}`}>
+                <button type="button" className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label={`More options for ${project.title}`}>
                   <Icon name="dots" className="h-5 w-5" />
                 </button>
               </div>

@@ -97,7 +97,7 @@ const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
         <button type="button" onClick={loadStatus} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-black text-red-600 transition hover:bg-red-100">Try again</button>
       </div>}
     </section>
-    <EnableTwoFactorModal open={enableOpen} required={setupMode || status?.required} onClose={() => setEnableOpen(false)} onEnabled={enabled} />
+    {enableOpen && <EnableTwoFactorModal required={setupMode || status?.required} onClose={() => setEnableOpen(false)} onEnabled={enabled} />}
     <DisableTwoFactorModal open={disableOpen} onClose={() => setDisableOpen(false)} onDisabled={disabled} />
   </>;
 };

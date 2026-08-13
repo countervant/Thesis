@@ -20,7 +20,11 @@ import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
 import User from "./model/userModel.js";
-import { MAX_STORED_AVATAR_BYTES, withAvatarUrl } from "./utils/avatar.js";
+import {
+  MAX_AVATAR_CACHE_ENTRIES,
+  MAX_STORED_AVATAR_BYTES,
+  withAvatarUrl,
+} from "./utils/avatar.js";
 
 // Resolve .env relative to this file so it works regardless of cwd
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +39,7 @@ const warmAvatarCache = async () => {
   const profiles = await User.aggregate([
     {
       $match: {
+        avatar: { $type: "string", $ne: "" },
         $expr: {
           $lte: [
             { $strLenBytes: { $ifNull: ["$avatar", ""] } },
@@ -43,6 +48,8 @@ const warmAvatarCache = async () => {
         },
       },
     },
+    { $sort: { updatedAt: -1 } },
+    { $limit: MAX_AVATAR_CACHE_ENTRIES },
     { $project: { avatar: 1, updatedAt: 1 } },
   ]).option({ maxTimeMS: 8000 });
 

@@ -172,6 +172,17 @@ const formatAssigneeName = (assignee) => {
   return assignee.isSelf ? `${label} (Myself)` : label;
 };
 
+const formatLeaveEndDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
 const normalizeClients = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.clients)) return data.clients;
@@ -197,11 +208,28 @@ const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
-const Addtask = ({ onNavigate, onTaskCreated, task }) => {
-  const { user } = useAuth();
-  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
-  const isEditing = Boolean(task?.id);
-  const [formData, setFormData] = useState({
+const createInitialForm = (task, user, isAdmin) => {
+  if (task) {
+    return {
+      title: task.title || "",
+      description: task.description || "",
+      startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
+      dueDate: toInputDate(task.dueDate),
+      amount: task.amount ?? task.budget ?? "",
+      downPaymentType: task.downPayment?.mode || "none",
+      downPaymentValue: task.downPayment?.value ?? "",
+      priority: task.priority || "medium",
+      requestedBy:
+        getEntityId(task.requestedBy) ||
+        (task.createdBy?.role === "client" ? getEntityId(task.createdBy) : ""),
+      assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
+        .map(getEntityId)
+        .filter(Boolean),
+      subtasks: ensureSubmitOutputSubtask(normalizeSubtasks(task.subtasks)),
+    };
+  }
+
+  return {
     title: "",
     description: "",
     startDate: todayInputDate(),
@@ -213,7 +241,14 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     requestedBy: isAdmin ? "" : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
     subtasks: [createSubmitOutputSubtask()],
-  });
+  };
+};
+
+const Addtask = ({ onNavigate, onTaskCreated, task }) => {
+  const { user } = useAuth();
+  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
+  const isEditing = Boolean(task?.id);
+  const [formData, setFormData] = useState(() => createInitialForm(task, user, isAdmin));
   const [assignees, setAssignees] = useState([]);
   const [clients, setClients] = useState([]);
   const [clientSearch, setClientSearch] = useState("");
@@ -293,6 +328,11 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         if (isMounted) {
           setClients(loadedClients);
 
+          const requestedClient = loadedClients.find(
+            (client) => getEntityId(client) === getEntityId(task?.requestedBy)
+          );
+          if (requestedClient) setClientSearch(formatClientName(requestedClient));
+
           setFormData((currentData) => ({
             ...currentData,
             requestedBy:
@@ -316,33 +356,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       isMounted = false;
     };
   }, [isAdmin, task?.requestedBy]);
-
-  useEffect(() => {
-    if (!task) {
-      return;
-    }
-
-    setFormData({
-      title: task.title || "",
-      description: task.description || "",
-      startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
-      dueDate: toInputDate(task.dueDate),
-      amount: task.amount ?? task.budget ?? "",
-      downPaymentType: task.downPayment?.mode || "none",
-      downPaymentValue: task.downPayment?.value ?? "",
-      priority: task.priority || "medium",
-      requestedBy:
-        getEntityId(task.requestedBy) ||
-        (task.createdBy?.role === "client" ? getEntityId(task.createdBy) : ""),
-      assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
-        .map(getEntityId)
-        .filter(Boolean),
-      subtasks: ensureSubmitOutputSubtask(normalizeSubtasks(task.subtasks)),
-    });
-    const usesCustomClient = Boolean(task.requestedByName && !getEntityId(task.requestedBy));
-    setClientRequestType(usesCustomClient ? "custom" : "existing");
-    setCustomClientName(usesCustomClient ? task.requestedByName : "");
-  }, [task, user]);
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({
@@ -482,6 +495,19 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
+    const unavailableAssignee = safeAssignees.find((assignee) => {
+      const assigneeId = getEntityId(assignee);
+      return (
+        formData.assignees.includes(assigneeId) &&
+        assignee?.isOnLeave &&
+        !originalAssigneeIds.has(assigneeId)
+      );
+    });
+    if (unavailableAssignee) {
+      setErrorMessage(`${formatAssigneeName(unavailableAssignee)} is currently on approved leave and cannot be assigned to this project.`);
+      return;
+    }
+
     if (formData.amount === "" || Number(formData.amount) < 0) {
       setErrorMessage("Please enter a valid amount.");
       return;
@@ -594,6 +620,13 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   };
 
   const safeAssignees = normalizeAssignees(assignees);
+  const originalAssigneeIds = new Set(
+    (task?.assignees?.length ? task.assignees : [task?.assignedTo])
+      .map(getEntityId)
+      .filter(Boolean)
+  );
+  const isUnavailableForNewAssignment = (assignee) =>
+    Boolean(assignee?.isOnLeave) && !originalAssigneeIds.has(getEntityId(assignee));
   const safeClients = normalizeClients(clients);
   const currentClient = safeClients.find(
     (client) => getEntityId(client) === formData.requestedBy
@@ -627,12 +660,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
-
-  useEffect(() => {
-    if (clientRequestType === "existing" && !isClientPickerOpen) {
-      setClientSearch(formatClientName(currentClient));
-    }
-  }, [clientRequestType, clients, currentClient, isClientPickerOpen]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/65 p-3 text-neutral-950 sm:p-6 dark:text-white">
@@ -727,8 +754,12 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                   >
                     <option value="">Any project assignee</option>
                     {safeAssignees.map((assignee) => (
-                        <option key={getEntityId(assignee)} value={getEntityId(assignee)}>
-                          {formatAssigneeName(assignee)}
+                        <option
+                          key={getEntityId(assignee)}
+                          value={getEntityId(assignee)}
+                          disabled={isUnavailableForNewAssignment(assignee)}
+                        >
+                          {formatAssigneeName(assignee)}{assignee?.isOnLeave ? " — On approved leave" : ""}
                         </option>
                       ))}
                   </select>
@@ -883,7 +914,10 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               <div className="grid grid-cols-2 rounded-lg border border-neutral-300 bg-white/40 p-1 dark:border-neutral-700 dark:bg-neutral-950">
                 <button
                   type="button"
-                  onClick={() => setClientRequestType("existing")}
+                  onClick={() => {
+                    setClientRequestType("existing");
+                    setClientSearch(formatClientName(currentClient));
+                  }}
                   className={`h-8 rounded-md text-xs font-bold transition ${
                     clientRequestType === "existing"
                       ? "bg-[#dc4fb2] text-white shadow-sm"
@@ -930,7 +964,10 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                     value={clientSearch}
                     onChange={(event) => handleClientSearchChange(event.target.value)}
                     onFocus={() => setIsClientPickerOpen(true)}
-                    onBlur={() => window.setTimeout(() => setIsClientPickerOpen(false), 120)}
+                    onBlur={() => window.setTimeout(() => {
+                      setIsClientPickerOpen(false);
+                      setClientSearch(formatClientName(currentClient));
+                    }, 120)}
                     placeholder="Search client..."
                     className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 pr-9 text-xs font-medium text-neutral-500 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#070707] dark:text-neutral-300 dark:placeholder:text-neutral-600 dark:focus:ring-pink-950"
                   />
@@ -993,10 +1030,19 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               {safeAssignees.map((assignee) => {
                 const assigneeId = getEntityId(assignee);
                 const isSelected = formData.assignees.includes(assigneeId);
+                const isUnavailable = isUnavailableForNewAssignment(assignee);
+                const leaveEndDate = formatLeaveEndDate(assignee?.leaveEndDate);
                 return (
-                  <label key={assigneeId} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${isSelected ? "border-pink-300 bg-pink-50 text-[#c72fb2] dark:bg-pink-950/30" : "border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-300"}`}>
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleAssignee(assigneeId)} className="h-4 w-4 accent-[#dc4fb2]" />
-                    <span className="truncate">{formatAssigneeName(assignee)}</span>
+                  <label key={assigneeId} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${isUnavailable ? "cursor-not-allowed border-amber-200 bg-amber-50 text-amber-700 opacity-80 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300" : isSelected ? "cursor-pointer border-pink-300 bg-pink-50 text-[#c72fb2] dark:bg-pink-950/30" : "cursor-pointer border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-300"}`}>
+                    <input type="checkbox" checked={isSelected} disabled={isUnavailable} onChange={() => toggleAssignee(assigneeId)} className="h-4 w-4 accent-[#dc4fb2]" />
+                    <span className="min-w-0">
+                      <span className="block truncate">{formatAssigneeName(assignee)}</span>
+                      {assignee?.isOnLeave && (
+                        <span className="mt-0.5 block text-[10px] font-semibold">
+                          On approved leave{leaveEndDate ? ` until ${leaveEndDate}` : ""}{!isUnavailable ? " • Existing assignment" : ""}
+                        </span>
+                      )}
+                    </span>
                   </label>
                 );
               })}

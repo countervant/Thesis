@@ -27,11 +27,11 @@ const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => 
       <div className={`flex gap-3 text-pink-500 ${
         mobileInline ? "flex-row justify-between text-sm font-bold md:font-medium" : "flex-col text-sm font-medium sm:flex-row sm:justify-between sm:gap-0"
       }`}>
-        <Link to={link} onClick={handlePrimaryClick} className="hover:text-pink-600">
+        <Link to={link} onClick={handlePrimaryClick} className="inline-flex min-h-11 items-center hover:text-pink-600">
           {Label}
         </Link>
         {Label1 && (
-          <Link to = '/ForgotPassword' className="hover:text-pink-600">
+          <Link to='/ForgotPassword' className="inline-flex min-h-11 items-center hover:text-pink-600">
             {Label1}
           </Link>
         )}

@@ -112,7 +112,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+    <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:px-5 lg:px-6">
       <div className="mx-auto max-w-[1540px] space-y-4">
 
 

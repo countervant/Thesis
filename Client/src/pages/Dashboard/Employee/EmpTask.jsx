@@ -390,7 +390,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
             </span>
           </div>
 
-          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50 min-[1280px]:mt-7" aria-label={`View ${item.title} date`}>
+          <button type="button" onClick={() => onViewCalendar(item)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-600 hover:bg-pink-50 min-[1280px]:mt-7" aria-label={`View ${item.title} date`}>
             <SmallIcon name="calendar" />
           </button>
         </div>
@@ -437,7 +437,7 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
           <span className={`w-fit rounded-full px-4 py-1 text-xs font-black ${statusStyles[item.status] || statusStyles.Pending}`}>
             {item.status}
           </span>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onViewCalendar(item); }} className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`View ${item.title} date`}>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onViewCalendar(item); }} className="grid h-11 w-11 place-items-center rounded-lg text-slate-600 hover:bg-pink-50" aria-label={`View ${item.title} date`}>
             <SmallIcon name="calendar" />
           </button>
         </div>
@@ -736,7 +736,7 @@ const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
             <h2 className="mt-3 text-xl font-black text-[#10142d] dark:text-white">{revision.title || "Client revision request"}</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">Review the client’s requested changes before starting.</p>
           </div>
-          <button type="button" onClick={onClose} disabled={isStarting} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:opacity-50" aria-label="Close revision details">x</button>
+          <button type="button" onClick={onClose} disabled={isStarting} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:opacity-50" aria-label="Close revision details">x</button>
         </div>
 
         <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/40 p-4 text-xs font-bold text-slate-600 dark:border-neutral-800 dark:bg-neutral-950">
@@ -1070,7 +1070,7 @@ const EmpTask = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:px-6 lg:px-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1

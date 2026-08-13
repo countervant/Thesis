@@ -570,7 +570,7 @@ const Profile = ({ embedded = false }) => {
                           {skill}
                           <button
                             type="button"
-                            className="text-sm font-black text-[#c72fb2] transition hover:text-[#10142d] dark:hover:text-white"
+                            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#c72fb2] transition hover:bg-pink-100 hover:text-[#10142d] dark:hover:bg-neutral-800 dark:hover:text-white"
                             aria-label={`Remove ${skill}`}
                           >
                             x

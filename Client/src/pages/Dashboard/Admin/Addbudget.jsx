@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { budgetAPI } from "../../../services/api.js";
 
 const formatDateValue = (date) => {
@@ -33,30 +33,26 @@ const emptyForm = {
   date: formatInputDate(),
 };
 
+const createInitialForm = (entry) =>
+  entry
+    ? {
+        type: entry.type || "expense",
+        description: entry.description || "",
+        category: entry.category || "",
+        amount: String(Math.abs(Number(entry.amount) || 0)),
+        date: entry.inputDate || formatInputDate(entry.date),
+      }
+    : emptyForm;
+
 const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
 const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) => {
   const isEditing = Boolean(entry?.id);
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState(() => createInitialForm(entry));
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!entry) {
-      setFormData(emptyForm);
-      return;
-    }
-
-    setFormData({
-      type: entry.type || "expense",
-      description: entry.description || "",
-      category: entry.category || "",
-      amount: String(Math.abs(Number(entry.amount) || 0)),
-      date: entry.inputDate || formatInputDate(entry.date),
-    });
-  }, [entry]);
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({

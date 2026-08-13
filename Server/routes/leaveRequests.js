@@ -1,14 +1,14 @@
 import express from "express";
 import LeaveRequest from "../model/leaveRequestModel.js";
 import User from "../model/userModel.js";
-import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
+import { getManilaDayRange } from "../utils/leaveAvailability.js";
 
 const router = express.Router();
 
-const allowedStatuses = ["Pending", "Approved", "Rejected"];
+const allowedStatuses = ["Pending", "Approved", "Rejected", "Returned"];
 const allowedLeaveTypes = ["Vacation Leave", "Sick Leave", "Emergency Leave", "Others"];
 
 const getFullName = (user) =>
@@ -23,6 +23,7 @@ const getDepartment = (user, fallback = "") =>
 const leaveRequestPopulate = [
   { path: "employee", select: "firstName lastName email position companyName role updatedAt" },
   { path: "reviewedBy", select: "firstName lastName email role updatedAt" },
+  { path: "returnedBy", select: "firstName lastName email role updatedAt" },
   { path: "comments.author", select: "firstName lastName email role position companyName updatedAt" },
 ];
 
@@ -30,6 +31,7 @@ const withLeaveRequestAvatarUrls = (request) => ({
   ...request,
   employee: withAvatarUrl(request.employee),
   reviewedBy: withAvatarUrl(request.reviewedBy),
+  returnedBy: withAvatarUrl(request.returnedBy),
   comments: Array.isArray(request.comments)
     ? request.comments.map((comment) => ({
         ...comment,
@@ -140,6 +142,7 @@ router.get("/", protect, async (req, res) => {
     delete summaryQuery.status;
 
     const now = new Date();
+    const todayRange = getManilaDayRange(now);
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const [requests, total, metadata] = await Promise.all([
@@ -167,8 +170,8 @@ router.get("/", protect, async (req, res) => {
                 $match: {
                   ...summaryQuery,
                   status: "Approved",
-                  startDate: { $lte: now },
-                  endDate: { $gte: now },
+                  startDate: { $lt: todayRange.end },
+                  endDate: { $gte: todayRange.start },
                 },
               },
               { $count: "count" },
@@ -177,7 +180,7 @@ router.get("/", protect, async (req, res) => {
               {
                 $match: {
                   ...summaryQuery,
-                  status: "Approved",
+                  status: { $in: ["Approved", "Returned"] },
                   reviewedAt: {
                     $gte: currentMonthStart,
                     $lt: nextMonthStart,
@@ -220,6 +223,7 @@ router.get("/", protect, async (req, res) => {
         pending: byStatus.Pending || 0,
         approved: byStatus.Approved || 0,
         rejected: byStatus.Rejected || 0,
+        returned: byStatus.Returned || 0,
         approvedThisMonth: summaryData.approvedThisMonth?.[0]?.count || 0,
         onLeaveToday: summaryData.onLeaveToday?.[0]?.count || 0,
         byType: summaryData.byType || [],
@@ -256,13 +260,13 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-router.patch("/:id/status", protect, authorize("admin"), async (req, res) => {
+router.patch("/:id/status", protect, async (req, res) => {
   try {
     const status = String(req.body.status || "");
     const comment = String(req.body.comment || "").trim();
 
-    if (!["Approved", "Rejected"].includes(status)) {
-      return res.status(400).json({ message: "Status must be Approved or Rejected" });
+    if (!["Approved", "Rejected", "Returned"].includes(status)) {
+      return res.status(400).json({ message: "Status must be Approved, Rejected, or Returned" });
     }
 
     const leaveRequest = await LeaveRequest.findById(req.params.id);
@@ -271,9 +275,47 @@ router.patch("/:id/status", protect, authorize("admin"), async (req, res) => {
       return res.status(404).json({ message: "Leave request not found" });
     }
 
-    leaveRequest.status = status;
-    leaveRequest.reviewedBy = req.user._id;
-    leaveRequest.reviewedAt = new Date();
+    const isAdmin = req.user.role === "admin";
+    const isOwner = String(leaveRequest.employee) === String(req.user._id);
+    const isEmployeeOwner = req.user.role === "employee" && isOwner;
+
+    if (status === "Returned") {
+      if (!isAdmin && !isEmployeeOwner) {
+        return res.status(403).json({ message: "You cannot end this employee's leave" });
+      }
+      if (leaveRequest.status !== "Approved") {
+        return res.status(400).json({ message: "Only an approved leave can be marked as returned" });
+      }
+
+      const todayRange = getManilaDayRange();
+      const isCurrentlyOnLeave =
+        leaveRequest.startDate < todayRange.end && leaveRequest.endDate >= todayRange.start;
+      if (!isCurrentlyOnLeave) {
+        return res.status(400).json({ message: "Only a currently active leave can be marked as returned" });
+      }
+
+      leaveRequest.status = "Returned";
+      leaveRequest.returnedBy = req.user._id;
+      leaveRequest.returnedAt = new Date();
+    } else {
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only admins can approve or reject leave requests" });
+      }
+
+      const canReviewPending = leaveRequest.status === "Pending";
+      const canReactivateLeave = status === "Approved" && leaveRequest.status === "Returned";
+      if (!canReviewPending && !canReactivateLeave) {
+        return res.status(400).json({ message: "This leave status can no longer be changed that way" });
+      }
+
+      leaveRequest.status = status;
+      leaveRequest.reviewedBy = req.user._id;
+      leaveRequest.reviewedAt = new Date();
+      if (canReactivateLeave) {
+        leaveRequest.returnedBy = undefined;
+        leaveRequest.returnedAt = undefined;
+      }
+    }
     if (comment) {
       leaveRequest.comments.push({
         author: req.user._id,

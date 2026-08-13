@@ -1352,7 +1352,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   }
 
   return (
-        <div className="-mx-4 -mb-8 mt-0 min-h-[calc(100dvh-4rem)] space-y-3 bg-[#fbf9ff] px-3 py-3 dark:bg-neutral-950 md:-mx-5 md:-mt-4 md:space-y-4 md:bg-[#f8f9fd] md:px-5 md:py-4 lg:-mx-6 lg:px-6">
+        <div className="-mb-8 mt-0 min-h-[calc(100dvh-4rem)] space-y-3 bg-[#fbf9ff] px-3 py-3 dark:bg-neutral-950 md:-mt-4 md:space-y-4 md:bg-[#f8f9fd] md:px-5 md:py-4 lg:px-6">
           {loadError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {loadError}

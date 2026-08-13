@@ -27,6 +27,7 @@ import {
   verifyLoginTwoFactor,
 } from "../controllers/twoFactorController.js";
 import { isUserOnline, PRESENCE_TIMEOUT_MS } from "../utils/presence.js";
+import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
 
 const router = express.Router();
 const emailRegex =
@@ -314,7 +315,7 @@ router.post("/reset-password", async (req, res) => {
           lastSeen: { $gte: onlineSince },
           isActive: { $ne: false },
         })
-          .select("firstName lastName email role companyName avatar isActive isOnline showOnlineStatus lastSeen updatedAt")
+          .select("firstName lastName email role companyName isActive isOnline showOnlineStatus lastSeen updatedAt")
           .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
           .maxTimeMS(8000)
           .lean();
@@ -724,9 +725,24 @@ router.post("/reset-password", async (req, res) => {
           .sort({ firstName: 1, lastName: 1 })
           .lean();
 
+        const approvedLeaves = await getEmployeesOnApprovedLeave(
+          employees.map((employee) => employee._id)
+        );
+        const leaveByEmployeeId = new Map(
+          approvedLeaves.map((leaveRequest) => [String(leaveRequest.employee), leaveRequest])
+        );
+
         res.status(200).json([
           currentUserAssignee,
-          ...employees,
+          ...employees.map((employee) => {
+            const leaveRequest = leaveByEmployeeId.get(String(employee._id));
+            return {
+              ...employee,
+              isOnLeave: Boolean(leaveRequest),
+              leaveType: leaveRequest?.leaveType || "",
+              leaveEndDate: leaveRequest?.endDate,
+            };
+          }),
         ]);
       } catch (error) {
         console.error("Get assignees error:", error);
@@ -758,7 +774,7 @@ router.post("/reset-password", async (req, res) => {
         };
         const [employees, total] = await Promise.all([
           User.find(query)
-          .select("firstName lastName email phone country position role avatar isActive isOnline showOnlineStatus lastSeen createdAt updatedAt")
+          .select("firstName lastName email phone country position role isActive isOnline showOnlineStatus lastSeen createdAt updatedAt")
           .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)

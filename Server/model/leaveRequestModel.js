@@ -78,7 +78,7 @@ const leaveRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected"],
+      enum: ["Pending", "Approved", "Rejected", "Returned"],
       default: "Pending",
       index: true,
     },
@@ -87,6 +87,13 @@ const leaveRequestSchema = new mongoose.Schema(
       ref: "User",
     },
     reviewedAt: {
+      type: Date,
+    },
+    returnedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    returnedAt: {
       type: Date,
     },
     comments: [leaveRequestCommentSchema],
@@ -99,6 +106,7 @@ const leaveRequestSchema = new mongoose.Schema(
 leaveRequestSchema.index({ status: 1, startDate: -1 });
 leaveRequestSchema.index({ department: 1, startDate: -1 });
 leaveRequestSchema.index({ employee: 1, createdAt: -1 });
+leaveRequestSchema.index({ employee: 1, status: 1, startDate: 1, endDate: 1 });
 
 const LeaveRequest = mongoose.model("LeaveRequest", leaveRequestSchema);
 

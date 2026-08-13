@@ -3,7 +3,7 @@ import { CheckCircle2, KeyRound, LoaderCircle, Mail, ShieldCheck, X } from "luci
 import { authAPI } from "../../services/api.js";
 import OtpInput from "./OtpInput.jsx";
 
-const EnableTwoFactorModal = ({ open, onClose, onEnabled, required = false }) => {
+const EnableTwoFactorModal = ({ onClose, onEnabled, required = false }) => {
   const [step, setStep] = useState("password");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -14,19 +14,12 @@ const EnableTwoFactorModal = ({ open, onClose, onEnabled, required = false }) =>
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   useEffect(() => {
-    if (!open) return;
-    setStep("password"); setPassword(""); setCode(""); setError("");
-  }, [open]);
-
-  useEffect(() => {
     if (!expiresAt) return undefined;
     const update = () => setSecondsLeft(Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000)));
     update();
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [expiresAt]);
-
-  if (!open) return null;
 
   const requestCode = async (event) => {
     event?.preventDefault();
@@ -59,7 +52,7 @@ const EnableTwoFactorModal = ({ open, onClose, onEnabled, required = false }) =>
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby="enable-2fa-title">
       <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-pink-100 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-7 dark:border-[#DA70D6]/60 dark:bg-[#141414]">
-        {!required && <button type="button" onClick={onClose} className="ml-auto grid h-9 w-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>}
+        {!required && <button type="button" onClick={onClose} className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>}
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-br from-pink-500 to-purple-600 text-white">
           {step === "success" ? <CheckCircle2 /> : step === "password" ? <KeyRound /> : <ShieldCheck />}
         </div>

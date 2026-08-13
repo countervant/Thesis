@@ -269,7 +269,7 @@ const LoginPage = () => {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                className="grid pl-4 text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
+                className="grid h-11 w-11 shrink-0 place-items-center text-pink-500 transition hover:text-pink-600 dark:opacity-70 dark:hover:opacity-100"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (

@@ -182,7 +182,7 @@ export const AuthProvider = ({ children }) => {
     updateUser,
     isAuthenticated,
     hasRole,
-  }), [hasRole, isAuthenticated, login, logout, token, updateUser, user]);
+  }), [hasRole, isAuthenticated, loading, login, logout, token, updateUser, user]);
 
   return (
     <AuthContext.Provider value={contextValue}>

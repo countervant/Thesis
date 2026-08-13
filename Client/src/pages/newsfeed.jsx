@@ -65,7 +65,7 @@ const EmojiPicker = ({ onSelect }) => {
             key={`${emoji}-${index}`}
             type="button"
             onClick={() => onSelect(emoji)}
-            className="grid h-8 w-8 place-items-center rounded-md text-lg transition hover:bg-pink-50 dark:hover:bg-pink-500/20"
+            className="grid h-10 w-10 place-items-center rounded-md text-lg transition hover:bg-pink-50 dark:hover:bg-pink-500/20"
             aria-label={`Add ${emoji}`}
           >
             {emoji}
@@ -325,38 +325,34 @@ const Newsfeed = () => {
     let isMounted = true;
 
     const loadMissingMedia = async () => {
-      for (const post of postsMissingMedia) {
-        try {
-          const media = await newsfeedAPI.getMedia(post.id);
+      const mediaResults = await Promise.allSettled(
+        postsMissingMedia.map((post) => newsfeedAPI.getMedia(post.id))
+      );
+      if (!isMounted) return;
 
-          if (!isMounted) return;
+      const mediaByPostId = new Map(
+        postsMissingMedia.map((post, index) => {
+          const result = mediaResults[index];
+          const media = result.status === "fulfilled" ? result.value : null;
 
-          setPosts((currentPosts) =>
-            currentPosts.map((currentPost) =>
-              currentPost.id === post.id
-                ? {
-                    ...currentPost,
-                    media: {
-                      type: media?.type || "",
-                      url: media?.url || "",
-                      name: media?.name || "",
-                    },
-                  }
-                : currentPost
-            )
-          );
-        } catch {
-          if (!isMounted) return;
+          return [
+            post.id,
+            {
+              type: media?.type || "",
+              url: media?.url || "",
+              name: media?.name || "",
+            },
+          ];
+        })
+      );
 
-          setPosts((currentPosts) =>
-            currentPosts.map((currentPost) =>
-              currentPost.id === post.id
-                ? { ...currentPost, media: { type: "", url: "", name: "" } }
-                : currentPost
-            )
-          );
-        }
-      }
+      setPosts((currentPosts) =>
+        currentPosts.map((currentPost) =>
+          mediaByPostId.has(currentPost.id)
+            ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
+            : currentPost
+        )
+      );
     };
 
     loadMissingMedia();
@@ -761,7 +757,7 @@ const Newsfeed = () => {
   };
 
   return (
-    <div className="-mx-4 -mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+    <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:px-5 lg:px-6">
       <div className="mx-auto grid max-w-[1600px] gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
         <div className="min-w-0 space-y-4">
           <header>
@@ -914,7 +910,7 @@ const Newsfeed = () => {
                           currentId === post.id ? "" : post.id
                         )
                       }
-                      className="grid h-9 w-9 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                      className="grid h-11 w-11 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                       aria-label="Post options"
                       aria-expanded={isPostMenuOpen}
                     >
@@ -1189,7 +1185,7 @@ const Newsfeed = () => {
                                 <button
                                   type="button"
                                   onClick={() => toggleEmojiPicker(`reply:${commentId}`)}
-                                  className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full transition hover:bg-pink-50"
+                                  className="absolute right-0 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full transition hover:bg-pink-50"
                                   aria-label="Add emoji to reply"
                                 >
                                   <img src={emojiIcon} alt="" className="h-4 w-4 object-contain" />
@@ -1234,7 +1230,7 @@ const Newsfeed = () => {
                     <button
                       type="button"
                       onClick={() => toggleEmojiPicker(`comment:${post.id}`)}
-                      className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                      className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                       aria-label="Add emoji to comment"
                     >
                       <img src={emojiIcon} alt="" className="h-4 w-4 object-contain" />
@@ -1244,10 +1240,10 @@ const Newsfeed = () => {
                         <EmojiPicker onSelect={(emoji) => handleInsertCommentEmoji(post.id, emoji)} />
                       </span>
                     )}
-                    <button type="button" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add image">
+                    <button type="button" className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add image">
                       <img src={insertImageIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
-                    <button type="submit" className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2]" aria-label="Send comment">
+                    <button type="submit" className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2]" aria-label="Send comment">
                       <img src={sendIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
                   </span>

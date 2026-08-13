@@ -208,7 +208,7 @@ const TwoFactorVerification = () => {
             <Mail className="h-4 w-4" /> Use email verification instead
           </button>
         )}
-        <button type="button" onClick={() => { sessionStorage.removeItem("clientraPending2FA"); navigate("/", { replace: true }); }} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-[#b62ca1]">
+        <button type="button" onClick={() => { sessionStorage.removeItem("clientraPending2FA"); navigate("/", { replace: true }); }} className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-[#b62ca1]">
           <ArrowLeft className="h-4 w-4" /> Back to Login
         </button>
       </section>

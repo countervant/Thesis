@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import budgetIcon from "../assets/budget.png";
 import calendarIcon from "../assets/calendar.png";
@@ -80,6 +80,29 @@ const roleNavItems = {
   ],
   employee: ["dashboard", "newsfeed", "feedback", "tasks", "calendar", "budget", "leave-request", "settings"],
   client: ["dashboard", "projects", "newsfeed", "settings"],
+};
+
+const mobileNavItemsByRole = {
+  employee: [
+    { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+    { id: "tasks", label: "Projects", icon: "tasks" },
+    { id: "calendar", label: "Calendar", icon: "calendar" },
+    { id: "leave-request", label: "Leave", icon: "leave-request" },
+    { id: "settings", label: "Settings", icon: "settings" },
+  ],
+  client: [
+    { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+    { id: "projects", label: "Projects", icon: "tasks" },
+    { id: "newsfeed", label: "Newsfeed", icon: "newsfeed" },
+    { id: "settings", label: "Settings", icon: "settings" },
+  ],
+  admin: [
+    { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+    { id: "tasks", label: "Projects", icon: "tasks" },
+    { id: "calendar", label: "Calendar", icon: "calendar" },
+    { id: "employee", label: "Employee", icon: "employee" },
+    { id: "settings", label: "Settings", icon: "settings" },
+  ],
 };
 
 const navIcons = {
@@ -442,15 +465,17 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const userRole = ["admin", "client", "employee"].includes(routeRole)
     ? routeRole
     : String(user?.role || "client").toLowerCase();
-  const allowedNavItems = roleNavItems[userRole] ?? roleNavItems.client;
-  const visibleSideNavSections = allowedNavItems
-    ? sideNavSections
+  const visibleSideNavSections = useMemo(() => {
+    const allowedNavItems = roleNavItems[userRole] ?? roleNavItems.client;
+    return allowedNavItems
+      ? sideNavSections
         .map((section) => ({
           ...section,
           items: section.items.filter((item) => allowedNavItems.includes(item.id)),
         }))
         .filter((section) => section.items.length > 0)
-    : sideNavSections;
+      : sideNavSections;
+  }, [userRole]);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem(themeStorageKey) === "dark"
@@ -474,21 +499,36 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const userId = getEntityId(user);
-  const readNotificationSet = new Set(readNotificationIds);
-  const hiddenNotificationSet = new Set(hiddenNotificationIds);
-  const visibleNotifications =
-    notificationFilter === "unread"
-      ? notifications.filter(
-          (notification) =>
-            !readNotificationSet.has(notification.id) &&
-            !hiddenNotificationSet.has(notification.id)
-        )
-      : notifications.filter((notification) => !hiddenNotificationSet.has(notification.id));
-  const unreadCount = notifications.filter(
-    (notification) =>
-      !readNotificationSet.has(notification.id) &&
-      !hiddenNotificationSet.has(notification.id)
-  ).length;
+  const readNotificationSet = useMemo(
+    () => new Set(readNotificationIds),
+    [readNotificationIds]
+  );
+  const hiddenNotificationSet = useMemo(
+    () => new Set(hiddenNotificationIds),
+    [hiddenNotificationIds]
+  );
+  const visibleNotifications = useMemo(
+    () =>
+      notificationFilter === "unread"
+        ? notifications.filter(
+            (notification) =>
+              !readNotificationSet.has(notification.id) &&
+              !hiddenNotificationSet.has(notification.id)
+          )
+        : notifications.filter(
+            (notification) => !hiddenNotificationSet.has(notification.id)
+          ),
+    [hiddenNotificationSet, notificationFilter, notifications, readNotificationSet]
+  );
+  const unreadCount = useMemo(
+    () =>
+      notifications.filter(
+        (notification) =>
+          !readNotificationSet.has(notification.id) &&
+          !hiddenNotificationSet.has(notification.id)
+      ).length,
+    [hiddenNotificationSet, notifications, readNotificationSet]
+  );
 
   useEffect(() => {
     const handleSettingsChanged = (event) => {
@@ -498,29 +538,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     window.addEventListener(notificationSettingsChangedEvent, handleSettingsChanged);
     return () => window.removeEventListener(notificationSettingsChangedEvent, handleSettingsChanged);
   }, [user, userId]);
-  const mobileNavItems =
-    userRole === "employee"
-      ? [
-          { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-          { id: "tasks", label: "Projects", icon: "tasks" },
-          { id: "calendar", label: "Calendar", icon: "calendar" },
-          { id: "leave-request", label: "Leave", icon: "leave-request" },
-          { id: "settings", label: "Settings", icon: "settings" },
-        ]
-      : userRole === "client"
-        ? [
-            { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-            { id: "projects", label: "Projects", icon: "tasks" },
-            { id: "newsfeed", label: "Newsfeed", icon: "newsfeed" },
-            { id: "settings", label: "Settings", icon: "settings" },
-          ]
-      : [
-          { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-          { id: "tasks", label: "Projects", icon: "tasks" },
-          { id: "calendar", label: "Calendar", icon: "calendar" },
-          { id: "employee", label: "Employee", icon: "employee" },
-          { id: "settings", label: "Settings", icon: "settings" },
-        ];
+  const mobileNavItems = mobileNavItemsByRole[userRole] ?? mobileNavItemsByRole.admin;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
@@ -1304,8 +1322,8 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       <button
         type="button"
         onClick={toggleSidebar}
-        className={`fixed top-7 z-50 hidden h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-neutral-900 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800 md:grid ${
-          isSidebarExpanded ? "left-[186px]" : "left-[78px]"
+        className={`fixed top-7 z-50 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-xl text-neutral-900 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800 md:grid ${
+          isSidebarExpanded ? "left-[176px]" : "left-[70px]"
         }`}
         aria-label={isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
         aria-expanded={isSidebarExpanded}

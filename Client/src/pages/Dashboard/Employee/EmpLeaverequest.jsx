@@ -23,6 +23,7 @@ const statusStyles = {
   Approved: "bg-emerald-50 text-emerald-600",
   Pending: "bg-orange-50 text-orange-600",
   Rejected: "bg-red-50 text-red-600",
+  Returned: "bg-sky-50 text-sky-600",
 };
 
 const leaveTypeColors = {
@@ -145,6 +146,20 @@ const calculateDuration = (startDate, endDate) => {
 
 const durationLabel = (days) => `${days || 0} ${Number(days) === 1 ? "day" : "days"}`;
 
+const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+const isCurrentApprovedLeave = (request) => {
+  if (request?.status !== "Approved") return false;
+
+  const start = new Date(request.startDate);
+  const end = new Date(request.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+
+  const manilaNow = Date.now() + MANILA_OFFSET_MS;
+  const endExclusive = end.getTime() + 24 * 60 * 60 * 1000;
+  return start.getTime() <= manilaNow && manilaNow < endExclusive;
+};
+
 const normalizeRequest = (request) => ({
   ...request,
   id: request.requestCode || getEntityId(request),
@@ -194,6 +209,8 @@ const Calendar = ({ currentMonth, onNextMonth, onPreviousMonth, requests }) => {
   const cells = Math.ceil((daysInMonth + firstDayOffset) / 7) * 7;
   const days = Array.from({ length: cells }, (_, index) => index - firstDayOffset + 1);
   const markedDays = requests.reduce((map, request) => {
+    if (request.status === "Returned") return map;
+
     const start = new Date(request.startDate);
     const end = new Date(request.endDate);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return map;
@@ -215,11 +232,11 @@ const Calendar = ({ currentMonth, onNextMonth, onPreviousMonth, requests }) => {
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-xl font-black">Leave Calendar</h2>
         <div className="flex items-center gap-4 text-sm font-black text-[#10142d]">
-          <button type="button" onClick={onPreviousMonth} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-pink-50" aria-label="Previous month">
+          <button type="button" onClick={onPreviousMonth} className="grid h-11 w-11 place-items-center rounded-lg hover:bg-pink-50" aria-label="Previous month">
             <SmallIcon name="chevron" className="h-4 w-4 rotate-180" />
           </button>
           {monthName(currentMonth)}
-          <button type="button" onClick={onNextMonth} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-pink-50" aria-label="Next month">
+          <button type="button" onClick={onNextMonth} className="grid h-11 w-11 place-items-center rounded-lg hover:bg-pink-50" aria-label="Next month">
             <SmallIcon name="chevron" className="h-4 w-4" />
           </button>
         </div>
@@ -271,6 +288,7 @@ const EmpLeaverequest = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
+  const [busyRequestId, setBusyRequestId] = useState("");
 
   const loadRequests = useCallback(async () => {
     try {
@@ -288,15 +306,9 @@ const EmpLeaverequest = () => {
   }, []);
 
   useEffect(() => {
-    loadRequests();
+    const timer = window.setTimeout(loadRequests, 0);
+    return () => window.clearTimeout(timer);
   }, [loadRequests]);
-
-  useEffect(() => {
-    setForm((currentForm) => ({
-      ...currentForm,
-      emergencyContact: currentForm.emergencyContact || user?.phone || "",
-    }));
-  }, [user?.phone]);
 
   const formDuration = calculateDuration(form.startDate, form.endDate);
 
@@ -408,8 +420,27 @@ const EmpLeaverequest = () => {
     }
   };
 
+  const handleMarkReturned = async (request) => {
+    const requestId = getEntityId(request);
+    if (!requestId || !isCurrentApprovedLeave(request) || busyRequestId) return;
+
+    try {
+      setBusyRequestId(requestId);
+      setMessage("");
+      setErrorMessage("");
+      const updatedRequest = await leaveRequestAPI.updateStatus(requestId, "Returned");
+      updateRequestInState(updatedRequest);
+      setMessage("You are marked as returned and can receive new project assignments.");
+      await loadRequests();
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to mark this leave as returned."));
+    } finally {
+      setBusyRequestId("");
+    }
+  };
+
   return (
-    <div className="-mx-4 -mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#111936] md:px-6 lg:px-8">
       <header>
         <h1
           className="page-title text-3xl leading-none text-neutral-950 md:text-4xl dark:text-white"
@@ -543,6 +574,7 @@ const EmpLeaverequest = () => {
             <option value="">All Status</option>
             <option value="Approved">Approved</option>
             <option value="Pending">Pending</option>
+            <option value="Returned">Returned</option>
             <option value="Rejected">Rejected</option>
           </select>
         </div>
@@ -582,6 +614,16 @@ const EmpLeaverequest = () => {
                       >
                         View Details
                       </button>
+                      {isCurrentApprovedLeave(item) && (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkReturned(item)}
+                          disabled={busyRequestId === getEntityId(item)}
+                          className="h-9 rounded-lg border border-sky-100 bg-sky-50 px-3 text-xs font-black text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {busyRequestId === getEntityId(item) ? "Updating..." : "Mark Returned"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -694,12 +736,22 @@ const EmpLeaverequest = () => {
                             complete: true,
                             rejected: detailRequest.status === "Rejected",
                           },
+                          ...(detailRequest.status === "Returned"
+                            ? [
+                                {
+                                  label: "Returned early",
+                                  date: formatDateTime(detailRequest.returnedAt || detailRequest.updatedAt),
+                                  complete: true,
+                                  returned: true,
+                                },
+                              ]
+                            : []),
                         ]),
                   ].map((item, index, items) => (
                     <div key={item.label} className="grid grid-cols-[28px_1fr_auto] gap-3">
                       <span className="relative flex justify-center">
                         <span className={`mt-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white ${
-                          item.rejected ? "bg-rose-500" : item.complete ? "bg-emerald-500" : "bg-orange-500"
+                          item.rejected ? "bg-rose-500" : item.returned ? "bg-sky-500" : item.complete ? "bg-emerald-500" : "bg-orange-500"
                         }`}>
                           {item.complete ? (item.rejected ? "x" : "✓") : ""}
                         </span>
@@ -710,9 +762,9 @@ const EmpLeaverequest = () => {
                         <span className="mt-1 block text-xs font-bold text-slate-500">{item.date || "-"}</span>
                       </span>
                       <span className={`mt-0.5 h-fit rounded-full px-3 py-1 text-[11px] font-black ${
-                        item.rejected ? "bg-rose-50 text-rose-600" : item.complete ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+                        item.rejected ? "bg-rose-50 text-rose-600" : item.returned ? "bg-sky-50 text-sky-600" : item.complete ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
                       }`}>
-                        {item.rejected ? "Rejected" : item.complete ? "Completed" : "Pending"}
+                        {item.rejected ? "Rejected" : item.returned ? "Returned" : item.complete ? "Completed" : "Pending"}
                       </span>
                     </div>
                   ))}
@@ -780,7 +832,7 @@ const EmpLeaverequest = () => {
               </DetailSection>
             </div>
 
-            <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
+            <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
               <button
                 type="button"
                 onClick={() => setDetailRequestId("")}
@@ -788,6 +840,16 @@ const EmpLeaverequest = () => {
               >
                 Close
               </button>
+              {isCurrentApprovedLeave(detailRequest) && (
+                <button
+                  type="button"
+                  onClick={() => handleMarkReturned(detailRequest)}
+                  disabled={busyRequestId === getEntityId(detailRequest)}
+                  className="h-11 rounded-xl bg-sky-500 px-8 text-sm font-black text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busyRequestId === getEntityId(detailRequest) ? "Updating..." : "Mark as Returned"}
+                </button>
+              )}
             </div>
           </div>
         </div>
