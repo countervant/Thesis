@@ -4,22 +4,31 @@ import { useNavigate } from "react-router-dom";
 const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => {
   const navigate = useNavigate();
 
-  const handlePrimaryClick = (e) => {
-    if (link !== "/register" && link !== "/") return;
-
+  const navigateWithAnimation = (e, target, transitionClass) => {
     e.preventDefault();
-    if (link === "/") {
+    if (target === "/") {
       sessionStorage.setItem("clientraSuppressLoginAutofillOnce", "true");
     }
     const authScreen = document.querySelector("[data-auth-screen]");
-    const transitionClass =
-      link === "/register" ? "auth-screen-exit-register" : "auth-screen-exit-login";
-
     authScreen?.classList.add(transitionClass);
 
     window.setTimeout(() => {
-      navigate(link);
+      navigate(target);
     }, 420);
+  };
+
+  const handlePrimaryClick = (e) => {
+    if (link !== "/register" && link !== "/") return;
+
+    navigateWithAnimation(
+      e,
+      link,
+      link === "/register" ? "auth-screen-exit-register" : "auth-screen-exit-login"
+    );
+  };
+
+  const handleForgotPasswordClick = (e) => {
+    navigateWithAnimation(e, "/ForgotPassword", "auth-screen-exit-register");
   };
 
   return (
@@ -31,7 +40,11 @@ const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => 
           {Label}
         </Link>
         {Label1 && (
-          <Link to='/ForgotPassword' className="inline-flex min-h-11 items-center hover:text-pink-600">
+          <Link
+            to="/ForgotPassword"
+            onClick={handleForgotPasswordClick}
+            className="inline-flex min-h-11 items-center hover:text-pink-600"
+          >
             {Label1}
           </Link>
         )}
