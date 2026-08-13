@@ -1850,10 +1850,10 @@ const Tasks = ({
 
   return (
         <div className="-mb-10 mt-0 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-3 py-4 text-[#111936] md:-mt-8 md:space-y-5 md:px-6 md:py-5 lg:px-8">
-          <header className="flex items-center justify-between gap-3 md:flex-wrap md:gap-4">
-            <div>
+          <header className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="min-w-0">
               <h1
-                className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-4xl"
+                className="page-title whitespace-nowrap text-2xl leading-none text-neutral-950 dark:text-white md:text-4xl"
                 style={{ fontFamily: "var(--font-bruno)" }}
               >
                 Projects
@@ -1863,11 +1863,11 @@ const Tasks = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={handleAddTask}
-                className="flex h-10 items-center gap-1.5 rounded-xl bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:h-11 md:gap-2 md:px-5 md:text-sm"
+                className="flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-linear-to-r from-[#db4ab5] to-[#f06ac8] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105 md:px-5 md:text-sm"
               >
                 <SmallIcon name="plus" className="h-4 w-4 md:h-5 md:w-5" />
                 <span>Create Project</span>
@@ -1876,8 +1876,8 @@ const Tasks = ({
           </header>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-5 xl:grid-cols-5">
-            {taskStats.map((item) => (
-              <Card key={item.label} className={`min-w-0 p-2 !shadow-sm dark:!shadow-none md:p-5 ${statCardStyles[item.tone]}`}>
+            {taskStats.map((item, index) => (
+              <Card key={item.label} className={`min-w-0 p-2 !shadow-sm dark:!shadow-none md:p-5 ${index === taskStats.length - 1 ? "col-span-2 sm:col-span-1" : ""} ${statCardStyles[item.tone]}`}>
                 <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-4 md:text-left">
                   <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
                     <ImageIcon src={item.icon} className="h-5 w-5 md:h-9 md:w-9" />
