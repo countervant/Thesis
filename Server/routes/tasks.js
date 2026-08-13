@@ -1,7 +1,9 @@
 import express from "express";
 import { createHash, randomUUID } from "crypto";
 import fs from "fs/promises";
+import mongoose from "mongoose";
 import path from "path";
+import sharp from "sharp";
 import { fileURLToPath } from "url";
 import Budget from "../model/Admin/budgetmodel.js";
 import { BudgetPlannerEntry } from "../model/Employee/budgetPlannerModel.js";
@@ -9,13 +11,21 @@ import Task from "../model/Admin/taskmodel.js";
 import User from "../model/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { getSafeSearchPattern } from "../utils/search.js";
 import { withAvatarUrl } from "../utils/avatar.js";
 import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsRoot = path.resolve(__dirname, "../uploads/tasks");
-const privateUploadsRoot = path.resolve(__dirname, "../private_uploads/tasks");
+const configuredStorageRoot = String(process.env.OUTPUT_STORAGE_ROOT || "").trim();
+const legacyUploadsRoot = path.resolve(__dirname, "../uploads/tasks");
+const legacyPrivateUploadsRoot = path.resolve(__dirname, "../private_uploads/tasks");
+const uploadsRoot = configuredStorageRoot
+  ? path.resolve(configuredStorageRoot, "public/tasks")
+  : legacyUploadsRoot;
+const privateUploadsRoot = configuredStorageRoot
+  ? path.resolve(configuredStorageRoot, "private/tasks")
+  : legacyPrivateUploadsRoot;
 
 const allowedStatuses = ["pending", "in_progress", "review", "done"];
 const allowedPriorities = ["low", "medium", "high"];
@@ -30,8 +40,8 @@ const fullTaskFields = [
   "revisionRequests.preferredCompletionDate", "revisionRequests.createdAt",
   "revisionRequests.startedAt", "revisionRequests.startedBy", "finalOutput.submittedBy",
   "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName",
-  "finalOutput.fileUrl", "finalOutput.previewFileName", "finalOutput.originalStoredName",
-  "finalOutput.mimeType", "finalOutput.watermarked", "finalOutput.link",
+  "finalOutput.fileUrl", "finalOutput.previewFileName", "finalOutput.mimeType",
+  "finalOutput.watermarked", "finalOutput.link",
   "finalOutput.submittedAt", "feedback.user", "feedback.rating", "feedback.submittedBy",
   "feedback.overallRating", "feedback.communication", "feedback.communicationRating",
   "feedback.quality", "feedback.qualityRating", "feedback.timeliness",
@@ -50,7 +60,7 @@ const taskFieldsByView = {
     "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
     "downPayment.mode", "downPayment.value", "downPayment.amount", "downPayment.paidAt",
     "assignedTo", "assignees", "requestedBy", "requestedByName",
-    "subtasks._id", "subtasks.title", "subtasks.completed",
+    "subtasks._id", "subtasks.title", "subtasks.completed", "subtasks.assignedTo",
     "activities.type", "revisionRequests._id", "finalOutput.submittedBy", "finalOutput.submittedAt",
     "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName", "finalOutput.fileUrl",
     "finalOutput.link", "finalOutput.mimeType", "finalOutput.watermarked",
@@ -315,7 +325,29 @@ const addActivity = (task, activity) => {
   });
 };
 
-const addTaskAvatarUrls = (task) => ({
+export const isPaymentProtectedTask = (task) =>
+  Number(task?.amount || 0) <= 0 || Number(task?.paid || 0) < Number(task?.amount || 0);
+
+export const getTaskFinalOutputForViewer = (task, viewer) => {
+  if (!task?.finalOutput) return task?.finalOutput;
+  const safeOutput = {
+    ...task.finalOutput,
+    originalStoredName: undefined,
+    previewStoredName: undefined,
+  };
+  if (viewer?.role !== "client") return safeOutput;
+
+  const paymentProtected = isPaymentProtectedTask(task);
+  return {
+    ...safeOutput,
+    fileUrl: undefined,
+    link: paymentProtected ? "" : safeOutput.link,
+    linkProtected: paymentProtected && Boolean(safeOutput.link),
+  };
+};
+
+const addTaskAvatarUrls = (task, viewer) => {
+  const responseTask = {
   ...task,
   assignedTo: withAvatarUrl(task.assignedTo),
   assignees: Array.isArray(task.assignees) ? task.assignees.map(withAvatarUrl) : [],
@@ -365,7 +397,12 @@ const addTaskAvatarUrls = (task) => ({
         grantedBy: withAvatarUrl(task.newsfeedPermission.grantedBy),
       }
     : task.newsfeedPermission,
-});
+  };
+
+  responseTask.finalOutput = getTaskFinalOutputForViewer(responseTask, viewer);
+
+  return responseTask;
+};
 
 const recordSubtaskActivities = (task, previousSubtasks, nextSubtasks, user) => {
   const previousByKey = new Map(
@@ -459,39 +496,278 @@ const safeFileName = (fileName) =>
     .replace(/\s+/g, "-")
     .slice(0, 120) || "output-file";
 
-const saveOutputFile = async (taskId, file, options = {}) => {
+const MAX_OUTPUT_FILE_BYTES = 10 * 1024 * 1024;
+// Project outputs intentionally exclude active browser content and executable
+// formats. Stored names and extensions are derived only from this allowlist.
+const OUTPUT_MIME_EXTENSIONS = new Map([
+  ["application/msword", ".doc"],
+  ["application/pdf", ".pdf"],
+  ["application/rtf", ".rtf"],
+  ["application/vnd.ms-excel", ".xls"],
+  ["application/vnd.ms-powerpoint", ".ppt"],
+  ["application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx"],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"],
+  ["audio/mpeg", ".mp3"],
+  ["audio/ogg", ".ogg"],
+  ["audio/wav", ".wav"],
+  ["image/gif", ".gif"],
+  ["image/jpeg", ".jpg"],
+  ["image/png", ".png"],
+  ["image/webp", ".webp"],
+  ["text/csv", ".csv"],
+  ["text/plain", ".txt"],
+  ["video/mp4", ".mp4"],
+  ["video/quicktime", ".mov"],
+  ["video/webm", ".webm"],
+]);
+const RASTER_IMAGE_MIME_TYPES = new Set([
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const ACTIVE_OR_EXECUTABLE_MIME_PATTERN = /^(?:text\/html|image\/svg\+xml|application\/(?:xhtml\+xml|xml|javascript|ecmascript|x-httpd-php|x-executable|x-msdownload|x-sh|x-shellscript))$/i;
+
+const outputValidationError = (message, status = 400) => {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+};
+
+const hasRasterImageSignature = (mimeType, buffer) => {
+  if (mimeType === "image/jpeg") {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimeType === "image/png") {
+    return buffer.length >= 8 && buffer.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    );
+  }
+  if (mimeType === "image/gif") {
+    const signature = buffer.subarray(0, 6).toString("ascii");
+    return signature === "GIF87a" || signature === "GIF89a";
+  }
+  if (mimeType === "image/webp") {
+    return buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+      buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  }
+  return false;
+};
+
+export const parseOutputFile = (file, options = {}) => {
   const dataUrl = String(file?.dataUrl || "");
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  const match = /^data:([^;,]+);base64,([a-z0-9+/]*={0,2})$/i.exec(dataUrl);
   if (!match) {
-    throw new Error("Invalid file upload");
+    throw outputValidationError("File must be a valid base64-encoded data URL");
   }
 
-  const buffer = Buffer.from(match[2], "base64");
-  if (buffer.length > 10 * 1024 * 1024) {
-    throw new Error("File size must be 10MB or less");
+  const mimeType = match[1].trim().toLowerCase();
+  if (ACTIVE_OR_EXECUTABLE_MIME_PATTERN.test(mimeType)) {
+    throw outputValidationError("HTML, SVG, XML, JavaScript, and executable files are not supported");
   }
 
+  const extension = OUTPUT_MIME_EXTENSIONS.get(mimeType);
+  if (!extension) {
+    throw outputValidationError("This file type is not supported for project outputs");
+  }
+  if (options.rasterImageOnly && !RASTER_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw outputValidationError("Image review copies must be JPEG, PNG, WebP, or GIF files");
+  }
+
+  const encodedData = match[2];
+  if (!encodedData || encodedData.length % 4 !== 0) {
+    throw outputValidationError("File data is not valid base64");
+  }
+
+  const paddingLength = encodedData.endsWith("==") ? 2 : encodedData.endsWith("=") ? 1 : 0;
+  const decodedBytes = (encodedData.length * 3) / 4 - paddingLength;
+  if (decodedBytes > MAX_OUTPUT_FILE_BYTES) {
+    throw outputValidationError("File size must be 10MB or less", 413);
+  }
+
+  const buffer = Buffer.from(encodedData, "base64");
+  if (buffer.length !== decodedBytes || buffer.toString("base64") !== encodedData) {
+    throw outputValidationError("File data is not valid base64");
+  }
+  if (RASTER_IMAGE_MIME_TYPES.has(mimeType) && !hasRasterImageSignature(mimeType, buffer)) {
+    throw outputValidationError("Image data does not match its declared file type");
+  }
+
+  const prefix = buffer.subarray(0, 1024).toString("utf8").replace(/^\uFEFF/, "").trimStart();
+  const isActiveDocument = /^(?:<!doctype\s+html|<html|<svg|<\?xml|<script)\b/i.test(prefix);
+  const isWindowsExecutable = buffer.length >= 2 && buffer[0] === 0x4d && buffer[1] === 0x5a;
+  const isElfExecutable =
+    buffer.length >= 4 &&
+    buffer[0] === 0x7f &&
+    buffer[1] === 0x45 &&
+    buffer[2] === 0x4c &&
+    buffer[3] === 0x46;
+  if (isActiveDocument || isWindowsExecutable || isElfExecutable) {
+    throw outputValidationError("Active or executable file content is not supported");
+  }
+
+  const suppliedName = safeFileName(file?.fileName || `output${extension}`);
+  const baseName = suppliedName.replace(/\.[^.]*$/, "").slice(0, 100) || "output";
+
+  return {
+    buffer,
+    extension,
+    fileName: `${baseName}${extension}`,
+    mimeType,
+  };
+};
+
+const saveOutputFile = async (taskId, parsedFile, options = {}) => {
   const storageRoot = options.private ? privateUploadsRoot : uploadsRoot;
   const taskUploadDir = path.join(storageRoot, String(taskId));
   await fs.mkdir(taskUploadDir, { recursive: true });
 
-  const fileName = `${randomUUID()}-${safeFileName(file.fileName)}`;
-  const filePath = path.join(taskUploadDir, fileName);
-  await fs.writeFile(filePath, buffer);
+  const storedName = `${randomUUID()}${parsedFile.extension}`;
+  const filePath = path.join(taskUploadDir, storedName);
+  await fs.writeFile(filePath, parsedFile.buffer);
 
   return {
-    fileName: file.fileName || fileName,
-    mimeType: match[1],
-    storedName: fileName,
-    fileUrl: options.private ? undefined : `/uploads/tasks/${taskId}/${fileName}`,
+    fileName: parsedFile.fileName,
+    mimeType: parsedFile.mimeType,
+    storedName,
+    fileUrl: options.private ? undefined : `/uploads/tasks/${taskId}/${storedName}`,
+    filePath,
   };
+};
+
+const removeFileIfPresent = async (filePath) => {
+  if (!filePath) return;
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+};
+
+const findStoredTaskFile = async (primaryRoot, legacyRoot, taskId, storedFileName) => {
+  const roots = configuredStorageRoot && primaryRoot !== legacyRoot
+    ? [primaryRoot, legacyRoot]
+    : [primaryRoot];
+
+  for (const storageRoot of roots) {
+    const filePath = path.join(storageRoot, String(taskId), storedFileName);
+    if (!filePath.startsWith(`${storageRoot}${path.sep}`)) continue;
+
+    try {
+      await fs.access(filePath);
+      return filePath;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+
+  return "";
+};
+
+const removeStoredTaskOutput = async (taskId, finalOutput) => {
+  const safeTaskId = String(taskId);
+  const paths = [];
+  const originalName = path.basename(String(finalOutput?.originalStoredName || ""));
+  if (originalName && originalName === finalOutput?.originalStoredName) {
+    paths.push(path.join(privateUploadsRoot, safeTaskId, originalName));
+  }
+
+  const publicPrefix = `/uploads/tasks/${safeTaskId}/`;
+  const publicUrl = String(finalOutput?.fileUrl || "");
+  if (publicUrl.startsWith(publicPrefix)) {
+    const reviewName = path.basename(publicUrl.slice(publicPrefix.length));
+    if (reviewName) paths.push(path.join(uploadsRoot, safeTaskId, reviewName));
+  }
+  const previewName = path.basename(String(finalOutput?.previewStoredName || ""));
+  if (previewName && previewName === finalOutput?.previewStoredName) {
+    paths.push(path.join(privateUploadsRoot, safeTaskId, previewName));
+  }
+
+  await Promise.all(paths.map(removeFileIfPresent));
+};
+
+const removeTaskOutputDirectories = async (taskId) => {
+  const safeTaskId = String(taskId);
+  await Promise.all([
+    fs.rm(path.join(privateUploadsRoot, safeTaskId), { recursive: true, force: true }),
+    fs.rm(path.join(uploadsRoot, safeTaskId), { recursive: true, force: true }),
+  ]);
+};
+
+export const normalizeHttpOutputLink = (value) => {
+  const link = String(value || "").trim();
+  if (!link) return "";
+
+  try {
+    const parsed = new URL(link);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+};
+
+export const assertDistinctReviewFile = (originalFile, reviewFile) => {
+  if (!Buffer.isBuffer(originalFile?.buffer) || !Buffer.isBuffer(reviewFile?.buffer)) {
+    throw outputValidationError("Invalid protected review file");
+  }
+  if (originalFile.buffer.equals(reviewFile.buffer)) {
+    throw outputValidationError("The protected review copy must be different from the original file");
+  }
+};
+
+export const createProtectedImageReview = async (originalFile) => {
+  try {
+    const source = sharp(originalFile.buffer, {
+      animated: false,
+      failOn: "warning",
+      limitInputPixels: 40_000_000,
+    }).rotate();
+    const metadata = await source.metadata();
+    if (!metadata.width || !metadata.height) {
+      throw new Error("Image dimensions are unavailable");
+    }
+
+    const scale = Math.min(1, 1600 / Math.max(metadata.width, metadata.height));
+    const width = Math.max(1, Math.round(metadata.width * scale));
+    const height = Math.max(1, Math.round(metadata.height * scale));
+    const centerFontSize = Math.max(12, Math.min(56, Math.round(Math.min(width, height) / 8)));
+    const watermark = Buffer.from(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <defs>
+          <pattern id="preview" width="360" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-28)">
+            <text x="12" y="100" fill="rgba(255,255,255,0.48)" stroke="rgba(20,20,20,0.2)" stroke-width="1" font-family="sans-serif" font-size="34" font-weight="700">CLIENTRA PREVIEW</text>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#preview)"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="rgba(255,255,255,0.62)" stroke="rgba(20,20,20,0.35)" stroke-width="1" font-family="sans-serif" font-size="${centerFontSize}" font-weight="800">CLIENTRA PREVIEW</text>
+      </svg>
+    `);
+    const buffer = await source
+      .resize({ width, height, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .composite([{ input: watermark, blend: "over" }])
+      .jpeg({ quality: 72, chromaSubsampling: "4:2:0" })
+      .toBuffer();
+    const baseName = originalFile.fileName.replace(/\.[^.]*$/, "").slice(0, 80) || "output";
+
+    return {
+      buffer,
+      extension: ".jpg",
+      fileName: `${baseName}-protected-review.jpg`,
+      mimeType: "image/jpeg",
+    };
+  } catch (error) {
+    throw outputValidationError(`Unable to generate a protected image review: ${error.message}`);
+  }
 };
 
 router.get("/", protect, async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
     const query = { ...taskQueryForUser(req.user) };
-    const search = String(req.query.search || "").trim();
+    const search = getSafeSearchPattern(req.query.search);
     const view = allowedTaskViews.has(req.query.view) ? req.query.view : "";
 
     if (search) {
@@ -562,9 +838,11 @@ router.get("/", protect, async (req, res) => {
         .populate("createdBy", "firstName lastName companyName email role updatedAt");
     }
 
-    const rawTasks = await taskRequest.lean();
-    const tasks = rawTasks.map(addTaskAvatarUrls);
-    const total = skip + rawTasks.length;
+    const [rawTasks, total] = await Promise.all([
+      taskRequest.lean(),
+      Task.countDocuments(query).maxTimeMS(8000),
+    ]);
+    const tasks = rawTasks.map((task) => addTaskAvatarUrls(task, req.user));
 
     res.status(200).json(pagedResponse({ data: tasks, page, limit, total, key: "tasks" }));
   } catch (error) {
@@ -600,7 +878,7 @@ router.get("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    return res.status(200).json(addTaskAvatarUrls(task));
+    return res.status(200).json(addTaskAvatarUrls(task, req.user));
   } catch (error) {
     console.error("Get project details error:", error);
     return res.status(500).json({ message: "Unable to fetch project details" });
@@ -803,7 +1081,79 @@ router.put("/:id", protect, async (req, res) => {
         .populate("requestedBy", "firstName lastName companyName email role")
         .lean();
 
-      return res.status(200).json(updatedTask);
+      return res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
+    }
+
+    if (req.user.role !== "admin") {
+      if (req.user.role !== "client") {
+        return res.status(403).json({ message: "You cannot update this project" });
+      }
+
+      const amountWasChanged =
+        Object.hasOwn(req.body, "amount") &&
+        Number(req.body.amount) !== Number(task.amount || 0);
+      const paidWasChanged =
+        Object.hasOwn(req.body, "paid") &&
+        Number(req.body.paid) !== Number(task.paid || 0);
+      if (amountWasChanged || paidWasChanged) {
+        return res.status(403).json({ message: "Clients cannot change project payment details" });
+      }
+
+      const title = req.body.title === undefined
+        ? task.title
+        : String(req.body.title || "").trim();
+      const description = req.body.description === undefined
+        ? task.description
+        : String(req.body.description || "").trim();
+      const priority = req.body.priority === undefined
+        ? task.priority
+        : String(req.body.priority || "").trim().toLowerCase();
+      const startDate = req.body.startDate === undefined
+        ? new Date(task.startDate || task.createdAt || task.dueDate)
+        : new Date(req.body.startDate);
+      const dueDate = req.body.dueDate === undefined
+        ? new Date(task.dueDate)
+        : new Date(req.body.dueDate);
+
+      if (!title) {
+        return res.status(400).json({ message: "Task title is required" });
+      }
+      if (!allowedPriorities.includes(priority)) {
+        return res.status(400).json({ message: "Invalid project priority" });
+      }
+      if (Number.isNaN(startDate.getTime())) {
+        return res.status(400).json({ message: "Valid start date is required" });
+      }
+      if (Number.isNaN(dueDate.getTime())) {
+        return res.status(400).json({ message: "Valid due date is required" });
+      }
+      if (startDate > dueDate) {
+        return res.status(400).json({ message: "Start date cannot be after due date" });
+      }
+      if (
+        (req.body.startDate !== undefined && isPastDate(startDate)) ||
+        (req.body.dueDate !== undefined && isPastDate(dueDate))
+      ) {
+        return res.status(400).json({ message: "Past dates cannot be selected" });
+      }
+
+      task.title = title;
+      task.description = description;
+      task.startDate = startDate;
+      task.dueDate = dueDate;
+      task.priority = priority;
+      await task.save();
+
+      const updatedTask = await Task.findById(task._id)
+        .populate("assignedTo", "firstName lastName email role")
+        .populate("assignees", "firstName lastName email role")
+        .populate("subtasks.assignedTo", "firstName lastName email role")
+        .populate("createdBy", "firstName lastName email role")
+        .populate("requestedBy", "firstName lastName companyName email role")
+        .populate("finalOutput.submittedBy", "firstName lastName email role")
+        .lean();
+
+      return res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
     }
 
     const payload = normalizeTaskPayload(
@@ -924,7 +1274,7 @@ router.put("/:id", protect, async (req, res) => {
       .populate("finalOutput.submittedBy", "firstName lastName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Update task error:", error);
     res.status(500).json({ message: "Unable to update task" });
@@ -932,23 +1282,22 @@ router.put("/:id", protect, async (req, res) => {
 });
 
 router.post("/:id/mark-paid", protect, async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can mark projects as paid" });
     }
 
-    const task = await Task.findById(req.params.id);
-    if (!task) {
-      return res.status(404).json({ message: "Project not found" });
-    }
+    await session.withTransaction(async () => {
+      const task = await Task.findById(req.params.id).session(session);
+      if (!task) throw outputValidationError("Project not found", 404);
 
-    const projectAmount = Number(task.amount || 0);
-    if (!Number.isFinite(projectAmount) || projectAmount <= 0) {
-      return res.status(400).json({ message: "Set a project amount before marking it as paid" });
-    }
+      const projectAmount = Number(task.amount || 0);
+      if (!Number.isFinite(projectAmount) || projectAmount <= 0) {
+        throw outputValidationError("Set a project amount before marking it as paid");
+      }
 
-    const paymentDate = new Date();
-    try {
+      const paymentDate = new Date();
       await Budget.findOneAndUpdate(
         { sourceTask: task._id },
         {
@@ -966,16 +1315,15 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
           runValidators: true,
           setDefaultsOnInsert: true,
           upsert: true,
+          session,
         }
       );
-    } catch (error) {
-      if (error?.code !== 11000) throw error;
-    }
 
-    task.paid = projectAmount;
-    await task.save();
+      task.paid = projectAmount;
+      await task.save({ session });
+    });
 
-    const updatedTask = await Task.findById(task._id)
+    const updatedTask = await Task.findById(req.params.id)
       .populate("assignedTo", "firstName lastName email role")
       .populate("assignees", "firstName lastName email role")
       .populate("subtasks.assignedTo", "firstName lastName email role")
@@ -983,14 +1331,22 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();
 
-    return res.status(200).json(updatedTask);
+    return res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Mark project paid error:", error);
-    return res.status(500).json({ message: "Unable to mark this project as paid" });
+    const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500
+      ? error.status
+      : 500;
+    return res.status(status).json({
+      message: status < 500 ? error.message : "Unable to mark this project as paid",
+    });
+  } finally {
+    await session.endSession();
   }
 });
 
 router.post("/:id/pay-employee", protect, async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins can pay assigned employees" });
@@ -1037,93 +1393,120 @@ router.post("/:id/pay-employee", protect, async (req, res) => {
       return res.status(409).json({ message: "This employee has already been paid for this project" });
     }
 
-    const paidAt = new Date();
     const employeeName = getActorName(employee);
     const sourceEmployeePayment = `${task._id}:${employee._id}`;
     const budgetEntryId = createHash("sha256")
       .update(`employee-payment:${sourceEmployeePayment}`)
       .digest("hex")
       .slice(0, 24);
-    const budgetEntry = await Budget.findOneAndUpdate(
-      { _id: budgetEntryId },
-      {
-        $setOnInsert: {
-          type: "expense",
-          description: `Employee payment: ${employeeName} — ${task.title}`,
-          category: "Employee Payment",
-          date: paidAt,
-          amount,
-          sourceEmployeePayment,
-          relatedTask: task._id,
-          paidEmployee: employee._id,
-        },
-      },
-      {
-        returnDocument: "after",
-        runValidators: true,
-        setDefaultsOnInsert: true,
-        upsert: true,
-      }
-    );
-
     const employeeIncomeEntryId = createHash("sha256")
       .update(`employee-budget-income:${sourceEmployeePayment}`)
       .digest("hex")
       .slice(0, 24);
-    const employeeIncomeEntry = await BudgetPlannerEntry.findOneAndUpdate(
-      { _id: employeeIncomeEntryId },
-      {
-        $setOnInsert: {
-          owner: employee._id,
-          type: "income",
-          description: `Project income: ${task.title}`,
-          category: "Project Income",
-          date: budgetEntry.date,
-          amount: budgetEntry.amount,
-          sourceEmployeePayment,
-          relatedTask: task._id,
-          paidBy: req.user._id,
-        },
-      },
-      {
-        returnDocument: "after",
-        runValidators: true,
-        setDefaultsOnInsert: true,
-        upsert: true,
+
+    await session.withTransaction(async () => {
+      const currentTask = await Task.findById(task._id)
+        .select("title assignedTo assignees employeePayments")
+        .session(session);
+      if (!currentTask) throw outputValidationError("Project not found", 404);
+      const currentAssignedEmployeeIds = taskAssigneeIds(currentTask);
+      if (!currentAssignedEmployeeIds.includes(employeeId)) {
+        throw outputValidationError("Only an employee assigned to this project can be paid");
       }
-    );
+      if (currentTask.employeePayments?.some(
+        (payment) => String(payment.employee?._id || payment.employee) === employeeId
+      )) {
+        throw outputValidationError("This employee has already been paid for this project", 409);
+      }
+      const currentEmployee = await User.findOne({
+        _id: employeeId,
+        role: "employee",
+        isActive: { $ne: false },
+      }).session(session);
+      if (!currentEmployee) {
+        throw outputValidationError("The selected project assignee is not an active employee");
+      }
 
-    const updatedTaskId = await Task.findOneAndUpdate(
-      {
-        _id: task._id,
-        "employeePayments.employee": { $ne: employee._id },
-      },
-      {
-        $push: {
-          employeePayments: {
-            employee: employee._id,
-            amount: budgetEntry.amount,
-            paidAt: budgetEntry.date,
-            paidBy: req.user._id,
-            budgetEntry: budgetEntry._id,
-            employeeBudgetEntry: employeeIncomeEntry._id,
-          },
-          activities: {
-            type: "employee_paid",
-            title: `Paid employee: ${employeeName}`,
-            details: `${employeeName} was paid ₱${Number(budgetEntry.amount).toFixed(2)} for this project`,
-            actor: req.user._id,
-            actorName: getActorName(req.user),
-            createdAt: budgetEntry.date,
+      const paidAt = new Date();
+      const budgetEntry = await Budget.findOneAndUpdate(
+        { _id: budgetEntryId },
+        {
+          $setOnInsert: {
+            type: "expense",
+            description: `Employee payment: ${employeeName} — ${currentTask.title}`,
+            category: "Employee Payment",
+            date: paidAt,
+            amount,
+            sourceEmployeePayment,
+            relatedTask: currentTask._id,
+            paidEmployee: currentEmployee._id,
           },
         },
-      },
-      { returnDocument: "after", runValidators: true }
-    ).select("_id");
+        {
+          returnDocument: "after",
+          runValidators: true,
+          setDefaultsOnInsert: true,
+          upsert: true,
+          session,
+        }
+      );
 
-    if (!updatedTaskId) {
-      return res.status(409).json({ message: "This employee has already been paid for this project" });
-    }
+      const employeeIncomeEntry = await BudgetPlannerEntry.findOneAndUpdate(
+        { _id: employeeIncomeEntryId },
+        {
+          $setOnInsert: {
+            owner: currentEmployee._id,
+            type: "income",
+            description: `Project income: ${currentTask.title}`,
+            category: "Project Income",
+            date: budgetEntry.date,
+            amount: budgetEntry.amount,
+            sourceEmployeePayment,
+            relatedTask: currentTask._id,
+            paidBy: req.user._id,
+          },
+        },
+        {
+          returnDocument: "after",
+          runValidators: true,
+          setDefaultsOnInsert: true,
+          upsert: true,
+          session,
+        }
+      );
+
+      const updatedTaskId = await Task.findOneAndUpdate(
+        {
+          _id: currentTask._id,
+          "employeePayments.employee": { $ne: currentEmployee._id },
+        },
+        {
+          $push: {
+            employeePayments: {
+              employee: currentEmployee._id,
+              amount: budgetEntry.amount,
+              paidAt: budgetEntry.date,
+              paidBy: req.user._id,
+              budgetEntry: budgetEntry._id,
+              employeeBudgetEntry: employeeIncomeEntry._id,
+            },
+            activities: {
+              type: "employee_paid",
+              title: `Paid employee: ${employeeName}`,
+              details: `${employeeName} was paid ₱${Number(budgetEntry.amount).toFixed(2)} for this project`,
+              actor: req.user._id,
+              actorName: getActorName(req.user),
+              createdAt: budgetEntry.date,
+            },
+          },
+        },
+        { returnDocument: "after", runValidators: true, session }
+      ).select("_id");
+
+      if (!updatedTaskId) {
+        throw outputValidationError("This employee has already been paid for this project", 409);
+      }
+    });
 
     const updatedTask = await Task.findById(task._id)
       .select(fullTaskFields)
@@ -1136,10 +1519,17 @@ router.post("/:id/pay-employee", protect, async (req, res) => {
       .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
       .lean();
 
-    return res.status(201).json(addTaskAvatarUrls(updatedTask));
+    return res.status(201).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Pay employee error:", error);
-    return res.status(500).json({ message: "Unable to record the employee payment" });
+    const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500
+      ? error.status
+      : 500;
+    return res.status(status).json({
+      message: status < 500 ? error.message : "Unable to record the employee payment",
+    });
+  } finally {
+    await session.endSession();
   }
 });
 
@@ -1184,7 +1574,7 @@ router.patch("/:id/archive", protect, async (req, res) => {
       .populate("feedback.reply.repliedBy", "firstName lastName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Archive project error:", error);
     res.status(500).json({ message: "Unable to update the project archive" });
@@ -1248,7 +1638,7 @@ router.post("/:id/revisions", protect, async (req, res) => {
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();
 
-    res.status(201).json(updatedTask);
+    res.status(201).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Create task revision request error:", error);
     res.status(500).json({ message: "Unable to submit revision request" });
@@ -1313,7 +1703,7 @@ router.post("/:id/revisions/start", protect, async (req, res) => {
       .populate("revisionRequests.startedBy", "firstName lastName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Start task revision error:", error);
     res.status(500).json({ message: "Unable to start revision" });
@@ -1373,7 +1763,7 @@ router.post("/:id/approve", protect, async (req, res) => {
       .populate("requestedBy", "firstName lastName companyName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Approve project error:", error);
     res.status(500).json({ message: "Unable to approve the project" });
@@ -1431,7 +1821,7 @@ router.patch("/:id/newsfeed-permission", protect, async (req, res) => {
       .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role")
       .lean();
 
-    return res.status(200).json(updatedTask);
+      return res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Update newsfeed permission error:", error);
     return res.status(500).json({ message: "Unable to update newsfeed posting permission" });
@@ -1498,7 +1888,7 @@ router.post("/:id/feedback", protect, async (req, res) => {
       .populate("feedback.submittedBy", "firstName lastName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Submit task feedback error:", error);
     res.status(500).json({ message: "Unable to submit feedback" });
@@ -1534,7 +1924,7 @@ router.delete("/:id/feedback", protect, async (req, res) => {
       .populate("requestedBy", "firstName lastName companyName email role avatar")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Delete task feedback error:", error);
     res.status(500).json({ message: "Unable to delete feedback" });
@@ -1591,7 +1981,7 @@ router.post("/:id/feedback/reply", protect, async (req, res) => {
       .populate("feedback.reply.repliedBy", "firstName lastName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
     console.error("Reply to feedback error:", error);
     res.status(500).json({ message: "Unable to send feedback reply" });
@@ -1613,28 +2003,39 @@ router.get("/:id/output/download", protect, async (req, res) => {
       return res.status(404).json({ message: "No uploaded output is available for this task" });
     }
 
-    const fullyPaid = Number(task.amount || 0) > 0 && Number(task.paid || 0) >= Number(task.amount || 0);
+    const fullyPaid = !isPaymentProtectedTask(task);
     const canAccessOriginal = req.user.role !== "client" || fullyPaid;
     const canUseOriginal = canAccessOriginal && task.finalOutput.originalStoredName;
-    if (!canAccessOriginal && !task.finalOutput.fileUrl) {
+    if (!canAccessOriginal && !task.finalOutput.previewStoredName && !task.finalOutput.fileUrl) {
       return res.status(402).json({
         message: "The original output is protected until the project is fully paid",
       });
     }
 
-    const selectedRoot = canUseOriginal ? privateUploadsRoot : uploadsRoot;
-    const storedFileName = canUseOriginal
-      ? path.basename(task.finalOutput.originalStoredName)
-      : path.basename(task.finalOutput.fileUrl);
-    const filePath = path.join(selectedRoot, String(task._id), storedFileName);
-    const rootPath = `${selectedRoot}${path.sep}`;
-    if (!filePath.startsWith(rootPath)) {
+    const hasPrivatePreview = !canUseOriginal && Boolean(task.finalOutput.previewStoredName);
+    const selectedRoot = canUseOriginal || hasPrivatePreview ? privateUploadsRoot : uploadsRoot;
+    const selectedStoredValue = canUseOriginal
+      ? String(task.finalOutput.originalStoredName || "")
+      : hasPrivatePreview
+        ? String(task.finalOutput.previewStoredName || "")
+        : String(task.finalOutput.fileUrl || "");
+    const storedFileName = path.basename(selectedStoredValue);
+    if (
+      !storedFileName ||
+      ((canUseOriginal || hasPrivatePreview) && storedFileName !== selectedStoredValue)
+    ) {
       return res.status(400).json({ message: "Invalid output file" });
     }
-
-    try {
-      await fs.access(filePath);
-    } catch {
+    const selectedLegacyRoot = canUseOriginal || hasPrivatePreview
+      ? legacyPrivateUploadsRoot
+      : legacyUploadsRoot;
+    const filePath = await findStoredTaskFile(
+      selectedRoot,
+      selectedLegacyRoot,
+      task._id,
+      storedFileName
+    );
+    if (!filePath) {
       return res.status(404).json({ message: "The uploaded output file could not be found" });
     }
 
@@ -1648,7 +2049,52 @@ router.get("/:id/output/download", protect, async (req, res) => {
   }
 });
 
+router.get("/:id/attachments/:index/download", protect, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    }).select("attachments");
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    const attachmentIndex = Number(req.params.index);
+    const attachment = Number.isInteger(attachmentIndex) && attachmentIndex >= 0
+      ? task.attachments?.[attachmentIndex]
+      : null;
+    if (!attachment) return res.status(404).json({ message: "Attachment not found" });
+
+    const fileUrl = String(attachment.fileUrl || "");
+    const expectedPrefix = `/uploads/tasks/${task._id}/`;
+    if (!fileUrl.startsWith(expectedPrefix)) {
+      return res.status(400).json({ message: "This attachment is not stored by CLIENTRA" });
+    }
+    const storedFileName = path.basename(fileUrl.slice(expectedPrefix.length));
+    if (!storedFileName) {
+      return res.status(400).json({ message: "Invalid attachment file" });
+    }
+
+    const filePath = await findStoredTaskFile(
+      uploadsRoot,
+      legacyUploadsRoot,
+      task._id,
+      storedFileName
+    );
+    if (!filePath) {
+      return res.status(404).json({ message: "The attachment file could not be found" });
+    }
+    return res.download(filePath, safeFileName(attachment.fileName || storedFileName));
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return res.status(404).json({ message: "The attachment file could not be found" });
+    }
+    console.error("Download task attachment error:", error);
+    return res.status(500).json({ message: "Unable to download task attachment" });
+  }
+});
+
 router.post("/:id/submit-output", protect, async (req, res) => {
+  const createdFilePaths = [];
+  let outputCommitted = false;
   try {
     const task = await Task.findById(req.params.id);
 
@@ -1670,6 +2116,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       : task.subtasks;
     let fileOutput = {};
     let link = "";
+    const previousFinalOutput = task.finalOutput?.toObject?.() || task.finalOutput || null;
 
     if (req.user.role === "employee") {
       if (subtasks.length !== previousSubtasks.length) {
@@ -1723,28 +2170,51 @@ router.post("/:id/submit-output", protect, async (req, res) => {
         return res.status(400).json({ message: "Please upload a file before submitting" });
       }
 
-      const requiresPaymentProtection =
-        Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
+      const parsedOriginalFile = parseOutputFile(req.body.file);
+      const requiresPaymentProtection = isPaymentProtectedTask(task);
       if (requiresPaymentProtection) {
-        const originalFile = await saveOutputFile(task._id, req.body.file, { private: true });
-        const reviewFile = req.body.watermarkedFile?.dataUrl
-          ? await saveOutputFile(task._id, req.body.watermarkedFile)
-          : await saveOutputFile(task._id, req.body.file);
+        const parsedReviewFile = RASTER_IMAGE_MIME_TYPES.has(parsedOriginalFile.mimeType)
+          ? await createProtectedImageReview(parsedOriginalFile)
+          : req.body.watermarkedFile?.dataUrl
+            ? parseOutputFile(req.body.watermarkedFile, { rasterImageOnly: true })
+            : null;
+        if (!parsedReviewFile) {
+          return res.status(400).json({
+            message: "A rasterized JPEG, PNG, WebP, or GIF review copy is required until the project is fully paid",
+          });
+        }
+        assertDistinctReviewFile(parsedOriginalFile, parsedReviewFile);
+
+        const originalFile = await saveOutputFile(task._id, parsedOriginalFile, { private: true });
+        createdFilePaths.push(originalFile.filePath);
+        const reviewFile = await saveOutputFile(task._id, parsedReviewFile, { private: true });
+        createdFilePaths.push(reviewFile.filePath);
         fileOutput = {
           fileName: originalFile.fileName,
-          fileUrl: reviewFile.fileUrl,
           previewFileName: reviewFile.fileName,
+          previewStoredName: reviewFile.storedName,
           originalStoredName: originalFile.storedName,
           mimeType: originalFile.mimeType,
-          watermarked: Boolean(req.body.watermarkedFile?.dataUrl),
+          watermarked: true,
         };
       } else {
-        fileOutput = await saveOutputFile(task._id, req.body.file);
+        const originalFile = await saveOutputFile(task._id, parsedOriginalFile, { private: true });
+        createdFilePaths.push(originalFile.filePath);
+        fileOutput = {
+          fileName: originalFile.fileName,
+          originalStoredName: originalFile.storedName,
+          mimeType: originalFile.mimeType,
+          watermarked: false,
+        };
       }
     } else {
-      link = String(req.body.link || "").trim();
-      if (!link) {
+      const requestedLink = String(req.body.link || "").trim();
+      if (!requestedLink) {
         return res.status(400).json({ message: "Please paste a link before submitting" });
+      }
+      link = normalizeHttpOutputLink(requestedLink);
+      if (!link) {
+        return res.status(400).json({ message: "Output links must use HTTP or HTTPS" });
       }
     }
 
@@ -1759,6 +2229,7 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       fileName: fileOutput.fileName,
       fileUrl: fileOutput.fileUrl,
       previewFileName: fileOutput.previewFileName,
+      previewStoredName: fileOutput.previewStoredName,
       originalStoredName: fileOutput.originalStoredName,
       mimeType: fileOutput.mimeType,
       watermarked: Boolean(fileOutput.watermarked),
@@ -1781,6 +2252,10 @@ router.post("/:id/submit-output", protect, async (req, res) => {
     }
 
     await task.save();
+    outputCommitted = true;
+    await removeStoredTaskOutput(task._id, previousFinalOutput).catch((cleanupError) => {
+      console.error("Unable to remove superseded task output files:", cleanupError);
+    });
 
     const updatedTask = await Task.findById(task._id)
       .populate("assignedTo", "firstName lastName email role")
@@ -1791,11 +2266,19 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       .populate("finalOutput.submittedBy", "firstName lastName email role")
       .lean();
 
-    res.status(200).json(updatedTask);
+    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
+    if (!outputCommitted && createdFilePaths.length > 0) {
+      await Promise.all(createdFilePaths.map(removeFileIfPresent)).catch((cleanupError) => {
+        console.error("Unable to roll back task output files after a failed submission:", cleanupError);
+      });
+    }
     console.error("Submit task output error:", error);
-    res.status(error.message?.includes("File size") || error.message?.includes("Invalid file") ? 400 : 500).json({
-      message: error.message || "Unable to submit output",
+    const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500
+      ? error.status
+      : 500;
+    res.status(status).json({
+      message: status < 500 ? error.message : "Unable to submit output",
     });
   }
 });
@@ -1814,6 +2297,10 @@ router.delete("/:id", protect, async (req, res) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+
+    await removeTaskOutputDirectories(task._id).catch((cleanupError) => {
+      console.error("Unable to remove deleted task output files:", cleanupError);
+    });
 
     res.status(200).json({ message: "Task deleted" });
   } catch (error) {

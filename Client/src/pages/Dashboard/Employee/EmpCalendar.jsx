@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { calendarAPI, taskAPI } from "../../../services/api.js";
+import { calendarAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
 const calendars = [
   ["My Schedule", "accent-pink-600"],
@@ -127,6 +127,18 @@ const getCalendarDays = (monthDate) => {
   });
 };
 
+const getWeekDays = (dateKey) => {
+  const selected = new Date(`${dateKey}T00:00:00`);
+  const firstDay = new Date(selected);
+  firstDay.setDate(selected.getDate() - selected.getDay());
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(firstDay);
+    date.setDate(firstDay.getDate() + index);
+    return date;
+  });
+};
+
 const getTone = (event) => typeTones[event.type] || "violet";
 
 const normalizeEvent = (event) => {
@@ -176,13 +188,20 @@ const loadCalendarSources = async (currentMonth) => {
   const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
   const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];
 
-  if (calendarResult.status === "rejected") console.error("Unable to load employee calendar events", calendarResult.reason);
-  if (taskResult.status === "rejected") console.error("Unable to load employee calendar tasks", taskResult.reason);
+  const unavailableSources = [
+    calendarResult.status === "rejected" ? "calendar events" : "",
+    taskResult.status === "rejected" ? "task deadlines" : "",
+  ].filter(Boolean);
 
-  return [
-    ...calendarEvents.map(normalizeEvent),
-    ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
-  ];
+  return {
+    events: [
+      ...calendarEvents.map(normalizeEvent),
+      ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
+    ],
+    warning: unavailableSources.length
+      ? `Some calendar data could not be loaded (${unavailableSources.join(" and ")}). Refresh to retry.`
+      : "",
+  };
 };
 
 const emptyPersonalForm = (date) => ({
@@ -233,21 +252,35 @@ const EmpCalendar = () => {
   const [events, setEvents] = useState([]);
   const [eventForm, setEventForm] = useState(null);
   const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
-
-  const loadEvents = async () => {
-    setEvents(await loadCalendarSources(currentMonth));
-  };
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let isActive = true;
 
-    loadCalendarSources(currentMonth)
-      .then((calendarEvents) => {
+    const loadCalendarData = async () => {
+      setIsLoading(true);
+
+      try {
+        const { events: calendarEvents, warning } = await loadCalendarSources(currentMonth);
+
         if (isActive) {
           setEvents(calendarEvents);
+          setErrorMessage(warning);
         }
-      })
-      .catch((error) => console.error("Unable to load employee calendar events", error));
+      } catch (error) {
+        if (isActive) {
+          setErrorMessage(getApiErrorMessage(error, "Unable to load your calendar."));
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadCalendarData();
 
     return () => {
       isActive = false;
@@ -261,6 +294,18 @@ const EmpCalendar = () => {
   }, [events, visibleCalendars]);
 
   const selectedEvents = filteredEvents.filter((event) => event.dateKey === selectedDate);
+  const eventsByDate = useMemo(() => {
+    const groupedEvents = new Map();
+    filteredEvents.forEach((event) => {
+      groupedEvents.set(event.dateKey, [...(groupedEvents.get(event.dateKey) || []), event]);
+    });
+    return groupedEvents;
+  }, [filteredEvents]);
+  const visibleDays = useMemo(() => {
+    if (activeView === "Week") return getWeekDays(selectedDate);
+    if (activeView === "Day") return [new Date(`${selectedDate}T00:00:00`)];
+    return getCalendarDays(currentMonth);
+  }, [activeView, currentMonth, selectedDate]);
   const sortedUpcoming = [...filteredEvents]
     .filter((event) => event.dateKey >= selectedDate && (showAllUpcoming || event.dateKey <= addDays(selectedDate, 6)))
     .sort((first, second) => first.dateKey.localeCompare(second.dateKey) || first.startTime.localeCompare(second.startTime));
@@ -289,6 +334,8 @@ const EmpCalendar = () => {
 
   const saveEvent = async (event) => {
     event.preventDefault();
+    if (isSaving) return;
+
     const payload = {
       title: eventForm.title,
       date: eventForm.date,
@@ -301,17 +348,36 @@ const EmpCalendar = () => {
       color: "emerald",
     };
 
-    if (eventForm.id) {
-      await calendarAPI.update(eventForm.id, payload);
-    } else {
-      await calendarAPI.create(payload);
-    }
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+      const savedEvent = eventForm.id
+        ? await calendarAPI.update(eventForm.id, payload)
+        : await calendarAPI.create(payload);
+      const normalizedEvent = normalizeEvent(savedEvent);
+      const belongsToCurrentMonth = sameMonth(new Date(normalizedEvent.date), currentMonth);
 
-    setEventForm(null);
-    await loadEvents();
+      setEvents((currentEvents) => [
+        ...currentEvents.filter((currentEvent) => currentEvent.id !== normalizedEvent.id),
+        ...(belongsToCurrentMonth ? [normalizedEvent] : []),
+      ]);
+      setEventForm(null);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to save this event."));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const goToMonth = (offset) => setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() + offset, 1));
+  const selectMonth = (month) => {
+    const nextMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    setCurrentMonth(nextMonth);
+    setSelectedDate(toDateKey(nextMonth));
+  };
+
+  const goToMonth = (offset) => {
+    selectMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
 
   const goToday = () => {
     setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -336,7 +402,7 @@ const EmpCalendar = () => {
               <button type="button" onClick={() => goToMonth(-1)} className="grid h-11 w-12 place-items-center text-slate-700" aria-label="Previous month"><Icon className="h-4 w-4 rotate-180" /></button>
               <button type="button" onClick={() => goToMonth(1)} className="grid h-11 w-12 place-items-center border-l border-slate-200 text-slate-700" aria-label="Next month"><Icon className="h-4 w-4" /></button>
             </div>
-            <select value={currentMonth.getMonth()} onChange={(event) => setCurrentMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="h-11 rounded-xl border border-transparent bg-white px-3 text-base font-black text-[#26314f] outline-none">
+            <select value={currentMonth.getMonth()} onChange={(event) => selectMonth(new Date(currentMonth.getFullYear(), Number(event.target.value), 1))} className="h-11 rounded-xl border border-transparent bg-white px-3 text-base font-black text-[#26314f] outline-none">
               {getMonthOptions(currentMonth.getFullYear()).map((month) => <option key={month.getMonth()} value={month.getMonth()}>{formatMonth(month)}</option>)}
             </select>
             <div className="grid w-full grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-sm md:flex md:w-auto">
@@ -348,6 +414,13 @@ const EmpCalendar = () => {
             </div>
           </div>
         </header>
+
+        {errorMessage && (
+          <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+            {errorMessage}
+          </p>
+        )}
+        {isLoading && <p role="status" className="text-sm font-bold text-slate-500">Loading calendar data...</p>}
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
           {stats.map((item) => (
@@ -402,15 +475,16 @@ const EmpCalendar = () => {
           </div>
 
           <Card className="overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[10px] font-black text-[#10142d] md:text-base">
-              {weekDays.map((day) => <span key={day} className="py-2 md:py-5">{day}</span>)}
+            <div className={`grid border-b border-slate-200 text-center text-[10px] font-black text-[#10142d] md:text-base ${activeView === "Day" ? "grid-cols-1" : "grid-cols-7"}`}>
+              {(activeView === "Day" ? [new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-US", { weekday: "long" })] : weekDays)
+                .map((day) => <span key={day} className="py-2 md:py-5">{day}</span>)}
             </div>
-            <div className="grid grid-cols-7">
-              {getCalendarDays(currentMonth).map((date) => {
+            <div className={`grid ${activeView === "Day" ? "grid-cols-1" : "grid-cols-7"}`}>
+              {visibleDays.map((date) => {
                 const dateKey = toDateKey(date);
                 const muted = !sameMonth(date, currentMonth);
                 const selected = selectedDate === dateKey;
-                const dayEvents = filteredEvents.filter((event) => event.dateKey === dateKey);
+                const dayEvents = eventsByDate.get(dateKey) || [];
 
                 return (
                   <button
@@ -420,7 +494,7 @@ const EmpCalendar = () => {
                       setSelectedDate(dateKey);
                       setShowDayEventsPanel(true);
                     }}
-                    className={`min-h-16 border-b border-r border-slate-200 p-1 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white md:min-h-32 md:p-3 ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
+                    className={`min-h-16 border-b border-r border-slate-200 p-1 text-left transition hover:bg-pink-50/40 dark:hover:!bg-pink-500/15 dark:hover:text-white md:min-h-32 md:p-3 ${activeView === "Day" ? "min-h-64" : ""} ${dateKey < todayKey ? "bg-slate-50/70 dark:!bg-neutral-900" : ""} ${selected ? "bg-pink-50/70 dark:!bg-pink-500/20 dark:text-white" : ""}`}
                     aria-label={`View events for ${date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
                   >
                     <div className={`mb-1 text-[10px] font-black md:mb-3 md:text-base ${muted ? "text-slate-400" : "text-[#10142d]"}`}>{date.getDate()}</div>
@@ -444,7 +518,7 @@ const EmpCalendar = () => {
         <Card className="overflow-hidden p-4 md:p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-black">{activeView === "Month" ? "Today's Schedule" : `${activeView} Schedule`}</h2>
-            <button type="button" onClick={goToday} className="inline-flex min-h-11 items-center px-2 text-sm font-black text-pink-600">View full day</button>
+            <button type="button" onClick={() => { setActiveView("Day"); setShowDayEventsPanel(true); }} className="inline-flex min-h-11 items-center px-2 text-sm font-black text-pink-600">View full day</button>
           </div>
           <div className="overflow-x-auto">
           <div className="min-w-[760px] divide-y divide-slate-100">
@@ -504,7 +578,7 @@ const EmpCalendar = () => {
       )}
 
       {eventForm && (
-        <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => setEventForm(null)}>
+        <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => !isSaving && setEventForm(null)}>
           <form onSubmit={saveEvent} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Title">
@@ -551,11 +625,11 @@ const EmpCalendar = () => {
               />
             </Field>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
+              <button type="button" disabled={isSaving} onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-60">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
-                Save Event
+              <button type="submit" disabled={isSaving} className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] disabled:cursor-not-allowed disabled:opacity-60">
+                {isSaving ? "Saving..." : "Save Event"}
               </button>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, Clock3, KeyRound, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -33,6 +33,11 @@ const TwoFactorVerification = () => {
   const [resendAt, setResendAt] = useState(pending?.resendAvailableAt || null);
   const [secondsLeft, setSecondsLeft] = useState(300);
   const [resendSeconds, setResendSeconds] = useState(60);
+  const completionTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (completionTimerRef.current) window.clearTimeout(completionTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -53,7 +58,10 @@ const TwoFactorVerification = () => {
     sessionStorage.setItem("token", data.token);
     const profile = await authAPI.getMe().catch(() => data);
     login(profile, data.token);
-    window.setTimeout(() => navigate(dashboardPathByRole[data.role] || "/dashboard", { replace: true }), 650);
+    completionTimerRef.current = window.setTimeout(
+      () => navigate(dashboardPathByRole[data.role] || "/dashboard", { replace: true }),
+      650
+    );
   };
 
   const handleVerificationError = (requestError) => {

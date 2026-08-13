@@ -35,15 +35,14 @@
     "client": "npm run dev --prefix Client",
     "server": "npm run dev --prefix Server",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "npm install --include=dev --prefix Client && npm run build --prefix Client",
-    "render-build": "npm install --omit=dev --prefix Server && npm run build",
-    "postinstall": "npm run render-build",
+    "build": "npm run build --prefix Client",
+    "render-build": "npm ci --include=dev --prefix Client && npm ci --omit=dev --prefix Server && npm run build --prefix Client",
     "start": "npm run start --prefix Server",
     "lint": "npm run lint --prefix Client",
     "install:all": "npm install && npm install --prefix Client && npm install --prefix Server"
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "repository": {
     "type": "git",

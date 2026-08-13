@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -292,6 +292,20 @@ const Feedback = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
+  const noticeTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+  }, []);
+
+  const showNotice = (message) => {
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+    setNoticeMessage(message);
+    noticeTimerRef.current = window.setTimeout(() => {
+      setNoticeMessage("");
+      noticeTimerRef.current = null;
+    }, 4500);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -402,8 +416,7 @@ const Feedback = () => {
     const updatedId = updatedTask?._id || updatedTask?.id;
     setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
     setReplyTarget(null);
-    setNoticeMessage(wasEditing ? "Reply updated successfully." : "Reply sent. The client can now view it in their project and notifications.");
-    window.setTimeout(() => setNoticeMessage(""), 4500);
+    showNotice(wasEditing ? "Reply updated successfully." : "Reply sent. The client can now view it in their project and notifications.");
   };
 
   const handleDeleteFeedback = async () => {
@@ -417,8 +430,7 @@ const Feedback = () => {
       setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
       setSelectedFeedback((current) => current?.id === deleteTarget.id ? null : current);
       setDeleteTarget(null);
-      setNoticeMessage("Feedback deleted successfully.");
-      window.setTimeout(() => setNoticeMessage(""), 4500);
+      showNotice("Feedback deleted successfully.");
     } catch (error) {
       setDeleteError(getApiErrorMessage(error, "Unable to delete feedback."));
     } finally {

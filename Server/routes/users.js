@@ -1,10 +1,12 @@
 import express from "express";
 
+import { authorize } from "../middleware/authorize.js";
+import { protect } from "../middleware/protectedjwt.js";
 import User from "../model/userModel.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
     const users = await User.find({})
       .select("firstName middleInitial lastName companyName email phone country role position isActive createdAt updatedAt")
@@ -13,7 +15,6 @@ router.get("/", async (req, res) => {
       .maxTimeMS(8000)
       .lean();
 
-    console.log(`[users] Retrieved ${users.length} users`);
     res.status(200).json(users);
   } catch (error) {
     console.error("[users] Failed to retrieve users:", {

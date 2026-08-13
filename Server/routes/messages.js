@@ -1,15 +1,25 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-import { protect } from "../middleware/protectedjwt.js";
+import {
+  protect,
+  wasTokenIssuedBeforePasswordChange,
+} from "../middleware/protectedjwt.js";
 import Message from "../model/messageModel.js";
 import User from "../model/userModel.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { getSafeSearchPattern } from "../utils/search.js";
 import { getAvatarUrl } from "../utils/avatar.js";
 import { isUserOnline } from "../utils/presence.js";
+import { createRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 const messageClients = new Map();
+const MESSAGE_EVENTS_AUDIENCE = "clientra-message-events";
+const MESSAGE_EVENT_TICKET_SECONDS = 90;
+const MAX_MESSAGE_CONNECTIONS_PER_USER = 3;
+const MAX_MESSAGE_CONNECTIONS = 1000;
+const messageTicketLimiter = createRateLimiter({ max: 30, windowMs: 60 * 1000 });
 
 const userFields = "firstName lastName email role companyName isActive isOnline showOnlineStatus lastSeen updatedAt";
 
@@ -63,9 +73,28 @@ const removeMessageClient = (userId, res) => {
   }
 };
 
+export const closeMessageClients = () => {
+  messageClients.forEach((clients) => {
+    clients.forEach((client) => {
+      if (!client.writableEnded && !client.destroyed) {
+        client.end();
+      }
+    });
+  });
+  messageClients.clear();
+};
+
 const hasMessageConnection = (userId) => {
   const clients = messageClients.get(String(userId));
   return Boolean(clients?.size);
+};
+
+const messageConnectionCount = () => {
+  let count = 0;
+  messageClients.forEach((clients) => {
+    count += clients.size;
+  });
+  return count;
 };
 
 const emitMessageEvent = (userId, payload) => {
@@ -100,28 +129,107 @@ const toMessagePayload = (message) => ({
   updatedAt: message.updatedAt,
 });
 
+router.post("/events-ticket", protect, messageTicketLimiter, (req, res) => {
+  const ticket = jwt.sign(
+    { id: getUserId(req.user), type: "message-events" },
+    process.env.JWT_SECRET,
+    { audience: MESSAGE_EVENTS_AUDIENCE, expiresIn: `${MESSAGE_EVENT_TICKET_SECONDS}s` }
+  );
+
+  res.set("Cache-Control", "no-store");
+  return res.status(200).json({ ticket, expiresInSeconds: MESSAGE_EVENT_TICKET_SECONDS });
+});
+
 router.get("/events", async (req, res) => {
+  let cleanup = () => {};
+
   try {
     const token = req.query.token;
     if (!token) {
       return res.status(401).json({ message: "Not authorized, no token" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("_id").lean();
-    if (!user) {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      audience: MESSAGE_EVENTS_AUDIENCE,
+    });
+    if (decoded.type !== "message-events" || !decoded.id) {
+      return res.status(401).json({ message: "Not authorized, token failed" });
+    }
+
+    const user = await User.findById(decoded.id)
+      .select("_id isActive role twoFactorEnabled +passwordChangedAt")
+      .lean();
+    if (!user || user.isActive === false) {
       return res.status(401).json({ message: "Not authorized, user not found" });
+    }
+    if (wasTokenIssuedBeforePasswordChange(decoded.iat, user.passwordChangedAt)) {
+      return res.status(401).json({ message: "Not authorized, password was changed" });
+    }
+    if (user.role === "admin" && user.twoFactorEnabled !== true) {
+      return res.status(403).json({
+        message: "Two-factor authentication setup is required for administrator accounts",
+        code: "TWO_FACTOR_SETUP_REQUIRED",
+      });
     }
 
     const userId = getUserId(user);
+    let heartbeat;
+    let connectionExpiry;
+    let cleanedUp = false;
+    cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+
+      if (heartbeat) {
+        clearInterval(heartbeat);
+        heartbeat = undefined;
+      }
+      if (connectionExpiry) {
+        clearTimeout(connectionExpiry);
+        connectionExpiry = undefined;
+      }
+      removeMessageClient(userId, res);
+
+      if (!res.writableEnded && !res.destroyed) {
+        res.end();
+      }
+    };
+
+    if (
+      (messageClients.get(userId)?.size || 0) >= MAX_MESSAGE_CONNECTIONS_PER_USER ||
+      messageConnectionCount() >= MAX_MESSAGE_CONNECTIONS
+    ) {
+      return res.status(429).json({ message: "Too many realtime message connections" });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Cache-Control", "no-cache, no-store");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders?.();
     res.write(`event: connected\n`);
     res.write(`data: {"ok":true}\n\n`);
 
     addMessageClient(userId, res);
+    req.once("close", cleanup);
+    res.once("close", cleanup);
+    res.once("error", cleanup);
+
+    heartbeat = setInterval(() => {
+      if (res.writableEnded || res.destroyed) {
+        cleanup();
+        return;
+      }
+
+      try {
+        res.write(`event: ping\n`);
+        res.write(`data: {}\n\n`);
+      } catch (error) {
+        console.error("Message heartbeat error:", error);
+        cleanup();
+      }
+    }, 25000);
+    connectionExpiry = setTimeout(cleanup, MESSAGE_EVENT_TICKET_SECONDS * 1000);
 
     const deliveredMessages = await Message.find({
       recipient: userId,
@@ -143,20 +251,20 @@ router.get("/events", async (req, res) => {
         emitMessageChange(message, "delivered");
       });
     }
-
-    const heartbeat = setInterval(() => {
-      res.write(`event: ping\n`);
-      res.write(`data: {}\n\n`);
-    }, 25000);
-
-    req.on("close", () => {
-      clearInterval(heartbeat);
-      removeMessageClient(userId, res);
-      res.end();
-    });
   } catch (error) {
     console.error("Message events error:", error);
-    res.status(401).json({ message: "Not authorized, token failed" });
+    cleanup();
+
+    if (res.headersSent) {
+      return;
+    }
+
+    const isTokenError = ["JsonWebTokenError", "TokenExpiredError", "NotBeforeError"].includes(
+      error?.name
+    );
+    return res.status(isTokenError ? 401 : 500).json({
+      message: isTokenError ? "Not authorized, token failed" : "Unable to open message events",
+    });
   }
 });
 
@@ -164,7 +272,7 @@ router.get("/users", protect, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
     const { page, limit, skip } = getPagination(req.query, { defaultLimit: 50 });
-    const search = String(req.query.search || "").trim();
+    const search = getSafeSearchPattern(req.query.search);
     const searchQuery = search
       ? {
           $or: [

@@ -65,6 +65,7 @@ const mobileInput =
 const RegisterPage = () => {
   const formRef = useRef(null);
   const hasUserInteractedRef = useRef(false);
+  const navigationTimerRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -85,6 +86,9 @@ const RegisterPage = () => {
 
   useEffect(() => {
     sessionStorage.setItem("clientraSuppressLoginAutofillOnce", "true");
+    return () => {
+      if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+    };
   }, []);
 
   const handleLoginClick = () => {
@@ -92,7 +96,8 @@ const RegisterPage = () => {
     const authScreen = document.querySelector("[data-auth-screen]");
     authScreen?.classList.add("auth-screen-exit-login");
 
-    window.setTimeout(() => {
+    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+    navigationTimerRef.current = window.setTimeout(() => {
       navigate("/");
     }, 420);
   };
@@ -190,7 +195,8 @@ const RegisterPage = () => {
       );
       resetForm();
       setSuccessMessage("Account created successfully. Please log in.");
-      setTimeout(() => navigate("/"), 1200);
+      if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+      navigationTimerRef.current = window.setTimeout(() => navigate("/"), 1200);
     } catch (err) {
       setError(getAuthErrorMessage(err, "Registration failed. Please try again."));
     } finally {

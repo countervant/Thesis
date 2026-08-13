@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import emojiIcon from "../assets/emoji.png";
 import heartIcon from "../assets/heart.png";
@@ -13,6 +13,21 @@ import { FeedSkeleton } from "../components/Skeleton.jsx";
 import { getCountryFlag } from "../utils/countries.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
+const NEWSFEED_PAGE_SIZE = 10;
+const MAX_POST_MEDIA_BYTES = 8 * 1024 * 1024;
+const MAX_POST_MEDIA_NAME_LENGTH = 180;
+const POST_MEDIA_TYPES = new Map([
+  ["image/avif", "image"],
+  ["image/gif", "image"],
+  ["image/jpeg", "image"],
+  ["image/png", "image"],
+  ["image/webp", "image"],
+  ["video/mp4", "video"],
+  ["video/ogg", "video"],
+  ["video/quicktime", "video"],
+  ["video/webm", "video"],
+]);
+const POST_MEDIA_ACCEPT = Array.from(POST_MEDIA_TYPES.keys()).join(",");
 
 const emojiCategories = [
   {
@@ -139,6 +154,67 @@ const normalizePost = (post) => ({
   createdAt: post?.createdAt,
 });
 
+const mergePostPreservingMedia = (currentPost, updatedPost) => {
+  const normalizedPost = normalizePost(updatedPost);
+
+  return {
+    ...currentPost,
+    ...normalizedPost,
+    media: {
+      ...(currentPost?.media || {}),
+      ...(normalizedPost.media || {}),
+      url: normalizedPost.media?.url || currentPost?.media?.url || "",
+    },
+  };
+};
+
+const mergePostPage = (currentPosts, incomingPosts) => {
+  const mergedPosts = [...currentPosts];
+  const indexById = new Map(
+    mergedPosts.map((post, index) => [post.id, index])
+  );
+
+  incomingPosts.forEach((incomingPost) => {
+    const normalizedPost = normalizePost(incomingPost);
+    if (!normalizedPost.id) return;
+
+    const existingIndex = indexById.get(normalizedPost.id);
+    if (existingIndex === undefined) {
+      indexById.set(normalizedPost.id, mergedPosts.length);
+      mergedPosts.push(normalizedPost);
+      return;
+    }
+
+    mergedPosts[existingIndex] = mergePostPreservingMedia(
+      mergedPosts[existingIndex],
+      normalizedPost
+    );
+  });
+
+  return mergedPosts;
+};
+
+const copyShareUrl = async (url) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = url;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const didCopy = document.execCommand("copy");
+  textarea.remove();
+
+  if (!didCopy) {
+    throw new Error("Clipboard access is unavailable");
+  }
+};
+
 const toggleUserHeart = (hearts, user) => {
   const userId = getEntityId(user);
   const safeHearts = Array.isArray(hearts) ? hearts : [];
@@ -228,10 +304,22 @@ const Newsfeed = () => {
   const [commentToDelete, setCommentToDelete] = useState(null);
   const [focusedTarget, setFocusedTarget] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loadMoreError, setLoadMoreError] = useState("");
+  const [shareNotice, setShareNotice] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [showAllTeamMembers, setShowAllTeamMembers] = useState(false);
   const [onlineTeam, setOnlineTeam] = useState([]);
+  const focusTimerRef = useRef(null);
+  const sharedPostTimerRef = useRef(null);
+  const notificationRequestRef = useRef(false);
+
+  useEffect(() => () => {
+    if (sharedPostTimerRef.current) window.clearTimeout(sharedPostTimerRef.current);
+  }, []);
   const canPost = ["admin", "client", "employee"].includes(
     String(user?.role || "").toLowerCase()
   );
@@ -247,6 +335,12 @@ const Newsfeed = () => {
   }, []);
 
   useEffect(() => {
+    if (!shareNotice) return undefined;
+    const timer = window.setTimeout(() => setShareNotice(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [shareNotice]);
+
+  useEffect(() => {
     if (authLoading) return;
 
     let isMounted = true;
@@ -255,14 +349,24 @@ const Newsfeed = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
+        setLoadMoreError("");
+        setCurrentPage(1);
+        setHasNextPage(false);
+        setIsLoadingMore(false);
         // The newsfeed is shared by all account roles. Always fetch a current
         // list when opening it so posts made by another user are not hidden by
         // the short-lived API cache.
         newsfeedAPI.clearCachedPosts();
-        const data = await newsfeedAPI.getAll();
+        const pageData = await newsfeedAPI.getPage({
+          page: 1,
+          limit: NEWSFEED_PAGE_SIZE,
+          refresh: true,
+        });
 
         if (isMounted) {
-          setPosts(Array.isArray(data) ? data.map(normalizePost) : []);
+          setPosts(pageData.posts.map(normalizePost));
+          setCurrentPage(pageData.page);
+          setHasNextPage(pageData.page < pageData.totalPages);
         }
       } catch (error) {
         if (isMounted) {
@@ -286,9 +390,13 @@ const Newsfeed = () => {
     if (authLoading || !userId) return undefined;
 
     let isMounted = true;
+    let onlineTeamRequest = null;
     const loadOnlineTeam = async () => {
+      if (onlineTeamRequest) return onlineTeamRequest;
+
+      onlineTeamRequest = authAPI.getOnlineTeam();
       try {
-        const members = await authAPI.getOnlineTeam();
+        const members = await onlineTeamRequest;
         if (isMounted) {
           setOnlineTeam(members.filter((member) => canShowInOnlineTeam(member, userId)));
         }
@@ -298,6 +406,8 @@ const Newsfeed = () => {
             currentMembers.length > 0 ? currentMembers : [user].filter(Boolean)
           );
         }
+      } finally {
+        onlineTeamRequest = null;
       }
     };
 
@@ -325,51 +435,63 @@ const Newsfeed = () => {
     let isMounted = true;
 
     const loadMissingMedia = async () => {
-      const mediaResults = await Promise.allSettled(
-        postsMissingMedia.map((post) => newsfeedAPI.getMedia(post.id))
+      const result = await newsfeedAPI.getMediaBatch(
+        postsMissingMedia.map((post) => post.id)
       );
       if (!isMounted) return;
 
       const mediaByPostId = new Map(
-        postsMissingMedia.map((post, index) => {
-          const result = mediaResults[index];
-          const media = result.status === "fulfilled" ? result.value : null;
-
-          return [
-            post.id,
-            {
-              type: media?.type || "",
-              url: media?.url || "",
-              name: media?.name || "",
-            },
-          ];
-        })
+        Object.entries(result.mediaById).map(([postId, media]) => [
+          postId,
+          {
+            type: media?.type || "",
+            url: media?.url || "",
+            name: media?.name || "",
+          },
+        ])
       );
 
-      setPosts((currentPosts) =>
-        currentPosts.map((currentPost) =>
-          mediaByPostId.has(currentPost.id)
-            ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
-            : currentPost
-        )
-      );
+      if (mediaByPostId.size > 0) {
+        setPosts((currentPosts) =>
+          currentPosts.map((currentPost) =>
+            mediaByPostId.has(currentPost.id)
+              ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
+              : currentPost
+          )
+        );
+      }
+
+      if (result.failedBatchCount > 0) {
+        setErrorMessage("Some post media could not be loaded. Refresh to retry.");
+      }
     };
 
-    loadMissingMedia();
+    loadMissingMedia().catch(() => {
+      if (isMounted) {
+        setErrorMessage("Post media could not be loaded. Refresh to retry.");
+      }
+    });
 
     return () => {
       isMounted = false;
     };
   }, [posts]);
 
-  useEffect(() => {
-    const focusTarget = () => {
+  const focusNotificationTarget = useCallback(async () => {
       const rawTarget = sessionStorage.getItem(notificationTargetKey);
-      if (!rawTarget) return;
+      if (!rawTarget || notificationRequestRef.current) return;
 
       try {
         const target = JSON.parse(rawTarget);
         if (target?.page !== "newsfeed" || !target?.postId) return;
+
+        let targetPost = posts.find((post) => String(post.id) === String(target.postId));
+        if (!targetPost) {
+          notificationRequestRef.current = true;
+          const fetchedPost = await newsfeedAPI.getById(target.postId, { refresh: true });
+          targetPost = normalizePost(fetchedPost);
+          setPosts((currentPosts) => mergePostPage([targetPost], currentPosts));
+        }
 
         setVisibleComments((currentVisibility) => ({
           ...currentVisibility,
@@ -385,30 +507,67 @@ const Newsfeed = () => {
 
         setFocusedTarget(target);
 
-        window.setTimeout(() => {
+        if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+        focusTimerRef.current = window.setTimeout(() => {
           const targetId = target.replyId
             ? `newsfeed-reply-${target.replyId}`
             : target.commentId
               ? `newsfeed-comment-${target.commentId}`
               : `newsfeed-post-${target.postId}`;
 
-          document.getElementById(targetId)?.scrollIntoView({
+          const targetElement = document.getElementById(targetId) ||
+            document.getElementById(`newsfeed-post-${target.postId}`);
+          targetElement?.scrollIntoView({
             behavior: "smooth",
             block: "center",
           });
-          sessionStorage.removeItem(notificationTargetKey);
+          if (targetElement) sessionStorage.removeItem(notificationTargetKey);
+          focusTimerRef.current = null;
         }, 160);
-      } catch {
-        sessionStorage.removeItem(notificationTargetKey);
+      } catch (error) {
+        setErrorMessage(error.response?.data?.message || "Unable to open the selected newsfeed activity.");
+      } finally {
+        notificationRequestRef.current = false;
+      }
+  }, [posts]);
+
+  useEffect(() => {
+    const focusTarget = () => {
+      focusNotificationTarget();
+    };
+
+    if (!isLoading) focusTarget();
+
+    window.addEventListener("clientra:notification-target", focusTarget);
+    return () => {
+      window.removeEventListener("clientra:notification-target", focusTarget);
+      if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+    };
+  }, [focusNotificationTarget, isLoading]);
+
+  useEffect(() => {
+    const focusSharedPost = async () => {
+      const match = window.location.hash.match(/^#newsfeed-post-([a-f\d]{24})$/i);
+      const postId = match?.[1];
+      if (!postId || posts.some((post) => String(post.id) === postId)) return;
+
+      try {
+        const fetchedPost = normalizePost(await newsfeedAPI.getById(postId, { refresh: true }));
+        setPosts((currentPosts) => mergePostPage([fetchedPost], currentPosts));
+        if (sharedPostTimerRef.current) window.clearTimeout(sharedPostTimerRef.current);
+        sharedPostTimerRef.current = window.setTimeout(() => {
+          document.getElementById(`newsfeed-post-${postId}`)?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          sharedPostTimerRef.current = null;
+        }, 160);
+      } catch (error) {
+        setErrorMessage(error.response?.data?.message || "Unable to open the shared post.");
       }
     };
 
-    if (!isLoading) {
-      focusTarget();
-    }
-
-    window.addEventListener("clientra:notification-target", focusTarget);
-    return () => window.removeEventListener("clientra:notification-target", focusTarget);
+    if (!isLoading) focusSharedPost();
   }, [isLoading, posts]);
 
   const hasAnyPosts = useMemo(() => posts.length > 0, [posts]);
@@ -456,9 +615,69 @@ const Newsfeed = () => {
     const normalizedPost = normalizePost(updatedPost);
     setPosts((currentPosts) =>
       currentPosts.map((post) =>
-        post.id === normalizedPost.id ? normalizedPost : post
+        post.id === normalizedPost.id
+          ? mergePostPreservingMedia(post, normalizedPost)
+          : post
       )
     );
+  };
+
+  const handleLoadMore = async () => {
+    if (!hasNextPage || isLoadingMore) return;
+
+    try {
+      setIsLoadingMore(true);
+      setLoadMoreError("");
+      const nextPage = currentPage + 1;
+      const pageData = await newsfeedAPI.getPage({
+        page: nextPage,
+        limit: NEWSFEED_PAGE_SIZE,
+        refresh: true,
+      });
+
+      setPosts((currentPosts) => mergePostPage(currentPosts, pageData.posts));
+      setCurrentPage(pageData.page);
+      setHasNextPage(pageData.page < pageData.totalPages);
+    } catch (error) {
+      setLoadMoreError(
+        error.response?.data?.message || "Unable to load more posts. Try again."
+      );
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  const handleSharePost = async (post) => {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.hash = `newsfeed-post-${post.id}`;
+    const shareData = {
+      title: "Clientra Newsfeed",
+      text: post.content?.trim().slice(0, 180) || "View this Clientra post.",
+      url: shareUrl.toString(),
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShareNotice({ type: "success", message: "Post shared." });
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+      }
+    }
+
+    try {
+      await copyShareUrl(shareData.url);
+      setShareNotice({
+        type: "success",
+        message: "Post link copied to your clipboard.",
+      });
+    } catch {
+      setShareNotice({
+        type: "error",
+        message: "Unable to share this post or copy its link.",
+      });
+    }
   };
 
   const handleMediaChange = (event) => {
@@ -467,19 +686,22 @@ const Newsfeed = () => {
 
     if (!file) return;
 
-    const mediaType = file.type.startsWith("image/")
-      ? "image"
-      : file.type.startsWith("video/")
-        ? "video"
-        : "";
+    const mediaType = POST_MEDIA_TYPES.get(file.type.toLowerCase()) || "";
 
     if (!mediaType) {
-      setErrorMessage("Please choose an image or video file.");
+      setErrorMessage(
+        "Choose a JPEG, PNG, GIF, WebP, AVIF, MP4, WebM, MOV, or Ogg file."
+      );
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
+    if (file.size > MAX_POST_MEDIA_BYTES) {
       setErrorMessage("Media must be 8MB or smaller.");
+      return;
+    }
+
+    if (file.name.trim().length > MAX_POST_MEDIA_NAME_LENGTH) {
+      setErrorMessage("Media file names must be 180 characters or fewer.");
       return;
     }
 
@@ -491,6 +713,9 @@ const Newsfeed = () => {
         name: file.name,
       });
       setErrorMessage("");
+    };
+    reader.onerror = () => {
+      setErrorMessage("Unable to read the selected media file.");
     };
     reader.readAsDataURL(file);
   };
@@ -778,6 +1003,19 @@ const Newsfeed = () => {
         </p>
       )}
 
+      {shareNotice && (
+        <p
+          className={`rounded-md px-4 py-3 text-sm font-medium ring-1 ${
+            shareNotice.type === "success"
+              ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+              : "bg-red-50 text-red-700 ring-red-100"
+          }`}
+          role={shareNotice.type === "error" ? "alert" : "status"}
+        >
+          {shareNotice.message}
+        </p>
+      )}
+
       {canPost && (
         <form
           onSubmit={handleCreatePost}
@@ -805,7 +1043,7 @@ const Newsfeed = () => {
                 <span>Photo / Video</span>
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept={POST_MEDIA_ACCEPT}
                   onChange={handleMediaChange}
                   className="sr-only"
                 />
@@ -1005,7 +1243,11 @@ const Newsfeed = () => {
                     >
                       {post.comments.length} comments
                     </button>
-                    <button type="button" className="transition hover:text-pink-600">
+                    <button
+                      type="button"
+                      onClick={() => handleSharePost(post)}
+                      className="transition hover:text-pink-600"
+                    >
                       Share
                     </button>
                   </div>
@@ -1032,6 +1274,7 @@ const Newsfeed = () => {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleSharePost(post)}
                     className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
@@ -1240,7 +1483,17 @@ const Newsfeed = () => {
                         <EmojiPicker onSelect={(emoji) => handleInsertCommentEmoji(post.id, emoji)} />
                       </span>
                     )}
-                    <button type="button" className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-pink-50 hover:text-pink-600 dark:hover:!bg-[#c72fb2] dark:hover:text-white" aria-label="Add image">
+                    <span id={`comment-image-unavailable-${post.id}`} className="sr-only">
+                      Image attachments are not available for comments.
+                    </span>
+                    <button
+                      type="button"
+                      disabled
+                      aria-describedby={`comment-image-unavailable-${post.id}`}
+                      aria-label="Add image to comment (not available)"
+                      title="Image attachments are not available for comments"
+                      className="grid h-11 w-11 cursor-not-allowed place-items-center rounded-full opacity-40"
+                    >
                       <img src={insertImageIcon} alt="" className="h-4 w-4 object-contain" />
                     </button>
                     <button type="submit" className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2]" aria-label="Send comment">
@@ -1252,6 +1505,27 @@ const Newsfeed = () => {
             </article>
           );
         })}
+        {!isLoading && (hasNextPage || loadMoreError) && (
+          <div className="rounded-2xl border border-pink-100 bg-white p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+            {loadMoreError && (
+              <p className="mb-3 text-sm font-semibold text-red-600" role="alert">
+                {loadMoreError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              disabled={isLoadingMore || !hasNextPage}
+              className="h-10 min-w-36 rounded-xl border border-[#dc4fb2] px-5 text-sm font-black text-[#dc4fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#c72fb2] dark:hover:text-white"
+            >
+              {isLoadingMore
+                ? "Loading..."
+                : loadMoreError
+                  ? "Retry Load More"
+                  : "Load More"}
+            </button>
+          </div>
+        )}
         </div>
 
         <aside className="hidden space-y-4 xl:sticky xl:top-20 xl:block xl:self-start xl:pt-[68px]">

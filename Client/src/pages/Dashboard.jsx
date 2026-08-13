@@ -121,14 +121,25 @@ const getMessageStatus = (message) => {
 const getMessageInboxStateKey = (userId) =>
   `clientraMessageInboxState:${userId || "guest"}`;
 
+const MAX_LOCAL_CONVERSATION_IDS = 100;
+
+const normalizeConversationIds = (ids) =>
+  Array.from(
+    new Set(
+      (Array.isArray(ids) ? ids : [])
+        .map((id) => String(id || "").trim())
+        .filter(Boolean)
+    )
+  ).slice(-MAX_LOCAL_CONVERSATION_IDS);
+
 const readMessageInboxState = (userId) => {
   try {
     const storedState = JSON.parse(
       localStorage.getItem(getMessageInboxStateKey(userId)) || "{}"
     );
     return {
-      archivedIds: Array.isArray(storedState.archivedIds) ? storedState.archivedIds : [],
-      deletedIds: Array.isArray(storedState.deletedIds) ? storedState.deletedIds : [],
+      archivedIds: normalizeConversationIds(storedState.archivedIds),
+      deletedIds: normalizeConversationIds(storedState.deletedIds),
     };
   } catch {
     return { archivedIds: [], deletedIds: [] };
@@ -284,13 +295,24 @@ const MessagesPanel = () => {
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
   }, []);
 
-  const updateInboxState = (updater) => {
+  const updateInboxState = useCallback((updater) => {
     setInboxState((currentState) => {
-      const nextState = updater(currentState);
-      localStorage.setItem(getMessageInboxStateKey(currentUserId), JSON.stringify(nextState));
+      const updatedState = updater(currentState);
+      const nextState = {
+        archivedIds: normalizeConversationIds(updatedState.archivedIds),
+        deletedIds: normalizeConversationIds(updatedState.deletedIds),
+      };
+      try {
+        localStorage.setItem(
+          getMessageInboxStateKey(currentUserId),
+          JSON.stringify(nextState)
+        );
+      } catch (error) {
+        console.error("Unable to persist message inbox preferences:", error);
+      }
       return nextState;
     });
-  };
+  }, [currentUserId]);
 
   const handleArchiveConversation = (participantId) => {
     updateInboxState((currentState) => ({
@@ -492,11 +514,14 @@ const MessagesPanel = () => {
     if (!activeUserId || isRealtimeConnected) return undefined;
 
     let isMounted = true;
+    let activeThreadRequest = null;
     const refreshActiveThread = async () => {
       if (document.visibilityState !== "visible") return;
+      if (activeThreadRequest) return activeThreadRequest;
 
       try {
-        const thread = await messageAPI.getThread(activeUserId);
+        activeThreadRequest = messageAPI.getThread(activeUserId);
+        const thread = await activeThreadRequest;
         if (!isMounted) return;
 
         setActiveParticipant(thread.participant);
@@ -512,6 +537,8 @@ const MessagesPanel = () => {
         });
       } catch {
         // EventSource reconnects automatically; this slower poll is only a fallback.
+      } finally {
+        activeThreadRequest = null;
       }
     };
 
@@ -593,6 +620,25 @@ const MessagesPanel = () => {
         const conversationUserId =
           senderId === currentUserId ? recipientId : senderId;
 
+        // A locally deleted/archived conversation must become visible when a
+        // participant sends a new message; otherwise the badge can increase
+        // while the new message remains permanently hidden from the inbox.
+        if (
+          action === "created" &&
+          senderId &&
+          senderId !== currentUserId &&
+          conversationUserId
+        ) {
+          updateInboxState((currentState) => ({
+            archivedIds: currentState.archivedIds.filter(
+              (id) => id !== conversationUserId
+            ),
+            deletedIds: currentState.deletedIds.filter(
+              (id) => id !== conversationUserId
+            ),
+          }));
+        }
+
         if (conversationUserId === activeUserIdRef.current) {
           setMessages((currentMessages) => {
             if (action === "deleted") {
@@ -648,18 +694,22 @@ const MessagesPanel = () => {
       }
       closeMessages();
     };
-  }, [currentUserId, scheduleThreadRefresh]);
+  }, [currentUserId, scheduleThreadRefresh, updateInboxState]);
 
   useEffect(() => {
     let isMounted = true;
+    let presenceRequest = null;
 
     const refreshParticipantPresence = async () => {
       if (document.visibilityState !== "visible") return;
+      if (presenceRequest) return presenceRequest;
 
-      const [threadResult, userResult] = await Promise.allSettled([
+      presenceRequest = Promise.allSettled([
         isRealtimeConnected ? Promise.resolve(null) : messageAPI.getThreadsFresh(),
         messageAPI.getUsersFresh({ limit: 100 }),
       ]);
+      const [threadResult, userResult] = await presenceRequest;
+      presenceRequest = null;
       if (!isMounted) return;
 
       if (threadResult.status === "fulfilled" && Array.isArray(threadResult.value)) {
@@ -1329,10 +1379,10 @@ const MessagesPanel = () => {
         <div className="flex w-full items-center gap-1.5 rounded-full border border-slate-100 bg-white px-2 py-1.5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] dark:border-neutral-800 dark:bg-neutral-900 md:gap-3 md:px-4 md:py-2">
           <button
             type="button"
-            disabled={!activeUserId || isSending}
-            className="hidden h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600 transition hover:bg-slate-50 hover:text-[#ff3faf] disabled:opacity-40 dark:text-white dark:hover:bg-neutral-800 min-[390px]:grid"
-            aria-label="Attach file"
-            title="Attach file"
+            disabled
+            className="hidden h-9 w-9 shrink-0 cursor-not-allowed place-items-center rounded-full text-slate-400 opacity-50 min-[390px]:grid"
+            aria-label="File attachments are not available in messages"
+            title="File attachments are not available yet"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
               <path d="m8.5 12.5 5.9-5.9a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.7-7.7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
@@ -1652,13 +1702,18 @@ const Dashboard = () => {
             onNavigate={handleAdminNavigate}
             refreshKey={taskRefreshKey}
           />
-          {(adminPage === "add-task" || adminPage === "edit-task") && (
+          {(adminPage === "add-task" || (adminPage === "edit-task" && editingTask)) && (
             <AdminAddTask
               key={adminPage === "edit-task" ? editingTask?.id || "edit-task" : "new-task"}
               onNavigate={handleAdminNavigate}
               onTaskCreated={handleTaskCreated}
               task={adminPage === "edit-task" ? editingTask : null}
             />
+          )}
+          {adminPage === "edit-task" && !editingTask && (
+            <p role="alert" className="fixed inset-x-4 top-24 z-40 mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-lg">
+              Select a project from the list before editing it. No new project has been created.
+            </p>
           )}
         </>
       );
@@ -1674,13 +1729,18 @@ const Dashboard = () => {
             onEditEntry={handleEditBudgetEntry}
             refreshKey={budgetRefreshKey}
           />
-          {(adminPage === "add-budget" || adminPage === "edit-budget") && (
+          {(adminPage === "add-budget" || (adminPage === "edit-budget" && editingBudgetEntry)) && (
             <AdminAddBudget
               key={adminPage === "edit-budget" ? editingBudgetEntry?.id || "edit-budget" : "new-budget"}
               entry={adminPage === "edit-budget" ? editingBudgetEntry : null}
               onBudgetSaved={handleBudgetSaved}
               onNavigate={handleAdminNavigate}
             />
+          )}
+          {adminPage === "edit-budget" && !editingBudgetEntry && (
+            <p role="alert" className="fixed inset-x-4 top-24 z-40 mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-lg">
+              Select a budget entry from the list before editing it. No new entry has been created.
+            </p>
           )}
         </>
       );
@@ -1712,13 +1772,18 @@ const Dashboard = () => {
             onEditEmployee={handleEditEmployee}
             refreshKey={employeeRefreshKey}
           />
-          {(adminPage === "add-employee" || adminPage === "edit-employee") && (
+          {(adminPage === "add-employee" || (adminPage === "edit-employee" && editingEmployee)) && (
             <AdminAddEmployee
               key={adminPage === "edit-employee" ? editingEmployee?.id || "edit-employee" : "new-employee"}
               employee={adminPage === "edit-employee" ? editingEmployee : null}
               onEmployeeSaved={handleEmployeeSaved}
               onNavigate={handleAdminNavigate}
             />
+          )}
+          {adminPage === "edit-employee" && !editingEmployee && (
+            <p role="alert" className="fixed inset-x-4 top-24 z-40 mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-lg">
+              Select an employee from the list before editing. No new employee has been created.
+            </p>
           )}
         </>
       );
@@ -1750,7 +1815,7 @@ const Dashboard = () => {
     role === "employee" && localPage === "dashboard" ? (
       <EmpDashboard />
     ) : role === "client" && localPage === "dashboard" ? (
-      <ClientDashboard />
+      <ClientDashboard onNavigate={handleLocalNavigate} />
     ) : role === "client" && localPage === "projects" ? (
       <ClientProjects />
     ) : role === "employee" && localPage === "tasks" ? (
@@ -1764,7 +1829,7 @@ const Dashboard = () => {
           onEditEntry={handleEditBudgetEntry}
           refreshKey={budgetRefreshKey}
         />
-        {(localPage === "add-budget" || localPage === "edit-budget") && (
+        {(localPage === "add-budget" || (localPage === "edit-budget" && editingBudgetEntry)) && (
           <AdminAddBudget
             key={localPage === "edit-budget" ? editingBudgetEntry?.id || "edit-budget" : "new-budget"}
             dataAPI={budgetPlannerAPI}
@@ -1772,6 +1837,11 @@ const Dashboard = () => {
             onBudgetSaved={handleBudgetSaved}
             onNavigate={handleLocalNavigate}
           />
+        )}
+        {localPage === "edit-budget" && !editingBudgetEntry && (
+          <p role="alert" className="fixed inset-x-4 top-24 z-40 mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-lg">
+            Select a budget entry from the list before editing it. No new entry has been created.
+          </p>
         )}
       </>
     ) : role === "employee" && localPage === "leave-request" ? (
@@ -1787,13 +1857,18 @@ const Dashboard = () => {
           onNavigate={handleLocalNavigate}
           refreshKey={taskRefreshKey}
         />
-        {(localPage === "add-task" || localPage === "edit-task") && (
+        {(localPage === "add-task" || (localPage === "edit-task" && editingTask)) && (
           <AdminAddTask
             key={localPage === "edit-task" ? editingTask?.id || "edit-task" : "new-task"}
             onNavigate={handleLocalNavigate}
             onTaskCreated={handleTaskCreated}
             task={localPage === "edit-task" ? editingTask : null}
           />
+        )}
+        {localPage === "edit-task" && !editingTask && (
+          <p role="alert" className="fixed inset-x-4 top-24 z-40 mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-lg">
+            Select a project from the list before editing it. No new project has been created.
+          </p>
         )}
       </>
     ) : localPage === "messages" ? (

@@ -45,7 +45,12 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 6,
+      minlength: 8,
+    },
+
+    passwordChangedAt: {
+      type: Date,
+      select: false,
     },
 
     avatar: {
@@ -143,6 +148,17 @@ const userSchema = new mongoose.Schema(
       type: Date,
     },
 
+    resetPasswordAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+
+    resetPasswordLastSentAt: {
+      type: Date,
+      select: false,
+    },
+
     // Login/setup OTPs are always stored as keyed hashes, never as plaintext.
     twoFactorEnabled: {
       type: Boolean,
@@ -220,6 +236,10 @@ userSchema.pre("save", async function () {
     return;
   }
 
+  if (!this.isNew) {
+    this.passwordChangedAt = new Date();
+  }
+
   const salt = await bcrypt.genSalt(10);
 
   this.password = await bcrypt.hash(this.password, salt);
@@ -234,6 +254,7 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ role: 1, isActive: 1, createdAt: -1 });
 userSchema.index({ role: 1, isActive: 1, firstName: 1, lastName: 1 });
 userSchema.index({ role: 1, isOnline: 1, lastSeen: -1 });
 

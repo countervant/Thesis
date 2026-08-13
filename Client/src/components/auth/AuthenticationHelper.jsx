@@ -1,8 +1,13 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => {
   const navigate = useNavigate();
+  const navigationTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+  }, []);
 
   const navigateWithAnimation = (e, target, transitionClass) => {
     e.preventDefault();
@@ -12,7 +17,8 @@ const AuthenticationHelper = ({ link, Label, Label1, mobileInline = false }) => 
     const authScreen = document.querySelector("[data-auth-screen]");
     authScreen?.classList.add(transitionClass);
 
-    window.setTimeout(() => {
+    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+    navigationTimerRef.current = window.setTimeout(() => {
       navigate(target);
     }, 420);
   };

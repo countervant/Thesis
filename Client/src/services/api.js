@@ -65,9 +65,11 @@ const cachedGet = async (url) => {
 
   if (cached?.data !== undefined && now - cached.time < CACHE_TIME) {
     if (API_DEBUG) console.debug(`[api] GET ${url} served from cache`);
+    setCacheEntry(url, cached);
     return cached.data;
   }
 
+  const requestEntry = { promise: null, time: now };
   const promise = api
     .get(url)
     .then((response) => {
@@ -75,18 +77,27 @@ const cachedGet = async (url) => {
         ? `array(${response.data.length})`
         : typeof response.data;
       if (API_DEBUG) console.debug(`[api] GET ${url} cached ${dataShape}`);
-      setCacheEntry(url, {
-        data: response.data,
-        time: Date.now(),
-      });
+      // A mutation may invalidate this request while it is in flight, and a
+      // newer GET may already own the same key. Only the current owner may
+      // populate the cache so an older response cannot restore stale data.
+      if (cache.get(url) === requestEntry) {
+        setCacheEntry(url, {
+          data: response.data,
+          time: Date.now(),
+        });
+      }
       return response.data;
     })
     .catch((error) => {
-      cache.delete(url);
+      // Do not let a failed older request delete a newer in-flight/data entry.
+      if (cache.get(url) === requestEntry) {
+        cache.delete(url);
+      }
       throw error;
     });
 
-  setCacheEntry(url, { promise, time: now });
+  requestEntry.promise = promise;
+  setCacheEntry(url, requestEntry);
   return promise;
 };
 
@@ -181,6 +192,55 @@ export const getApiErrorMessage = (error, fallback = "Unable to load data.") => 
 
 const getEntityId = (entity) => entity?._id || entity?.id || entity || "";
 
+const MAX_PROJECT_OUTPUT_FILE_BYTES = 10 * 1024 * 1024;
+const PROJECT_OUTPUT_MIME_TYPES = new Set([
+  "application/msword",
+  "application/pdf",
+  "application/rtf",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/csv",
+  "text/plain",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+]);
+const AUTO_WATERMARK_IMAGE_MIME_TYPES = new Set([
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const getFileMimeType = (file) => String(file?.type || "")
+  .split(";", 1)[0]
+  .trim()
+  .toLowerCase();
+
+export const PROJECT_OUTPUT_FILE_ACCEPT = [...PROJECT_OUTPUT_MIME_TYPES].join(",");
+
+export const getProjectOutputFileError = (file, label) => {
+  if (!file) return `${label} is required.`;
+  if (file.size > MAX_PROJECT_OUTPUT_FILE_BYTES) return `${label} must be 10MB or less.`;
+  if (!PROJECT_OUTPUT_MIME_TYPES.has(getFileMimeType(file))) {
+    return `${label} type is not supported. Use a PDF, Office, image, audio, video, text, or CSV file.`;
+  }
+  return "";
+};
+
+export const isAutoWatermarkImage = (file) =>
+  AUTO_WATERMARK_IMAGE_MIME_TYPES.has(getFileMimeType(file));
+
 const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -201,7 +261,7 @@ const loadWatermarkLogo = () => {
 };
 
 const createWatermarkedImage = async (file) => {
-  if (!file || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) return null;
+  if (!isAutoWatermarkImage(file)) return null;
 
   const bitmap = await createImageBitmap(file);
   const watermarkLogo = await loadWatermarkLogo();
@@ -267,6 +327,71 @@ const watermarkDownloadedImage = async (blob, fileName) => {
   const sourceFile = new File([blob], fileName || "output-image", { type: blob.type });
   const watermarked = await createWatermarkedImage(sourceFile);
   return watermarked?.dataUrl ? dataUrlToBlob(watermarked.dataUrl) : blob;
+};
+
+const isSafePreviewMimeType = (mimeType) => {
+  const normalizedMimeType = String(mimeType || "")
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+
+  return [
+    "application/pdf",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "text/plain",
+  ].includes(normalizedMimeType) ||
+    normalizedMimeType.startsWith("audio/") ||
+    normalizedMimeType.startsWith("video/");
+};
+
+const downloadTaskFile = async (endpoint, fileName, options = {}) => {
+  const response = await api.get(endpoint, { responseType: "blob" });
+  const outputBlob = options.watermark
+    ? await watermarkDownloadedImage(response.data, fileName)
+    : response.data;
+  const url = URL.createObjectURL(outputBlob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
+const viewTaskFile = async (endpoint, fileName, options = {}) => {
+  const previewWindow = window.open("", "_blank");
+  if (previewWindow) previewWindow.opener = null;
+  let response;
+  try {
+    response = await api.get(endpoint, { responseType: "blob" });
+  } catch (error) {
+    previewWindow?.close();
+    throw error;
+  }
+  const outputBlob = options.watermark
+    ? await watermarkDownloadedImage(response.data, fileName)
+    : response.data;
+  const url = URL.createObjectURL(outputBlob);
+
+  if (!isSafePreviewMimeType(outputBlob.type)) {
+    previewWindow?.close();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    return;
+  }
+
+  if (previewWindow) previewWindow.location.href = url;
+  else window.open(url, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
 const mergeCachedPost = (currentPost, nextPost) => ({
@@ -380,9 +505,12 @@ api.interceptors.response.use(
     const requestConfig = error.config || {};
     const retryCount = Number(requestConfig.__retryCount || 0);
     const isTransientFailure =
-      !status ||
-      [408, 429, 502, 503, 504].includes(status) ||
-      ["ECONNABORTED", "ETIMEDOUT", "ERR_NETWORK"].includes(error.code);
+      error.code !== "ERR_CANCELED" &&
+      (
+        !status ||
+        [408, 429, 502, 503, 504].includes(status) ||
+        ["ECONNABORTED", "ETIMEDOUT", "ERR_NETWORK"].includes(error.code)
+      );
 
     if (
       String(requestConfig.method || "get").toLowerCase() === "get" &&
@@ -457,8 +585,10 @@ export const authAPI = {
     return cachedGet("/auth/me");
   },
 
-  getPublicProfile: async (id) => {
-    return cachedGet(`/auth/users/${id}`);
+  getPublicProfile: async (id, { refresh = false } = {}) => {
+    const url = `/auth/users/${id}`;
+    if (refresh) cache.delete(url);
+    return cachedGet(url);
   },
 
   getOnlineTeam: async () => {
@@ -498,7 +628,11 @@ export const authAPI = {
       },
       body: JSON.stringify({ isOnline: false }),
       keepalive: true,
-    }).catch(() => {});
+    }).catch((error) => {
+      if (import.meta.env.DEV) {
+        console.debug("Unable to report offline presence during page unload:", error);
+      }
+    });
   },
 
   updateMe: async (profile) => {
@@ -556,6 +690,9 @@ export const authAPI = {
 
   verifyEnableTwoFactor: async (code) => {
     const response = await twoFactorRequest({ method: "post", url: "/auth/enable-2fa/verify", data: { code } });
+    if (response.data?.token) {
+      sessionStorage.setItem("token", response.data.token);
+    }
     clearCache("/auth/me", "/auth/2fa-status");
     return response.data;
   },
@@ -670,42 +807,35 @@ export const taskAPI = {
   },
 
   downloadOutput: async (id, fileName = "task-output", options = {}) => {
-    const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
-    const outputBlob = options.watermark
-      ? await watermarkDownloadedImage(response.data, fileName)
-      : response.data;
-    const url = URL.createObjectURL(outputBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    return downloadTaskFile(`/tasks/${id}/output/download`, fileName, options);
   },
 
   viewOutput: async (id, fileName = "task-output", options = {}) => {
-    const previewWindow = window.open("", "_blank");
-    if (previewWindow) previewWindow.opener = null;
-    const response = await api.get(`/tasks/${id}/output/download`, { responseType: "blob" });
-    const outputBlob = options.watermark
-      ? await watermarkDownloadedImage(response.data, fileName)
-      : response.data;
-    const url = URL.createObjectURL(outputBlob);
-    if (previewWindow) previewWindow.location.href = url;
-    else window.open(url, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return viewTaskFile(`/tasks/${id}/output/download`, fileName, options);
+  },
+
+  downloadAttachment: async (id, attachmentIndex, fileName = "task-attachment") => {
+    return downloadTaskFile(`/tasks/${id}/attachments/${attachmentIndex}/download`, fileName);
+  },
+
+  viewAttachment: async (id, attachmentIndex, fileName = "task-attachment") => {
+    return viewTaskFile(`/tasks/${id}/attachments/${attachmentIndex}/download`, fileName);
   },
   submitOutput: async (id, output) => {
-    const filePayload = output.file
-      ? {
-          fileName: output.file.name,
-          dataUrl: await fileToDataUrl(output.file),
-        }
-      : undefined;
-    const watermarkedFilePayload = output.watermark && output.file
-      ? await createWatermarkedImage(output.file).catch(() => null)
-      : undefined;
+    const [filePayload, watermarkedFilePayload] = await Promise.all([
+      output.file
+        ? fileToDataUrl(output.file).then((dataUrl) => ({
+            fileName: output.file.name,
+            dataUrl,
+          }))
+        : undefined,
+      output.watermarkedFile
+        ? fileToDataUrl(output.watermarkedFile).then((dataUrl) => ({
+            fileName: output.watermarkedFile.name,
+            dataUrl,
+          }))
+        : undefined,
+    ]);
     const response = await api.post(`/tasks/${id}/submit-output`, {
       file: filePayload,
       watermarkedFile: watermarkedFilePayload,
@@ -726,10 +856,75 @@ export const taskAPI = {
   },
 };
 
+const getNewsfeedQuery = (params = "") => {
+  if (typeof params === "string") {
+    return { query: params.replace(/^\?/, ""), refresh: false };
+  }
+
+  const { refresh = false, ...queryParams } = params || {};
+  const query = new URLSearchParams();
+  Object.entries(queryParams).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      query.set(key, String(value));
+    }
+  });
+
+  return {
+    query: query.toString(),
+    refresh: Boolean(refresh),
+  };
+};
+
+const normalizeNewsfeedPage = (data) => {
+  const posts = asArray(data, "newsfeed posts");
+
+  if (Array.isArray(data)) {
+    return {
+      posts,
+      page: 1,
+      limit: posts.length,
+      total: posts.length,
+      totalPages: 1,
+    };
+  }
+
+  return {
+    ...(data || {}),
+    posts,
+    page: Math.max(Number(data?.page) || 1, 1),
+    limit: Math.max(Number(data?.limit) || posts.length || 1, 1),
+    total: Math.max(Number(data?.total) || 0, 0),
+    totalPages: Math.max(Number(data?.totalPages) || 1, 1),
+  };
+};
+
 export const newsfeedAPI = {
+  getById: async (id, options = {}) => {
+    const url = `/newsfeed/post/${id}`;
+    if (options.refresh) cache.delete(url);
+    return cachedGet(url);
+  },
+
+  getPage: async (params = "") => {
+    const { query, refresh } = getNewsfeedQuery(params);
+    const url = `/newsfeed${query ? `?${query}` : ""}`;
+    if (refresh) cache.delete(url);
+    return normalizeNewsfeedPage(await cachedGet(url));
+  },
+
   getAll: async (params = "") => {
-    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
-    return asArray(await cachedGet(`/newsfeed${query ? `?${query}` : ""}`), "newsfeed posts");
+    const page = await newsfeedAPI.getPage(params);
+    return page.posts;
+  },
+
+  getByAuthor: async (author, params = "") => {
+    if (typeof params === "string") {
+      const query = new URLSearchParams(params.replace(/^\?/, ""));
+      query.set("author", author);
+      return newsfeedAPI.getAll(query.toString());
+    }
+
+    return newsfeedAPI.getAll({ ...(params || {}), author });
   },
 
   updateCachedPost,
@@ -753,6 +948,38 @@ export const newsfeedAPI = {
 
   getMedia: async (id) => {
     return cachedGet(`/newsfeed/${id}/media`);
+  },
+
+  getMediaBatch: async (postIds) => {
+    const ids = [...new Set((Array.isArray(postIds) ? postIds : []).map(String).filter(Boolean))];
+    const mediaById = {};
+    const missingIds = [];
+    const now = Date.now();
+
+    ids.forEach((id) => {
+      const cached = cache.get(`/newsfeed/${id}/media`);
+      if (cached?.data !== undefined && now - cached.time < CACHE_TIME) {
+        mediaById[id] = cached.data;
+      } else {
+        missingIds.push(id);
+      }
+    });
+
+    let failedBatchCount = 0;
+    for (let index = 0; index < missingIds.length; index += 3) {
+      const batch = missingIds.slice(index, index + 3);
+      try {
+        const response = await api.post("/newsfeed/media/batch", { ids: batch });
+        Object.entries(response.data?.mediaById || {}).forEach(([id, media]) => {
+          mediaById[id] = media;
+          setCacheEntry(`/newsfeed/${id}/media`, { data: media, time: Date.now() });
+        });
+      } catch {
+        failedBatchCount += 1;
+      }
+    }
+
+    return { mediaById, failedBatchCount };
   },
 
   create: async (post) => {
@@ -870,28 +1097,73 @@ export const messageAPI = {
       return () => {};
     }
 
-    const events = new EventSource(
-      `${API_URL}/messages/events?token=${encodeURIComponent(token)}`
-    );
+    let events = null;
+    let reconnectTimer = null;
+    let reconnectDelay = 1000;
+    let stopped = false;
 
-    events.addEventListener("open", () => {
-      onOpen?.();
-    });
+    const scheduleReconnect = () => {
+      if (stopped || reconnectTimer) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+    };
 
-    events.addEventListener("message", (event) => {
+    const connect = async () => {
       try {
-        clearCache("/messages/threads");
-        onMessage?.(JSON.parse(event.data));
-      } catch {
-        onError?.("Unable to receive realtime message.");
+        const response = await api.post("/messages/events-ticket");
+        if (stopped) return;
+
+        const ticket = response.data?.ticket;
+        if (!ticket) throw new Error("Realtime ticket was not returned");
+
+        const source = new EventSource(
+          `${API_URL}/messages/events?token=${encodeURIComponent(ticket)}`
+        );
+        events = source;
+
+        source.addEventListener("open", () => {
+          if (stopped || events !== source) return;
+          reconnectDelay = 1000;
+          onOpen?.();
+        });
+
+        source.addEventListener("message", (event) => {
+          if (stopped || events !== source) return;
+          try {
+            clearCache("/messages/threads");
+            onMessage?.(JSON.parse(event.data));
+          } catch {
+            onError?.("Unable to receive realtime message.");
+          }
+        });
+
+        source.addEventListener("error", () => {
+          if (stopped || events !== source) return;
+          source.close();
+          events = null;
+          onError?.("Realtime connection interrupted.");
+          scheduleReconnect();
+        });
+      } catch (error) {
+        if (stopped) return;
+        onError?.(
+          error.response?.data?.message || "Realtime messaging is unavailable."
+        );
+        scheduleReconnect();
       }
-    });
+    };
 
-    events.addEventListener("error", () => {
-      onError?.("Realtime connection interrupted.");
-    });
+    connect();
 
-    return () => events.close();
+    return () => {
+      stopped = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      events?.close();
+      events = null;
+    };
   },
 };
 
@@ -957,10 +1229,60 @@ export const clientAPI = {
   },
 };
 
+const getBudgetQuery = (params = "") => {
+  if (typeof params === "string") {
+    return { query: params.replace(/^\?/, ""), refresh: false };
+  }
+
+  if (params instanceof URLSearchParams) {
+    return { query: params.toString(), refresh: false };
+  }
+
+  const { refresh = false, ...queryParams } = params || {};
+  const query = new URLSearchParams();
+  Object.entries(queryParams).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      query.set(key, String(value));
+    }
+  });
+
+  return { query: query.toString(), refresh: Boolean(refresh) };
+};
+
+const normalizeBudgetPage = (data) => {
+  const budgets = asArray(data, "budget entries");
+
+  if (Array.isArray(data)) {
+    return {
+      budgets,
+      page: 1,
+      limit: budgets.length,
+      total: budgets.length,
+      totalPages: 1,
+    };
+  }
+
+  return {
+    ...(data || {}),
+    budgets,
+    page: Math.max(Number(data?.page) || 1, 1),
+    limit: Math.max(Number(data?.limit) || budgets.length || 1, 1),
+    total: Math.max(Number(data?.total) || 0, 0),
+    totalPages: Math.max(Number(data?.totalPages) || 1, 1),
+  };
+};
+
 export const budgetAPI = {
+  getPage: async (params = "") => {
+    const { query, refresh } = getBudgetQuery(params);
+    const url = `/budgets${query ? `?${query}` : ""}`;
+    if (refresh) cache.delete(url);
+    return normalizeBudgetPage(await cachedGet(url));
+  },
+
   getAll: async (params = "") => {
-    const query = typeof params === "string" ? params : new URLSearchParams(params).toString();
-    return asArray(await cachedGet(`/budgets${query ? `?${query}` : ""}`), "budget entries");
+    const page = await budgetAPI.getPage(params);
+    return page.budgets;
   },
 
   create: async (budget) => {

@@ -5,6 +5,7 @@ import fs from "fs";
 import express from "express";
 import cors from "cors";
 import compression from "compression";
+import mongoose from "mongoose";
 
 import { dbConnect, isDbConnected } from "./config/dbConnect.js";
 import auth from "./routes/auth.js";
@@ -15,7 +16,7 @@ import calendar from "./routes/calendar.js";
 import leaveRequests from "./routes/leaveRequests.js";
 import tasks from "./routes/tasks.js";
 import newsfeed from "./routes/newsfeed.js";
-import messages from "./routes/messages.js";
+import messages, { closeMessageClients } from "./routes/messages.js";
 import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
@@ -73,7 +74,11 @@ const validateRuntimeConfig = () => {
   requireEnv("MONGODB_URI");
   const jwtSecret = requireEnv("JWT_SECRET");
 
-  if (isProduction && jwtSecret === "replace_this_with_a_long_random_secret") {
+  const unsafeJwtPlaceholders = new Set([
+    "replace_this_with_a_long_random_secret",
+    "replace-with-a-long-random-secret",
+  ]);
+  if (isProduction && unsafeJwtPlaceholders.has(jwtSecret)) {
     throw new Error("JWT_SECRET must be changed before production deployment");
   }
 };
@@ -158,15 +163,21 @@ app.use(
       req.path.endsWith("/events") ? false : compression.filter(req, res),
   })
 );
-app.use(express.json({ limit: "30mb" }));
-app.use(express.urlencoded({ extended: true, limit: "30mb" }));
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "uploads"), {
-    immutable: true,
-    maxAge: "30d",
-  })
+const standardJsonParser = express.json({ limit: "1mb" });
+const largeUploadJsonParser = express.json({ limit: "30mb" });
+const usesLargeJsonUpload = (req) => {
+  const requestPath = req.path;
+  return (
+    (req.method === "POST" && /^\/api\/tasks\/[^/]+\/submit-output$/.test(requestPath)) ||
+    (req.method === "POST" && requestPath === "/api/newsfeed") ||
+    (req.method === "PUT" && /^\/api\/(?:auth|user)\/me$/.test(requestPath))
+  );
+};
+
+app.use((req, res, next) =>
+  (usesLargeJsonUpload(req) ? largeUploadJsonParser : standardJsonParser)(req, res, next)
 );
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.get("/api/health", (req, res) => {
   res.status(isDbConnected() ? 200 : 503).json({
@@ -177,10 +188,6 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/database", (req, res, next) => {
-  if (!isProduction) {
-    return next();
-  }
-
   if (process.env.ENABLE_DATABASE_DIAGNOSTICS !== "true") {
     return res.status(404).json({ message: "API route not found" });
   }
@@ -225,6 +232,15 @@ app.use("/api", (req, res) => {
 
 if (isProduction) {
   if (fs.existsSync(clientDistPath)) {
+    const sendClientIndex = (req, res) => {
+      // index.html points at hashed build assets. Never cache it across
+      // deployments or an older page can request bundles that no longer exist
+      // and leave the browser on the static preload screen forever.
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      return res.sendFile(path.join(clientDistPath, "index.html"));
+    };
+
+    app.get("/index.html", sendClientIndex);
     app.use(
       express.static(clientDistPath, {
         maxAge: "1y",
@@ -233,13 +249,7 @@ if (isProduction) {
       })
     );
 
-    app.get(/^(?!\/api).*/, (req, res) => {
-      // index.html points at hashed build assets. Never cache it across
-      // deployments or an older page can request bundles that no longer exist
-      // and leave the browser on the static preload screen forever.
-      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.sendFile(path.join(clientDistPath, "index.html"));
-    });
+    app.get(/^(?!\/api).*/, sendClientIndex);
   } else {
     console.warn(`[startup] Client build not found at ${clientDistPath}; serving API only`);
   }
@@ -252,8 +262,15 @@ app.use((error, req, res, next) => {
     return next(error);
   }
 
-  res.status(error.status || 500).json({
-    message: error.message || "Server error",
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
+    ? error.status
+    : 500;
+  const message = status < 500 || !isProduction
+    ? error.message || "Request failed"
+    : "Server error";
+
+  res.status(status).json({
+    message,
   });
 });
 
@@ -263,6 +280,42 @@ app.use((error, req, res, next) => {
 const httpServer = app.listen(port, () => {
   console.log(`Server running on port ${port}; waiting for database readiness`);
 });
+
+let isShuttingDown = false;
+const shutdown = (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[shutdown] ${signal} received; draining HTTP, SSE, and database connections`);
+
+  closeMessageClients();
+  httpServer.closeIdleConnections?.();
+
+  const forceCloseTimer = setTimeout(() => {
+    console.error("[shutdown] Grace period expired; closing remaining connections");
+    httpServer.closeAllConnections?.();
+    process.exitCode = 1;
+  }, 10000);
+  forceCloseTimer.unref();
+
+  httpServer.close(async (error) => {
+    clearTimeout(forceCloseTimer);
+    if (error) {
+      console.error("[shutdown] HTTP server close failed:", error);
+      process.exitCode = 1;
+    }
+
+    try {
+      await mongoose.disconnect();
+      console.log("[shutdown] Connections closed");
+    } catch (disconnectError) {
+      console.error("[shutdown] Database disconnect failed:", disconnectError);
+      process.exitCode = 1;
+    }
+  });
+};
+
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
 
 try {
   await dbConnect();

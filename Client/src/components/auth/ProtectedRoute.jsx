@@ -21,7 +21,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  if (user?.role === "admin" && user.twoFactorEnabled === false && location.pathname !== "/setup-2fa") {
+  if (
+    user?.role === "admin" &&
+    user.twoFactorEnabled !== true &&
+    location.pathname !== "/setup-2fa"
+  ) {
     return <Navigate to="/setup-2fa" replace />;
   }
 

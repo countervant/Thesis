@@ -5,6 +5,10 @@ services:
     buildCommand: npm run render-build
     startCommand: npm start
     healthCheckPath: /api/health
+    disk:
+      name: clientra-output-storage
+      mountPath: /var/data/clientra
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -16,3 +20,11 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        value: CLIENTRA Security
+      - key: OUTPUT_STORAGE_ROOT
+        value: /var/data/clientra

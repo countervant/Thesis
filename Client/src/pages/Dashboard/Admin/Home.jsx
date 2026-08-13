@@ -468,9 +468,9 @@ const MonthlyChart = ({ tasks }) => {
   <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 md:py-5 ${dashboardCardShadow}`}>
     <div className="mb-3 flex items-center justify-between gap-4 md:mb-4">
       <h2 className="text-sm font-extrabold text-[#10172a] md:text-base dark:text-white">Monthly Overview</h2>
-      <button type="button" className="box-border h-8 shrink-0 rounded-full border-2 border-slate-200 bg-transparent px-3 text-[10px] font-black leading-none text-[#10172a] md:h-10 md:rounded-2xl md:px-4 md:text-sm dark:border-[#e347a8] dark:text-white">
+      <span className="box-border inline-flex h-8 shrink-0 items-center rounded-full border-2 border-slate-200 bg-transparent px-3 text-[10px] font-black leading-none text-[#10172a] md:h-10 md:rounded-2xl md:px-4 md:text-sm dark:border-[#e347a8] dark:text-white">
         This Month
-      </button>
+      </span>
     </div>
     <div
       className={`grid grid-cols-[86px_1fr] overflow-x-auto md:grid-cols-[178px_1fr] ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
@@ -1218,35 +1218,49 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
     value: taskStatusCounts[item.key] ?? tasks.filter((task) => task.status === item.key).length,
   }));
 
-  const activeTaskAssigneeIds = new Set(
-    tasks
-      .filter((task) => task.status === "in_progress" || task.status === "review")
-      .map((task) => getUserId(task.assignedTo))
-      .filter(Boolean)
-  );
-
-  const workingEmployees = employees
-    .filter((employee) => activeTaskAssigneeIds.has(getUserId(employee)))
-    .map((employee) => {
-      const task = tasks.find((item) => getUserId(item.assignedTo) === getUserId(employee));
-      const client = clients.find((item) => getUserId(item.assignedEmployee) === getUserId(employee));
-
-      return {
-        name: getUserName(employee),
-        job: employee.position || "Employee",
-        client: client?.companyName || task?.title || "No client",
-        date: formatDate(task?.dueDate),
-      };
+  const { notWorkingEmployees, workingEmployees } = useMemo(() => {
+    const activeTaskByAssignee = new Map();
+    tasks.forEach((task) => {
+      if (task.status !== "in_progress" && task.status !== "review") return;
+      const assigneeId = getUserId(task.assignedTo);
+      if (assigneeId && !activeTaskByAssignee.has(assigneeId)) {
+        activeTaskByAssignee.set(assigneeId, task);
+      }
     });
 
-  const notWorkingEmployees = employees
-    .filter((employee) => !activeTaskAssigneeIds.has(getUserId(employee)))
-    .map((employee) => ({
-      name: getUserName(employee),
-      job: employee.position || "Employee",
-      client: "No active task",
-      date: "Available",
-    }));
+    const clientByEmployee = new Map();
+    clients.forEach((client) => {
+      const employeeId = getUserId(client.assignedEmployee);
+      if (employeeId && !clientByEmployee.has(employeeId)) {
+        clientByEmployee.set(employeeId, client);
+      }
+    });
+
+    const working = [];
+    const available = [];
+    employees.forEach((employee) => {
+      const employeeId = getUserId(employee);
+      const task = activeTaskByAssignee.get(employeeId);
+      if (!task) {
+        available.push({
+          name: getUserName(employee),
+          job: employee.position || "Employee",
+          client: "No active task",
+          date: "Available",
+        });
+        return;
+      }
+
+      working.push({
+        name: getUserName(employee),
+        job: employee.position || "Employee",
+        client: clientByEmployee.get(employeeId)?.companyName || task.title || "No client",
+        date: formatDate(task.dueDate),
+      });
+    });
+
+    return { notWorkingEmployees: available, workingEmployees: working };
+  }, [clients, employees, tasks]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1325,13 +1339,19 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let onlineTeamRequest = null;
 
     const refreshOnlineTeam = async () => {
+      if (onlineTeamRequest) return onlineTeamRequest;
+
       try {
-        const members = await authAPI.getOnlineTeam();
+        onlineTeamRequest = authAPI.getOnlineTeam();
+        const members = await onlineTeamRequest;
         if (isMounted) setOnlineTeam(Array.isArray(members) ? members : []);
       } catch {
         // Keep the last successful presence list until the next refresh.
+      } finally {
+        onlineTeamRequest = null;
       }
     };
 

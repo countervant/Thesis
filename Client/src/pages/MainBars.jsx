@@ -568,21 +568,30 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       return undefined;
     }
 
+    // MessagesPanel owns the live connection and thread unread state while it
+    // is mounted. Avoid a duplicate SSE stream and redundant unread polling.
+    if (isMessagesPage) {
+      return undefined;
+    }
+
     let isMounted = true;
+    let unreadRequest = null;
 
-    const loadUnreadMessages = async () => {
+    const loadUnreadMessages = () => {
       if (document.visibilityState !== "visible") return;
+      if (unreadRequest) return unreadRequest;
 
-      try {
-        const count = await messageAPI.getUnreadCount();
-        if (isMounted) {
-          setUnreadMessageCount(count);
-        }
-      } catch {
-        if (isMounted) {
-          setUnreadMessageCount(0);
-        }
-      }
+      unreadRequest = messageAPI
+        .getUnreadCount()
+        .then((count) => {
+          if (isMounted) setUnreadMessageCount(count);
+        })
+        // Retain the last confirmed badge value during transient failures.
+        .catch(() => null)
+        .finally(() => {
+          unreadRequest = null;
+        });
+      return unreadRequest;
     };
 
     loadUnreadMessages();
@@ -598,7 +607,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       clearInterval(intervalId);
       closeMessages();
     };
-  }, [token, userId]);
+  }, [isMessagesPage, token, userId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -856,7 +865,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
               }`}
               aria-hidden="true"
             />
-            {unreadMessageCount > 0 && (
+            {!isMessagesPage && unreadMessageCount > 0 && (
               <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full border-2 border-[#f8f9fd] bg-[#dc4fb2] px-1 text-[11px] font-black leading-none text-white dark:border-neutral-950">
                 {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
               </span>

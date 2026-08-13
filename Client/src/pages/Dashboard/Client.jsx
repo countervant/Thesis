@@ -150,10 +150,18 @@ const normalizeMessagePreview = (thread) => ({
   time: thread?.lastMessage?.createdAt,
 });
 
-const SectionHeader = ({ action, title }) => (
+const SectionHeader = ({ action, onAction, title }) => (
   <div className="flex items-center justify-between gap-4 border-b border-pink-50 px-5 py-4 dark:border-neutral-800">
     <h2 className="text-sm font-black text-[#10142d] dark:text-white">{title}</h2>
-    {action && <span className="text-xs font-black text-[#e347a8]">{action}</span>}
+    {action && (
+      <button
+        type="button"
+        onClick={onAction}
+        className="min-h-11 rounded-lg px-2 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:hover:bg-neutral-800"
+      >
+        {action}
+      </button>
+    )}
   </div>
 );
 
@@ -261,7 +269,7 @@ const ClientDashboardSkeleton = () => (
   </div>
 );
 
-const ClientDashboard = () => {
+const ClientDashboard = ({ onNavigate }) => {
   const [tasks, setTasks] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [messagePreviews, setMessagePreviews] = useState([]);
@@ -276,10 +284,12 @@ const ClientDashboard = () => {
       try {
         setIsLoading(true);
         setErrorMessage("");
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
         const [taskResult, unreadResult, meetingResult, threadResult] = await Promise.allSettled([
           taskAPI.getAll({ limit: 100, view: "dashboard" }),
           messageAPI.getUnreadCount(),
-          calendarAPI.getAll({ limit: 20 }),
+          calendarAPI.getAll({ month: currentMonth }),
           messageAPI.getThreads({ limit: 3 }),
         ]);
 
@@ -418,7 +428,7 @@ const ClientDashboard = () => {
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
         <Card className="overflow-hidden">
-          <SectionHeader action="View all projects" title="Project Overview" />
+          <SectionHeader action="View all projects" onAction={() => onNavigate?.("projects")} title="Project Overview" />
           <div className="divide-y divide-pink-50 px-5 dark:divide-neutral-800">
             {dashboardData.projectOverview.length === 0 && (
               <p className="py-8 text-center text-sm font-bold text-slate-500">No projects yet.</p>
@@ -446,7 +456,7 @@ const ClientDashboard = () => {
                 <span className={`w-fit rounded-full px-3 py-1 text-[11px] font-black ${statusStyles[project.status] || statusStyles.Pending}`}>
                   {project.status}
                 </span>
-                <button type="button" className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label={`More options for ${project.title}`}>
+                <button type="button" onClick={() => onNavigate?.("projects")} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label={`View ${project.title} in projects`}>
                   <Icon name="dots" className="h-5 w-5" />
                 </button>
               </div>
@@ -455,7 +465,7 @@ const ClientDashboard = () => {
         </Card>
 
         <Card className="overflow-hidden">
-          <SectionHeader action="View all" title="Recent Revision Requests" />
+          <SectionHeader action="View all" onAction={() => onNavigate?.("projects")} title="Recent Revision Requests" />
           <div className="divide-y divide-pink-50 px-5 dark:divide-neutral-800">
             {dashboardData.recentRevisions.length === 0 && (
               <p className="py-8 text-center text-sm font-bold text-slate-500">No revision requests yet.</p>
@@ -483,7 +493,7 @@ const ClientDashboard = () => {
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
         <Card className="overflow-hidden">
-          <SectionHeader action="View all" title="Latest Messages" />
+          <SectionHeader action="View all" onAction={() => onNavigate?.("messages")} title="Latest Messages" />
           <div className="divide-y divide-pink-50 px-5 dark:divide-neutral-800">
             {messagePreviews.length === 0 && (
               <p className="py-8 text-center text-sm font-bold text-slate-500">No messages yet.</p>

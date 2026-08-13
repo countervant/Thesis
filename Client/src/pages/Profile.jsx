@@ -28,11 +28,26 @@ const emptyForm = {
   phone: "",
   position: "",
   birthday: "",
+  gender: "Prefer not to say",
   password: "",
   confirmPassword: "",
   avatar: "",
   coverPhoto: "",
 };
+
+const SKILL_GROUPS = [
+  { key: "technical", label: "Technical Skills" },
+  { key: "soft", label: "Soft Skills" },
+  { key: "other", label: "Other Expertise" },
+];
+
+const normalizeSkillGroups = (skillGroups) =>
+  SKILL_GROUPS.reduce((groups, { key }) => {
+    groups[key] = Array.isArray(skillGroups?.[key])
+      ? skillGroups[key].map((skill) => String(skill).trim()).filter(Boolean)
+      : [];
+    return groups;
+  }, {});
 
 const fieldNames = {
   firstName: `profile_given_${Date.now()}`,
@@ -75,6 +90,7 @@ const profileToForm = (profile) => {
     phone: ensureCountryDialCode(profile?.phone || getCountryDialCode(country), country),
     position: role === "client" ? "Client" : profile?.position || "",
     birthday: toDateInputValue(profile?.birthday),
+    gender: profile?.gender || "Prefer not to say",
     password: "",
     confirmPassword: "",
     avatar: profile?.avatar || "",
@@ -99,12 +115,25 @@ const formatRole = (role = "") => {
 const Profile = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const userId = user?.id || user?._id;
   const hasCachedProfile = Boolean(user?.email);
   const [formData, setFormData] = useState(() => profileToForm(user) || emptyForm);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(!hasCachedProfile);
   const [isSaving, setIsSaving] = useState(false);
+  const [skillGroups, setSkillGroups] = useState(() => normalizeSkillGroups(user?.skillGroups));
+  const [isAddingSkill, setIsAddingSkill] = useState(false);
+  const [newSkill, setNewSkill] = useState("");
+  const [newSkillGroup, setNewSkillGroup] = useState("technical");
+  const [hasLoadedAvatar, setHasLoadedAvatar] = useState(() =>
+    Object.prototype.hasOwnProperty.call(user || {}, "avatar")
+  );
+  const [hasChangedAvatar, setHasChangedAvatar] = useState(false);
+  const [hasLoadedCoverPhoto, setHasLoadedCoverPhoto] = useState(() =>
+    Object.prototype.hasOwnProperty.call(user || {}, "coverPhoto")
+  );
+  const [hasChangedCoverPhoto, setHasChangedCoverPhoto] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -114,15 +143,44 @@ const Profile = ({ embedded = false }) => {
         setIsLoading(!hasCachedProfile);
         setErrorMessage("");
         const data = await authAPI.getMe();
+        const profileId = data?._id || data?.id || userId;
+        let nextProfile = data;
+        let avatarIsLoaded = Object.prototype.hasOwnProperty.call(data || {}, "avatar");
+        let coverPhotoIsLoaded = Object.prototype.hasOwnProperty.call(
+          data || {},
+          "coverPhoto"
+        );
+
+        if (profileId) {
+          try {
+            const publicProfile = await authAPI.getPublicProfile(profileId, {
+              refresh: true,
+            });
+            nextProfile = { ...data, ...publicProfile };
+            avatarIsLoaded = true;
+            coverPhotoIsLoaded = true;
+          } catch {
+            if (isMounted) {
+              setErrorMessage(
+                "Profile loaded, but the current profile photos could not be loaded. They will be preserved unless you choose new ones."
+              );
+            }
+          }
+        }
 
         if (isMounted) {
           const nextUser = {
-            id: data._id || data.id,
-            ...data,
+            id: nextProfile._id || nextProfile.id,
+            ...nextProfile,
           };
 
           updateUser(nextUser);
-          setFormData(profileToForm(data));
+          setFormData(profileToForm(nextProfile));
+          setSkillGroups(normalizeSkillGroups(nextProfile.skillGroups));
+          setHasLoadedAvatar(avatarIsLoaded);
+          setHasChangedAvatar(false);
+          setHasLoadedCoverPhoto(coverPhotoIsLoaded);
+          setHasChangedCoverPhoto(false);
         }
       } catch (error) {
         if (isMounted) {
@@ -140,9 +198,11 @@ const Profile = ({ embedded = false }) => {
     return () => {
       isMounted = false;
     };
-  }, [hasCachedProfile, updateUser]);
+  }, [hasCachedProfile, updateUser, userId]);
 
   const updateField = (field, value) => {
+    if (field === "avatar") setHasChangedAvatar(true);
+    if (field === "coverPhoto") setHasChangedCoverPhoto(true);
     setFormData((currentData) => ({
       ...currentData,
       [field]: value,
@@ -217,6 +277,33 @@ const Profile = ({ embedded = false }) => {
     reader.readAsDataURL(file);
   };
 
+  const handleAddSkill = () => {
+    const skill = newSkill.trim();
+    if (!skill) {
+      setErrorMessage("Enter a skill before adding it.");
+      return;
+    }
+
+    setSkillGroups((currentGroups) => ({
+      ...currentGroups,
+      [newSkillGroup]: currentGroups[newSkillGroup].some(
+        (currentSkill) => currentSkill.toLowerCase() === skill.toLowerCase()
+      )
+        ? currentGroups[newSkillGroup]
+        : [...currentGroups[newSkillGroup], skill],
+    }));
+    setNewSkill("");
+    setIsAddingSkill(false);
+    setErrorMessage("");
+  };
+
+  const handleRemoveSkill = (group, skill) => {
+    setSkillGroups((currentGroups) => ({
+      ...currentGroups,
+      [group]: currentGroups[group].filter((currentSkill) => currentSkill !== skill),
+    }));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage("");
@@ -271,9 +358,17 @@ const Profile = ({ embedded = false }) => {
         phone: formData.phone.trim(),
         position: user?.role === "client" ? "Client" : formData.position.trim(),
         birthday: formData.birthday,
-        avatar: formData.avatar,
-        coverPhoto: formData.coverPhoto,
+        gender: formData.gender,
+        skillGroups,
       };
+
+      if (hasLoadedAvatar || hasChangedAvatar) {
+        payload.avatar = formData.avatar;
+      }
+
+      if (hasLoadedCoverPhoto || hasChangedCoverPhoto) {
+        payload.coverPhoto = formData.coverPhoto;
+      }
 
       if (formData.password) {
         payload.password = formData.password;
@@ -286,6 +381,11 @@ const Profile = ({ embedded = false }) => {
         password: "",
         confirmPassword: "",
       });
+      setSkillGroups(normalizeSkillGroups(updatedProfile.skillGroups));
+      setHasLoadedAvatar(true);
+      setHasChangedAvatar(false);
+      setHasLoadedCoverPhoto(true);
+      setHasChangedCoverPhoto(false);
       setSuccessMessage("Profile updated successfully.");
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to update profile.");
@@ -495,7 +595,11 @@ const Profile = ({ embedded = false }) => {
                     />
                   </Field>
                   <Field label="Gender" icon="person" required>
-                    <select className={iconInputClass} defaultValue="Male">
+                    <select
+                      className={iconInputClass}
+                      value={formData.gender}
+                      onChange={(event) => updateField("gender", event.target.value)}
+                    >
                       <option>Male</option>
                       <option>Female</option>
                       <option>Prefer not to say</option>
@@ -547,22 +651,59 @@ const Profile = ({ embedded = false }) => {
                   </div>
                   <button
                     type="button"
+                    onClick={() => setIsAddingSkill((isOpen) => !isOpen)}
                     className="flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                    aria-expanded={isAddingSkill}
                   >
                     <span className="text-lg leading-none">+</span>
                     Add Skill
                   </button>
                 </div>
 
-                {[
-                  ["Technical Skills", ["React", "Laravel", "JavaScript", "TypeScript", "PHP", "MySQL", "Git", "UI/UX Design"]],
-                  ["Soft Skills", ["Leadership", "Communication", "Problem Solving", "Time Management", "Teamwork", "Adaptability"]],
-                  ["Other Expertise", ["System Administration", "Database Management", "Cybersecurity Basics", "Agile Methodology"]],
-                ].map(([group, skills]) => (
-                  <div key={group} className="mb-5 last:mb-0">
-                    <h3 className="mb-3 text-sm font-black text-[black] dark:text-white">{group}</h3>
+                {isAddingSkill && (
+                  <div className="mb-5 grid gap-2 rounded-xl border border-pink-100 bg-pink-50/40 p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
+                    <select
+                      value={newSkillGroup}
+                      onChange={(event) => setNewSkillGroup(event.target.value)}
+                      className={inputClass}
+                      aria-label="Skill category"
+                    >
+                      {SKILL_GROUPS.map(({ key, label }) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      maxLength={80}
+                      value={newSkill}
+                      onChange={(event) => setNewSkill(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleAddSkill();
+                        }
+                      }}
+                      placeholder="Enter a skill"
+                      className={inputClass}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddSkill}
+                      className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+
+                {SKILL_GROUPS.map(({ key, label }) => (
+                  <div key={key} className="mb-5 last:mb-0">
+                    <h3 className="mb-3 text-sm font-black text-[black] dark:text-white">{label}</h3>
                     <div className="flex flex-wrap gap-2">
-                      {skills.map((skill) => (
+                      {skillGroups[key].length === 0 && (
+                        <span className="text-xs font-semibold text-slate-400">No skills added.</span>
+                      )}
+                      {skillGroups[key].map((skill) => (
                         <span
                           key={skill}
                           className="inline-flex items-center gap-2 rounded-full border border-black-100 bg-black-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
@@ -570,6 +711,7 @@ const Profile = ({ embedded = false }) => {
                           {skill}
                           <button
                             type="button"
+                            onClick={() => handleRemoveSkill(key, skill)}
                             className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#c72fb2] transition hover:bg-pink-100 hover:text-[#10142d] dark:hover:bg-neutral-800 dark:hover:text-white"
                             aria-label={`Remove ${skill}`}
                           >

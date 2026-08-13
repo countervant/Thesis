@@ -286,6 +286,7 @@ const taskSchema = new mongoose.Schema(
       fileName: String,
       fileUrl: String,
       previewFileName: String,
+      previewStoredName: String,
       originalStoredName: String,
       mimeType: String,
       watermarked: {

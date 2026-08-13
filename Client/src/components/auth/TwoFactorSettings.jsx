@@ -20,7 +20,7 @@ const statusFromUser = (user) => user ? ({
 }) : null;
 
 const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
-  const { user, updateUser } = useAuth();
+  const { login, user, updateUser } = useAuth();
   const [status, setStatus] = useState(() => statusFromUser(user));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,7 +65,14 @@ const TwoFactorSettings = ({ setupMode = false, onEnabled }) => {
     const timer = window.setTimeout(loadStatus, 0);
     return () => window.clearTimeout(timer);
   }, [loadStatus]);
-  const enabled = async () => { setEnableOpen(false); updateUser({ twoFactorEnabled: true }); await loadStatus(); onEnabled?.(); };
+  const enabled = async (verification) => {
+    setEnableOpen(false);
+    const nextUser = { ...user, twoFactorEnabled: true, twoFactorSetupRequired: false };
+    if (verification?.token) login(nextUser, verification.token);
+    else updateUser(nextUser);
+    await loadStatus();
+    onEnabled?.();
+  };
   const disabled = async () => { setDisableOpen(false); updateUser({ twoFactorEnabled: false }); await loadStatus(); };
 
   return <>

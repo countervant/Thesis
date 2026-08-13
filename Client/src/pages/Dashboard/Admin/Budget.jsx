@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { budgetAPI, getApiErrorMessage } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import balanceIcon from "../../../assets/balance.png";
@@ -10,6 +10,9 @@ import {
   BudgetSummarySkeleton,
   SkeletonRows,
 } from "../../../components/Skeleton.jsx";
+
+const BUDGET_FETCH_PAGE_SIZE = 100;
+const BUDGET_FETCH_CONCURRENCY = 4;
 
 const formatInputDate = (value) => {
   if (!value) {
@@ -514,9 +517,92 @@ const getPercentChange = (current, previous) => {
   return `${percent >= 0 ? "+" : ""}${percent.toFixed(0)}%`;
 };
 
+const getBudgetPageEntries = (pageData) => {
+  if (Array.isArray(pageData)) return pageData;
+  return Array.isArray(pageData?.budgets) ? pageData.budgets : [];
+};
+
+const deduplicateBudgetEntries = (pages) => {
+  const entries = [];
+  const seenIds = new Set();
+
+  pages.flatMap(getBudgetPageEntries).forEach((entry) => {
+    const entryId = entry?._id || entry?.id;
+    if (entryId && seenIds.has(entryId)) return;
+    if (entryId) seenIds.add(entryId);
+    entries.push(entry);
+  });
+
+  return entries;
+};
+
+const loadAllBudgetEntries = async (dataAPI, isCurrentRequest) => {
+  if (typeof dataAPI.getPage !== "function") {
+    const entries = await dataAPI.getAll();
+    return {
+      entries: Array.isArray(entries) ? entries : [],
+      expectedTotal: Array.isArray(entries) ? entries.length : 0,
+      failedPages: [],
+    };
+  }
+
+  const firstPage = await dataAPI.getPage({
+    page: 1,
+    limit: BUDGET_FETCH_PAGE_SIZE,
+    refresh: true,
+  });
+  if (!isCurrentRequest()) return null;
+
+  const totalPages = Math.max(Math.ceil(Number(firstPage.totalPages) || 1), 1);
+  const loadedPages = [firstPage];
+  const failedPages = [];
+
+  for (let page = 2; page <= totalPages; page += BUDGET_FETCH_CONCURRENCY) {
+    if (!isCurrentRequest()) return null;
+
+    const pageNumbers = Array.from(
+      {
+        length: Math.min(
+          BUDGET_FETCH_CONCURRENCY,
+          totalPages - page + 1
+        ),
+      },
+      (_, index) => page + index
+    );
+    const results = await Promise.allSettled(
+      pageNumbers.map((pageNumber) =>
+        dataAPI.getPage({
+          page: pageNumber,
+          limit: BUDGET_FETCH_PAGE_SIZE,
+          refresh: true,
+        })
+      )
+    );
+    if (!isCurrentRequest()) return null;
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        loadedPages.push(result.value);
+      } else {
+        failedPages.push({
+          error: result.reason,
+          page: pageNumbers[index],
+        });
+      }
+    });
+  }
+
+  return {
+    entries: deduplicateBudgetEntries(loadedPages),
+    expectedTotal: Math.max(Number(firstPage.total) || 0, 0),
+    failedPages,
+  };
+};
+
 const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }) => {
   const [budgetEntries, setBudgetEntries] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [actionErrorMessage, setActionErrorMessage] = useState("");
+  const [loadErrorMessage, setLoadErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
@@ -524,26 +610,45 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
   const [typeFilter, setTypeFilter] = useState("All Types");
   const [sortOrder, setSortOrder] = useState("Newest");
   const [currentPage, setCurrentPage] = useState(1);
+  const loadGeneration = useRef(0);
   const pageSize = 7;
 
   useEffect(() => {
-    let isMounted = true;
+    const requestGeneration = loadGeneration.current + 1;
+    loadGeneration.current = requestGeneration;
+    const isCurrentRequest = () => loadGeneration.current === requestGeneration;
 
     const loadBudgets = async () => {
       try {
         setIsLoading(true);
-        setErrorMessage("");
-        const data = await dataAPI.getAll();
+        setActionErrorMessage("");
+        setLoadErrorMessage("");
+        setBudgetEntries([]);
+        const result = await loadAllBudgetEntries(dataAPI, isCurrentRequest);
 
-        if (isMounted) {
-          setBudgetEntries(Array.isArray(data) ? data.map(normalizeEntry) : []);
+        if (!result || !isCurrentRequest()) return;
+
+        setBudgetEntries(result.entries.map(normalizeEntry));
+        if (
+          result.failedPages.length > 0 ||
+          result.entries.length !== result.expectedTotal
+        ) {
+          const failedPageMessage = result.failedPages.length > 0
+            ? `${result.failedPages.length} page${result.failedPages.length === 1 ? "" : "s"} could not be loaded`
+            : "the dataset changed while pages were loading";
+          setLoadErrorMessage(
+            `Budget data is incomplete because ${failedPageMessage}. Totals, charts, filters, month lists, and transactions may be incomplete. Refresh to retry.`
+          );
         }
       } catch (error) {
-        if (isMounted) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load budget entries."));
+        if (isCurrentRequest()) {
+          setBudgetEntries([]);
+          setLoadErrorMessage(
+            getApiErrorMessage(error, "Unable to load budget entries.")
+          );
         }
       } finally {
-        if (isMounted) {
+        if (isCurrentRequest()) {
           setIsLoading(false);
         }
       }
@@ -552,7 +657,9 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
     loadBudgets();
 
     return () => {
-      isMounted = false;
+      if (loadGeneration.current === requestGeneration) {
+        loadGeneration.current += 1;
+      }
     };
   }, [dataAPI, refreshKey]);
 
@@ -624,13 +731,15 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
 
   const deleteEntry = async (entryId) => {
     try {
-      setErrorMessage("");
+      setActionErrorMessage("");
       await dataAPI.delete(entryId);
       setBudgetEntries((currentEntries) =>
         currentEntries.filter((entry) => entry.id !== entryId)
       );
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to delete budget entry.");
+      setActionErrorMessage(
+        error.response?.data?.message || "Unable to delete budget entry."
+      );
     }
   };
 
@@ -666,6 +775,15 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
             </div>
           </header>
 
+          {(loadErrorMessage || actionErrorMessage) && (
+            <p
+              className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100"
+              role="alert"
+            >
+              {[loadErrorMessage, actionErrorMessage].filter(Boolean).join(" ")}
+            </p>
+          )}
+
           <section className="mt-5 grid grid-cols-3 gap-2 md:gap-4">
             {isLoading ? (
               <BudgetSummarySkeleton />
@@ -700,12 +818,6 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
               </>
             )}
           </section>
-
-          {errorMessage && (
-            <p className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100">
-              {errorMessage}
-            </p>
-          )}
 
           <section className="mt-4 overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-[0_8px_24px_rgba(190,65,158,0.08)] ring-1 ring-pink-50 dark:bg-[#141414] dark:ring-neutral-800">
             <div className="flex flex-col items-stretch gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">

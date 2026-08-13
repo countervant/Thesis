@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { authAPI } from "../../services/api.js";
 import AuthenticationHelper from "../../components/auth/AuthenticationHelper.jsx";
@@ -20,6 +20,11 @@ const ResetPassword = () => {
   const [resendMessage, setResendMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigationTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,8 +42,13 @@ const ResetPassword = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+      setError("Password must include uppercase, lowercase, and number characters");
       return;
     }
 
@@ -51,7 +61,7 @@ const ResetPassword = () => {
       setLoading(true);
       await authAPI.resetPassword(email.trim(), otp.trim(), password);
       setMessage("Password reset successfully. You can now log in.");
-      setTimeout(() => navigate("/"), 1200);
+      navigationTimerRef.current = window.setTimeout(() => navigate("/"), 1200);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to reset password");
     } finally {

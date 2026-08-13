@@ -10,7 +10,6 @@ import {
   useRouteError,
 } from "react-router-dom";
 
-import TwoFactorVerification from "../components/auth/TwoFactorVerification.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import AppLoadingScreen from "../components/AppLoadingScreen.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
@@ -19,6 +18,7 @@ const Login = lazy(() => import("../pages/auth/Login.jsx"));
 const Register = lazy(() => import("../pages/auth/Register.jsx"));
 const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword.jsx"));
 const ResetPassword = lazy(() => import("../pages/auth/ResetPassword.jsx"));
+const TwoFactorVerification = lazy(() => import("../components/auth/TwoFactorVerification.jsx"));
 const Dashboard = lazy(() => import("../pages/Dashboard.jsx"));
 const Profile = lazy(() => import("../pages/Profile.jsx"));
 const PublicProfile = lazy(() => import("../pages/PublicProfile.jsx"));

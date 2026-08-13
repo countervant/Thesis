@@ -2,9 +2,10 @@ import express from "express";
 import Client from "../model/Admin/Clientmodel.js";
 import User from "../model/userModel.js";
 import { authorize } from "../middleware/authorize.js";
-import { protect } from "../middleware/protectedjwt.js";
+import { clearCachedAuthUser, protect } from "../middleware/protectedjwt.js";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { getSafeSearchPattern } from "../utils/search.js";
 import { withAvatarUrl } from "../utils/avatar.js";
 import { isUserOnline } from "../utils/presence.js";
 
@@ -70,7 +71,7 @@ const clientUserToClient = (user) => {
 router.get("/", protect, authorize("admin"), async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
-    const search = String(req.query.search || "").trim();
+    const search = getSafeSearchPattern(req.query.search);
     const activeFilter =
       req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
     const searchQuery = search
@@ -97,15 +98,13 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
       .select("companyName contactPerson email phone country service isActive address notes assignedEmployee createdAt updatedAt")
       .populate("assignedEmployee", "firstName lastName email role")
       .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
+        .limit(skip + limit)
         .maxTimeMS(8000)
       .lean(),
       User.find(userQuery)
       .select("firstName lastName companyName email phone country position role isActive isOnline showOnlineStatus lastSeen createdAt updatedAt")
       .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
+        .limit(skip + limit)
         .maxTimeMS(8000)
       .lean(),
       Client.countDocuments(clientQuery).maxTimeMS(8000),
@@ -120,7 +119,9 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
         isOnline: false,
         hasLoginAccount: false,
       })),
-    ].slice(0, limit);
+    ]
+      .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt))
+      .slice(skip, skip + limit);
 
     res.status(200).json(pagedResponse({
       data,
@@ -207,6 +208,7 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       userClient.isActive = payload.isActive;
 
       await userClient.save();
+      clearCachedAuthUser(userClient._id);
       return res.status(200).json(clientUserToClient(userClient));
     }
 
@@ -269,6 +271,7 @@ router.delete("/:id", protect, authorize("admin"), async (req, res) => {
       if (!userClient) {
         return res.status(404).json({ message: "Client not found" });
       }
+      clearCachedAuthUser(userClient._id);
     }
 
     res.status(200).json({ message: "Client deleted" });

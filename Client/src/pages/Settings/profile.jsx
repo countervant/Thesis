@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import InitialsAvatar from "../../components/InitialsAvatar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
@@ -80,6 +80,7 @@ const iconInputClass = `${inputClass} pl-10`;
 
 const ProfileSettings = ({ user }) => {
   const { updateUser } = useAuth();
+  const userId = user?._id || user?.id;
   const localSettings = useMemo(() => loadLocalSettings(user), [user]);
   const initialData = useMemo(
     () => ({
@@ -110,8 +111,49 @@ const ProfileSettings = ({ user }) => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [hasLoadedAvatar, setHasLoadedAvatar] = useState(() =>
+    Object.prototype.hasOwnProperty.call(user || {}, "avatar")
+  );
+  const [hasChangedAvatar, setHasChangedAvatar] = useState(false);
+  const [hasLoadedCoverPhoto, setHasLoadedCoverPhoto] = useState(() =>
+    Object.prototype.hasOwnProperty.call(user || {}, "coverPhoto")
+  );
+  const [hasChangedCoverPhoto, setHasChangedCoverPhoto] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+
+    let isActive = true;
+
+    authAPI
+      .getPublicProfile(userId, { refresh: true })
+      .then((profile) => {
+        if (!isActive) return;
+
+        setFormData((currentData) => ({
+          ...currentData,
+          avatar: currentData.avatar || profile?.avatar || "",
+          coverPhoto: currentData.coverPhoto || profile?.coverPhoto || "",
+        }));
+        setHasLoadedAvatar(true);
+        setHasLoadedCoverPhoto(true);
+      })
+      .catch(() => {
+        if (isActive) {
+          setError(
+            "Current profile photos could not be loaded. They will be preserved unless you choose new ones."
+          );
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [userId]);
 
   const updateField = (field, value) => {
+    if (field === "avatar") setHasChangedAvatar(true);
+    if (field === "coverPhoto") setHasChangedCoverPhoto(true);
     setFormData((currentData) => ({ ...currentData, [field]: value }));
     setMessage("");
     setError("");
@@ -163,7 +205,7 @@ const ProfileSettings = ({ user }) => {
     setMessage("");
     setError("");
     try {
-      const updatedUser = await authAPI.updateMe({
+      const payload = {
         firstName: nameParts[0],
         lastName: nameParts.slice(1).join(" "),
         email: formData.email.trim(),
@@ -178,11 +220,27 @@ const ProfileSettings = ({ user }) => {
         },
         companyName: formData.companyName.trim(),
         position: formData.role.trim(),
-        avatar: formData.avatar,
-        coverPhoto: formData.coverPhoto,
-      });
+      };
+
+      if (hasLoadedAvatar || hasChangedAvatar) {
+        payload.avatar = formData.avatar;
+      }
+      if (hasLoadedCoverPhoto || hasChangedCoverPhoto) {
+        payload.coverPhoto = formData.coverPhoto;
+      }
+
+      const updatedUser = await authAPI.updateMe(payload);
       localStorage.setItem(getStorageKey(user), JSON.stringify({ gender: formData.gender, skills: skillGroups }));
       updateUser(updatedUser);
+      setFormData((currentData) => ({
+        ...currentData,
+        avatar: updatedUser.avatar || "",
+        coverPhoto: updatedUser.coverPhoto || "",
+      }));
+      setHasLoadedAvatar(true);
+      setHasChangedAvatar(false);
+      setHasLoadedCoverPhoto(true);
+      setHasChangedCoverPhoto(false);
       setMessage("Profile settings saved.");
     } catch (saveError) {
       setError(getApiErrorMessage(saveError, "Unable to save profile settings."));

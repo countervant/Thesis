@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Skeleton from "../../components/Skeleton.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
@@ -40,7 +40,8 @@ const statStyles = {
 const tabs = ["All Projects", "In Progress", "In Review", "Completed", "Archived"];
 const statusFilters = ["All Status", "In Progress", "In Review", "Completed", "Pending Revisions"];
 const sortOptions = ["Newest", "Oldest", "Due Date", "Progress"];
-const API_ROOT = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api\/?$/, "");
+const PROJECTS_PAGE_SIZE = 6;
+const API_ROOT = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
 const todayInputDate = () => {
   const today = new Date();
@@ -140,8 +141,28 @@ const getPersonName = (person, fallback = "Clientra Team") => {
 };
 
 const getFileUrl = (fileUrl) => {
-  if (!fileUrl) return "";
-  return fileUrl.startsWith("http") ? fileUrl : `${API_ROOT}${fileUrl}`;
+  const value = String(fileUrl || "").trim();
+  if (!value) return "";
+  if (value.startsWith("/uploads/")) return `${API_ROOT}${value}`;
+
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+};
+
+const getSafeOutputLink = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
 };
 
 const normalizeProject = (task) => {
@@ -397,14 +418,22 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
 
 const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
   const [openActivityPanel, setOpenActivityPanel] = useState(null);
+  const rawFinalOutputLink = String(project.finalOutput?.link || "").trim();
+  const safeFinalOutputLink = getSafeOutputLink(rawFinalOutputLink);
+  const isFinalOutputLinkProtected = Boolean(project.finalOutput?.linkProtected);
   const outputCandidates = [
-    ...(project.finalOutput?.link
+    ...(rawFinalOutputLink || isFinalOutputLinkProtected
       ? [{
           id: "final-link",
           title: "Project Output Link",
-          subtitle: project.finalOutput.link,
+          subtitle: isFinalOutputLinkProtected
+            ? "Available after the project payment is confirmed."
+            : safeFinalOutputLink
+              ? rawFinalOutputLink
+              : "Submitted link is unavailable.",
           type: "link",
-          url: project.finalOutput.link,
+          url: safeFinalOutputLink,
+          protected: isFinalOutputLinkProtected,
           submittedAt: project.finalOutput.submittedAt,
         }]
       : []),
@@ -419,6 +448,8 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
             : "Original output • Fully paid",
           type: "file",
           url: getFileUrl(project.finalOutput.fileUrl),
+          source: "final-output",
+          available: true,
           protected: project.paymentPending,
           watermarked: Boolean(project.finalOutput.watermarked),
           submittedAt: project.finalOutput.submittedAt,
@@ -430,6 +461,9 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
       subtitle: "Project file",
       type: "file",
       url: getFileUrl(file.fileUrl),
+      source: "attachment",
+      attachmentIndex: index,
+      localAttachment: String(file.fileUrl || "").startsWith("/uploads/"),
       submittedAt: project.finalOutput?.submittedAt || project.updatedAt,
     })),
   ];
@@ -540,6 +574,55 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
     </div>
   );
 
+  const renderOutputs = (items) => (
+    <div className="divide-y divide-pink-50 dark:divide-neutral-800">
+      {items.length === 0 ? (
+        <p className="py-8 text-center text-sm font-bold text-slate-500">No submitted output yet.</p>
+      ) : items.map((output) => (
+        <div key={output.id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3 py-3 min-[420px]:grid-cols-[52px_minmax(0,1fr)_auto]">
+          <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
+            <Icon name={output.type === "link" ? "external" : "file"} className="h-6 w-6" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-black">{output.title}</span>
+            <span className="block truncate text-xs font-bold text-slate-500">{output.subtitle}</span>
+            {output.protected && (
+              <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                {output.watermarked ? "Watermarked" : "Payment pending"}
+              </span>
+            )}
+            <span className="block text-xs font-bold text-slate-400">{formatDateTime(output.submittedAt)}</span>
+          </span>
+          {output.type === "link" ? (
+            output.url ? (
+              <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                Open Link
+                <Icon name="external" className="h-4 w-4" />
+              </a>
+            ) : (
+              <span className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-xs font-black text-slate-400" aria-disabled="true">
+                {output.protected ? "Payment required" : "Link unavailable"}
+              </span>
+            )
+          ) : (
+            <span className="flex items-center gap-2">
+              {(output.available || output.url) && (
+                <button type="button" onClick={() => onViewOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
+                  View
+                  <Icon name="eye" className="h-4 w-4" />
+                </button>
+              )}
+              <button type="button" disabled={!output.url && output.source === "attachment"} onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50">
+                {output.source === "attachment" && !output.localAttachment ? "Open" : "Download"}
+                <Icon name={output.source === "attachment" && !output.localAttachment ? "external" : "download"} className="h-4 w-4" />
+              </button>
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="-mb-10 -mt-8 min-h-[calc(100dvh-4rem)] space-y-5 bg-[#f8f9fd] px-4 py-5 text-[#10142d] dark:bg-neutral-950 dark:text-white md:px-6 lg:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -605,47 +688,15 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
         <Card className="p-5">
           <h2 className="text-lg font-black">Submitted Output</h2>
           <p className="mt-1 text-xs font-bold text-slate-500">Here are the latest files and links submitted by your team.</p>
-          <div className="mt-4 divide-y divide-pink-50 dark:divide-neutral-800">
-            {outputItems.length === 0 ? (
-              <p className="py-8 text-center text-sm font-bold text-slate-500">No submitted output yet.</p>
-            ) : outputItems.map((output) => (
-              <div key={output.id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3 py-3 min-[420px]:grid-cols-[52px_minmax(0,1fr)_auto]">
-                <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
-                  <Icon name={output.type === "link" ? "external" : "file"} className="h-6 w-6" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-black">{output.title}</span>
-                  <span className="block truncate text-xs font-bold text-slate-500">{output.subtitle}</span>
-                  {output.protected && (
-                    <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
-                      {output.watermarked ? "Watermarked" : "Payment pending"}
-                    </span>
-                  )}
-                  <span className="block text-xs font-bold text-slate-400">{formatDateTime(output.submittedAt)}</span>
-                </span>
-                {output.type === "link" ? (
-                  <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                    Open Link
-                    <Icon name="external" className="h-4 w-4" />
-                  </a>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    {output.url && (
-                      <button type="button" onClick={() => onViewOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                        View
-                        <Icon name="eye" className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button type="button" onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                      Download
-                      <Icon name="download" className="h-4 w-4" />
-                    </button>
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-          <button type="button" className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Files</button>
+          <div className="mt-4">{renderOutputs(outputItems.slice(0, 3))}</div>
+          <button
+            type="button"
+            disabled={outputItems.length === 0}
+            onClick={() => setOpenActivityPanel("files")}
+            className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
+          >
+            {outputItems.length > 0 ? `View All Files (${outputItems.length})` : "No Files Available"}
+          </button>
           {project.clientApproved && project.finalOutput?.submittedAt && (
             <div className={`mt-5 rounded-xl border p-4 ${project.newsfeedPermissionAllowed ? "border-emerald-200 bg-emerald-50/80" : "border-pink-100 bg-pink-50/40"}`}>
               <div className="flex items-start gap-3">
@@ -723,6 +774,11 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
           {renderTimeline(timeline)}
         </ProjectActivityPanel>
       )}
+      {openActivityPanel === "files" && (
+        <ProjectActivityPanel title="All Submitted Files and Links" count={outputItems.length} onClose={() => setOpenActivityPanel(null)}>
+          {renderOutputs(outputItems)}
+        </ProjectActivityPanel>
+      )}
     </div>
   );
 };
@@ -790,7 +846,7 @@ const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
 
 SimpleFeedbackModal.displayName = "SimpleFeedbackModal";
 
-const RevisionModal = ({ onClose, onSubmit, project }) => {
+const RevisionModal = ({ errorMessage = "", isSubmitting = false, onClose, onSubmit, project }) => {
   const [form, setForm] = useState({
     title: "",
     priority: "",
@@ -805,6 +861,7 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
     onSubmit(project, form);
   };
 
@@ -825,8 +882,9 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
           </div>
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onClose}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:hover:bg-neutral-900"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-900"
             aria-label="Close request revision"
           >
             x
@@ -849,7 +907,7 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
           </span>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <fieldset disabled={isSubmitting} className="m-0 mt-6 grid min-w-0 gap-4 border-0 p-0 disabled:opacity-70 md:grid-cols-2">
           <label className="block">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Revision Title <span className="text-pink-500">*</span></span>
             <input
@@ -887,16 +945,14 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
             />
             <span className="mt-1 block text-xs font-bold text-slate-400">{form.description.length} / 1000 characters</span>
           </label>
-          <label className="block">
-            <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Upload Attachment <span className="font-bold text-slate-400">(optional)</span></span>
-            <span className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#e347a8]/50 bg-pink-50/30 text-center transition hover:bg-pink-50 dark:bg-neutral-950">
+          <div className="block">
+            <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Reference Attachment</span>
+            <span className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 text-center dark:border-neutral-800 dark:bg-neutral-950">
               <Icon name="upload" className="h-6 w-6 text-[#c72fb2]" />
-              <span className="mt-2 text-sm font-black text-[#10142d] dark:text-white">Drag & drop files here</span>
-              <span className="mt-1 text-xs font-bold text-slate-500">or click to browse</span>
-              <span className="mt-2 text-[11px] font-bold text-slate-400">PNG, JPG, PDF up to 10MB each</span>
-              <input type="file" className="sr-only" multiple />
+              <span className="mt-2 text-sm font-black text-slate-500">Attachment uploads are not available yet.</span>
+              <span className="mt-1 text-xs font-bold text-slate-400">Include a secure reference link in the description instead.</span>
             </span>
-          </label>
+          </div>
           <label className="block">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Preferred Completion Date <span className="font-bold text-slate-400">(optional)</span></span>
             <span className="relative block">
@@ -910,22 +966,26 @@ const RevisionModal = ({ onClose, onSubmit, project }) => {
             </span>
             <span className="mt-2 block text-xs font-bold text-slate-500">Let us know if you have a target date in mind.</span>
           </label>
-        </div>
+        </fieldset>
+
+        {errorMessage && <p className="mt-4 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
 
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={onClose}
-            className="h-12 rounded-xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-600 transition hover:bg-slate-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
+            className="h-12 rounded-xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105"
+            disabled={isSubmitting}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Icon name="send" className="h-4 w-4" />
-            Submit Request
+            {isSubmitting ? "Submitting..." : "Submit Request"}
           </button>
         </div>
       </form>
@@ -956,7 +1016,7 @@ const RatingStars = ({ label, onChange, required = false, value }) => (
   </div>
 );
 
-const FeedbackModal = ({ onClose, onSubmit, project }) => {
+const FeedbackModal = ({ errorMessage = "", isSubmitting = false, onClose, onSubmit, project }) => {
   const feedback = project.feedback || {};
   const [form, setForm] = useState({
     overallRating: feedback.overallRating || 0,
@@ -973,6 +1033,7 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
     onSubmit(project, {
       ...form,
       wouldRecommend: form.wouldRecommend === "yes",
@@ -987,7 +1048,7 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
             <h2 className="text-2xl font-black text-[#10142d] dark:text-white">Give Feedback</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">Tell us about your experience with this project.</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close feedback">x</button>
+          <button type="button" disabled={isSubmitting} onClick={onClose} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-50" aria-label="Close feedback">x</button>
         </div>
 
         <div className="mt-5 rounded-xl border border-pink-100 bg-pink-50/30 p-4">
@@ -995,7 +1056,7 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
           <p className="mt-1 text-xs font-bold text-emerald-600">Completed {formatDate(project.completedAt || project.updatedAt)}</p>
         </div>
 
-        <div className="mt-5 space-y-4">
+        <fieldset disabled={isSubmitting} className="m-0 mt-5 space-y-4 border-0 p-0 disabled:opacity-70">
           <RatingStars label="Overall Rating" required value={form.overallRating} onChange={(value) => updateRating("overallRating", value)} />
           <div className="rounded-xl border border-pink-100 p-4">
             <p className="mb-3 text-xs font-black text-slate-600">Detailed Ratings <span className="font-bold text-slate-400">(optional)</span></p>
@@ -1017,11 +1078,13 @@ const FeedbackModal = ({ onClose, onSubmit, project }) => {
               <label className="inline-flex items-center gap-2"><input type="radio" name="recommend" checked={form.wouldRecommend === "no"} onChange={() => updateRating("wouldRecommend", "no")} className="accent-[#c72fb2]" />Not really</label>
             </div>
           </fieldset>
-        </div>
+        </fieldset>
+
+        {errorMessage && <p className="mt-4 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
 
         <div className="mt-6 grid gap-3 md:grid-cols-2">
-          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
-          <button type="submit" disabled={!form.overallRating} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c72fb2] text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="send" className="h-4 w-4" />Submit Feedback</button>
+          <button type="button" disabled={isSubmitting} onClick={onClose} className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
+          <button type="submit" disabled={!form.overallRating || isSubmitting} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c72fb2] text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="send" className="h-4 w-4" />{isSubmitting ? "Submitting..." : "Submit Feedback"}</button>
         </div>
       </form>
     </div>
@@ -1152,11 +1215,16 @@ const ClientProjectsSkeleton = () => (
 const ClientProjects = () => {
   const [activeTab, setActiveTab] = useState("All Projects");
   const [approveProject, setApproveProject] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [errorMessage, setErrorMessage] = useState("");
   const [feedbackProject, setFeedbackProject] = useState(null);
   const [feedbackSuccessProject, setFeedbackSuccessProject] = useState(null);
+  const [isApprovingProject, setIsApprovingProject] = useState(false);
+  const [isArchivingProject, setIsArchivingProject] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState([]);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
   const [revisionMessage, setRevisionMessage] = useState("");
   const [revisionProject, setRevisionProject] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -1169,6 +1237,20 @@ const ClientProjects = () => {
   const [noticeMessage, setNoticeMessage] = useState("");
   const [permissionAction, setPermissionAction] = useState(null);
   const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
+  const noticeTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+  }, []);
+
+  const showNotice = (message) => {
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+    setNoticeMessage(message);
+    noticeTimerRef.current = window.setTimeout(() => {
+      setNoticeMessage("");
+      noticeTimerRef.current = null;
+    }, 4000);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -1271,9 +1353,13 @@ const ClientProjects = () => {
         return (parseDate(second.updatedAt) || 0) - (parseDate(first.updatedAt) || 0);
       });
   }, [activeTab, projects, searchTerm, sortBy, statusFilter]);
-  const projectsInCurrentSection = projects.filter((project) =>
-    activeTab === "Archived" ? project.archived : !project.archived
-  ).length;
+  const totalPages = Math.max(1, Math.ceil(visibleProjects.length / PROJECTS_PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = visibleProjects.length === 0
+    ? 0
+    : (safeCurrentPage - 1) * PROJECTS_PAGE_SIZE + 1;
+  const pageEnd = Math.min(safeCurrentPage * PROJECTS_PAGE_SIZE, visibleProjects.length);
+  const paginatedProjects = visibleProjects.slice(pageStart ? pageStart - 1 : 0, pageEnd);
 
   const handleOpenFeedback = async (project) => {
     try {
@@ -1289,23 +1375,28 @@ const ClientProjects = () => {
 
   const handleArchiveProject = async () => {
     const action = archiveAction;
-    if (!action) return;
+    if (!action || isArchivingProject) return;
     try {
+      setIsArchivingProject(true);
       setErrorMessage("");
       const updatedTask = await taskAPI.setArchived(action.project.id, action.archived);
       const updatedProject = normalizeProject(updatedTask);
       setProjects((currentProjects) => currentProjects.map((project) => project.id === updatedProject.id ? updatedProject : project));
       setArchiveAction(null);
-      setNoticeMessage(action.archived ? "Project moved to Archived." : "Project restored to My Projects.");
-      window.setTimeout(() => setNoticeMessage(""), 4000);
+      showNotice(action.archived ? "Project moved to Archived." : "Project restored to My Projects.");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, action.archived ? "Unable to archive the project." : "Unable to restore the project."));
-      setArchiveAction(null);
+    } finally {
+      setIsArchivingProject(false);
     }
   };
 
   const handleSubmitRevision = async (project, form) => {
+    if (isSubmittingRevision) return;
+
     try {
+      setIsSubmittingRevision(true);
+      setErrorMessage("");
       const updatedTask = await taskAPI.requestRevision(project.id, form);
       const updatedProject = normalizeProject(updatedTask);
       setProjects((currentProjects) =>
@@ -1321,12 +1412,24 @@ const ClientProjects = () => {
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit revision request."));
+    } finally {
+      setIsSubmittingRevision(false);
     }
   };
 
   const handleDownloadOutput = async (project, output) => {
     try {
       setErrorMessage("");
+      if (output.source === "attachment") {
+        if (output.localAttachment) {
+          await taskAPI.downloadAttachment(project.id, output.attachmentIndex, output.title);
+        } else if (output.url) {
+          window.open(output.url, "_blank", "noopener,noreferrer");
+        } else {
+          throw new Error("This attachment is unavailable.");
+        }
+        return;
+      }
       await taskAPI.downloadOutput(project.id, output.title, {
         watermark: project.paymentPending && !project.finalOutput?.watermarked,
       });
@@ -1338,6 +1441,16 @@ const ClientProjects = () => {
   const handleViewOutput = async (project, output) => {
     try {
       setErrorMessage("");
+      if (output.source === "attachment") {
+        if (output.localAttachment) {
+          await taskAPI.viewAttachment(project.id, output.attachmentIndex, output.title);
+        } else if (output.url) {
+          window.open(output.url, "_blank", "noopener,noreferrer");
+        } else {
+          throw new Error("This attachment is unavailable.");
+        }
+        return;
+      }
       await taskAPI.viewOutput(project.id, output.title, {
         watermark: project.paymentPending && !project.finalOutput?.watermarked,
       });
@@ -1348,9 +1461,10 @@ const ClientProjects = () => {
 
   const handleApproveProject = async () => {
     const project = approveProject;
-    if (!project) return;
+    if (!project || isApprovingProject) return;
 
     try {
+      setIsApprovingProject(true);
       setErrorMessage("");
       const updatedTask = await taskAPI.approve(project.id);
       const updatedProject = normalizeProject(updatedTask);
@@ -1363,11 +1477,11 @@ const ClientProjects = () => {
         currentProject?.id === updatedProject.id ? updatedProject : currentProject
       );
       setApproveProject(null);
-      setNoticeMessage(`${project.title} was approved.`);
-      window.setTimeout(() => setNoticeMessage(""), 4000);
+      showNotice(`${project.title} was approved.`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to approve the project."));
-      setApproveProject(null);
+    } finally {
+      setIsApprovingProject(false);
     }
   };
 
@@ -1386,12 +1500,11 @@ const ClientProjects = () => {
       );
       setSelectedProject((project) => project?.id === updatedProject.id ? updatedProject : project);
       setPermissionAction(null);
-      setNoticeMessage(
+      showNotice(
         action.allowed
           ? `Admin and assigned employees may now post ${action.project.title} to the newsfeed.`
           : `Newsfeed posting permission was removed for ${action.project.title}.`
       );
-      window.setTimeout(() => setNoticeMessage(""), 4000);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to update newsfeed posting permission."));
       setPermissionAction(null);
@@ -1401,7 +1514,11 @@ const ClientProjects = () => {
   };
 
   const handleSubmitFeedback = async (project, form) => {
+    if (isSubmittingFeedback) return;
+
     try {
+      setIsSubmittingFeedback(true);
+      setErrorMessage("");
       const updatedTask = await taskAPI.submitFeedback(project.id, form);
       const updatedProject = normalizeProject(updatedTask);
       setProjects((currentProjects) =>
@@ -1417,6 +1534,8 @@ const ClientProjects = () => {
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit feedback."));
+    } finally {
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -1434,11 +1553,18 @@ const ClientProjects = () => {
         <ProjectDetails
           errorMessage={errorMessage}
           noticeMessage={noticeMessage}
-          onApprove={setApproveProject}
+          onApprove={(project) => {
+            setErrorMessage("");
+            setApproveProject(project);
+          }}
           onBack={() => setSelectedProjectId("")}
           onDownloadOutput={handleDownloadOutput}
-          onFeedback={() => setFeedbackProject(selectedProject)}
+          onFeedback={() => {
+            setErrorMessage("");
+            setFeedbackProject(selectedProject);
+          }}
           onRequestRevision={(project) => {
+            setErrorMessage("");
             setRevisionMessage("");
             setRevisionProject(project);
           }}
@@ -1448,15 +1574,25 @@ const ClientProjects = () => {
         />
         {revisionProject && (
           <RevisionModal
-            onClose={() => setRevisionProject(null)}
+            errorMessage={errorMessage}
+            isSubmitting={isSubmittingRevision}
+            onClose={() => {
+              setErrorMessage("");
+              setRevisionProject(null);
+            }}
             onSubmit={handleSubmitRevision}
             project={revisionProject}
           />
         )}
         {feedbackProject && (
           <FeedbackModal
+            errorMessage={errorMessage}
+            isSubmitting={isSubmittingFeedback}
             key={feedbackProject.id}
-            onClose={() => setFeedbackProject(null)}
+            onClose={() => {
+              setErrorMessage("");
+              setFeedbackProject(null);
+            }}
             onSubmit={handleSubmitFeedback}
             project={feedbackProject}
           />
@@ -1466,10 +1602,16 @@ const ClientProjects = () => {
         )}
         <ConfirmDialog
           confirmLabel="Approve"
+          confirmingLabel="Approving..."
+          errorMessage={errorMessage}
           icon="done"
+          isConfirming={isApprovingProject}
           isOpen={Boolean(approveProject)}
           message={`Approve “${approveProject?.title || "this project"}”? This will mark the submitted output as completed.`}
-          onCancel={() => setApproveProject(null)}
+          onCancel={() => {
+            setErrorMessage("");
+            setApproveProject(null);
+          }}
           onConfirm={handleApproveProject}
           title="Approve Project"
         />
@@ -1505,7 +1647,10 @@ const ClientProjects = () => {
             <input
               type="search"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search projects..."
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
             />
@@ -1515,7 +1660,10 @@ const ClientProjects = () => {
             <span className="sr-only">Status filter</span>
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setCurrentPage(1);
+              }}
               className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-black text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
             >
               {statusFilters.map((status) => (
@@ -1528,7 +1676,10 @@ const ClientProjects = () => {
             <span className="sr-only">Sort projects</span>
             <select
               value={sortBy}
-              onChange={(event) => setSortBy(event.target.value)}
+              onChange={(event) => {
+                setSortBy(event.target.value);
+                setCurrentPage(1);
+              }}
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
             >
               {sortOptions.map((option) => (
@@ -1558,7 +1709,10 @@ const ClientProjects = () => {
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                setCurrentPage(1);
+              }}
               className={`relative h-12 whitespace-nowrap px-2 text-xs font-black transition ${
                 activeTab === tab ? "text-[#c72fb2]" : "text-slate-500 hover:text-[#e347a8]"
               }`}
@@ -1574,16 +1728,23 @@ const ClientProjects = () => {
             <p className="py-12 text-center text-sm font-bold text-slate-500">No projects found.</p>
           ) : (
             <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-              {visibleProjects.map((project) => (
+              {paginatedProjects.map((project) => (
                 <ProjectCard
                   key={project.id || project.title}
-                  onApprove={setApproveProject}
+                  onApprove={(selectedProject) => {
+                    setErrorMessage("");
+                    setApproveProject(selectedProject);
+                  }}
                   onFeedback={handleOpenFeedback}
                   onRequestRevision={(selectedProject) => {
+                    setErrorMessage("");
                     setRevisionMessage("");
                     setRevisionProject(selectedProject);
                   }}
-                  onToggleArchive={(selectedProject, archived) => setArchiveAction({ project: selectedProject, archived })}
+                  onToggleArchive={(selectedProject, archived) => {
+                    setErrorMessage("");
+                    setArchiveAction({ project: selectedProject, archived });
+                  }}
                   onViewDetails={(project) => setSelectedProjectId(project.id)}
                   project={project}
                 />
@@ -1593,43 +1754,65 @@ const ClientProjects = () => {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
-          <span>Showing {visibleProjects.length ? 1 : 0} to {visibleProjects.length} of {projectsInCurrentSection} projects</span>
+          <span>Showing {pageStart} to {pageEnd} of {visibleProjects.length} projects</span>
           <span className="flex items-center gap-2">
-            <button type="button" className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Previous page">‹</button>
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#c72fb2] text-white">1</span>
-            <button type="button" className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8]" aria-label="Next page">›</button>
+            <button type="button" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400" aria-label="Previous page">‹</button>
+            <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-[#c72fb2] px-2 text-white">{safeCurrentPage}</span>
+            <button type="button" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400" aria-label="Next page">›</button>
           </span>
         </div>
       </Card>
       <ConfirmDialog
         confirmLabel={archiveAction?.archived ? "Archive" : "Restore"}
+        confirmingLabel={archiveAction?.archived ? "Archiving..." : "Restoring..."}
+        errorMessage={errorMessage}
         icon="done"
+        isConfirming={isArchivingProject}
         isOpen={Boolean(archiveAction)}
         message={archiveAction?.archived ? `Archive “${archiveAction.project.title}”? You can restore it later from the Archived tab.` : `Restore “${archiveAction?.project.title}” to My Projects?`}
-        onCancel={() => setArchiveAction(null)}
+        onCancel={() => {
+          setErrorMessage("");
+          setArchiveAction(null);
+        }}
         onConfirm={handleArchiveProject}
         title={archiveAction?.archived ? "Archive Project" : "Restore Project"}
       />
       <ConfirmDialog
         confirmLabel="Approve"
+        confirmingLabel="Approving..."
+        errorMessage={errorMessage}
         icon="done"
+        isConfirming={isApprovingProject}
         isOpen={Boolean(approveProject)}
         message={`Approve “${approveProject?.title || "this project"}”? This will mark the submitted output as completed.`}
-        onCancel={() => setApproveProject(null)}
+        onCancel={() => {
+          setErrorMessage("");
+          setApproveProject(null);
+        }}
         onConfirm={handleApproveProject}
         title="Approve Project"
       />
       {revisionProject && (
         <RevisionModal
-          onClose={() => setRevisionProject(null)}
+          errorMessage={errorMessage}
+          isSubmitting={isSubmittingRevision}
+          onClose={() => {
+            setErrorMessage("");
+            setRevisionProject(null);
+          }}
           onSubmit={handleSubmitRevision}
           project={revisionProject}
         />
       )}
       {feedbackProject && (
         <FeedbackModal
+          errorMessage={errorMessage}
+          isSubmitting={isSubmittingFeedback}
           key={feedbackProject.id}
-          onClose={() => setFeedbackProject(null)}
+          onClose={() => {
+            setErrorMessage("");
+            setFeedbackProject(null);
+          }}
           onSubmit={handleSubmitFeedback}
           project={feedbackProject}
         />

@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:vercel": "node scripts/validateVercelEnv.js && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

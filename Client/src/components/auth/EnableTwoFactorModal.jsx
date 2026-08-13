@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, KeyRound, LoaderCircle, Mail, ShieldCheck, X } from "lucide-react";
 import { authAPI } from "../../services/api.js";
 import OtpInput from "./OtpInput.jsx";
@@ -12,6 +12,11 @@ const EnableTwoFactorModal = ({ onClose, onEnabled, required = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const completionTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (completionTimerRef.current) window.clearTimeout(completionTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!expiresAt) return undefined;
@@ -41,9 +46,9 @@ const EnableTwoFactorModal = ({ onClose, onEnabled, required = false }) => {
     if (code.length !== 6) return setError("Enter the complete 6-digit code.");
     setLoading(true); setError("");
     try {
-      await authAPI.verifyEnableTwoFactor(code);
+      const data = await authAPI.verifyEnableTwoFactor(code);
       setStep("success");
-      window.setTimeout(() => onEnabled?.(), 700);
+      completionTimerRef.current = window.setTimeout(() => onEnabled?.(data), 700);
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Unable to verify the code."); setCode("");
     } finally { setLoading(false); }

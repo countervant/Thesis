@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { authAPI, calendarAPI, taskAPI } from "../../../services/api.js";
+import { authAPI, calendarAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
 
 const calendarChecks = [
   ["Company Events", "bg-violet-500"],
@@ -197,13 +197,20 @@ const loadCalendarSources = async (currentMonth) => {
   const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
   const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];
 
-  if (calendarResult.status === "rejected") console.error("Unable to load calendar events", calendarResult.reason);
-  if (taskResult.status === "rejected") console.error("Unable to load calendar tasks", taskResult.reason);
+  const unavailableSources = [
+    calendarResult.status === "rejected" ? "calendar events" : "",
+    taskResult.status === "rejected" ? "project deadlines" : "",
+  ].filter(Boolean);
 
-  return [
-    ...calendarEvents.map(normalizeEvent),
-    ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
-  ];
+  return {
+    events: [
+      ...calendarEvents.map(normalizeEvent),
+      ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
+    ],
+    warning: unavailableSources.length
+      ? `Some calendar data could not be loaded (${unavailableSources.join(" and ")}). Refresh to retry.`
+      : "",
+  };
 };
 
 const emptyEventForm = (date) => ({
@@ -337,23 +344,40 @@ const AdminCalendar = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAllEventsPanel, setShowAllEventsPanel] = useState(false);
   const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
+  const [sourceErrorMessage, setSourceErrorMessage] = useState("");
+  const [assigneeErrorMessage, setAssigneeErrorMessage] = useState("");
+  const [actionErrorMessage, setActionErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const employeeNames = useMemo(() => new Map(employees.map((employee) => [getEntityId(employee), getPersonName(employee)])), [employees]);
-
-  const loadEvents = async () => {
-    setEvents(await loadCalendarSources(currentMonth));
-  };
 
   useEffect(() => {
     let isActive = true;
 
-    loadCalendarSources(currentMonth)
-      .then((calendarEvents) => {
+    const loadCalendarData = async () => {
+      setIsLoading(true);
+
+      try {
+        const { events: calendarEvents, warning } = await loadCalendarSources(currentMonth);
+
         if (isActive) {
           setEvents(calendarEvents);
+          setSourceErrorMessage(warning);
         }
-      })
-      .catch((error) => console.error("Unable to load calendar events", error));
+      } catch (error) {
+        if (isActive) {
+          setSourceErrorMessage(getApiErrorMessage(error, "Unable to load calendar."));
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadCalendarData();
 
     return () => {
       isActive = false;
@@ -368,9 +392,16 @@ const AdminCalendar = () => {
       .then((data) => {
         if (isActive) {
           setEmployees(data.filter((person) => person?.role === "employee"));
+          setAssigneeErrorMessage("");
         }
       })
-      .catch((error) => console.error("Unable to load calendar employees", error));
+      .catch((error) => {
+        if (isActive) {
+          setAssigneeErrorMessage(
+            getApiErrorMessage(error, "Unable to load calendar employees.")
+          );
+        }
+      });
 
     return () => {
       isActive = false;
@@ -435,6 +466,8 @@ const AdminCalendar = () => {
 
   const saveEvent = async (event) => {
     event.preventDefault();
+    if (isSaving) return;
+
     const payload = {
       title: eventForm.title,
       date: eventForm.date,
@@ -446,22 +479,44 @@ const AdminCalendar = () => {
       visibility: eventForm.visibility,
     };
 
-    if (eventForm.id) {
-      await calendarAPI.update(eventForm.id, payload);
-    } else {
-      await calendarAPI.create(payload);
-    }
+    try {
+      setIsSaving(true);
+      setActionErrorMessage("");
+      const savedEvent = eventForm.id
+        ? await calendarAPI.update(eventForm.id, payload)
+        : await calendarAPI.create(payload);
+      const normalizedEvent = normalizeEvent(savedEvent);
+      const belongsToCurrentMonth = sameMonth(new Date(normalizedEvent.date), currentMonth);
 
-    setEventForm(null);
-    await loadEvents();
+      setEvents((currentEvents) => [
+        ...currentEvents.filter((currentEvent) => currentEvent.id !== normalizedEvent.id),
+        ...(belongsToCurrentMonth ? [normalizedEvent] : []),
+      ]);
+      setEventForm(null);
+    } catch (error) {
+      setActionErrorMessage(getApiErrorMessage(error, "Unable to save this event."));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const confirmDeleteEvent = async () => {
-    if (!deleteTarget) return;
-    await calendarAPI.delete(deleteTarget.id);
-    setDeleteTarget(null);
-    setShowAllEventsPanel(false);
-    await loadEvents();
+    if (!deleteTarget || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+      setActionErrorMessage("");
+      await calendarAPI.delete(deleteTarget.id);
+      setEvents((currentEvents) =>
+        currentEvents.filter((currentEvent) => currentEvent.id !== deleteTarget.id)
+      );
+      setDeleteTarget(null);
+      setShowAllEventsPanel(false);
+    } catch (error) {
+      setActionErrorMessage(getApiErrorMessage(error, "Unable to delete this event."));
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const resetFilters = () => {
@@ -478,6 +533,14 @@ const AdminCalendar = () => {
     setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
     setSelectedDate(toDateKey(today));
   };
+
+  const errorMessage = [
+    sourceErrorMessage,
+    assigneeErrorMessage,
+    actionErrorMessage,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:px-5 lg:px-6">
@@ -504,6 +567,15 @@ const AdminCalendar = () => {
             <button type="button" onClick={addEvent} className="order-5 col-span-2 flex h-9 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] md:col-span-1"><Icon name="plus" className="h-4 w-4" />Add Event</button>
           </div>
         </header>
+
+        {errorMessage && (
+          <p role="alert" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+            {errorMessage}
+          </p>
+        )}
+        {isLoading && (
+          <p className="mt-4 text-sm font-bold text-slate-500" role="status">Loading calendar data...</p>
+        )}
 
         <div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 md:grid-cols-5 md:gap-4">
           {stats.map((item) => (
@@ -732,7 +804,7 @@ const AdminCalendar = () => {
       )}
 
       {eventForm && (
-        <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => setEventForm(null)}>
+        <Modal title={eventForm.id ? "Edit Event" : "Add Event"} onClose={() => !isSaving && setEventForm(null)}>
           <form onSubmit={saveEvent} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Title">
@@ -785,11 +857,11 @@ const AdminCalendar = () => {
               <EmployeeMultiSelect employees={employees} selected={eventForm.participants} onChange={(participants) => setEventForm((form) => ({ ...form, participants }))} />
             </Field>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
+              <button type="button" disabled={isSaving} onClick={() => setEventForm(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-60">
                 Cancel
               </button>
-              <button type="submit" className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)]">
-                Save Event
+              <button type="submit" disabled={isSaving} className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(199,47,178,0.3)] disabled:cursor-not-allowed disabled:opacity-60">
+                {isSaving ? "Saving..." : "Save Event"}
               </button>
             </div>
           </form>
@@ -797,16 +869,16 @@ const AdminCalendar = () => {
       )}
 
       {deleteTarget && (
-        <Modal title="Do you want to delete?" onClose={() => setDeleteTarget(null)}>
+        <Modal title="Do you want to delete?" onClose={() => !isDeleting && setDeleteTarget(null)}>
           <p className="text-sm font-semibold leading-6 text-slate-500">
             This will permanently delete "{deleteTarget.title}" from the calendar.
           </p>
           <div className="mt-5 flex justify-end gap-3">
-            <button type="button" onClick={() => setDeleteTarget(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600">
+            <button type="button" disabled={isDeleting} onClick={() => setDeleteTarget(null)} className="h-10 rounded-lg border border-slate-200 bg-white px-5 text-xs font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-60">
               Cancel
             </button>
-            <button type="button" onClick={confirmDeleteEvent} className="h-10 rounded-lg bg-pink-600 px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(219,39,119,0.25)]">
-              Delete
+            <button type="button" disabled={isDeleting} onClick={confirmDeleteEvent} className="h-10 rounded-lg bg-pink-600 px-5 text-xs font-black text-white shadow-[0_9px_18px_rgba(219,39,119,0.25)] disabled:cursor-not-allowed disabled:opacity-60">
+              {isDeleting ? "Deleting..." : "Delete"}
             </button>
           </div>
         </Modal>

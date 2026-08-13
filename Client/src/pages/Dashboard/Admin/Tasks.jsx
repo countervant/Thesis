@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import done from "../../../assets/done.png";
 import notification from "../../../assets/notification.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
@@ -6,7 +6,13 @@ import progress from "../../../assets/progress.png";
 import taskIcon from "../../../assets/task.png";
 import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import {
+  getApiErrorMessage,
+  getProjectOutputFileError,
+  isAutoWatermarkImage,
+  PROJECT_OUTPUT_FILE_ACCEPT,
+  taskAPI,
+} from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton.jsx";
 import ProjectGanttChart from "../../../components/ProjectGanttChart.jsx";
@@ -1222,7 +1228,7 @@ const ProjectDetailsModal = ({
   );
 };
 
-const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
+const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, onSubmit }) => {
   const [message, setMessage] = useState(
     completion.finalize
       ? `Hi, we've completed ${completion.task.title}. Please find the final output attached.`
@@ -1232,19 +1238,46 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
   const [link, setLink] = useState("");
   const [file, setFile] = useState(null);
   const [fileError, setFileError] = useState("");
+  const [watermarkedFile, setWatermarkedFile] = useState(null);
+  const [watermarkedFileError, setWatermarkedFileError] = useState("");
 
   const task = completion.task;
   const pendingAmount = Math.max(0, Number(task.amount || 0) - Number(task.paid || 0));
   const needsPaymentProtection = Number(task.amount || 0) <= 0 || Number(task.paid || 0) < Number(task.amount || 0);
+  const requiresManualReviewCopy = Boolean(
+    needsPaymentProtection &&
+    outputMethod === "file" &&
+    file &&
+    !isAutoWatermarkImage(file)
+  );
+  const isBusy = isSubmitting;
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    if (isBusy) return;
+
+    if (outputMethod === "file") {
+      const originalFileError = getProjectOutputFileError(file, "Final output");
+      setFileError(originalFileError);
+      if (originalFileError) return;
+
+      if (requiresManualReviewCopy) {
+        const reviewCopyError = getProjectOutputFileError(watermarkedFile, "Protected review copy") ||
+          (!isAutoWatermarkImage(watermarkedFile)
+            ? "Protected review copy must be a JPEG, PNG, WebP, or GIF image."
+            : "");
+        setWatermarkedFileError(reviewCopyError);
+        if (reviewCopyError) return;
+      }
+    }
+
     onSubmit({
       file: outputMethod === "file" ? file : null,
       link,
       message,
       outputMethod,
       watermark: needsPaymentProtection,
+      watermarkedFile: requiresManualReviewCopy ? watermarkedFile : null,
     });
   };
 
@@ -1256,7 +1289,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
       >
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-black text-[#10142d] dark:text-white">Submit Task Output</h2>
-          <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2]" aria-label="Close submit completed task">
+          <button type="button" disabled={isBusy} onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-pink-50 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-60" aria-label="Close submit completed task">
             x
           </button>
         </div>
@@ -1295,7 +1328,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
           </p>
           <p className="mt-1 text-[11px] font-bold text-slate-600">
             {needsPaymentProtection
-              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image review copies are watermarked and remain viewable/downloadable. For other file types, upload a pre-watermarked review copy.`
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a rasterized, watermarked or redacted image preview.`
               : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>
@@ -1305,10 +1338,10 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
             <h3 className="text-sm font-black text-[#10142d] dark:text-white">1. Upload Final Output <span className="font-bold text-slate-500">(Choose one)</span></h3>
             <div className="mt-3 overflow-hidden rounded-xl border border-pink-100 dark:border-neutral-800">
               <div className="grid grid-cols-2 border-b border-pink-100 text-xs font-black dark:border-neutral-800">
-                <button type="button" onClick={() => setOutputMethod("file")} className={`h-10 ${outputMethod === "file" ? "border-b-2 border-[#c72fb2] text-[#c72fb2]" : "text-slate-500"}`}>
+                <button type="button" disabled={isBusy} onClick={() => setOutputMethod("file")} className={`h-10 disabled:cursor-not-allowed disabled:opacity-60 ${outputMethod === "file" ? "border-b-2 border-[#c72fb2] text-[#c72fb2]" : "text-slate-500"}`}>
                   Upload File
                 </button>
-                <button type="button" onClick={() => setOutputMethod("link")} className={`h-10 ${outputMethod === "link" ? "border-b-2 border-[#c72fb2] text-[#c72fb2]" : "text-slate-500"}`}>
+                <button type="button" disabled={isBusy} onClick={() => setOutputMethod("link")} className={`h-10 disabled:cursor-not-allowed disabled:opacity-60 ${outputMethod === "link" ? "border-b-2 border-[#c72fb2] text-[#c72fb2]" : "text-slate-500"}`}>
                   Paste Link
                 </button>
               </div>
@@ -1316,21 +1349,23 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
                 <div className="p-4">
                   <label className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#c72fb2]/70 bg-pink-50/30 text-center transition hover:bg-pink-50">
                     <SmallIcon name="upload" className="h-7 w-7 text-[#c72fb2]" />
-                    <span className="mt-2 text-sm font-black text-[#10142d] dark:text-white">Drag & drop your file here</span>
-                    <span className="mt-1 text-xs font-bold text-slate-500">or click to browse</span>
+                    <span className="mt-2 text-sm font-black text-[#10142d] dark:text-white">Choose your output file</span>
+                    <span className="mt-1 text-xs font-bold text-slate-500">Click to browse</span>
                     <span className="mt-2 text-[11px] font-bold text-slate-400">Maximum file size: 10MB</span>
                     <input
                       type="file"
+                      accept={PROJECT_OUTPUT_FILE_ACCEPT}
+                      disabled={isBusy}
                       className="sr-only"
                       onChange={(event) => {
                         const selectedFile = event.target.files?.[0] || null;
-                        if (selectedFile && selectedFile.size > 10 * 1024 * 1024) {
-                          setFile(null);
-                          setFileError("File size must be 10MB or less.");
-                          return;
-                        }
-                        setFile(selectedFile);
-                        setFileError("");
+                        const validationError = selectedFile
+                          ? getProjectOutputFileError(selectedFile, "Final output")
+                          : "";
+                        setFile(validationError ? null : selectedFile);
+                        setFileError(validationError);
+                        setWatermarkedFile(null);
+                        setWatermarkedFileError("");
                       }}
                     />
                   </label>
@@ -1341,7 +1376,46 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
                         <SmallIcon name="upload" className="h-5 w-5 text-[#c72fb2]" />
                         <span className="truncate">{file.name}</span>
                       </span>
-                      <button type="button" onClick={() => { setFile(null); setFileError(""); }} className="text-slate-400 hover:text-[#c72fb2]" aria-label="Remove file">x</button>
+                      <button type="button" disabled={isBusy} onClick={() => { setFile(null); setFileError(""); setWatermarkedFile(null); setWatermarkedFileError(""); }} className="text-slate-400 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-60" aria-label="Remove file">x</button>
+                    </div>
+                  )}
+                  {requiresManualReviewCopy && (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                      <p className="text-xs font-black text-amber-800">Protected review copy <span className="text-rose-600">*</span></p>
+                      <p className="mt-1 text-[11px] font-bold leading-5 text-slate-600">
+                        Upload a rasterized, watermarked or redacted image preview for the client. It must be JPEG, PNG, WebP, or GIF and 10MB or less.
+                      </p>
+                      <label className="mt-3 flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-amber-400 bg-white text-center transition hover:bg-amber-50">
+                        <SmallIcon name="upload" className="h-6 w-6 text-amber-700" />
+                        <span className="mt-2 text-xs font-black text-[#10142d]">Choose protected review copy</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          disabled={isBusy}
+                          className="sr-only"
+                          onChange={(event) => {
+                            const selectedFile = event.target.files?.[0] || null;
+                            const validationError = selectedFile
+                              ? getProjectOutputFileError(selectedFile, "Protected review copy") ||
+                                (!isAutoWatermarkImage(selectedFile)
+                                  ? "Protected review copy must be a JPEG, PNG, WebP, or GIF image."
+                                  : "")
+                              : "";
+                            setWatermarkedFile(validationError ? null : selectedFile);
+                            setWatermarkedFileError(validationError);
+                          }}
+                        />
+                      </label>
+                      {watermarkedFileError && <p role="alert" className="mt-2 text-xs font-bold text-rose-600">{watermarkedFileError}</p>}
+                      {watermarkedFile && (
+                        <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-200 bg-white px-4 py-3 text-xs font-bold text-[#10142d]">
+                          <span className="inline-flex min-w-0 items-center gap-3">
+                            <SmallIcon name="upload" className="h-5 w-5 text-amber-700" />
+                            <span className="truncate">{watermarkedFile.name}</span>
+                          </span>
+                          <button type="button" disabled={isBusy} onClick={() => { setWatermarkedFile(null); setWatermarkedFileError(""); }} className="text-slate-400 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60" aria-label="Remove protected review copy">x</button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1349,6 +1423,8 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
                 <div className="p-4">
                   <input
                     type="url"
+                    disabled={isBusy}
+                    required
                     value={link}
                     onChange={(event) => setLink(event.target.value)}
                     placeholder="https://..."
@@ -1363,6 +1439,7 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
             <h3 className="text-sm font-black text-[#10142d] dark:text-white">2. Message to Client <span className="font-bold text-slate-500">(Optional)</span></h3>
             <label className="mt-3 block">
               <textarea
+                disabled={isBusy}
                 maxLength={500}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
@@ -1377,15 +1454,16 @@ const CompletedTaskModal = ({ completion, onClose, onSubmit }) => {
               ? "What happens next? The final output will be saved and the project will be marked as done."
               : "What happens next? The client will be notified and can review, request revisions, or approve this task."}
           </p>
+          {errorMessage && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">{errorMessage}</p>}
         </div>
 
         <div className="mt-6 grid gap-3 min-[400px]:flex min-[400px]:justify-end">
-          <button type="button" onClick={onClose} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-600 transition hover:bg-slate-50 min-[400px]:w-auto min-[400px]:px-8">
+          <button type="button" disabled={isBusy} onClick={onClose} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:w-auto min-[400px]:px-8">
             Cancel
           </button>
-          <button type="submit" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 min-[400px]:w-auto min-[400px]:px-8">
+          <button type="submit" disabled={isBusy} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-6 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60 min-[400px]:w-auto min-[400px]:px-8">
             <SmallIcon name="send" />
-            {completion.finalize ? "Submit Final Output" : "Submit to Client"}
+            {isSubmitting ? "Processing & submitting..." : completion.finalize ? "Submit Final Output" : "Submit to Client"}
           </button>
         </div>
       </form>
@@ -1412,9 +1490,11 @@ const Tasks = ({
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
   const [completionDraft, setCompletionDraft] = useState(null);
+  const [isSubmittingOutput, setIsSubmittingOutput] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
   const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
+  const pendingTaskUpdateIdsRef = useRef(new Set());
   const currentUserId = getEntityId(user);
 
   useEffect(() => {
@@ -1590,6 +1670,9 @@ const Tasks = ({
   };
 
   const updateTaskSubtasks = async (task, nextSubtasks) => {
+    if (pendingTaskUpdateIdsRef.current.has(task.id)) return;
+    pendingTaskUpdateIdsRef.current.add(task.id);
+
     try {
       setErrorMessage("");
       const updatedTask = await taskAPI.update(task.id, {
@@ -1613,6 +1696,8 @@ const Tasks = ({
       );
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to update task.");
+    } finally {
+      pendingTaskUpdateIdsRef.current.delete(task.id);
     }
   };
 
@@ -1651,6 +1736,7 @@ const Tasks = ({
 
     if (isCompletingSubtask && isSubmissionSubtask) {
       setSelectedTaskId("");
+      setErrorMessage("");
       setCompletionDraft({ task, nextSubtasks, finalize: false });
       return;
     }
@@ -1669,15 +1755,26 @@ const Tasks = ({
       index === subtaskIndex ? { ...subtask, completed: true } : subtask
     );
     setSelectedTaskId("");
+    setErrorMessage("");
     setCompletionDraft({ task, nextSubtasks, finalize: false });
   };
 
   const submitCompletedTask = async (output) => {
     const draft = completionDraft;
-    if (!draft) return;
+    if (!draft || isSubmittingOutput) return;
 
     if (output.outputMethod === "file" && !output.file) {
       setErrorMessage("Please upload a file before submitting.");
+      return;
+    }
+
+    if (
+      output.outputMethod === "file" &&
+      output.watermark &&
+      !isAutoWatermarkImage(output.file) &&
+      !output.watermarkedFile
+    ) {
+      setErrorMessage("Please upload a separate protected review copy before submitting.");
       return;
     }
 
@@ -1687,6 +1784,7 @@ const Tasks = ({
     }
 
     try {
+      setIsSubmittingOutput(true);
       setErrorMessage("");
       const updatedTask = await taskAPI.submitOutput(draft.task.id, {
         ...output,
@@ -1704,6 +1802,8 @@ const Tasks = ({
       setCompletionDraft(null);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
+    } finally {
+      setIsSubmittingOutput(false);
     }
   };
 
@@ -1981,7 +2081,14 @@ const Tasks = ({
           {completionDraft && (
             <CompletedTaskModal
               completion={completionDraft}
-              onClose={() => setCompletionDraft(null)}
+              errorMessage={errorMessage}
+              isSubmitting={isSubmittingOutput}
+              onClose={() => {
+                if (!isSubmittingOutput) {
+                  setErrorMessage("");
+                  setCompletionDraft(null);
+                }
+              }}
               onSubmit={submitCompletedTask}
             />
           )}

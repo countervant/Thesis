@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { getSafeSearchPattern } from "../utils/search.js";
 import { sendPasswordResetCode } from "../utils/email.js";
 import {
   getCachedAvatar,
@@ -28,6 +29,7 @@ import {
 } from "../controllers/twoFactorController.js";
 import { isUserOnline, PRESENCE_TIMEOUT_MS } from "../utils/presence.js";
 import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
+import { createRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 const emailRegex =
@@ -38,6 +40,14 @@ const isMongoTimeoutError = (error) =>
   error?.name === "MongoServerSelectionError" ||
   String(error?.message || "").toLowerCase().includes("timed out");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const RESET_OTP_TTL_MS = 10 * 60 * 1000;
+const RESET_OTP_COOLDOWN_MS = 60 * 1000;
+const RESET_OTP_MAX_ATTEMPTS = 5;
+const genericResetMessage = "If that email is registered, reset instructions have been sent.";
+const loginLimiter = createRateLimiter({ max: 20, windowMs: 15 * 60 * 1000 });
+const verificationLimiter = createRateLimiter({ max: 20, windowMs: 10 * 60 * 1000 });
+const passwordResetRequestLimiter = createRateLimiter({ max: 5, windowMs: 15 * 60 * 1000 });
+const registrationLimiter = createRateLimiter({ max: 10, windowMs: 60 * 60 * 1000 });
 
 const findUserAvatar = (userId) =>
   User.findById(userId)
@@ -65,7 +75,7 @@ const isValidEmail = (email) => {
 };
 
 // Register route
-router.post("/register", async (req, res) => {
+router.post("/register", registrationLimiter, async (req, res) => {
   const {
     firstName,
     middleInitial = "",
@@ -161,19 +171,19 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
     console.error("Registration error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Unable to register account" });
   }
 });
 
-router.post("/login", login);
-router.post("/verify-2fa", verifyLoginTwoFactor);
-router.post("/resend-2fa", resendLoginTwoFactor);
+router.post("/login", loginLimiter, login);
+router.post("/verify-2fa", verificationLimiter, verifyLoginTwoFactor);
+router.post("/resend-2fa", verificationLimiter, resendLoginTwoFactor);
 router.get("/2fa-status", protect, getTwoFactorStatus);
 router.post("/enable-2fa/request", protect, requestEnableTwoFactor);
 router.post("/enable-2fa/verify", protect, verifyEnableTwoFactor);
 router.post("/disable-2fa", protect, disableTwoFactor);
 router.post("/backup-codes/regenerate", protect, regenerateBackupCodes);
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", passwordResetRequestLimiter, async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
@@ -187,40 +197,68 @@ router.post("/forgot-password", async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email: normalizedEmail }).select("+trustedDevices");
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "+trustedDevices +resetPasswordAttempts +resetPasswordLastSentAt"
+    );
 
     if (!user) {
-      return res.status(404).json({ message: "Email is not registered" });
+      return res.status(200).json({ message: genericResetMessage });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    if (
+      user.resetPasswordLastSentAt &&
+      Date.now() - user.resetPasswordLastSentAt.getTime() < RESET_OTP_COOLDOWN_MS
+    ) {
+      return res.status(200).json({ message: genericResetMessage });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
 
     user.resetPasswordOTP = hashedOTP;
-    user.resetPasswordOTPExpires = Date.now() + 1000 * 60 * 10; // 10 minutes
-    await user.save();
+    user.resetPasswordOTPExpires = new Date(Date.now() + RESET_OTP_TTL_MS);
+    user.resetPasswordAttempts = 0;
+    user.resetPasswordLastSentAt = new Date();
+    await user.save({ validateModifiedOnly: true });
 
     try {
       await sendPasswordResetCode({ to: user.email, code: otp });
     } catch (error) {
       user.resetPasswordOTP = undefined;
       user.resetPasswordOTPExpires = undefined;
-      await user.save({ validateModifiedOnly: true }).catch(() => {});
+      user.resetPasswordLastSentAt = undefined;
+      await user.save({ validateModifiedOnly: true }).catch((cleanupError) => {
+        console.error("Unable to clear undelivered password reset code:", cleanupError);
+      });
       throw error;
     }
 
-    res.status(200).json({ message: "If that email is registered, reset instructions have been sent." });
+    res.status(200).json({ message: genericResetMessage });
   } catch (error) {
     console.error("Forgot password error:", error);
     res.status(error.status || 500).json({ message: "Unable to send reset email" });
   }
 });
 
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", verificationLimiter, async (req, res) => {
   const { email, otp, password } = req.body;
 
   if (!email || !otp || !password) {
     return res.status(400).json({ message: "Email, OTP, and new password are required" });
+  }
+
+  if (!/^\d{6}$/.test(String(otp))) {
+    return res.status(400).json({ message: "OTP must be a 6-digit code" });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ message: "Password must be at least 8 characters" });
+  }
+
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+    return res.status(400).json({
+      message: "Password must include uppercase, lowercase, and number characters",
+    });
   }
 
   try {
@@ -230,19 +268,53 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Enter a valid email" });
     }
 
-    const user = await User.findOne({ email: normalizedEmail }).select("+backupCodeHashes");
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "+backupCodeHashes +resetPasswordAttempts +resetPasswordLastSentAt"
+    );
     if (!user) {
       return res.status(400).json({ message: "Invalid email or OTP" });
     }
 
     const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
 
-    const isValid =
-      user.resetPasswordOTP === hashedOTP &&
-      user.resetPasswordOTPExpires &&
-      user.resetPasswordOTPExpires > Date.now();
+    const consumedOtp = await User.updateOne(
+      {
+        _id: user._id,
+        resetPasswordOTP: hashedOTP,
+        resetPasswordOTPExpires: { $gt: new Date() },
+        $or: [
+          { resetPasswordAttempts: { $lt: RESET_OTP_MAX_ATTEMPTS } },
+          { resetPasswordAttempts: { $exists: false } },
+        ],
+      },
+      {
+        $unset: {
+          resetPasswordOTP: 1,
+          resetPasswordOTPExpires: 1,
+          resetPasswordLastSentAt: 1,
+        },
+        $set: { resetPasswordAttempts: 0 },
+      }
+    );
 
-    if (!isValid) {
+    if (consumedOtp.modifiedCount !== 1) {
+      const failedAttempt = await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          $or: [
+            { resetPasswordAttempts: { $lt: RESET_OTP_MAX_ATTEMPTS } },
+            { resetPasswordAttempts: { $exists: false } },
+          ],
+        },
+        { $inc: { resetPasswordAttempts: 1 } },
+        { new: true }
+      ).select("+resetPasswordAttempts");
+      if ((failedAttempt?.resetPasswordAttempts || RESET_OTP_MAX_ATTEMPTS) >= RESET_OTP_MAX_ATTEMPTS) {
+        await User.updateOne(
+          { _id: user._id },
+          { $unset: { resetPasswordOTP: 1, resetPasswordOTPExpires: 1 } }
+        );
+      }
       return res.status(400).json({ message: "OTP is invalid or has expired" });
     }
 
@@ -251,7 +323,10 @@ router.post("/reset-password", async (req, res) => {
     user.backupCodeHashes = [];
     user.resetPasswordOTP = undefined;
     user.resetPasswordOTPExpires = undefined;
+    user.resetPasswordAttempts = 0;
+    user.resetPasswordLastSentAt = undefined;
     await user.save();
+    clearCachedAuthUser(user._id);
 
     res.status(200).json({ message: "Password has been reset successfully" });
   } catch (error) {
@@ -260,10 +335,11 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
-    router.get('/me', protect,  async (req, res) => {
-      res.status(200).json(req.user);
-     }
-    );
+    router.get("/me", protect, async (req, res) => {
+      const profile = { ...req.user };
+      delete profile.passwordChangedAt;
+      res.status(200).json(profile);
+    });
 
     router.patch("/presence", protect, async (req, res) => {
       try {
@@ -753,7 +829,7 @@ router.post("/reset-password", async (req, res) => {
     router.get("/employees", protect, authorize("admin"), async (req, res) => {
       try {
         const { page, limit, skip } = getPagination(req.query);
-        const search = String(req.query.search || "").trim();
+        const search = getSafeSearchPattern(req.query.search);
         const query = {
           role: "employee",
           ...(req.query.isActive === "true"
@@ -925,6 +1001,7 @@ router.post("/reset-password", async (req, res) => {
         }
 
         await employee.save();
+        clearCachedAuthUser(employee._id);
 
         res.status(200).json({
           _id: employee._id,
@@ -957,6 +1034,8 @@ router.post("/reset-password", async (req, res) => {
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
         }
+
+        clearCachedAuthUser(employee._id);
 
         res.status(200).json({ message: "Employee deleted" });
       } catch (error) {

@@ -53,5 +53,7 @@ try {
   console.error("Avatar optimization failed:", error.message);
   process.exitCode = 1;
 } finally {
-  await mongoose.disconnect().catch(() => {});
+  await mongoose.disconnect().catch((error) => {
+    console.warn("Unable to disconnect cleanly after avatar optimization:", error);
+  });
 }

@@ -9,15 +9,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
-            return "react";
-          }
+          const normalizedId = id.replaceAll("\\", "/");
 
-          if (id.includes("node_modules/react-router-dom")) {
+          if (/\/node_modules\/react-router(?:-dom)?\//.test(normalizedId)) {
             return "router";
           }
 
-          if (id.includes("node_modules/axios")) {
+          if (/\/node_modules\/(?:react|react-dom|scheduler)\//.test(normalizedId)) {
+            return "react";
+          }
+
+          if (/\/node_modules\/axios\//.test(normalizedId)) {
             return "axios";
           }
 

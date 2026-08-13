@@ -3,6 +3,7 @@ import Budget from "../model/Admin/budgetmodel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
+import { getSafeSearchPattern } from "../utils/search.js";
 
 const router = express.Router();
 const allowedTypes = ["income", "expense"];
@@ -34,7 +35,8 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
     const query = {};
 
     if (allowedTypes.includes(req.query.type)) query.type = req.query.type;
-    if (req.query.category) query.category = { $regex: String(req.query.category), $options: "i" };
+    const category = getSafeSearchPattern(req.query.category);
+    if (category) query.category = { $regex: category, $options: "i" };
     if (req.query.dateFrom || req.query.dateTo) {
       query.date = {};
       if (req.query.dateFrom) query.date.$gte = new Date(req.query.dateFrom);

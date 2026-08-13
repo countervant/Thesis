@@ -7,12 +7,134 @@ import { withAvatarUrl } from "../utils/avatar.js";
 
 const router = express.Router();
 const userPublicFields = "firstName lastName companyName role updatedAt";
+const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+const MAX_MEDIA_NAME_LENGTH = 180;
+const MEDIA_MIME_TYPES = {
+  image: new Set([
+    "image/avif",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ]),
+  video: new Set([
+    "video/mp4",
+    "video/ogg",
+    "video/quicktime",
+    "video/webm",
+  ]),
+};
+const ACTIVE_MEDIA_TYPE_PATTERN = /(?:html|svg|xml)/i;
 const isMongoTimeoutError = (error) =>
   error?.name === "MongoNetworkTimeoutError" ||
   error?.name === "MongoNetworkError" ||
   String(error?.message || "").toLowerCase().includes("timed out");
 const emptyMedia = { type: "", url: "", name: "" };
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const hasMediaSignature = (mimeType, buffer) => {
+  if (mimeType === "image/jpeg") {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimeType === "image/png") {
+    return buffer.length >= 8 && buffer.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    );
+  }
+  if (mimeType === "image/gif") {
+    return ["GIF87a", "GIF89a"].includes(buffer.subarray(0, 6).toString("ascii"));
+  }
+  if (mimeType === "image/webp") {
+    return buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+      buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  }
+  if (mimeType === "image/avif") {
+    const header = buffer.subarray(0, 32).toString("ascii");
+    return buffer.length >= 12 && header.slice(4, 8) === "ftyp" && /(?:avif|avis)/.test(header);
+  }
+  if (["video/mp4", "video/quicktime"].includes(mimeType)) {
+    return buffer.length >= 12 && buffer.subarray(4, 8).toString("ascii") === "ftyp";
+  }
+  if (mimeType === "video/webm") {
+    return buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  }
+  if (mimeType === "video/ogg") {
+    return buffer.length >= 4 && buffer.subarray(0, 4).toString("ascii") === "OggS";
+  }
+  return false;
+};
+
+export const validateMediaInput = (media) => {
+  if (!media || typeof media !== "object" || Array.isArray(media)) {
+    return { media: null };
+  }
+
+  const type = typeof media.type === "string" ? media.type.trim().toLowerCase() : "";
+  const url = typeof media.url === "string" ? media.url.trim() : "";
+  const name = typeof media.name === "string" ? media.name.trim() : "";
+
+  if (!url) {
+    return { media: null };
+  }
+
+  const allowedMimeTypes = Object.hasOwn(MEDIA_MIME_TYPES, type)
+    ? MEDIA_MIME_TYPES[type]
+    : null;
+
+  if (!allowedMimeTypes) {
+    return { error: "Media must be a supported image or video" };
+  }
+
+  if (name.length > MAX_MEDIA_NAME_LENGTH) {
+    return { error: `Media name must be ${MAX_MEDIA_NAME_LENGTH} characters or fewer` };
+  }
+
+  const dataUrlMatch = /^data:([^;,]+);base64,([a-z0-9+/]*={0,2})$/i.exec(url);
+  if (!dataUrlMatch) {
+    return { error: "Media must be a base64-encoded data URL" };
+  }
+
+  const mimeType = dataUrlMatch[1].trim().toLowerCase();
+  if (ACTIVE_MEDIA_TYPE_PATTERN.test(mimeType)) {
+    return { error: "SVG, HTML, and XML media are not supported" };
+  }
+
+  if (!allowedMimeTypes.has(mimeType)) {
+    return { error: `Media data does not match the declared ${type} type` };
+  }
+
+  const encodedData = dataUrlMatch[2];
+  if (!encodedData || encodedData.length % 4 !== 0) {
+    return { error: "Media data is not valid base64" };
+  }
+
+  const paddingLength = encodedData.endsWith("==")
+    ? 2
+    : encodedData.endsWith("=")
+      ? 1
+      : 0;
+  const decodedBytes = (encodedData.length * 3) / 4 - paddingLength;
+  if (decodedBytes > MAX_MEDIA_BYTES) {
+    return { error: "Media must be 8MB or smaller" };
+  }
+  const buffer = Buffer.from(encodedData, "base64");
+  if (
+    buffer.length !== decodedBytes ||
+    buffer.toString("base64") !== encodedData ||
+    !hasMediaSignature(mimeType, buffer)
+  ) {
+    return { error: "Media data does not match its declared file type" };
+  }
+
+  return {
+    media: {
+      type,
+      url,
+      name,
+    },
+  };
+};
 
 const findPostMedia = (postId) =>
   NewsfeedPost.findById(postId)
@@ -77,19 +199,49 @@ const withCounts = (post) => ({
   })),
 });
 
+router.get("/post/:id", protect, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid post" });
+    }
+
+    const post = await populatePost(
+      NewsfeedPost.findById(req.params.id)
+        .select("-media.url")
+        .maxTimeMS(8000)
+    );
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    return res.status(200).json(withCounts(post));
+  } catch (error) {
+    console.error("Get newsfeed post error:", error);
+    return res.status(500).json({ message: "Unable to fetch newsfeed post" });
+  }
+});
+
 router.get("/", protect, async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
+    const hasAuthorFilter = req.query.author !== undefined;
+    const author = typeof req.query.author === "string" ? req.query.author.trim() : "";
+
+    if (hasAuthorFilter && (!author || !mongoose.Types.ObjectId.isValid(author))) {
+      return res.status(400).json({ message: "Invalid newsfeed author" });
+    }
+
+    const filter = author ? { author } : {};
     const [posts, total] = await Promise.all([
       populatePost(
-        NewsfeedPost.find()
+        NewsfeedPost.find(filter)
           .select("-media.url")
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
           .maxTimeMS(8000)
       ),
-      NewsfeedPost.countDocuments().maxTimeMS(8000),
+      NewsfeedPost.countDocuments(filter).maxTimeMS(8000),
     ]);
 
     res.status(200).json(pagedResponse({
@@ -133,6 +285,35 @@ router.get("/activity", protect, async (req, res) => {
   }
 });
 
+router.post("/media/batch", protect, async (req, res) => {
+  try {
+    const requestedIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const ids = [...new Set(requestedIds.map((id) => String(id || "").trim()))];
+
+    if (ids.length === 0 || ids.length > 3 || ids.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ message: "Provide between 1 and 3 valid post IDs" });
+    }
+
+    const posts = await NewsfeedPost.find({ _id: { $in: ids } })
+      .select("media")
+      .maxTimeMS(8000)
+      .lean();
+    const storedMediaById = new Map(
+      posts.map((post) => [String(post._id), post.media || emptyMedia])
+    );
+    const mediaById = Object.fromEntries(
+      ids.map((id) => [id, storedMediaById.get(id) || emptyMedia])
+    );
+
+    return res.status(200).json({ mediaById });
+  } catch (error) {
+    console.error("Get newsfeed media batch error:", error);
+    return res.status(isMongoTimeoutError(error) ? 503 : 500).json({
+      message: "Unable to fetch post media",
+    });
+  }
+});
+
 router.get("/:id/media", protect, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -148,7 +329,7 @@ router.get("/:id/media", protect, async (req, res) => {
     res.status(200).json(post.media || emptyMedia);
   } catch (error) {
     if (isMongoTimeoutError(error)) {
-      return res.status(200).json(emptyMedia);
+      return res.status(503).json({ message: "Post media is temporarily unavailable" });
     }
 
     console.error("Get newsfeed media error:", error);
@@ -193,12 +374,19 @@ router.get("/:id/comments", protect, async (req, res) => {
 
 router.post("/", protect, async (req, res) => {
   try {
-    const content = req.body.content?.trim() || "";
-    const media = req.body.media || {};
-    const mediaType = ["image", "video"].includes(media.type) ? media.type : "";
-    const mediaUrl = typeof media.url === "string" ? media.url : "";
+    const body = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+      ? req.body
+      : {};
+    const content = typeof body.content === "string" ? body.content.trim() : "";
+    const mediaValidation = validateMediaInput(body.media);
 
-    if (!content && !mediaUrl) {
+    if (mediaValidation.error) {
+      return res.status(400).json({ message: mediaValidation.error });
+    }
+
+    const media = mediaValidation.media;
+
+    if (!content && !media) {
       return res.status(400).json({ message: "Post content or media is required" });
     }
 
@@ -206,20 +394,10 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Post content must be 1200 characters or fewer" });
     }
 
-    if (mediaUrl && !mediaType) {
-      return res.status(400).json({ message: "Media must be an image or video" });
-    }
-
     const post = await NewsfeedPost.create({
       author: req.user._id,
       content,
-      media: mediaUrl
-        ? {
-            type: mediaType,
-            url: mediaUrl,
-            name: String(media.name || "").slice(0, 180),
-          }
-        : undefined,
+      media: media || undefined,
     });
     const createdPost = await populatePost(
       NewsfeedPost.findById(post._id).select("-media.url")
