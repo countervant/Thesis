@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import AppLoadingScreen from "../AppLoadingScreen.jsx";
+import AppLoadingScreen from "../AppLoadingScreen/AppLoadingScreen";
 
 // Protected route component that checks authentication and roles
 const ProtectedRoute = ({ children, allowedRoles }) => {

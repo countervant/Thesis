@@ -2,11 +2,11 @@ import express from "express";
 import { createHash } from "crypto";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
-import Task from "../model/Admin/taskmodel.js";
+import Task from "../models/Admin/taskmodel.js";
 import {
   BudgetPlannerEntry,
   BudgetPlannerSettings,
-} from "../model/Employee/budgetPlannerModel.js";
+} from "../models/Employee/budgetPlannerModel.js";
 
 const router = express.Router();
 const allowedTypes = new Set(["income", "expense"]);

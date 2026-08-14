@@ -1,6 +1,6 @@
 import express from "express";
-import LeaveRequest from "../model/leaveRequestModel.js";
-import User from "../model/userModel.js";
+import LeaveRequest from "../models/leaveRequestModel.js";
+import User from "../models/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
