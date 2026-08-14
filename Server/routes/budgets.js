@@ -1,5 +1,5 @@
 import express from "express";
-import Budget from "../model/Admin/budgetmodel.js";
+import Budget from "../models/Admin/budgetmodel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";

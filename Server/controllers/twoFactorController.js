@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { createHmac, randomBytes } from "crypto";
-import User from "../model/userModel.js";
+import User from "../models/userModel.js";
 import { clearCachedAuthUser } from "../middleware/protectedjwt.js";
 import { sendTwoFactorCode } from "../utils/email.js";
 import {

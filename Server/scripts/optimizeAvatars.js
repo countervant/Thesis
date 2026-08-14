@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mongoose from "mongoose";
-import User from "../model/userModel.js";
+import User from "../models/userModel.js";
 import {
   MAX_STORED_AVATAR_BYTES,
   optimizeAvatarDataUrl,

@@ -3,16 +3,16 @@ import mongoose from "mongoose";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import "../model/Admin/Clientmodel.js";
-import "../model/Admin/budgetmodel.js";
-import "../model/Admin/taskmodel.js";
-import "../model/Employee/budgetPlannerModel.js";
-import "../model/calendarDepartmentModel.js";
-import "../model/calendarEventModel.js";
-import "../model/leaveRequestModel.js";
-import "../model/messageModel.js";
-import "../model/newsfeesModel.js";
-import "../model/userModel.js";
+import "../models/Admin/Clientmodel.js";
+import "../models/Admin/budgetmodel.js";
+import "../models/Admin/taskmodel.js";
+import "../models/Employee/budgetPlannerModel.js";
+import "../models/calendarDepartmentModel.js";
+import "../models/calendarEventModel.js";
+import "../models/leaveRequestModel.js";
+import "../models/messageModel.js";
+import "../models/newsfeedModel.js";
+import "../models/userModel.js";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(scriptDirectory, "../.env") });

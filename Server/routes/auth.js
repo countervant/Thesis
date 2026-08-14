@@ -1,7 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
-import User from "../model/userModel.js";
-import Client from "../model/Admin/Clientmodel.js";
+import User from "../models/userModel.js";
+import Client from "../models/Admin/Clientmodel.js";
 import { authorize } from "../middleware/authorize.js";
 import { clearCachedAuthUser, protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";

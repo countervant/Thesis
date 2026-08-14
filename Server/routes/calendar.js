@@ -1,8 +1,8 @@
 import express from "express";
 import mongoose from "mongoose";
-import CalendarDepartment from "../model/calendarDepartmentModel.js";
-import CalendarEvent from "../model/calendarEventModel.js";
-import User from "../model/userModel.js";
+import CalendarDepartment from "../models/calendarDepartmentModel.js";
+import CalendarEvent from "../models/calendarEventModel.js";
+import User from "../models/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 
 const router = express.Router();
