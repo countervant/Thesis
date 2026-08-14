@@ -19,9 +19,9 @@ import sidebarIcon from "../assets/sidebar.png";
 import settingsIcon from "../assets/settings.png";
 import taskIcon from "../assets/task.png";
 import themeIcon from "../assets/theme.png";
-import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import InitialsAvatar from "../components/InitialsAvatar.jsx";
-import { NotificationSkeleton } from "../components/Skeleton.jsx";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { NotificationSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getApiErrorMessage, messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
 import {

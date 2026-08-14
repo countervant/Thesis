@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import InitialsAvatar from "../components/InitialsAvatar.jsx";
-import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton.jsx";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import companyIcon from "../assets/company.png";
 import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
 import emailIcon from "../assets/email.png";

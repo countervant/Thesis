@@ -13,8 +13,8 @@ import {
   newsfeedAPI,
   taskAPI,
 } from "../../../services/api.js";
-import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
-import { DashboardSkeleton } from "../../../components/Skeleton.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
+import { DashboardSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 
 const statItems = [

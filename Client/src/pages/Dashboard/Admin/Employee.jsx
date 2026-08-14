@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { employeeAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
-import InitialsAvatar from "../../../components/InitialsAvatar.jsx";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
-import { PersonGridSkeleton } from "../../../components/Skeleton.jsx";
+import { PersonGridSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 
 const filters = [
   { label: "All accounts", value: "All" },

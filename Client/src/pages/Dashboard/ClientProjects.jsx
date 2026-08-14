@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Skeleton from "../../components/Skeleton.jsx";
-import ConfirmDialog from "../../components/ConfirmDialog.jsx";
+import Skeleton from "../../components/Skeleton/Skeleton.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.jsx";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
 import progressIcon from "../../assets/progress.png";
 import pendingIcon from "../../assets/pending.png";

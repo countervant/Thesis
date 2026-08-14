@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import { getApiErrorMessage, taskAPI } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
-import ConfirmDialog from "../../components/ConfirmDialog.jsx";
-import InitialsAvatar from "../../components/InitialsAvatar.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const ratingColors = ["#7c3aed", "#a855f7", "#ec4899", "#fb923c", "#94a3b8"];
