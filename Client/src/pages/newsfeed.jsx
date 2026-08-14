@@ -7,9 +7,9 @@ import redHeartIcon from "../assets/redheart.png";
 import sendIcon from "../assets/send.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI, newsfeedAPI } from "../services/api.js";
-import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import InitialsAvatar from "../components/InitialsAvatar.jsx";
-import { FeedSkeleton } from "../components/Skeleton.jsx";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { FeedSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { getCountryFlag } from "../utils/countries.js";
 
 const notificationTargetKey = "clientraNotificationTarget";

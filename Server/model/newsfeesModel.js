@@ -72,6 +72,10 @@ const newsfeedPostSchema = new mongoose.Schema(
         type: String,
         default: "",
       },
+      publicId: {
+        type: String,
+        default: "",
+      },
     },
     hearts: [
       {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import notificationIcon from "../assets/notification.png";
 import taskIcon from "../assets/task.png";
 import heartIcon from "../assets/heart.png";
@@ -8,7 +8,7 @@ import messagesIcon from "../assets/messages.png";
 import MainBars from "./MainBars.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getApiErrorMessage, newsfeedAPI, taskAPI } from "../services/api.js";
-import { NotificationSkeleton } from "../components/Skeleton.jsx";
+import { NotificationSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import {
   filterNotificationsByPreference,
   readNotificationSettings,

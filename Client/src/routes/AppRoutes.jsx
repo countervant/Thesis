@@ -11,7 +11,7 @@ import {
 } from "react-router-dom";
 
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
-import AppLoadingScreen from "../components/AppLoadingScreen.jsx";
+import AppLoadingScreen from "../components/AppLoadingScreen/AppLoadingScreen.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 const Login = lazy(() => import("../pages/auth/Login.jsx"));
