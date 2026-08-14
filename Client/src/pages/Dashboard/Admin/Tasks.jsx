@@ -1549,7 +1549,7 @@ const Tasks = ({
 
     window.addEventListener("clientra:notification-target", focusTarget);
     return () => window.removeEventListener("clientra:notification-target", focusTarget);
-  }, [isLoading, tasks]);
+  }, [isLoading]);
 
   useEffect(() => {
     if (!selectedTaskId) return undefined;
@@ -1580,6 +1580,8 @@ const Tasks = ({
   }, [selectedTaskId]);
 
   const visibleTasks = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
     const filteredTasks = tasks.filter((task) => {
       const dateStatus = getDateStatus(task.dueDate);
       const matchesGroup =
@@ -1588,7 +1590,7 @@ const Tasks = ({
         (visibleGroup === "Upcoming" && (dateStatus === "Week" || dateStatus === "Upcoming") && task.status !== "Done") ||
         (visibleGroup === "Overdue" && dateStatus === "Overdue" && task.status !== "Done") ||
         (visibleGroup === "Completed" && task.status === "Done");
-      const normalizedSearch = searchQuery.trim().toLowerCase();
+
       const matchesSearch =
         !normalizedSearch ||
         task.title.toLowerCase().includes(normalizedSearch) ||
@@ -1597,8 +1599,10 @@ const Tasks = ({
       return matchesGroup && matchesSearch;
     });
 
-    return [...filteredTasks].sort((firstTask, secondTask) => {
-      return new Date(toInputDate(firstTask.dueDate)) - new Date(toInputDate(secondTask.dueDate));
+    return filteredTasks.sort((firstTask, secondTask) => {
+      const firstDate = toInputDate(firstTask.dueDate);
+      const secondDate = toInputDate(secondTask.dueDate);
+      return firstDate.localeCompare(secondDate);
     });
   }, [searchQuery, tasks, visibleGroup]);
 
@@ -1609,13 +1613,33 @@ const Tasks = ({
     }
     return task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
   };
-  const taskStats = [
-    { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
-    { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
-    { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
-    { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
-  ];
+  const taskStats = useMemo(() => {
+    let dueToday = 0;
+    let inProgress = 0;
+    let completed = 0;
+    let overdue = 0;
+
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      const isDone = task.status === "Done";
+      if (isDone) {
+        completed++;
+      } else {
+        if (task.status === "In progress") inProgress++;
+        const dateStatus = getDateStatus(task.dueDate);
+        if (dateStatus === "Today") dueToday++;
+        else if (dateStatus === "Overdue") overdue++;
+      }
+    }
+
+    return [
+      { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
+      { label: "Due Today", value: dueToday, icon: pendingrequest, tone: "orange" },
+      { label: "In Progress", value: inProgress, icon: progress, tone: "blue" },
+      { label: "Completed", value: completed, icon: done, tone: "green" },
+      { label: "Overdue", value: overdue, icon: notification, tone: "rose" },
+    ];
+  }, [tasks]);
   const selectedTask = selectedTaskDetails;
 
   const renderTaskRows = (items, accentClass = "bg-pink-500") => {

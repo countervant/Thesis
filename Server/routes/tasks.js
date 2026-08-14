@@ -1073,15 +1073,15 @@ router.put("/:id", protect, async (req, res) => {
 
       await task.save();
 
-      const updatedTask = await Task.findById(task._id)
-      .populate("assignedTo", "firstName lastName email role")
-      .populate("assignees", "firstName lastName email role")
-      .populate("subtasks.assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role")
-        .populate("requestedBy", "firstName lastName companyName email role")
-        .lean();
+      await task.populate([
+        { path: "assignedTo", select: "firstName lastName email role" },
+        { path: "assignees", select: "firstName lastName email role" },
+        { path: "subtasks.assignedTo", select: "firstName lastName email role" },
+        { path: "createdBy", select: "firstName lastName email role" },
+        { path: "requestedBy", select: "firstName lastName companyName email role" },
+      ]);
 
-      return res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
+      return res.status(200).json(addTaskAvatarUrls(task.toObject(), req.user));
     }
 
     if (req.user.role !== "admin") {
@@ -1144,16 +1144,16 @@ router.put("/:id", protect, async (req, res) => {
       task.priority = priority;
       await task.save();
 
-      const updatedTask = await Task.findById(task._id)
-        .populate("assignedTo", "firstName lastName email role")
-        .populate("assignees", "firstName lastName email role")
-        .populate("subtasks.assignedTo", "firstName lastName email role")
-        .populate("createdBy", "firstName lastName email role")
-        .populate("requestedBy", "firstName lastName companyName email role")
-        .populate("finalOutput.submittedBy", "firstName lastName email role")
-        .lean();
+      await task.populate([
+        { path: "assignedTo", select: "firstName lastName email role" },
+        { path: "assignees", select: "firstName lastName email role" },
+        { path: "subtasks.assignedTo", select: "firstName lastName email role" },
+        { path: "createdBy", select: "firstName lastName email role" },
+        { path: "requestedBy", select: "firstName lastName companyName email role" },
+        { path: "finalOutput.submittedBy", select: "firstName lastName email role" },
+      ]);
 
-      return res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
+      return res.status(200).json(addTaskAvatarUrls(task.toObject(), req.user));
     }
 
     const payload = normalizeTaskPayload(
@@ -1265,16 +1265,16 @@ router.put("/:id", protect, async (req, res) => {
 
     await task.save();
 
-    const updatedTask = await Task.findById(task._id)
-      .populate("assignedTo", "firstName lastName email role")
-      .populate("assignees", "firstName lastName email role")
-      .populate("subtasks.assignedTo", "firstName lastName email role")
-      .populate("createdBy", "firstName lastName email role")
-      .populate("requestedBy", "firstName lastName companyName email role")
-      .populate("finalOutput.submittedBy", "firstName lastName email role")
-      .lean();
+    await task.populate([
+      { path: "assignedTo", select: "firstName lastName email role" },
+      { path: "assignees", select: "firstName lastName email role" },
+      { path: "subtasks.assignedTo", select: "firstName lastName email role" },
+      { path: "createdBy", select: "firstName lastName email role" },
+      { path: "requestedBy", select: "firstName lastName companyName email role" },
+      { path: "finalOutput.submittedBy", select: "firstName lastName email role" },
+    ]);
 
-    res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
+    res.status(200).json(addTaskAvatarUrls(task.toObject(), req.user));
   } catch (error) {
     console.error("Update task error:", error);
     res.status(500).json({ message: "Unable to update task" });

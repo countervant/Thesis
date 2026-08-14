@@ -14,9 +14,10 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
     const getValue = (result, fallback) =>
       result.status === "fulfilled" ? result.value : fallback;
     const queries = await Promise.allSettled([
-      Task.countDocuments().maxTimeMS(8000),
-      User.countDocuments({ role: "employee" }).maxTimeMS(8000),
-      User.countDocuments({ role: "client" }).maxTimeMS(8000),
+      User.aggregate([
+        { $match: { role: { $in: ["employee", "client"] } } },
+        { $group: { _id: "$role", count: { $sum: 1 } } },
+      ]).option({ maxTimeMS: 8000 }),
       Client.countDocuments().maxTimeMS(8000),
       Budget.countDocuments().maxTimeMS(8000),
       Task.aggregate([{ $group: { _id: "$status", total: { $sum: 1 } } }]).option({ maxTimeMS: 8000 }),
@@ -55,26 +56,37 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
         console.warn(`Dashboard query ${index} failed:`, result.reason?.message || result.reason);
       }
     });
-    const totalTasks = getValue(queries[0], 0);
-    const totalEmployees = getValue(queries[1], 0);
-    const totalUserClients = getValue(queries[2], 0);
-    const totalManualClients = getValue(queries[3], 0);
-    const totalBudgetEntries = getValue(queries[4], 0);
-    const taskStatusCounts = getValue(queries[5], []);
-    const recentTasks = getValue(queries[6], []);
-    const recentEmployees = getValue(queries[7], []);
-    const recentClients = getValue(queries[8], []);
-    const recentBudgetEntries = getValue(queries[9], []);
+    const userRoleCounts = getValue(queries[0], []);
+    const totalManualClients = getValue(queries[1], 0);
+    const totalBudgetEntries = getValue(queries[2], 0);
+    const taskStatusList = getValue(queries[3], []);
+    const recentTasks = getValue(queries[4], []);
+    const recentEmployees = getValue(queries[5], []);
+    const recentClients = getValue(queries[6], []);
+    const recentBudgetEntries = getValue(queries[7], []);
+
+    let totalEmployees = 0;
+    let totalUserClients = 0;
+    for (let i = 0; i < userRoleCounts.length; i++) {
+      const item = userRoleCounts[i];
+      if (item._id === "employee") totalEmployees = item.count;
+      else if (item._id === "client") totalUserClients = item.count;
+    }
+
+    let totalTasks = 0;
+    const taskStatusCounts = {};
+    for (let i = 0; i < taskStatusList.length; i++) {
+      const item = taskStatusList[i];
+      taskStatusCounts[item._id] = item.total;
+      totalTasks += item.total;
+    }
 
     res.status(200).json({
       totalTasks,
       totalEmployees,
       totalClients: totalUserClients + totalManualClients,
       totalBudgetEntries,
-      taskStatusCounts: taskStatusCounts.reduce(
-        (result, item) => ({ ...result, [item._id]: item.total }),
-        {}
-      ),
+      taskStatusCounts,
       recentTasks,
       recentEmployees,
       recentClients,

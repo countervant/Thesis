@@ -498,6 +498,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const [newsfeedSearch, setNewsfeedSearch] = useState("");
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const userId = getEntityId(user);
   const readNotificationSet = useMemo(
     () => new Set(readNotificationIds),
@@ -647,10 +651,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
         const nextNotifications = filterNotificationsByPreference(
           [
             ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], userId),
-            ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], user),
+            ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], userRef.current),
           ],
           notificationPreferences
-        ).sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
+        ).sort((first, second) => new Date(second.date || 0).getTime() - new Date(first.date || 0).getTime());
 
         if (isMounted) {
           setNotifications(nextNotifications);
@@ -678,7 +682,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [notificationPreferences, token, user, userId]);
+  }, [notificationPreferences, token, userId]);
 
   const handleOpenNotification = (notification) => {
     const nextReadIds = Array.from(new Set([...readNotificationIds, notification.id]));

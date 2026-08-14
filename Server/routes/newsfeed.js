@@ -412,23 +412,34 @@ router.post("/", protect, async (req, res) => {
 
 router.patch("/:id/heart", protect, async (req, res) => {
   try {
-    const post = await NewsfeedPost.findById(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid post" });
+    }
 
-    if (!post) {
+    const userId = req.user._id;
+    const postExists = await NewsfeedPost.findById(req.params.id)
+      .select("hearts")
+      .lean()
+      .maxTimeMS(8000);
+
+    if (!postExists) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    const userId = String(req.user._id);
-    const hasHearted = post.hearts.some((heart) => String(heart) === userId);
+    const hasHearted = (postExists.hearts || []).some((heart) => String(heart) === String(userId));
+    const updateOperator = hasHearted
+      ? { $pull: { hearts: userId } }
+      : { $addToSet: { hearts: userId } };
 
-    post.hearts = hasHearted
-      ? post.hearts.filter((heart) => String(heart) !== userId)
-      : [...post.hearts, req.user._id];
-
-    await post.save();
     const updatedPost = await populatePost(
-      NewsfeedPost.findById(post._id).select("-media.url")
+      NewsfeedPost.findByIdAndUpdate(req.params.id, updateOperator, { new: true })
+        .select("-media.url")
+        .maxTimeMS(8000)
     );
+
+    if (!updatedPost) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
     res.status(200).json(updatedPost);
   } catch (error) {
