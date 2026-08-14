@@ -14,6 +14,12 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
 import { withAvatarUrl } from "../utils/avatar.js";
 import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
+import {
+  deleteCloudinaryAsset,
+  getCloudinaryResourceType,
+  isCloudinaryConfigured,
+  uploadBufferToCloudinary,
+} from "../utils/cloudinary.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -637,6 +643,30 @@ const saveOutputFile = async (taskId, parsedFile, options = {}) => {
   };
 };
 
+const saveTaskOutput = async (taskId, parsedFile, options = {}) => {
+  if (isCloudinaryConfigured()) {
+    const resourceType = getCloudinaryResourceType(parsedFile.mimeType);
+    const folder = `clientra/tasks/${taskId}`;
+    const result = await uploadBufferToCloudinary(parsedFile.buffer, {
+      folder,
+      resourceType,
+    });
+    return {
+      fileName: parsedFile.fileName,
+      mimeType: parsedFile.mimeType,
+      fileUrl: result.secure_url,
+      publicId: result.public_id,
+      resourceType: result.resource_type || resourceType,
+    };
+  }
+
+  const localFile = await saveOutputFile(taskId, parsedFile, options);
+  return {
+    ...localFile,
+    resourceType: getCloudinaryResourceType(parsedFile.mimeType),
+  };
+};
+
 const removeFileIfPresent = async (filePath) => {
   if (!filePath) return;
   try {
@@ -667,8 +697,17 @@ const findStoredTaskFile = async (primaryRoot, legacyRoot, taskId, storedFileNam
 };
 
 const removeStoredTaskOutput = async (taskId, finalOutput) => {
+  if (!finalOutput) return;
   const safeTaskId = String(taskId);
   const paths = [];
+
+  if (finalOutput.publicId) {
+    await deleteCloudinaryAsset(finalOutput.publicId, finalOutput.resourceType || "raw");
+  }
+  if (finalOutput.previewPublicId) {
+    await deleteCloudinaryAsset(finalOutput.previewPublicId, "image");
+  }
+
   const originalName = path.basename(String(finalOutput?.originalStoredName || ""));
   if (originalName && originalName === finalOutput?.originalStoredName) {
     paths.push(path.join(privateUploadsRoot, safeTaskId, originalName));
@@ -688,8 +727,13 @@ const removeStoredTaskOutput = async (taskId, finalOutput) => {
   await Promise.all(paths.map(removeFileIfPresent));
 };
 
-const removeTaskOutputDirectories = async (taskId) => {
+const removeTaskOutputDirectories = async (taskId, finalOutput) => {
   const safeTaskId = String(taskId);
+  if (finalOutput) {
+    await removeStoredTaskOutput(taskId, finalOutput).catch((cleanupError) => {
+      console.error("Unable to remove task Cloudinary assets:", cleanupError);
+    });
+  }
   await Promise.all([
     fs.rm(path.join(privateUploadsRoot, safeTaskId), { recursive: true, force: true }),
     fs.rm(path.join(uploadsRoot, safeTaskId), { recursive: true, force: true }),
@@ -2005,13 +2049,40 @@ router.get("/:id/output/download", protect, async (req, res) => {
 
     const fullyPaid = !isPaymentProtectedTask(task);
     const canAccessOriginal = req.user.role !== "client" || fullyPaid;
-    const canUseOriginal = canAccessOriginal && task.finalOutput.originalStoredName;
-    if (!canAccessOriginal && !task.finalOutput.previewStoredName && !task.finalOutput.fileUrl) {
+    const canUseOriginal = canAccessOriginal && (task.finalOutput.fileUrl || task.finalOutput.originalStoredName);
+    if (!canAccessOriginal && !task.finalOutput.previewUrl && !task.finalOutput.previewStoredName && !task.finalOutput.fileUrl) {
       return res.status(402).json({
         message: "The original output is protected until the project is fully paid",
       });
     }
 
+    const downloadName = canAccessOriginal
+      ? task.finalOutput.fileName
+      : task.finalOutput.previewFileName || `watermarked-${task.finalOutput.fileName}`;
+
+    // Cloudinary remote URL download
+    const cloudinaryFileUrl = canUseOriginal
+      ? (task.finalOutput.fileUrl?.startsWith("http") ? task.finalOutput.fileUrl : null)
+      : (task.finalOutput.previewUrl?.startsWith("http")
+          ? task.finalOutput.previewUrl
+          : (task.finalOutput.fileUrl?.startsWith("http") ? task.finalOutput.fileUrl : null));
+
+    if (cloudinaryFileUrl) {
+      const response = await fetch(cloudinaryFileUrl);
+      if (!response.ok) {
+        return res.status(404).json({ message: "The uploaded output file could not be retrieved" });
+      }
+
+      const contentType =
+        task.finalOutput.mimeType || response.headers.get("content-type") || "application/octet-stream";
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(downloadName)}"`);
+      res.setHeader("Content-Type", contentType);
+
+      const arrayBuffer = await response.arrayBuffer();
+      return res.send(Buffer.from(arrayBuffer));
+    }
+
+    // Local filesystem download fallback
     const hasPrivatePreview = !canUseOriginal && Boolean(task.finalOutput.previewStoredName);
     const selectedRoot = canUseOriginal || hasPrivatePreview ? privateUploadsRoot : uploadsRoot;
     const selectedStoredValue = canUseOriginal
@@ -2039,9 +2110,6 @@ router.get("/:id/output/download", protect, async (req, res) => {
       return res.status(404).json({ message: "The uploaded output file could not be found" });
     }
 
-    const downloadName = canAccessOriginal
-      ? task.finalOutput.fileName
-      : task.finalOutput.previewFileName || `watermarked-${task.finalOutput.fileName}`;
     return res.download(filePath, safeFileName(downloadName || storedFileName));
   } catch (error) {
     console.error("Download task output error:", error);
@@ -2094,6 +2162,7 @@ router.get("/:id/attachments/:index/download", protect, async (req, res) => {
 
 router.post("/:id/submit-output", protect, async (req, res) => {
   const createdFilePaths = [];
+  const createdPublicIds = [];
   let outputCommitted = false;
   try {
     const task = await Task.findById(req.params.id);
@@ -2185,23 +2254,43 @@ router.post("/:id/submit-output", protect, async (req, res) => {
         }
         assertDistinctReviewFile(parsedOriginalFile, parsedReviewFile);
 
-        const originalFile = await saveOutputFile(task._id, parsedOriginalFile, { private: true });
-        createdFilePaths.push(originalFile.filePath);
-        const reviewFile = await saveOutputFile(task._id, parsedReviewFile, { private: true });
-        createdFilePaths.push(reviewFile.filePath);
+        const originalFile = await saveTaskOutput(task._id, parsedOriginalFile, { private: true });
+        if (originalFile.filePath) createdFilePaths.push(originalFile.filePath);
+        if (originalFile.publicId) {
+          createdPublicIds.push({ id: originalFile.publicId, type: originalFile.resourceType });
+        }
+
+        const reviewFile = await saveTaskOutput(task._id, parsedReviewFile, { private: true });
+        if (reviewFile.filePath) createdFilePaths.push(reviewFile.filePath);
+        if (reviewFile.publicId) {
+          createdPublicIds.push({ id: reviewFile.publicId, type: reviewFile.resourceType });
+        }
+
         fileOutput = {
           fileName: originalFile.fileName,
+          fileUrl: originalFile.fileUrl,
+          publicId: originalFile.publicId,
+          resourceType: originalFile.resourceType,
           previewFileName: reviewFile.fileName,
           previewStoredName: reviewFile.storedName,
+          previewPublicId: reviewFile.publicId,
+          previewUrl: reviewFile.fileUrl,
           originalStoredName: originalFile.storedName,
           mimeType: originalFile.mimeType,
           watermarked: true,
         };
       } else {
-        const originalFile = await saveOutputFile(task._id, parsedOriginalFile, { private: true });
-        createdFilePaths.push(originalFile.filePath);
+        const originalFile = await saveTaskOutput(task._id, parsedOriginalFile, { private: true });
+        if (originalFile.filePath) createdFilePaths.push(originalFile.filePath);
+        if (originalFile.publicId) {
+          createdPublicIds.push({ id: originalFile.publicId, type: originalFile.resourceType });
+        }
+
         fileOutput = {
           fileName: originalFile.fileName,
+          fileUrl: originalFile.fileUrl,
+          publicId: originalFile.publicId,
+          resourceType: originalFile.resourceType,
           originalStoredName: originalFile.storedName,
           mimeType: originalFile.mimeType,
           watermarked: false,
@@ -2228,8 +2317,12 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       outputMethod,
       fileName: fileOutput.fileName,
       fileUrl: fileOutput.fileUrl,
+      publicId: fileOutput.publicId,
+      resourceType: fileOutput.resourceType,
       previewFileName: fileOutput.previewFileName,
       previewStoredName: fileOutput.previewStoredName,
+      previewPublicId: fileOutput.previewPublicId,
+      previewUrl: fileOutput.previewUrl,
       originalStoredName: fileOutput.originalStoredName,
       mimeType: fileOutput.mimeType,
       watermarked: Boolean(fileOutput.watermarked),
@@ -2268,10 +2361,19 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
-    if (!outputCommitted && createdFilePaths.length > 0) {
-      await Promise.all(createdFilePaths.map(removeFileIfPresent)).catch((cleanupError) => {
-        console.error("Unable to roll back task output files after a failed submission:", cleanupError);
-      });
+    if (!outputCommitted) {
+      if (createdFilePaths.length > 0) {
+        await Promise.all(createdFilePaths.map(removeFileIfPresent)).catch((cleanupError) => {
+          console.error("Unable to roll back task output files after a failed submission:", cleanupError);
+        });
+      }
+      if (createdPublicIds.length > 0) {
+        await Promise.all(
+          createdPublicIds.map((item) => deleteCloudinaryAsset(item.id, item.type))
+        ).catch((cleanupError) => {
+          console.error("Unable to roll back Cloudinary assets after a failed submission:", cleanupError);
+        });
+      }
     }
     console.error("Submit task output error:", error);
     const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500
@@ -2298,7 +2400,7 @@ router.delete("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    await removeTaskOutputDirectories(task._id).catch((cleanupError) => {
+    await removeTaskOutputDirectories(task._id, task.finalOutput).catch((cleanupError) => {
       console.error("Unable to remove deleted task output files:", cleanupError);
     });
 
