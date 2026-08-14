@@ -5,8 +5,8 @@ import {
   protect,
   wasTokenIssuedBeforePasswordChange,
 } from "../middleware/protectedjwt.js";
-import Message from "../model/messageModel.js";
-import User from "../model/userModel.js";
+import Message from "../models/messageModel.js";
+import User from "../models/userModel.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
 import { getAvatarUrl } from "../utils/avatar.js";

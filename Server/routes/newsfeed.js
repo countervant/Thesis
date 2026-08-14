@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import NewsfeedPost from "../model/newsfeesModel.js";
+import NewsfeedPost from "../models/newsfeedModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";

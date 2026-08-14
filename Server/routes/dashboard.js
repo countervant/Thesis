@@ -1,8 +1,8 @@
 import express from "express";
-import Budget from "../model/Admin/budgetmodel.js";
-import Client from "../model/Admin/Clientmodel.js";
-import Task from "../model/Admin/taskmodel.js";
-import User from "../model/userModel.js";
+import Budget from "../models/Admin/budgetmodel.js";
+import Client from "../models/Admin/Clientmodel.js";
+import Task from "../models/Admin/taskmodel.js";
+import User from "../models/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 

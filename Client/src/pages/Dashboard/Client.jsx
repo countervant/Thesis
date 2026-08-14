@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Skeleton from "../../components/Skeleton.jsx";
+import Skeleton from "../../components/Skeleton/Skeleton";
 import { getApiErrorMessage, calendarAPI, messageAPI, taskAPI } from "../../services/api.js";
 
 const statusFromApi = {

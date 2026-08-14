@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { budgetAPI, getApiErrorMessage } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog.jsx";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog";
 import balanceIcon from "../../../assets/balance.png";
 import totalExpenseIcon from "../../../assets/totalexpense.png";
 import totalIncomeIcon from "../../../assets/totalincome.png";
@@ -9,7 +9,7 @@ import {
   BudgetChartsSkeleton,
   BudgetSummarySkeleton,
   SkeletonRows,
-} from "../../../components/Skeleton.jsx";
+} from "../../../components/Skeleton/Skeleton";
 
 const BUDGET_FETCH_PAGE_SIZE = 100;
 const BUDGET_FETCH_CONCURRENCY = 4;

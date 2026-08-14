@@ -5,8 +5,8 @@ import reject from "../assets/reject.png";
 import employees from "../assets/employees.png";
 import view from "../assets/view.png";
 import check from "../assets/check.png";
-import InitialsAvatar from "../components/InitialsAvatar.jsx";
-import { SkeletonRows } from "../components/Skeleton.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
+import { SkeletonRows } from "../components/Skeleton/Skeleton";
 import { getApiErrorMessage, leaveRequestAPI } from "../services/api";
 
 const toneStyles = {

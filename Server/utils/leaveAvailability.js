@@ -1,4 +1,4 @@
-import LeaveRequest from "../model/leaveRequestModel.js";
+import LeaveRequest from "../models/leaveRequestModel.js";
 
 const MANILA_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
 

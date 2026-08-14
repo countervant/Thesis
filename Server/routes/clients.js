@@ -1,6 +1,6 @@
 import express from "express";
-import Client from "../model/Admin/Clientmodel.js";
-import User from "../model/userModel.js";
+import Client from "../models/Admin/Clientmodel.js";
+import User from "../models/userModel.js";
 import { authorize } from "../middleware/authorize.js";
 import { clearCachedAuthUser, protect } from "../middleware/protectedjwt.js";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";

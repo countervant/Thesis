@@ -1,4 +1,4 @@
-import CLIENTRA2 from "../assets/CLIENTRA2.png";
+import CLIENTRA2 from "../../assets/CLIENTRA2.png";
 
 const AppLoadingScreen = () => (
   <main className="grid min-h-screen place-items-center bg-white px-6 text-neutral-950 dark:bg-[#111111] dark:text-white">

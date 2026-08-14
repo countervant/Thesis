@@ -11,9 +11,9 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import MainBars from "./MainBars.jsx";
-import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import InitialsAvatar from "../components/InitialsAvatar.jsx";
-import Skeleton from "../components/Skeleton.jsx";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
+import Skeleton from "../components/Skeleton/Skeleton";
 import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const AdminDashboard = lazy(() => import("./Dashboard/Admin/Home.jsx"));

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import InitialsAvatar from "../../components/InitialsAvatar.jsx";
+import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
 

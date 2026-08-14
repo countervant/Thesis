@@ -1,5 +1,5 @@
-import deleteIcon from "../assets/delete.png";
-import logoutIcon from "../assets/logout.png";
+import deleteIcon from "../../assets/delete.png";
+import logoutIcon from "../../assets/logout.png";
 
 const iconPaths = {
   done: "m5 12 4 4L19 6",

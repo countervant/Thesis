@@ -20,7 +20,7 @@ import messages, { closeMessageClients } from "./routes/messages.js";
 import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
-import User from "./model/userModel.js";
+import User from "./models/userModel.js";
 import {
   MAX_AVATAR_CACHE_ENTRIES,
   MAX_STORED_AVATAR_BYTES,

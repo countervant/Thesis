@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { countryOptions } from "../utils/countries.js";
+import { countryOptions } from "../../utils/countries.js";
 
 const CountrySelect = ({ className = "", onChange, value, ...props }) => {
   const wrapperRef = useRef(null);

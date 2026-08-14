@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { resolveApiAssetUrl } from "../utils/apiAssets.js";
+import { resolveApiAssetUrl } from "../../utils/apiAssets.js";
 
 const AVATAR_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000];
 

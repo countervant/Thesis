@@ -1,6 +1,6 @@
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import AppLoadingScreen from "../../components/AppLoadingScreen.jsx";
+import AppLoadingScreen from "../../components/AppLoadingScreen/AppLoadingScreen";
 
 const Unauthorized = () => {
   const { loading, token, user } = useAuth();

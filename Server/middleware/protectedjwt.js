@@ -1,6 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../model/userModel.js';
+import User from '../models/userModel.js';
 import { withAvatarUrl } from '../utils/avatar.js';
 
 const AUTH_USER_CACHE_MS = Number(process.env.AUTH_USER_CACHE_MS) || 30000;

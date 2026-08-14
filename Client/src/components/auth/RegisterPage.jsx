@@ -4,7 +4,7 @@ import logo from "../../assets/CLIENTRA.png";
 import mobileLogo from "../../assets/CLIENTRA2.png";
 import view from "../../assets/view.png";
 import hide from "../../assets/hide.png";
-import CountrySelect from "../CountrySelect.jsx";
+import CountrySelect from "../CountrySelect/CountrySelect";
 import { authAPI } from "../../services/api.js";
 import { validateEmail } from "../../utils/emailValidation.js";
 import {
