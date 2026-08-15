@@ -9,6 +9,7 @@ import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   getApiErrorMessage,
   getProjectOutputFileError,
+  isAllowedVideoFile,
   isAutoWatermarkImage,
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
@@ -551,7 +552,8 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
     needsPaymentProtection &&
     outputMethod === "file" &&
     file &&
-    !isAutoWatermarkImage(file)
+    !isAutoWatermarkImage(file) &&
+    !isAllowedVideoFile(file)
   );
   const isBusy = isSubmitting;
 
@@ -1131,6 +1133,7 @@ const EmpTask = () => {
       output.outputMethod === "file" &&
       output.watermark &&
       !isAutoWatermarkImage(output.file) &&
+      !isAllowedVideoFile(output.file) &&
       !output.watermarkedFile
     ) {
       setErrorMessage("Please upload a separate protected review copy before submitting.");

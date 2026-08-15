@@ -260,6 +260,13 @@ const taskSchema = new mongoose.Schema(
           type: Date,
           default: Date.now,
         },
+
+        attachment: {
+          fileName: String,
+          fileUrl: String,
+          publicId: String,
+          resourceType: String,
+        },
       },
     ],
 

@@ -9,6 +9,7 @@ import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   getApiErrorMessage,
   getProjectOutputFileError,
+  isAllowedVideoFile,
   isAutoWatermarkImage,
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
@@ -1248,7 +1249,8 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
     needsPaymentProtection &&
     outputMethod === "file" &&
     file &&
-    !isAutoWatermarkImage(file)
+    !isAutoWatermarkImage(file) &&
+    !isAllowedVideoFile(file)
   );
   const isBusy = isSubmitting;
 
@@ -1263,8 +1265,8 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
 
       if (requiresManualReviewCopy) {
         const reviewCopyError = getProjectOutputFileError(watermarkedFile, "Protected review copy") ||
-          (!isAutoWatermarkImage(watermarkedFile)
-            ? "Protected review copy must be a JPEG, PNG, WebP, or GIF image."
+          (!isAutoWatermarkImage(watermarkedFile) && !isAllowedVideoFile(watermarkedFile)
+            ? "Protected review copy must be a JPEG, PNG, WebP, GIF, MP4, WebM, OGG, or MOV file."
             : "");
         setWatermarkedFileError(reviewCopyError);
         if (reviewCopyError) return;
@@ -1328,7 +1330,7 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
           </p>
           <p className="mt-1 text-[11px] font-bold text-slate-600">
             {needsPaymentProtection
-              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a rasterized, watermarked or redacted image preview.`
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a watermarked or redacted image or video preview.`
               : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>
@@ -1383,22 +1385,22 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
                     <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                       <p className="text-xs font-black text-amber-800">Protected review copy <span className="text-rose-600">*</span></p>
                       <p className="mt-1 text-[11px] font-bold leading-5 text-slate-600">
-                        Upload a rasterized, watermarked or redacted image preview for the client. It must be JPEG, PNG, WebP, or GIF and 10MB or less.
+                        Upload a rasterized, watermarked or redacted image or video preview for the client. It must be JPEG, PNG, WebP, GIF, MP4, WebM, OGG, or MOV and 10MB or less.
                       </p>
                       <label className="mt-3 flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-amber-400 bg-white text-center transition hover:bg-amber-50">
                         <SmallIcon name="upload" className="h-6 w-6 text-amber-700" />
                         <span className="mt-2 text-xs font-black text-[#10142d]">Choose protected review copy</span>
                         <input
                           type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime"
                           disabled={isBusy}
                           className="sr-only"
                           onChange={(event) => {
                             const selectedFile = event.target.files?.[0] || null;
                             const validationError = selectedFile
                               ? getProjectOutputFileError(selectedFile, "Protected review copy") ||
-                                (!isAutoWatermarkImage(selectedFile)
-                                  ? "Protected review copy must be a JPEG, PNG, WebP, or GIF image."
+                                (!isAutoWatermarkImage(selectedFile) && !isAllowedVideoFile(selectedFile)
+                                  ? "Protected review copy must be a JPEG, PNG, WebP, GIF, MP4, WebM, OGG, or MOV file."
                                   : "")
                               : "";
                             setWatermarkedFile(validationError ? null : selectedFile);
@@ -1796,6 +1798,7 @@ const Tasks = ({
       output.outputMethod === "file" &&
       output.watermark &&
       !isAutoWatermarkImage(output.file) &&
+      !isAllowedVideoFile(output.file) &&
       !output.watermarkedFile
     ) {
       setErrorMessage("Please upload a separate protected review copy before submitting.");

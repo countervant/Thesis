@@ -606,7 +606,7 @@ const AdminEmployees = ({
     link.href = url;
     link.download = "employees.csv";
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (

@@ -77,6 +77,24 @@ export const uploadBufferToCloudinary = (buffer, options = {}) => {
     ...(options.extra || {}),
   };
 
+  // Automatically add a text watermark to video uploads
+  if (uploadOptions.resource_type === "video") {
+    uploadOptions.transformation = uploadOptions.transformation || [];
+    uploadOptions.transformation.push({
+      overlay: {
+        font_family: "Arial",
+        font_size: 40,
+        font_weight: "bold",
+        text: "Clientra",
+      },
+      color: "white",
+      gravity: "south_east",
+      x: 20,
+      y: 20,
+    });
+    uploadOptions.async = true;
+  }
+
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
       if (error) return reject(error);

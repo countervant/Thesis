@@ -533,6 +533,12 @@ const RASTER_IMAGE_MIME_TYPES = new Set([
   "image/png",
   "image/webp",
 ]);
+const VIDEO_MIME_TYPES = new Set([
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/ogg",
+]);
 const ACTIVE_OR_EXECUTABLE_MIME_PATTERN = /^(?:text\/html|image\/svg\+xml|application\/(?:xhtml\+xml|xml|javascript|ecmascript|x-httpd-php|x-executable|x-msdownload|x-sh|x-shellscript))$/i;
 
 const outputValidationError = (message, status = 400) => {
@@ -578,9 +584,13 @@ export const parseOutputFile = (file, options = {}) => {
   if (!extension) {
     throw outputValidationError("This file type is not supported for project outputs");
   }
+  if (options.reviewCopy && !RASTER_IMAGE_MIME_TYPES.has(mimeType) && !VIDEO_MIME_TYPES.has(mimeType)) {
+    throw outputValidationError("Review copies must be JPEG, PNG, WebP, GIF, MP4, WebM, OGG, or MOV files");
+  }
   if (options.rasterImageOnly && !RASTER_IMAGE_MIME_TYPES.has(mimeType)) {
     throw outputValidationError("Image review copies must be JPEG, PNG, WebP, or GIF files");
   }
+
 
   const encodedData = match[2];
   if (!encodedData || encodedData.length % 4 !== 0) {
@@ -1332,6 +1342,9 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
       return res.status(403).json({ message: "Only admins can mark projects as paid" });
     }
 
+    let removedPreviewPublicId = "";
+    let removedPreviewStoredName = "";
+
     await session.withTransaction(async () => {
       const task = await Task.findById(req.params.id).session(session);
       if (!task) throw outputValidationError("Project not found", 404);
@@ -1364,8 +1377,39 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
       );
 
       task.paid = projectAmount;
+
+      if (task.finalOutput && task.finalOutput.watermarked) {
+        removedPreviewPublicId = task.finalOutput.previewPublicId || "";
+        removedPreviewStoredName = task.finalOutput.previewStoredName || "";
+
+        task.finalOutput.watermarked = false;
+        task.finalOutput.previewFileName = undefined;
+        task.finalOutput.previewStoredName = undefined;
+        task.finalOutput.previewPublicId = undefined;
+        task.finalOutput.previewUrl = undefined;
+      }
+
       await task.save({ session });
     });
+
+    // Clean up watermarked preview files after the transaction commits (best-effort)
+    const cleanupTasks = [];
+    if (removedPreviewPublicId) {
+      cleanupTasks.push(deleteCloudinaryAsset(removedPreviewPublicId, "image"));
+    }
+    if (removedPreviewStoredName) {
+      const previewName = path.basename(String(removedPreviewStoredName));
+      if (previewName && previewName === removedPreviewStoredName) {
+        cleanupTasks.push(
+          removeFileIfPresent(path.join(privateUploadsRoot, String(req.params.id), previewName))
+        );
+      }
+    }
+    if (cleanupTasks.length > 0) {
+      await Promise.all(cleanupTasks).catch((cleanupError) => {
+        console.error("Unable to remove watermarked preview files after marking paid:", cleanupError);
+      });
+    }
 
     const updatedTask = await Task.findById(req.params.id)
       .populate("assignedTo", "firstName lastName email role")
@@ -1659,8 +1703,21 @@ router.post("/:id/revisions", protect, async (req, res) => {
       return res.status(400).json({ message: "Preferred completion date cannot be in the past" });
     }
 
+    let attachment = undefined;
+    if (req.body.file?.dataUrl) {
+      const parsedFile = parseOutputFile(req.body.file);
+      const savedFile = await saveTaskOutput(task._id, parsedFile, { private: true });
+      attachment = {
+        fileName: savedFile.fileName,
+        fileUrl: savedFile.fileUrl,
+        publicId: savedFile.publicId,
+        resourceType: savedFile.resourceType,
+      };
+    }
+
     task.revisionRequests.push({
       ...payload,
+      attachment,
       user: req.user._id,
     });
     addActivity(task, {
@@ -2077,9 +2134,11 @@ router.get("/:id/output/download", protect, async (req, res) => {
         task.finalOutput.mimeType || response.headers.get("content-type") || "application/octet-stream";
       res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(downloadName)}"`);
       res.setHeader("Content-Type", contentType);
+      const contentLength = response.headers.get("content-length");
+      if (contentLength) res.setHeader("Content-Length", contentLength);
 
-      const arrayBuffer = await response.arrayBuffer();
-      return res.send(Buffer.from(arrayBuffer));
+      const { Readable } = await import("stream");
+      return Readable.fromWeb(response.body).pipe(res);
     }
 
     // Local filesystem download fallback
@@ -2242,27 +2301,37 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       const parsedOriginalFile = parseOutputFile(req.body.file);
       const requiresPaymentProtection = isPaymentProtectedTask(task);
       if (requiresPaymentProtection) {
-        const parsedReviewFile = RASTER_IMAGE_MIME_TYPES.has(parsedOriginalFile.mimeType)
-          ? await createProtectedImageReview(parsedOriginalFile)
-          : req.body.watermarkedFile?.dataUrl
-            ? parseOutputFile(req.body.watermarkedFile, { rasterImageOnly: true })
+        let parsedReviewFile = null;
+        if (RASTER_IMAGE_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
+          parsedReviewFile = await createProtectedImageReview(parsedOriginalFile);
+        } else if (!VIDEO_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
+          parsedReviewFile = req.body.watermarkedFile?.dataUrl
+            ? parseOutputFile(req.body.watermarkedFile, { reviewCopy: true })
             : null;
-        if (!parsedReviewFile) {
+        }
+
+        if (!parsedReviewFile && !VIDEO_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
           return res.status(400).json({
-            message: "A rasterized JPEG, PNG, WebP, or GIF review copy is required until the project is fully paid",
+            message: "A protected image or video review copy is required until the project is fully paid",
           });
         }
-        assertDistinctReviewFile(parsedOriginalFile, parsedReviewFile);
 
-        const originalFile = await saveTaskOutput(task._id, parsedOriginalFile, { private: true });
+        if (parsedReviewFile) {
+          assertDistinctReviewFile(parsedOriginalFile, parsedReviewFile);
+        }
+
+        const [originalFile, reviewFile] = await Promise.all([
+          saveTaskOutput(task._id, parsedOriginalFile, { private: true }),
+          parsedReviewFile
+            ? saveTaskOutput(task._id, parsedReviewFile, { private: true })
+            : null,
+        ]);
         if (originalFile.filePath) createdFilePaths.push(originalFile.filePath);
         if (originalFile.publicId) {
           createdPublicIds.push({ id: originalFile.publicId, type: originalFile.resourceType });
         }
-
-        const reviewFile = await saveTaskOutput(task._id, parsedReviewFile, { private: true });
-        if (reviewFile.filePath) createdFilePaths.push(reviewFile.filePath);
-        if (reviewFile.publicId) {
+        if (reviewFile?.filePath) createdFilePaths.push(reviewFile.filePath);
+        if (reviewFile?.publicId) {
           createdPublicIds.push({ id: reviewFile.publicId, type: reviewFile.resourceType });
         }
 
@@ -2271,10 +2340,10 @@ router.post("/:id/submit-output", protect, async (req, res) => {
           fileUrl: originalFile.fileUrl,
           publicId: originalFile.publicId,
           resourceType: originalFile.resourceType,
-          previewFileName: reviewFile.fileName,
-          previewStoredName: reviewFile.storedName,
-          previewPublicId: reviewFile.publicId,
-          previewUrl: reviewFile.fileUrl,
+          previewFileName: reviewFile?.fileName,
+          previewStoredName: reviewFile?.storedName,
+          previewPublicId: reviewFile?.publicId,
+          previewUrl: reviewFile?.fileUrl || originalFile.fileUrl,
           originalStoredName: originalFile.storedName,
           mimeType: originalFile.mimeType,
           watermarked: true,

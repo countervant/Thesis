@@ -241,7 +241,10 @@ export const getProjectOutputFileError = (file, label) => {
 export const isAutoWatermarkImage = (file) =>
   AUTO_WATERMARK_IMAGE_MIME_TYPES.has(getFileMimeType(file));
 
-const fileToDataUrl = (file) =>
+export const isAllowedVideoFile = (file) =>
+  new Set(["video/mp4", "video/webm", "video/ogg", "video/quicktime"]).has(getFileMimeType(file));
+
+export const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -349,7 +352,7 @@ const isSafePreviewMimeType = (mimeType) => {
 
 const downloadTaskFile = async (endpoint, fileName, options = {}) => {
   const response = await api.get(endpoint, { responseType: "blob" });
-  const outputBlob = options.watermark
+  const outputBlob = options.watermark 
     ? await watermarkDownloadedImage(response.data, fileName)
     : response.data;
   const url = URL.createObjectURL(outputBlob);
@@ -359,7 +362,7 @@ const downloadTaskFile = async (endpoint, fileName, options = {}) => {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 const viewTaskFile = async (endpoint, fileName, options = {}) => {
@@ -385,7 +388,7 @@ const viewTaskFile = async (endpoint, fileName, options = {}) => {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     return;
   }
 
@@ -844,7 +847,7 @@ export const taskAPI = {
       outputMethod: output.outputMethod,
       subtasks: output.subtasks,
       finalize: output.finalize,
-    });
+    }, { timeout: 120000 });
     clearCache("/tasks", "/dashboard");
     return response.data;
   },
