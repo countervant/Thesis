@@ -416,7 +416,7 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   </div>
 );
 
-const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
+const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
   const [openActivityPanel, setOpenActivityPanel] = useState(null);
   const rawFinalOutputLink = String(project.finalOutput?.link || "").trim();
   const safeFinalOutputLink = getSafeOutputLink(rawFinalOutputLink);
@@ -612,8 +612,8 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
                   <Icon name="eye" className="h-4 w-4" />
                 </button>
               )}
-              <button type="button" disabled={!output.url && output.source === "attachment"} onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {output.source === "attachment" && !output.localAttachment ? "Open" : "Download"}
+              <button type="button" disabled={(!output.url && output.source === "attachment") || isDownloadingOutput} onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50">
+                {output.source === "attachment" && !output.localAttachment ? "Open" : isDownloadingOutput ? "Downloading..." : "Download"}
                 <Icon name={output.source === "attachment" && !output.localAttachment ? "external" : "download"} className="h-4 w-4" />
               </button>
             </span>
@@ -1274,6 +1274,7 @@ const ClientProjects = () => {
   const [noticeMessage, setNoticeMessage] = useState("");
   const [permissionAction, setPermissionAction] = useState(null);
   const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
+  const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
   const noticeTimerRef = useRef(null);
 
   useEffect(() => () => {
@@ -1456,6 +1457,7 @@ const ClientProjects = () => {
 
   const handleDownloadOutput = async (project, output) => {
     try {
+      setIsDownloadingOutputId(project.id);
       setErrorMessage("");
       if (output.source === "attachment") {
         if (output.localAttachment) {
@@ -1472,6 +1474,8 @@ const ClientProjects = () => {
       });
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
+    } finally {
+      setIsDownloadingOutputId("");
     }
   };
 
@@ -1589,6 +1593,7 @@ const ClientProjects = () => {
       <>
         <ProjectDetails
           errorMessage={errorMessage}
+          isDownloadingOutput={isDownloadingOutputId === selectedProject.id}
           noticeMessage={noticeMessage}
           onApprove={(project) => {
             setErrorMessage("");
