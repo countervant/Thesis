@@ -351,7 +351,7 @@ const isSafePreviewMimeType = (mimeType) => {
 };
 
 const downloadTaskFile = async (endpoint, fileName, options = {}) => {
-  const response = await api.get(endpoint, { responseType: "blob" });
+  const response = await api.get(endpoint, { responseType: "blob", timeout: 0 });
   const outputBlob = options.watermark 
     ? await watermarkDownloadedImage(response.data, fileName)
     : response.data;
@@ -370,7 +370,7 @@ const viewTaskFile = async (endpoint, fileName, options = {}) => {
   if (previewWindow) previewWindow.opener = null;
   let response;
   try {
-    response = await api.get(endpoint, { responseType: "blob" });
+    response = await api.get(endpoint, { responseType: "blob", timeout: 0 });
   } catch (error) {
     previewWindow?.close();
     throw error;
