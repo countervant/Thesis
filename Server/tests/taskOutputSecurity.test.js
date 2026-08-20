@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 import {
   assertDistinctReviewFile,
+  buildCloudinaryDownloadUrl,
   createProtectedImageReview,
   getTaskFinalOutputForViewer,
   isPaymentProtectedTask,
@@ -23,6 +24,25 @@ const expectValidationError = (action, messagePattern, status = 400) => {
     return true;
   });
 };
+
+test("Cloudinary video downloads are forced as attachments", () => {
+  const url = "https://res.cloudinary.com/demo/video/upload/sample.mp4?token=abc";
+  const downloadable = buildCloudinaryDownloadUrl(url, "sample-video.mp4");
+
+  // fl_attachment must be a path transformation, not a query string parameter.
+  // Cloudinary ignores unknown query parameters for delivery transformations.
+  // The filename stem (WITHOUT extension) must be used in fl_attachment because
+  // Cloudinary treats the portion after the final dot as a format transformation
+  // parameter — passing "file.mp4" causes 400 "Invalid flag in transformation: mp4".
+  // Cloudinary appends the correct extension from the delivery URL automatically.
+  assert.match(downloadable, /\/upload\/fl_attachment:sample-video\//);
+  // The extension must NOT appear inside the fl_attachment flag
+  assert.doesNotMatch(downloadable, /fl_attachment:sample-video\.mp4/);
+  // Original query parameters must be preserved
+  assert.match(downloadable, /token=abc/);
+  // fl_attachment should NOT appear as a query param
+  assert.doesNotMatch(downloadable, /fl_attachment=true/);
+});
 
 test("output links accept only absolute HTTP and HTTPS URLs", () => {
   assert.equal(
