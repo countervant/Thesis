@@ -77,7 +77,10 @@ export const uploadBufferToCloudinary = (buffer, options = {}) => {
     ...(options.extra || {}),
   };
 
-  // Automatically add a text watermark to video uploads
+  // Automatically add a text watermark to video uploads.
+  // Note: async is intentionally NOT set here. When async: true is used,
+  // Cloudinary returns the URL before the transformation is applied, causing
+  // the download fetch to fail (404 / not ready) for freshly uploaded videos.
   if (uploadOptions.resource_type === "video") {
     uploadOptions.transformation = uploadOptions.transformation || [];
     uploadOptions.transformation.push({
@@ -92,7 +95,6 @@ export const uploadBufferToCloudinary = (buffer, options = {}) => {
       x: 20,
       y: 20,
     });
-    uploadOptions.async = true;
   }
 
   return new Promise((resolve, reject) => {

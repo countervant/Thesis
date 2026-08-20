@@ -357,12 +357,15 @@ const downloadTaskFile = async (endpoint, fileName, options = {}) => {
     : response.data;
   const url = URL.createObjectURL(outputBlob);
   const link = document.createElement("a");
+  link.style.display = "none";
   link.href = url;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  window.setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 60000);
 };
 
 const viewTaskFile = async (endpoint, fileName, options = {}) => {
@@ -383,12 +386,15 @@ const viewTaskFile = async (endpoint, fileName, options = {}) => {
   if (!isSafePreviewMimeType(outputBlob.type)) {
     previewWindow?.close();
     const link = document.createElement("a");
+    link.style.display = "none";
     link.href = url;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    window.setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 60000);
     return;
   }
 
@@ -501,6 +507,15 @@ api.interceptors.response.use(
     // unmounting the protected UI. Do not send or retry those tokenless requests.
     if (error.code === "ERR_AUTH_REQUIRED") {
       return Promise.reject(error);
+    }
+
+    if (error.response?.data instanceof Blob && error.response.data.type === "application/json") {
+      try {
+        const text = await error.response.data.text();
+        error.response.data = JSON.parse(text);
+      } catch (e) {
+        // Ignore parsing errors
+      }
     }
 
     const status = error.response?.status;

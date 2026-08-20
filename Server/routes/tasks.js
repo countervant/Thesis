@@ -502,6 +502,53 @@ const safeFileName = (fileName) =>
     .replace(/\s+/g, "-")
     .slice(0, 120) || "output-file";
 
+export const buildCloudinaryDownloadUrl = (fileUrl, downloadName) => {
+  if (!fileUrl || typeof fileUrl !== "string") return fileUrl;
+
+  try {
+    const parsedUrl = new URL(fileUrl);
+
+    // fl_attachment must be injected into the Cloudinary URL path as a
+    // transformation segment, not as a query string parameter. Cloudinary's
+    // delivery API ignores unknown query parameters — only path-based
+    // transformations are applied. The pattern is:
+    //   /upload/fl_attachment:<safe-stem>/<rest-of-path>
+    // If the URL is not a Cloudinary delivery URL, we fall back to the
+    // original URL so the backend Content-Disposition header handles the
+    // download behaviour instead.
+    //
+    // IMPORTANT: The file extension MUST be stripped from the name used in
+    // fl_attachment. Cloudinary parses the segment after the final dot as a
+    // format/transformation parameter — passing "file.mp4" causes a 400
+    // "Invalid flag in transformation: mp4". Cloudinary automatically appends
+    // the correct extension from the delivery URL (e.g. .mp4, .jpg) so the
+    // browser still receives the properly named file in Content-Disposition.
+    const uploadSegment = "/upload/";
+    const uploadIndex = parsedUrl.pathname.indexOf(uploadSegment);
+    if (uploadIndex !== -1) {
+      const afterUpload = parsedUrl.pathname.slice(uploadIndex + uploadSegment.length);
+      const safeName = downloadName ? safeFileName(downloadName) : "";
+      // Strip the extension so Cloudinary does not misinterpret it as a
+      // format transformation parameter (e.g. strip ".mp4" from "video.mp4").
+      const safeStem = safeName
+        ? safeName.replace(/\.[^.]+$/, "") || safeName
+        : "";
+      const attachmentFlag = safeStem
+        ? `fl_attachment:${safeStem.replace(/[/:]/g, "-")}`
+        : "fl_attachment";
+      parsedUrl.pathname =
+        parsedUrl.pathname.slice(0, uploadIndex + uploadSegment.length) +
+        attachmentFlag +
+        "/" +
+        afterUpload;
+    }
+
+    return parsedUrl.toString();
+  } catch {
+    return fileUrl;
+  }
+};
+
 const MAX_OUTPUT_FILE_BYTES = 10 * 1024 * 1024;
 // Project outputs intentionally exclude active browser content and executable
 // formats. Stored names and extensions are derived only from this allowlist.
@@ -2125,7 +2172,8 @@ router.get("/:id/output/download", protect, async (req, res) => {
           : (task.finalOutput.fileUrl?.startsWith("http") ? task.finalOutput.fileUrl : null));
 
     if (cloudinaryFileUrl) {
-      const response = await fetch(cloudinaryFileUrl);
+      const attachmentUrl = buildCloudinaryDownloadUrl(cloudinaryFileUrl, downloadName);
+      const response = await fetch(attachmentUrl);
       if (!response.ok) {
         return res.status(404).json({ message: "The uploaded output file could not be retrieved" });
       }
