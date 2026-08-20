@@ -973,7 +973,7 @@ const RevisionModal = ({ errorMessage = "", isSubmitting = false, onClose, onSub
               <label className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 text-center transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800">
                 <Icon name="upload" className="h-6 w-6 text-slate-400" />
                 <span className="mt-2 text-sm font-black text-[#10142d] dark:text-white">Click to upload an attachment</span>
-                <span className="mt-1 text-xs font-bold text-slate-500">Image, video, document, or audio (10MB max)</span>
+                <span className="mt-1 text-xs font-bold text-slate-500">Image, document, or audio (10MB max)</span>
                 <input
                   type="file"
                   accept={PROJECT_OUTPUT_FILE_ACCEPT}

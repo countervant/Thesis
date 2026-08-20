@@ -211,9 +211,6 @@ const PROJECT_OUTPUT_MIME_TYPES = new Set([
   "image/webp",
   "text/csv",
   "text/plain",
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
 ]);
 const AUTO_WATERMARK_IMAGE_MIME_TYPES = new Set([
   "image/gif",
@@ -233,16 +230,13 @@ export const getProjectOutputFileError = (file, label) => {
   if (!file) return `${label} is required.`;
   if (file.size > MAX_PROJECT_OUTPUT_FILE_BYTES) return `${label} must be 10MB or less.`;
   if (!PROJECT_OUTPUT_MIME_TYPES.has(getFileMimeType(file))) {
-    return `${label} type is not supported. Use a PDF, Office, image, audio, video, text, or CSV file.`;
+    return `${label} type is not supported. Use a PDF, Office, image, audio, text, or CSV file.`;
   }
   return "";
 };
 
 export const isAutoWatermarkImage = (file) =>
   AUTO_WATERMARK_IMAGE_MIME_TYPES.has(getFileMimeType(file));
-
-export const isAllowedVideoFile = (file) =>
-  new Set(["video/mp4", "video/webm", "video/ogg", "video/quicktime"]).has(getFileMimeType(file));
 
 export const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {

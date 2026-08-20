@@ -523,21 +523,12 @@ const OUTPUT_MIME_EXTENSIONS = new Map([
   ["image/webp", ".webp"],
   ["text/csv", ".csv"],
   ["text/plain", ".txt"],
-  ["video/mp4", ".mp4"],
-  ["video/quicktime", ".mov"],
-  ["video/webm", ".webm"],
 ]);
 const RASTER_IMAGE_MIME_TYPES = new Set([
   "image/gif",
   "image/jpeg",
   "image/png",
   "image/webp",
-]);
-const VIDEO_MIME_TYPES = new Set([
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-  "video/ogg",
 ]);
 const ACTIVE_OR_EXECUTABLE_MIME_PATTERN = /^(?:text\/html|image\/svg\+xml|application\/(?:xhtml\+xml|xml|javascript|ecmascript|x-httpd-php|x-executable|x-msdownload|x-sh|x-shellscript))$/i;
 
@@ -584,8 +575,8 @@ export const parseOutputFile = (file, options = {}) => {
   if (!extension) {
     throw outputValidationError("This file type is not supported for project outputs");
   }
-  if (options.reviewCopy && !RASTER_IMAGE_MIME_TYPES.has(mimeType) && !VIDEO_MIME_TYPES.has(mimeType)) {
-    throw outputValidationError("Review copies must be JPEG, PNG, WebP, GIF, MP4, WebM, OGG, or MOV files");
+  if (options.reviewCopy && !RASTER_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw outputValidationError("Review copies must be JPEG, PNG, WebP, or GIF files");
   }
   if (options.rasterImageOnly && !RASTER_IMAGE_MIME_TYPES.has(mimeType)) {
     throw outputValidationError("Image review copies must be JPEG, PNG, WebP, or GIF files");
@@ -2304,15 +2295,15 @@ router.post("/:id/submit-output", protect, async (req, res) => {
         let parsedReviewFile = null;
         if (RASTER_IMAGE_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
           parsedReviewFile = await createProtectedImageReview(parsedOriginalFile);
-        } else if (!VIDEO_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
+        } else {
           parsedReviewFile = req.body.watermarkedFile?.dataUrl
             ? parseOutputFile(req.body.watermarkedFile, { reviewCopy: true })
             : null;
         }
 
-        if (!parsedReviewFile && !VIDEO_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
+        if (!parsedReviewFile) {
           return res.status(400).json({
-            message: "A protected image or video review copy is required until the project is fully paid",
+            message: "A protected image review copy is required until the project is fully paid",
           });
         }
 
