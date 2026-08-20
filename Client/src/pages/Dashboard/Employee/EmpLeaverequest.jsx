@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
-import { SkeletonRows } from "../../../components/Skeleton/Skeleton";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
+import { SkeletonRows } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext";
 import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
 

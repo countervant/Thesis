@@ -4,7 +4,7 @@ import notification from "../../../assets/notification.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import progress from "../../../assets/progress.png";
 import taskIcon from "../../../assets/task.png";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   getApiErrorMessage,
@@ -13,9 +13,9 @@ import {
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
 } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog";
-import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton";
-import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
+import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
+import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -1328,7 +1328,7 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
           </p>
           <p className="mt-1 text-[11px] font-bold text-slate-600">
             {needsPaymentProtection
-              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a rasterized, watermarked or redacted image preview.`
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a watermarked or redacted image preview.`
               : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>

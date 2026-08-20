@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { employeeAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
-import { PersonGridSkeleton } from "../../../components/Skeleton/Skeleton";
+import { PersonGridSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 
 const filters = [
   { label: "All accounts", value: "All" },
@@ -606,7 +606,7 @@ const AdminEmployees = ({
     link.href = url;
     link.download = "employees.csv";
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (

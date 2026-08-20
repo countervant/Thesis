@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Skeleton from "../../components/Skeleton/Skeleton";
-import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog";
-import { getApiErrorMessage, taskAPI } from "../../services/api.js";
+import Skeleton from "../../components/Skeleton/Skeleton.jsx";
+import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.jsx";
+import { fileToDataUrl, getApiErrorMessage, getProjectOutputFileError, PROJECT_OUTPUT_FILE_ACCEPT, taskAPI } from "../../services/api.js";
 import progressIcon from "../../assets/progress.png";
 import pendingIcon from "../../assets/pending.png";
 import reviewIcon from "../../assets/Review.png";
@@ -416,7 +416,7 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   </div>
 );
 
-const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
+const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
   const [openActivityPanel, setOpenActivityPanel] = useState(null);
   const rawFinalOutputLink = String(project.finalOutput?.link || "").trim();
   const safeFinalOutputLink = getSafeOutputLink(rawFinalOutputLink);
@@ -612,8 +612,8 @@ const ProjectDetails = ({ errorMessage, noticeMessage, onApprove, onBack, onDown
                   <Icon name="eye" className="h-4 w-4" />
                 </button>
               )}
-              <button type="button" disabled={!output.url && output.source === "attachment"} onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {output.source === "attachment" && !output.localAttachment ? "Open" : "Download"}
+              <button type="button" disabled={(!output.url && output.source === "attachment") || isDownloadingOutput} onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50">
+                {output.source === "attachment" && !output.localAttachment ? "Open" : isDownloadingOutput ? "Downloading..." : "Download"}
                 <Icon name={output.source === "attachment" && !output.localAttachment ? "external" : "download"} className="h-4 w-4" />
               </button>
             </span>
@@ -853,16 +853,30 @@ const RevisionModal = ({ errorMessage = "", isSubmitting = false, onClose, onSub
     description: "",
     dueDate: "",
   });
+  const [file, setFile] = useState(null);
+  const [fileError, setFileError] = useState("");
   const statusClass = statusStyles[project.status] || statusStyles["Pending Revisions"];
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (isSubmitting) return;
-    onSubmit(project, form);
+
+    let submitForm = { ...form };
+    if (file) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        submitForm.file = { dataUrl, fileName: file.name, size: file.size, type: file.type };
+      } catch (error) {
+        setFileError("Unable to read the selected file.");
+        return;
+      }
+    }
+
+    onSubmit(project, submitForm);
   };
 
   return (
@@ -946,12 +960,35 @@ const RevisionModal = ({ errorMessage = "", isSubmitting = false, onClose, onSub
             <span className="mt-1 block text-xs font-bold text-slate-400">{form.description.length} / 1000 characters</span>
           </label>
           <div className="block">
-            <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Reference Attachment</span>
-            <span className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 text-center dark:border-neutral-800 dark:bg-neutral-950">
-              <Icon name="upload" className="h-6 w-6 text-[#c72fb2]" />
-              <span className="mt-2 text-sm font-black text-slate-500">Attachment uploads are not available yet.</span>
-              <span className="mt-1 text-xs font-bold text-slate-400">Include a secure reference link in the description instead.</span>
-            </span>
+            <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Reference Attachment <span className="font-bold text-slate-400">(optional)</span></span>
+            {file ? (
+              <div className="flex items-center justify-between rounded-xl border border-pink-100 bg-white px-4 py-3 text-xs font-bold text-[#10142d] dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">
+                <span className="inline-flex min-w-0 items-center gap-3">
+                  <Icon name="upload" className="h-5 w-5 text-[#c72fb2]" />
+                  <span className="truncate">{file.name}</span>
+                </span>
+                <button type="button" disabled={isSubmitting} onClick={() => { setFile(null); setFileError(""); }} className="text-slate-400 hover:text-[#c72fb2] disabled:cursor-not-allowed disabled:opacity-60" aria-label="Remove file">x</button>
+              </div>
+            ) : (
+              <label className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 text-center transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800">
+                <Icon name="upload" className="h-6 w-6 text-slate-400" />
+                <span className="mt-2 text-sm font-black text-[#10142d] dark:text-white">Click to upload an attachment</span>
+                <span className="mt-1 text-xs font-bold text-slate-500">Image, document, or audio (10MB max)</span>
+                <input
+                  type="file"
+                  accept={PROJECT_OUTPUT_FILE_ACCEPT}
+                  disabled={isSubmitting}
+                  className="sr-only"
+                  onChange={(event) => {
+                    const selectedFile = event.target.files?.[0] || null;
+                    const error = selectedFile ? getProjectOutputFileError(selectedFile, "Attachment") : "";
+                    setFile(error ? null : selectedFile);
+                    setFileError(error);
+                  }}
+                />
+              </label>
+            )}
+            {fileError && <p className="mt-2 text-xs font-bold text-rose-600">{fileError}</p>}
           </div>
           <label className="block">
             <span className="mb-2 block text-xs font-black text-slate-600 dark:text-slate-300">Preferred Completion Date <span className="font-bold text-slate-400">(optional)</span></span>
@@ -1237,6 +1274,7 @@ const ClientProjects = () => {
   const [noticeMessage, setNoticeMessage] = useState("");
   const [permissionAction, setPermissionAction] = useState(null);
   const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
+  const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
   const noticeTimerRef = useRef(null);
 
   useEffect(() => () => {
@@ -1419,6 +1457,7 @@ const ClientProjects = () => {
 
   const handleDownloadOutput = async (project, output) => {
     try {
+      setIsDownloadingOutputId(project.id);
       setErrorMessage("");
       if (output.source === "attachment") {
         if (output.localAttachment) {
@@ -1435,6 +1474,8 @@ const ClientProjects = () => {
       });
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to download the uploaded file."));
+    } finally {
+      setIsDownloadingOutputId("");
     }
   };
 
@@ -1552,6 +1593,7 @@ const ClientProjects = () => {
       <>
         <ProjectDetails
           errorMessage={errorMessage}
+          isDownloadingOutput={isDownloadingOutputId === selectedProject.id}
           noticeMessage={noticeMessage}
           onApprove={(project) => {
             setErrorMessage("");

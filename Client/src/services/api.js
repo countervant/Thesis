@@ -211,9 +211,6 @@ const PROJECT_OUTPUT_MIME_TYPES = new Set([
   "image/webp",
   "text/csv",
   "text/plain",
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
 ]);
 const AUTO_WATERMARK_IMAGE_MIME_TYPES = new Set([
   "image/gif",
@@ -233,7 +230,7 @@ export const getProjectOutputFileError = (file, label) => {
   if (!file) return `${label} is required.`;
   if (file.size > MAX_PROJECT_OUTPUT_FILE_BYTES) return `${label} must be 10MB or less.`;
   if (!PROJECT_OUTPUT_MIME_TYPES.has(getFileMimeType(file))) {
-    return `${label} type is not supported. Use a PDF, Office, image, audio, video, text, or CSV file.`;
+    return `${label} type is not supported. Use a PDF, Office, image, audio, text, or CSV file.`;
   }
   return "";
 };
@@ -241,7 +238,7 @@ export const getProjectOutputFileError = (file, label) => {
 export const isAutoWatermarkImage = (file) =>
   AUTO_WATERMARK_IMAGE_MIME_TYPES.has(getFileMimeType(file));
 
-const fileToDataUrl = (file) =>
+export const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -348,8 +345,8 @@ const isSafePreviewMimeType = (mimeType) => {
 };
 
 const downloadTaskFile = async (endpoint, fileName, options = {}) => {
-  const response = await api.get(endpoint, { responseType: "blob" });
-  const outputBlob = options.watermark
+  const response = await api.get(endpoint, { responseType: "blob", timeout: 0 });
+  const outputBlob = options.watermark 
     ? await watermarkDownloadedImage(response.data, fileName)
     : response.data;
   const url = URL.createObjectURL(outputBlob);
@@ -359,7 +356,7 @@ const downloadTaskFile = async (endpoint, fileName, options = {}) => {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 const viewTaskFile = async (endpoint, fileName, options = {}) => {
@@ -367,7 +364,7 @@ const viewTaskFile = async (endpoint, fileName, options = {}) => {
   if (previewWindow) previewWindow.opener = null;
   let response;
   try {
-    response = await api.get(endpoint, { responseType: "blob" });
+    response = await api.get(endpoint, { responseType: "blob", timeout: 0 });
   } catch (error) {
     previewWindow?.close();
     throw error;
@@ -385,7 +382,7 @@ const viewTaskFile = async (endpoint, fileName, options = {}) => {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     return;
   }
 
@@ -844,7 +841,7 @@ export const taskAPI = {
       outputMethod: output.outputMethod,
       subtasks: output.subtasks,
       finalize: output.finalize,
-    });
+    }, { timeout: 120000 });
     clearCache("/tasks", "/dashboard");
     return response.data;
   },

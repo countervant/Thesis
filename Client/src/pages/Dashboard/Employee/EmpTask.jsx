@@ -4,7 +4,7 @@ import notification from "../../../assets/notification.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import progress from "../../../assets/progress.png";
 import taskIcon from "../../../assets/task.png";
-import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton";
+import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   getApiErrorMessage,
@@ -13,7 +13,7 @@ import {
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
 } from "../../../services/api.js";
-import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart";
+import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {

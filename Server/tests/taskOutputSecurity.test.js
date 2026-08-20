@@ -73,6 +73,18 @@ test("active and unsupported upload MIME types are rejected", () => {
     () => parseOutputFile({ fileName: "blob.bin", dataUrl: asDataUrl("application/octet-stream", "data") }),
     /file type is not supported/
   );
+  expectValidationError(
+    () => parseOutputFile({ fileName: "video.mp4", dataUrl: asDataUrl("video/mp4", "fake-video-bytes") }),
+    /file type is not supported/
+  );
+  expectValidationError(
+    () => parseOutputFile({ fileName: "clip.mov", dataUrl: asDataUrl("video/quicktime", "fake-video-bytes") }),
+    /file type is not supported/
+  );
+  expectValidationError(
+    () => parseOutputFile({ fileName: "movie.webm", dataUrl: asDataUrl("video/webm", "fake-video-bytes") }),
+    /file type is not supported/
+  );
 });
 
 test("upload base64 must be strict and canonical", () => {

@@ -5,7 +5,7 @@ import {
   getPhoneValidationMessage,
   limitPhoneNumberLength,
 } from "../../../utils/phoneValidation.js";
-import CountrySelect from "../../../components/CountrySelect/CountrySelect";
+import CountrySelect from "../../../components/CountrySelect/CountrySelect.jsx";
 import {
   applyCountryDialCode,
   defaultCountry,

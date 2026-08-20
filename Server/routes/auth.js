@@ -32,6 +32,12 @@ import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
+
+// generate JWT token
+const generateToken = (id) =>
+  jwt.sign({ id, type: "access" }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
 const emailRegex =
   /^[A-Za-z0-9]+(?:[._%+-][A-Za-z0-9]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
 const isMongoTimeoutError = (error) =>
@@ -1044,12 +1050,6 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
       }
     });
 
-    // generate JWT token
-      const generateToken = (id) => {
-       return jwt.sign({ id, type: "access" }, process.env.JWT_SECRET, {
-        expiresIn: '30d',
-       });
 
-      }
 
     export default router;
