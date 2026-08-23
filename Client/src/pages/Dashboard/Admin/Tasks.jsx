@@ -1956,9 +1956,9 @@ const Tasks = ({
   const requestDeleteTask = (task) => {
     setConfirmAction({
       icon: "delete",
-      title: "Delete",
-      message: `Delete task "${task.title}"?`,
-      confirmLabel: "Yes , delete",
+      title: "Delete Project",
+      message: `Permanently delete project "${task.title}" and its stored output files? This cannot be undone.`,
+      confirmLabel: "Delete permanently",
       onConfirm: () => handleDeleteTask(task),
     });
   };
@@ -2001,14 +2001,14 @@ const Tasks = ({
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-5 xl:grid-cols-5">
             {taskStats.map((item, index) => (
-              <Card key={item.label} className={`min-w-0 p-2 !shadow-sm dark:!shadow-none md:p-5 ${index === taskStats.length - 1 ? "col-span-2 sm:col-span-1" : ""} ${statCardStyles[item.tone]}`}>
-                <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-4 md:text-left">
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
-                    <ImageIcon src={item.icon} className="h-5 w-5 md:h-9 md:w-9" />
+              <Card key={item.label} className={`min-w-0 p-2 !shadow-sm dark:!shadow-none md:p-4 2xl:p-5 ${index === taskStats.length - 1 ? "col-span-2 sm:col-span-1" : ""} ${statCardStyles[item.tone]}`}>
+                <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-3 md:text-left 2xl:gap-4">
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg md:h-14 md:w-14 md:rounded-2xl 2xl:h-16 2xl:w-16 ${toneStyles[item.tone]}`}>
+                    <ImageIcon src={item.icon} className="h-5 w-5 md:h-8 md:w-8 2xl:h-9 2xl:w-9" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-base font-black leading-none text-[#10142d] md:text-4xl">{item.value}</p>
-                    <p className="mt-1 truncate text-[11px] font-black text-slate-600 md:text-sm">{item.label}</p>
+                    <p className="text-base font-black leading-none text-[#10142d] md:text-3xl 2xl:text-4xl">{item.value}</p>
+                    <p className="mt-1 text-[11px] font-black leading-tight text-slate-600 md:text-xs 2xl:text-sm">{item.label}</p>
                   </div>
                 </div>
               </Card>

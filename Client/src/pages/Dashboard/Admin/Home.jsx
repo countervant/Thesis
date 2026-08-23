@@ -29,53 +29,6 @@ const timelineDayCount = 21;
 const monthlyOverviewVisibleRows = 10;
 const compactListVisibleRows = 5;
 const modalListVisibleRows = 10;
-const timelineTasks = [
-  {
-    name: "Start",
-    priority: "medium",
-    progress: 100,
-    marker: "dot",
-    segments: [
-      { start: 0.6, width: 1.1, color: "#7da4e6" },
-    ],
-  },
-  {
-    name: "Design",
-    priority: "high",
-    progress: 0,
-    marker: "dot",
-    segments: [
-      { start: 1.5, width: 3.2, color: "#8a97ee", striped: true },
-    ],
-  },
-  {
-    name: "Review",
-    priority: "low",
-    progress: 100,
-    marker: "diamond",
-    segments: [
-      { start: 4.3, width: 0.7, color: "#8d73dc", diamond: true },
-    ],
-  },
-  {
-    name: "User tests",
-    priority: "medium",
-    progress: 50,
-    marker: "dot",
-    segments: [
-      { start: 5.0, width: 1.2, color: "#bd75e8", striped: true },
-    ],
-  },
-  {
-    name: "Programm...",
-    priority: "high",
-    progress: 0,
-    marker: "dot",
-    segments: [
-      { start: 6.3, width: 3.0, color: "#d46cdf", striped: true },
-    ],
-  },
-];
 
 const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
 const dashboardCardShadow =
@@ -462,7 +415,7 @@ const MonthlyChart = ({ tasks }) => {
     };
   });
 
-  const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
+  const visibleTasks = chartTasks;
 
   return (
   <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 md:py-5 ${dashboardCardShadow}`}>
@@ -472,6 +425,11 @@ const MonthlyChart = ({ tasks }) => {
         This Month
       </span>
     </div>
+    {visibleTasks.length === 0 ? (
+      <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-400">
+        No projects with scheduled start and due dates yet.
+      </p>
+    ) : (
     <div
       className={`grid grid-cols-[86px_1fr] overflow-x-auto md:grid-cols-[178px_1fr] ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
       style={shouldScrollRows ? { maxHeight: `${32 + chartRowsMaxHeight}px` } : undefined}
@@ -563,6 +521,7 @@ const MonthlyChart = ({ tasks }) => {
         </div>
       </div>
     </div>
+    )}
   </section>
   );
 };
@@ -834,18 +793,6 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
     </>
   );
 };
-
-const PlaceholderPanel = ({ title, children }) => (
-  <section className={`rounded-lg border border-pink-100 bg-white px-8 py-10 ${dashboardCardShadow}`}>
-    <h1
-      className="text-2xl uppercase text-neutral-950 dark:text-white"
-      style={{ fontFamily: "var(--font-bruno)" }}
-    >
-      {title}
-    </h1>
-    <p className="mt-3 text-sm font-medium text-neutral-600 dark:text-white">{children}</p>
-  </section>
-);
 
 const FloatingListPanel = ({ children, onClose, title }) => (
   <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 p-3 backdrop-blur-sm sm:p-5">
@@ -1197,7 +1144,7 @@ const OnlineTeam = ({ members }) => {
   );
 };
 
-const AdminDashboard = ({ activePage = "dashboard" }) => {
+const AdminDashboard = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -1209,9 +1156,6 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
   const [taskStatusCounts, setTaskStatusCounts] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const activeTopTab = ["dashboard", "newsfeed", "messages"].includes(activePage)
-    ? activePage
-    : "dashboard";
 
   const stats = statItems.map((item) => ({
     ...item,
@@ -1367,7 +1311,7 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
     };
   }, []);
 
-  if (activeTopTab === "dashboard" && isLoading) {
+  if (isLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -1379,8 +1323,6 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
             </div>
           )}
 
-          {activeTopTab === "dashboard" && (
-            <>
               <header className="pb-1">
                 <p className="text-sm font-black text-[#10172a] dark:text-white">
            
@@ -1422,20 +1364,6 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
                   tasks={tasks}
                 />
               </div>
-            </>
-          )}
-
-          {activeTopTab === "newsfeed" && (
-            <PlaceholderPanel title="Newsfeed">
-              Latest task, client, and employee updates are connected to the database.
-            </PlaceholderPanel>
-          )}
-
-          {activeTopTab === "messages" && (
-            <PlaceholderPanel title="Messages">
-              Message threads will stay on this connected Home tab once the messages API is added.
-            </PlaceholderPanel>
-          )}
         </div>
   );
 };

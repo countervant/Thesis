@@ -1,4 +1,6 @@
 import express from "express";
+import mongoose from "mongoose";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import Client from "../models/Admin/Clientmodel.js";
 import User from "../models/userModel.js";
 import { authorize } from "../middleware/authorize.js";
@@ -10,10 +12,12 @@ import { withAvatarUrl } from "../utils/avatar.js";
 import { isUserOnline } from "../utils/presence.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const emailRegex =
   /^[A-Za-z0-9]+(?:[._%+-][A-Za-z0-9]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
 
 const isValidEmail = (email) => {
+  if (typeof email !== "string") return false;
   const trimmedEmail = email.trim();
   return (
     trimmedEmail.length <= 254 &&
@@ -22,17 +26,21 @@ const isValidEmail = (email) => {
   );
 };
 
+const normalizeText = (value) => typeof value === "string" ? value.trim() : "";
+
 const normalizeClientPayload = (body) => ({
-  companyName: body.companyName?.trim() || "",
-  contactPerson: body.contactPerson?.trim() || "",
-  email: body.email?.trim().toLowerCase() || "",
-  phone: body.phone?.trim() || "",
-  country: body.country?.trim() || "Philippines",
-  service: body.service?.trim() || "",
-  address: body.address?.trim() || "",
-  notes: body.notes?.trim() || "",
-  isActive: body.isActive ?? true,
-  assignedEmployee: body.assignedEmployee || undefined,
+  companyName: normalizeText(body.companyName),
+  contactPerson: normalizeText(body.contactPerson),
+  email: normalizeText(body.email).toLowerCase(),
+  phone: normalizeText(body.phone),
+  country: normalizeText(body.country) || "Philippines",
+  service: normalizeText(body.service),
+  address: normalizeText(body.address),
+  notes: normalizeText(body.notes),
+  isActive: body.isActive === undefined ? true : body.isActive,
+  assignedEmployee: body.assignedEmployee
+    ? String(body.assignedEmployee?._id || body.assignedEmployee)
+    : undefined,
 });
 
 const validateClientPayload = (payload) => {
@@ -40,8 +48,19 @@ const validateClientPayload = (payload) => {
   if (!payload.companyName) return "Company name is required";
   if (!payload.email) return "Email is required";
   if (!isValidEmail(payload.email)) return "Enter a valid email";
+  if (typeof payload.isActive !== "boolean") return "Client status must be true or false";
+  if (payload.assignedEmployee && !mongoose.Types.ObjectId.isValid(payload.assignedEmployee)) {
+    return "Assigned employee is invalid";
+  }
   return getPhoneValidationMessage(payload.phone, payload.country);
 };
+
+const assignedEmployeeExists = async (employeeId) =>
+  !employeeId || Boolean(await User.exists({
+    _id: employeeId,
+    role: "employee",
+    isActive: true,
+  }));
 
 const clientUserToClient = (user) => {
   const avatar = withAvatarUrl(user)?.avatar || "";
@@ -145,14 +164,27 @@ router.post("/", protect, authorize("admin"), async (req, res) => {
       return res.status(400).json({ message: validationMessage });
     }
 
-    const emailOwner = await Client.findOne({ email: payload.email });
-    if (emailOwner) {
+    if (!(await assignedEmployeeExists(payload.assignedEmployee))) {
+      return res.status(400).json({ message: "Select an active employee" });
+    }
+
+    const [managedEmailOwner, accountEmailOwner] = await Promise.all([
+      Client.exists({ email: payload.email }),
+      User.exists({ email: payload.email }),
+    ]);
+    if (managedEmailOwner || accountEmailOwner) {
       return res.status(400).json({ message: "Client email already exists" });
     }
 
     const client = await Client.create(payload);
     res.status(201).json(client);
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Client email already exists" });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Create client error:", error);
     res.status(500).json({ message: "Unable to create client" });
   }
@@ -189,12 +221,12 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
         return res.status(400).json({ message: validationMessage });
       }
 
-      const emailOwner = await User.findOne({
-        email: payload.email,
-        _id: { $ne: userClient._id },
-      });
+      const [emailOwner, managedEmailOwner] = await Promise.all([
+        User.exists({ email: payload.email, _id: { $ne: userClient._id } }),
+        Client.exists({ email: payload.email }),
+      ]);
 
-      if (emailOwner) {
+      if (emailOwner || managedEmailOwner) {
         return res.status(400).json({ message: "Client email already exists" });
       }
 
@@ -230,12 +262,16 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
       return res.status(400).json({ message: validationMessage });
     }
 
-    const emailOwner = await Client.findOne({
-      email: payload.email,
-      _id: { $ne: client._id },
-    });
+    if (!(await assignedEmployeeExists(payload.assignedEmployee))) {
+      return res.status(400).json({ message: "Select an active employee" });
+    }
 
-    if (emailOwner) {
+    const [emailOwner, accountEmailOwner] = await Promise.all([
+      Client.exists({ email: payload.email, _id: { $ne: client._id } }),
+      User.exists({ email: payload.email }),
+    ]);
+
+    if (emailOwner || accountEmailOwner) {
       return res.status(400).json({ message: "Client email already exists" });
     }
 
@@ -253,6 +289,12 @@ router.put("/:id", protect, authorize("admin"), async (req, res) => {
     await client.save();
     res.status(200).json(client);
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Client email already exists" });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Update client error:", error);
     res.status(500).json({ message: "Unable to update client" });
   }

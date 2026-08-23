@@ -1,4 +1,5 @@
 import express from "express";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import { createHash, randomUUID } from "crypto";
 import fs from "fs/promises";
 import mongoose from "mongoose";
@@ -22,6 +23,7 @@ import {
 } from "../utils/cloudinary.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configuredStorageRoot = String(process.env.OUTPUT_STORAGE_ROOT || "").trim();
 const legacyUploadsRoot = path.resolve(__dirname, "../uploads/tasks");
@@ -283,6 +285,12 @@ const canUserSubmitTask = (task, userId) =>
   task.subtasks.some(
     (subtask) => String(subtask?.assignedTo?._id || subtask?.assignedTo || "") === String(userId)
   );
+
+export const canUserSubmitTaskOutput = (task, user) => {
+  if (user?.role === "admin") return true;
+  if (user?.role !== "employee") return false;
+  return canUserSubmitTask(task, user?._id || user?.id);
+};
 
 const validateProjectAssignees = async (assignees, adminUserId, existingAssignees = []) => {
   if (!assignees.length) return "Select at least one project assignee";
@@ -2221,9 +2229,10 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const isAssignedUser = canUserSubmitTask(task, req.user._id);
-    if (req.user.role !== "admin" && !isAssignedUser) {
-      return res.status(403).json({ message: "Only the assigned user can submit this output" });
+    if (!canUserSubmitTaskOutput(task, req.user)) {
+      return res.status(403).json({
+        message: "Only administrators and assigned employees can submit project output",
+      });
     }
 
     const outputMethod = req.body.outputMethod === "link" ? "link" : "file";

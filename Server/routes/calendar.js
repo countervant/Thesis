@@ -1,11 +1,14 @@
 import express from "express";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import mongoose from "mongoose";
 import CalendarDepartment from "../models/calendarDepartmentModel.js";
 import CalendarEvent from "../models/calendarEventModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
+import { authorize } from "../middleware/authorize.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 
 const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const startOfToday = () => {
@@ -138,7 +141,7 @@ router.get("/departments", protect, async (req, res) => {
   }
 });
 
-router.post("/departments", protect, async (req, res) => {
+router.post("/departments", protect, authorize("admin"), async (req, res) => {
   try {
     const name = String(req.body.name || "").trim();
 
@@ -160,6 +163,9 @@ router.post("/departments", protect, async (req, res) => {
 
     res.status(201).json(department);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Create calendar department error:", error);
     res.status(500).json({ message: "Unable to create calendar department" });
   }
@@ -237,6 +243,9 @@ router.post("/", protect, async (req, res) => {
 
     res.status(201).json(event);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Create calendar event error:", error);
     res.status(500).json({ message: "Unable to create calendar event" });
   }
@@ -277,6 +286,9 @@ router.put("/:id", protect, async (req, res) => {
     await event.save();
     res.status(200).json(event);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Update calendar event error:", error);
     res.status(500).json({ message: "Unable to update calendar event" });
   }

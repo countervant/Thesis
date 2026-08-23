@@ -978,17 +978,17 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
             )}
           </section>
           <ConfirmDialog
-            confirmLabel="Yes , delete"
+            confirmLabel="Delete permanently"
             icon="delete"
             isOpen={Boolean(entryToDelete)}
-            message={`Delete "${entryToDelete?.description || "this entry"}"?`}
+            message={`Permanently delete budget entry "${entryToDelete?.description || "this entry"}"? This cannot be undone.`}
             onCancel={() => setEntryToDelete(null)}
             onConfirm={async () => {
               const entry = entryToDelete;
               setEntryToDelete(null);
               if (entry) await deleteEntry(entry.id);
             }}
-            title="Delete"
+            title="Delete Budget Entry"
           />
         </div>
   );

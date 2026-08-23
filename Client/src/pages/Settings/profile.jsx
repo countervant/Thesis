@@ -3,12 +3,14 @@ import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
 
-const defaultSkills = {
-  "Technical Skills": ["React", "Laravel", "JavaScript", "TypeScript", "PHP", "MySQL", "Git", "UI/UX Design"],
-  "Soft Skills": ["Leadership", "Communication", "Problem Solving", "Time Management", "Teamwork", "Adaptability"],
-  "Other Expertise": ["System Administration", "Database Management", "Cybersecurity Basics", "Agile Methodology"],
+const DEFAULT_SKILLS = {
+  "Technical Skills": [],
+  "Soft Skills": [],
+  "Other Expertise": [],
 };
 const todayInputValue = new Date().toISOString().slice(0, 10);
+const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const PROFILE_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 const getStorageKey = (user) => `clientraProfileSettings:${user?._id || user?.id || user?.email || "guest"}`;
 
@@ -86,6 +88,7 @@ const ProfileSettings = ({ user }) => {
     () => ({
       fullName: getFullName(user),
       email: user?.email || "",
+      currentPassword: "",
       phone: user?.phone || "",
       address: user?.country || "",
       birthday: formatBirthday(user?.birthday),
@@ -104,7 +107,7 @@ const ProfileSettings = ({ user }) => {
         "Soft Skills": user.skillGroups.soft || [],
         "Other Expertise": user.skillGroups.other || [],
       }
-    : localSettings.skills || defaultSkills);
+    : localSettings.skills || DEFAULT_SKILLS);
   const [newSkill, setNewSkill] = useState("");
   const [newSkillGroup, setNewSkillGroup] = useState("Technical Skills");
   const [showSkillForm, setShowSkillForm] = useState(false);
@@ -181,8 +184,12 @@ const ProfileSettings = ({ user }) => {
 
   const loadImage = (field, file) => {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Please choose an image smaller than 10 MB.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setError("Please choose a PNG, JPEG, WebP, or GIF image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Please choose an image that is 5 MB or smaller.");
       return;
     }
 
@@ -198,6 +205,13 @@ const ProfileSettings = ({ user }) => {
     const nameParts = formData.fullName.trim().split(/\s+/).filter(Boolean);
     if (nameParts.length < 2) {
       setError("Please enter both first and last name.");
+      return;
+    }
+
+    const isChangingEmail = formData.email.trim().toLowerCase() !==
+      String(user?.email || "").trim().toLowerCase();
+    if (isChangingEmail && !formData.currentPassword) {
+      setError("Enter your current password to change your email address.");
       return;
     }
 
@@ -228,12 +242,16 @@ const ProfileSettings = ({ user }) => {
       if (hasLoadedCoverPhoto || hasChangedCoverPhoto) {
         payload.coverPhoto = formData.coverPhoto;
       }
+      if (isChangingEmail) {
+        payload.currentPassword = formData.currentPassword;
+      }
 
       const updatedUser = await authAPI.updateMe(payload);
       localStorage.setItem(getStorageKey(user), JSON.stringify({ gender: formData.gender, skills: skillGroups }));
       updateUser(updatedUser);
       setFormData((currentData) => ({
         ...currentData,
+        currentPassword: "",
         avatar: updatedUser.avatar || "",
         coverPhoto: updatedUser.coverPhoto || "",
       }));
@@ -259,7 +277,7 @@ const ProfileSettings = ({ user }) => {
               Change Cover
               <input
                 type="file"
-                accept="image/*"
+                accept={PROFILE_IMAGE_ACCEPT}
                 className="sr-only"
                 onChange={(event) => {
                   loadImage("coverPhoto", event.target.files?.[0]);
@@ -278,13 +296,10 @@ const ProfileSettings = ({ user }) => {
             </div>
             <h2 className="mt-3 text-base font-black text-[#10142d] dark:text-white">{formData.fullName || "Profile Name"}</h2>
             <span className="mt-2 inline-flex rounded-full bg-pink-50 px-3 py-1 text-xs font-black uppercase text-[#c72fb2]">
-              {user?.role || "Admin"}
+              {user?.role || "User"}
             </span>
             <p className="mt-3 text-sm font-black text-[#10142d] dark:text-white">
-              {formData.role || "System Administrator"}
-            </p>
-            <p className="mx-auto mt-2 max-w-[220px] text-xs font-semibold leading-5 text-slate-500">
-              Managing the system and ensuring everything runs smoothly.
+              {formData.role || user?.role || "Position not available"}
             </p>
             <div className="mt-4 space-y-3 border-y border-pink-50 py-3.5 text-left text-xs font-bold text-slate-600">
               <p className="flex items-center gap-3"><Icon name="mail" />{formData.email}</p>
@@ -298,7 +313,7 @@ const ProfileSettings = ({ user }) => {
                 Change Photo
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={PROFILE_IMAGE_ACCEPT}
                   className="sr-only"
                   onChange={(event) => {
                     loadImage("avatar", event.target.files?.[0]);
@@ -328,6 +343,18 @@ const ProfileSettings = ({ user }) => {
             <Field label="Email Address" icon="mail" required>
               <input type="email" required value={formData.email} onChange={(event) => updateField("email", event.target.value)} className={iconInputClass} />
             </Field>
+            {formData.email.trim().toLowerCase() !== String(user?.email || "").trim().toLowerCase() && (
+              <Field label="Current Password to Change Email" required>
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={formData.currentPassword}
+                  onChange={(event) => updateField("currentPassword", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            )}
             <Field label="Phone Number" icon="phone" required>
               <input type="tel" required value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} className={iconInputClass} />
             </Field>

@@ -837,7 +837,7 @@ const SimpleFeedbackModal = ({ onClose, onSubmit, project }) => {
         {formError && <p className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{formError}</p>}
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" onClick={onClose} className="h-10 rounded-lg px-5 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:hover:bg-neutral-900">Cancel</button>
-          <button disabled={isSubmitting} className="h-10 rounded-lg bg-[#c72fb2] px-5 text-sm font-black text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Submitting..." : "Submit Feedback"}</button>
+          <button type="submit" disabled={isSubmitting} className="h-10 rounded-lg bg-[#c72fb2] px-5 text-sm font-black text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Submitting..." : "Submit Feedback"}</button>
         </div>
       </form>
     </div>
@@ -870,7 +870,7 @@ const RevisionModal = ({ errorMessage = "", isSubmitting = false, onClose, onSub
       try {
         const dataUrl = await fileToDataUrl(file);
         submitForm.file = { dataUrl, fileName: file.name, size: file.size, type: file.type };
-      } catch (error) {
+      } catch {
         setFileError("Unable to read the selected file.");
         return;
       }

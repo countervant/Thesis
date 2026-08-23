@@ -5,6 +5,7 @@ import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
 import { PersonGridSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
+import { downloadCsv } from "../../../utils/csvExport.js";
 
 const filters = [
   { label: "All accounts", value: "All" },
@@ -719,19 +720,7 @@ const AdminClients = () => {
       client.projects.length,
       client.projects.map((project) => project.title).join("; "),
     ]);
-    const csv = [header, ...rows]
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "clients.csv";
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadCsv([header, ...rows], "clients.csv");
   };
 
   return (
@@ -823,17 +812,19 @@ const AdminClients = () => {
             onClose={() => setSelectedClientProjects(null)}
           />
           <ConfirmDialog
-            confirmLabel="Yes , delete"
+            confirmLabel="Delete permanently"
             icon="delete"
             isOpen={Boolean(clientToDelete)}
-            message={`Delete client "${clientToDelete?.name || ""}"?`}
+            message={clientToDelete?.hasLoginAccount
+              ? `Permanently delete client "${clientToDelete?.name || ""}" and their login account? Existing project records will remain.`
+              : `Permanently delete client record "${clientToDelete?.name || ""}"? Existing project records will remain.`}
             onCancel={() => setClientToDelete(null)}
             onConfirm={async () => {
               const client = clientToDelete;
               setClientToDelete(null);
               if (client) await deleteClient(client);
             }}
-            title="Delete"
+            title="Delete Client"
           />
         </div>
         </div>

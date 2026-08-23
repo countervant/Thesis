@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 import {
   assertDistinctReviewFile,
+  canUserSubmitTaskOutput,
   createProtectedImageReview,
   getTaskFinalOutputForViewer,
   isPaymentProtectedTask,
@@ -42,6 +43,20 @@ test("output links accept only absolute HTTP and HTTPS URLs", () => {
   ]) {
     assert.equal(normalizeHttpOutputLink(unsafeLink), "", unsafeLink);
   }
+});
+
+test("only administrators and assigned employees can submit project output", () => {
+  const task = {
+    assignedTo: "employee-1",
+    assignees: ["employee-1"],
+    subtasks: [{ assignedTo: "employee-2" }],
+  };
+
+  assert.equal(canUserSubmitTaskOutput(task, { role: "admin", _id: "admin-1" }), true);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "employee", _id: "employee-1" }), true);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "employee", _id: "employee-2" }), true);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "employee", _id: "employee-3" }), false);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "client", _id: "employee-1" }), false);
 });
 
 test("allowed uploads use the declared safe MIME and a server-selected extension", () => {

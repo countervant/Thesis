@@ -1,4 +1,5 @@
 import express from "express";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import mongoose from "mongoose";
 import NewsfeedPost from "../models/newsfeedModel.js";
 import { protect } from "../middleware/protectedjwt.js";
@@ -11,6 +12,8 @@ import {
 } from "../utils/cloudinary.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
+router.param("commentId", validateObjectIdParam);
 const userPublicFields = "firstName lastName companyName role updatedAt";
 const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
 const MAX_MEDIA_NAME_LENGTH = 180;

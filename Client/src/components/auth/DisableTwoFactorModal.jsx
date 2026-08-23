@@ -29,7 +29,7 @@ const DisableTwoFactorModal = ({ open, onClose, onDisabled }) => {
         {error && <p className="mt-3 text-sm font-bold text-red-500">{error}</p>}
         <div className="mt-5 grid gap-3 min-[360px]:grid-cols-2">
           <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 text-sm font-black text-slate-600">Keep Enabled</button>
-          <button disabled={!password || loading} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Disable 2FA</button>
+          <button type="submit" disabled={!password || loading} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Disable 2FA</button>
         </div>
       </form>
     </section>

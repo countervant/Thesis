@@ -8,34 +8,43 @@ const clientSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 160,
     },
 
     contactPerson: {
       type: String,
       required: true,
+      trim: true,
+      maxlength: 160,
     },
 
     email: {
       type: String,
       required: true,
       lowercase: true,
+      trim: true,
+      maxlength: 254,
     },
 
     phone: {
       type: String,
       default: "",
+      trim: true,
+      maxlength: 40,
     },
 
     country: {
       type: String,
       default: "Philippines",
       trim: true,
+      maxlength: 100,
     },
 
     service: {
       type: String,
       default: "",
       trim: true,
+      maxlength: 160,
     },
 
     isActive: {
@@ -46,11 +55,15 @@ const clientSchema = new mongoose.Schema(
     address: {
       type: String,
       default: "",
+      trim: true,
+      maxlength: 500,
     },
 
     notes: {
       type: String,
       default: "",
+      trim: true,
+      maxlength: 2000,
     },
 
     assignedEmployee: {
