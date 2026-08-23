@@ -1956,9 +1956,9 @@ const Tasks = ({
   const requestDeleteTask = (task) => {
     setConfirmAction({
       icon: "delete",
-      title: "Delete",
-      message: `Delete task "${task.title}"?`,
-      confirmLabel: "Yes , delete",
+      title: "Delete Project",
+      message: `Permanently delete project "${task.title}" and its stored output files? This cannot be undone.`,
+      confirmLabel: "Delete permanently",
       onConfirm: () => handleDeleteTask(task),
     });
   };

@@ -336,7 +336,7 @@ const MessagesPanel = () => {
     setOpenInboxMenuId("");
   };
 
-  const handleDeleteConversation = (participantId) => {
+  const handleHideConversation = (participantId) => {
     updateInboxState((currentState) => ({
       archivedIds: currentState.archivedIds.filter((id) => id !== participantId),
       deletedIds: Array.from(new Set([...currentState.deletedIds, participantId])),
@@ -1056,16 +1056,19 @@ const MessagesPanel = () => {
           const isOnline = Boolean(participant?.isOnline || participant?.online);
 
           return (
-          <button
+          <div
             key={participantId}
-            type="button"
-            onClick={() => handleSelectConversation(participant)}
-            className={`relative flex w-full items-center gap-3 border px-1 py-3.5 pr-11 text-left transition md:gap-4 md:rounded-2xl md:px-3 md:py-4 md:pr-12 ${
+            className={`relative w-full border text-left transition md:rounded-2xl ${
               isActive
                 ? "border-transparent bg-transparent md:border-pink-200 md:bg-pink-50 md:shadow-[0_10px_28px_rgba(236,72,153,0.12)] md:dark:border-[#DA70D6] md:dark:bg-neutral-900"
                 : "border-transparent bg-transparent hover:bg-pink-50/70 dark:hover:bg-neutral-900 md:border-pink-100 md:bg-white md:shadow-[0_6px_22px_rgba(15,23,42,0.06)] md:dark:border-[#DA70D6]/80 md:dark:bg-neutral-950"
             }`}
           >
+            <button
+              type="button"
+              onClick={() => handleSelectConversation(participant)}
+              className="flex w-full items-center gap-3 px-1 py-3.5 pr-11 text-left md:gap-4 md:px-3 md:py-4 md:pr-12"
+            >
             <span className="relative shrink-0">
               <Avatar className="h-14 w-14 md:h-12 md:w-12" user={participant} />
               {isOnline && (
@@ -1098,24 +1101,15 @@ const MessagesPanel = () => {
                 </span>
               )}
             </span>
+            </button>
             <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   setOpenInboxMenuId((currentId) =>
                     currentId === participantId ? "" : participantId
                   );
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setOpenInboxMenuId((currentId) =>
-                      currentId === participantId ? "" : participantId
-                    );
-                  }
                 }}
                 className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-white hover:text-[#ff3faf] dark:hover:bg-neutral-800"
                 aria-label="Conversation options"
@@ -1127,16 +1121,16 @@ const MessagesPanel = () => {
                   <span className="h-1 w-1 rounded-full bg-current" />
                   <span className="h-1 w-1 rounded-full bg-current" />
                 </span>
-              </span>
+              </button>
               {openInboxMenuId === participantId && (
-                <span
+                <div
                   className="absolute right-0 top-9 z-30 w-32 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 text-xs font-black shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
                   role="menu"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <span
+                  <button
+                    type="button"
                     role="menuitem"
-                    tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
                       if (isArchived) {
@@ -1145,25 +1139,25 @@ const MessagesPanel = () => {
                         handleArchiveConversation(participantId);
                       }
                     }}
-                    className="block cursor-pointer px-3 py-2 text-left text-slate-700 hover:bg-pink-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-slate-700 hover:bg-pink-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
                   >
                     {isArchived ? "Unarchive" : "Archive"}
-                  </span>
-                  <span
+                  </button>
+                  <button
+                    type="button"
                     role="menuitem"
-                    tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
-                      handleDeleteConversation(participantId);
+                      handleHideConversation(participantId);
                     }}
-                    className="block cursor-pointer px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-neutral-800"
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-neutral-800"
                   >
-                    Delete
-                  </span>
-                </span>
+                    Hide
+                  </button>
+                </div>
               )}
             </span>
-          </button>
+          </div>
           );
         })}
       </div>
@@ -1691,7 +1685,7 @@ const Dashboard = () => {
           : adminPage;
 
     let adminContent = (
-      <AdminDashboard activePage={adminPage} />
+      <AdminDashboard />
     );
 
     if (adminPage === "tasks" || adminPage === "add-task" || adminPage === "edit-task") {

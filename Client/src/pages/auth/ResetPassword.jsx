@@ -5,6 +5,7 @@ import AuthenticationHelper from "../../components/auth/AuthenticationHelper.jsx
 import hideIcon from "../../assets/hide.png";
 import viewIcon from "../../assets/view.png";
 import { validateEmail } from "../../utils/emailValidation.js";
+import { getPasswordValidationMessage } from "../../utils/passwordValidation.js";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -42,13 +43,9 @@ const ResetPassword = () => {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-      setError("Password must include uppercase, lowercase, and number characters");
+    const passwordValidationMessage = getPasswordValidationMessage(password);
+    if (passwordValidationMessage) {
+      setError(passwordValidationMessage);
       return;
     }
 

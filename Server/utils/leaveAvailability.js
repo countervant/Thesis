@@ -8,7 +8,7 @@ export const getManilaDayRange = (date = new Date()) => {
     manilaDate.getUTCFullYear(),
     manilaDate.getUTCMonth(),
     manilaDate.getUTCDate()
-  ));
+  ) - MANILA_UTC_OFFSET_MS);
 
   return {
     start,
