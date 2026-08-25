@@ -208,7 +208,7 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
             <div className="space-y-1">
               <FieldLabel>First Name</FieldLabel>
               <input
-                type="password"
+                type="text"
                 name={fieldNames.firstName}
                 {...antiAutofillProps}
                 readOnly
