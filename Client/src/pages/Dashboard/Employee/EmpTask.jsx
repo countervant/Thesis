@@ -215,6 +215,8 @@ const normalizeTask = (task) => {
     newsfeedPermissionAllowed: Boolean(task?.newsfeedPermission?.allowed),
     newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
+    createdAt: task?.createdAt,
+    updatedAt: task?.updatedAt,
   };
 };
 
@@ -857,6 +859,7 @@ const EmpTask = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("Newest to Oldest");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [completionDraft, setCompletionDraft] = useState(null);
@@ -964,9 +967,19 @@ const EmpTask = () => {
         return matchesGroup && matchesSearch;
       })
       .sort((firstTask, secondTask) => {
-        return (parseDate(firstTask.dueDate) || new Date(8640000000000000)) - (parseDate(secondTask.dueDate) || new Date(8640000000000000));
+        if (sortBy === "Oldest to Newest" || sortBy === "Oldest") {
+          const firstTime = new Date(firstTask.createdAt || firstTask.startDate || 0).getTime();
+          const secondTime = new Date(secondTask.createdAt || secondTask.startDate || 0).getTime();
+          return firstTime - secondTime;
+        }
+        if (sortBy === "Due Date") {
+          return (parseDate(firstTask.dueDate) || new Date(8640000000000000)) - (parseDate(secondTask.dueDate) || new Date(8640000000000000));
+        }
+        const firstTime = new Date(firstTask.createdAt || firstTask.startDate || 0).getTime();
+        const secondTime = new Date(secondTask.createdAt || secondTask.startDate || 0).getTime();
+        return secondTime - firstTime;
       });
-  }, [searchQuery, tasks, visibleGroup]);
+  }, [searchQuery, sortBy, tasks, visibleGroup]);
 
   const taskStats = [
     { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
@@ -1214,8 +1227,8 @@ const EmpTask = () => {
       </div>
 
       <Card className="p-5">
-        <div>
-          <label className="relative block">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="relative block flex-1">
             <span className="sr-only">Search projects</span>
             <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
@@ -1225,6 +1238,18 @@ const EmpTask = () => {
               placeholder="Search projects..."
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
             />
+          </label>
+          <label className="relative block sm:w-auto">
+            <span className="sr-only">Sort projects</span>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+            >
+              <option value="Newest to Oldest">Newest to Oldest</option>
+              <option value="Oldest to Newest">Oldest to Newest</option>
+              <option value="Due Date">Due Date</option>
+            </select>
           </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">

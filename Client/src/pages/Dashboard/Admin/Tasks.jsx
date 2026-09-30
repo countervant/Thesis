@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import done from "../../../assets/done.png";
 import notification from "../../../assets/notification.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
@@ -246,6 +246,8 @@ const normalizeTask = (task) => {
     newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
     employeePayments: Array.isArray(task?.employeePayments) ? task.employeePayments : [],
+    createdAt: task?.createdAt,
+    updatedAt: task?.updatedAt,
   };
 };
 
@@ -1487,6 +1489,8 @@ const Tasks = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("Newest to Oldest");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
   const [completionDraft, setCompletionDraft] = useState(null);
@@ -1536,6 +1540,7 @@ const Tasks = ({
         if (target?.page !== "tasks" || !target?.taskId) return;
 
         setVisibleGroup("All");
+        setAssignmentFilter("all");
         setSelectedTaskId(String(target.taskId));
         sessionStorage.removeItem(notificationTargetKey);
       } catch {
@@ -1579,10 +1584,48 @@ const Tasks = ({
     };
   }, [selectedTaskId]);
 
+  const isMyProject = useCallback(
+    (task) => {
+      if (!currentUserId) return false;
+      const isAssigned = [...(task?.assignees || []), task?.assignedTo].some(
+        (assignee) => getEntityId(assignee) === currentUserId
+      );
+      const isCreatedByMeWithoutEmployees =
+        getEntityId(task?.createdBy) === currentUserId &&
+        getAssignedEmployees(task).length === 0;
+      return isAssigned || isCreatedByMeWithoutEmployees;
+    },
+    [currentUserId]
+  );
+
+  const isEmployeeAssignedProject = useCallback(
+    (task) => {
+      if (getAssignedEmployees(task).length > 0) return true;
+      return (task?.subtasks || []).some((subtask) => {
+        const assignee = subtask?.assignedTo;
+        if (!assignee) return false;
+        if (assignee?.role === "employee") return true;
+        const id = getEntityId(assignee);
+        return id && id !== currentUserId;
+      });
+    },
+    [currentUserId]
+  );
+
+  const assignmentFilteredTasks = useMemo(() => {
+    if (assignmentFilter === "my-projects") {
+      return tasks.filter(isMyProject);
+    }
+    if (assignmentFilter === "employee-assigned") {
+      return tasks.filter(isEmployeeAssignedProject);
+    }
+    return tasks;
+  }, [assignmentFilter, isEmployeeAssignedProject, isMyProject, tasks]);
+
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
-    const filteredTasks = tasks.filter((task) => {
+    const filteredTasks = assignmentFilteredTasks.filter((task) => {
       const dateStatus = getDateStatus(task.dueDate);
       const matchesGroup =
         visibleGroup === "All" ||
@@ -1600,11 +1643,21 @@ const Tasks = ({
     });
 
     return filteredTasks.sort((firstTask, secondTask) => {
-      const firstDate = toInputDate(firstTask.dueDate);
-      const secondDate = toInputDate(secondTask.dueDate);
-      return firstDate.localeCompare(secondDate);
+      if (sortBy === "Oldest to Newest" || sortBy === "Oldest") {
+        const firstTime = new Date(firstTask.createdAt || firstTask.updatedAt || 0).getTime();
+        const secondTime = new Date(secondTask.createdAt || secondTask.updatedAt || 0).getTime();
+        return firstTime - secondTime;
+      }
+      if (sortBy === "Due Date") {
+        const firstDate = toInputDate(firstTask.dueDate);
+        const secondDate = toInputDate(secondTask.dueDate);
+        return firstDate.localeCompare(secondDate);
+      }
+      const firstTime = new Date(firstTask.createdAt || firstTask.updatedAt || 0).getTime();
+      const secondTime = new Date(secondTask.createdAt || secondTask.updatedAt || 0).getTime();
+      return secondTime - firstTime;
     });
-  }, [searchQuery, tasks, visibleGroup]);
+  }, [assignmentFilteredTasks, searchQuery, sortBy, visibleGroup]);
 
   const isOwnedByCurrentUser = (task) => {
     if (!currentUserId) return false;
@@ -1619,8 +1672,8 @@ const Tasks = ({
     let completed = 0;
     let overdue = 0;
 
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
+    for (let i = 0; i < assignmentFilteredTasks.length; i++) {
+      const task = assignmentFilteredTasks[i];
       const isDone = task.status === "Done";
       if (isDone) {
         completed++;
@@ -1633,13 +1686,13 @@ const Tasks = ({
     }
 
     return [
-      { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
+      { label: "Total Projects", value: assignmentFilteredTasks.length, icon: taskIcon, tone: "pink" },
       { label: "Due Today", value: dueToday, icon: pendingrequest, tone: "orange" },
       { label: "In Progress", value: inProgress, icon: progress, tone: "blue" },
       { label: "Completed", value: completed, icon: done, tone: "green" },
       { label: "Overdue", value: overdue, icon: notification, tone: "rose" },
     ];
-  }, [tasks]);
+  }, [assignmentFilteredTasks]);
   const selectedTask = selectedTaskDetails;
 
   const renderTaskRows = (items, accentClass = "bg-pink-500") => {
@@ -2016,28 +2069,61 @@ const Tasks = ({
           </div>
 
           <Card className="p-3 md:p-5">
-            <label className="relative block">
-              <span className="sr-only">Search projects</span>
-              <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search projects..."
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
-              />
-            </label>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
-                <button
-                  key={group}
-                  type="button"
-                  onClick={() => setVisibleGroup(group)}
-                  className={`rounded-full px-4 py-2 text-xs font-black transition ${visibleGroup === group ? "bg-pink-100 text-pink-700" : "border border-pink-100 bg-white text-slate-600 hover:bg-pink-50"}`}
-                >
-                  {group}
-                </button>
-              ))}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <label className="relative block flex-1">
+                <span className="sr-only">Search projects</span>
+                <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search projects..."
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center gap-2.5 sm:flex-nowrap md:gap-3">
+                <label className="relative block w-full sm:w-auto">
+                  <span className="sr-only">Filter by assignment</span>
+                  <select
+                    value={assignmentFilter}
+                    onChange={(event) => setAssignmentFilter(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto md:h-12 md:px-4 md:text-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                  >
+                    <option value="all">All Assignments</option>
+                    <option value="my-projects">My Projects</option>
+                    <option value="employee-assigned">Employee Assigned</option>
+                  </select>
+                </label>
+
+                <label className="relative block w-full sm:w-auto">
+                  <span className="sr-only">Filter by status</span>
+                  <select
+                    value={visibleGroup}
+                    onChange={(event) => setVisibleGroup(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto md:h-12 md:px-4 md:text-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Due Today">Due Today</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </label>
+
+                <label className="relative block w-full sm:w-auto">
+                  <span className="sr-only">Sort projects</span>
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto md:h-12 md:px-4 md:text-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                  >
+                    <option value="Newest to Oldest">Newest to Oldest</option>
+                    <option value="Oldest to Newest">Oldest to Newest</option>
+                    <option value="Due Date">Due Date</option>
+                  </select>
+                </label>
+              </div>
             </div>
           </Card>
 

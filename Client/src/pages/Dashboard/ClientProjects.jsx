@@ -39,7 +39,7 @@ const statStyles = {
 
 const tabs = ["All Projects", "In Progress", "In Review", "Completed", "Archived"];
 const statusFilters = ["All Status", "In Progress", "In Review", "Completed", "Pending Revisions"];
-const sortOptions = ["Newest", "Oldest", "Due Date", "Progress"];
+const sortOptions = ["Newest to Oldest", "Oldest to Newest", "Due Date", "Progress"];
 const PROJECTS_PAGE_SIZE = 6;
 const API_ROOT = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
@@ -193,6 +193,7 @@ const normalizeProject = (task) => {
     description: task?.description || "Project request",
     startDate: task?.startDate || task?.createdAt,
     dueDate: task?.dueDate,
+    createdAt: task?.createdAt,
     amount,
     paid,
     pendingAmount: Math.max(0, amount - paid),
@@ -1268,7 +1269,7 @@ const ClientProjects = () => {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isLoadingProjectDetails, setIsLoadingProjectDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState("Newest");
+  const [sortBy, setSortBy] = useState("Newest to Oldest");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [archiveAction, setArchiveAction] = useState(null);
   const [noticeMessage, setNoticeMessage] = useState("");
@@ -1379,8 +1380,10 @@ const ClientProjects = () => {
         return matchesTab && matchesStatus && matchesSearch;
       })
       .sort((first, second) => {
-        if (sortBy === "Oldest") {
-          return (parseDate(first.updatedAt) || 0) - (parseDate(second.updatedAt) || 0);
+        if (sortBy === "Oldest to Newest" || sortBy === "Oldest") {
+          const firstTime = parseDate(first.createdAt) || parseDate(first.startDate) || parseDate(first.updatedAt) || 0;
+          const secondTime = parseDate(second.createdAt) || parseDate(second.startDate) || parseDate(second.updatedAt) || 0;
+          return firstTime - secondTime;
         }
         if (sortBy === "Due Date") {
           return (parseDate(first.dueDate) || new Date(8640000000000000)) - (parseDate(second.dueDate) || new Date(8640000000000000));
@@ -1388,7 +1391,9 @@ const ClientProjects = () => {
         if (sortBy === "Progress") {
           return second.progress - first.progress;
         }
-        return (parseDate(second.updatedAt) || 0) - (parseDate(first.updatedAt) || 0);
+        const firstTime = parseDate(first.createdAt) || parseDate(first.startDate) || parseDate(first.updatedAt) || 0;
+        const secondTime = parseDate(second.createdAt) || parseDate(second.startDate) || parseDate(second.updatedAt) || 0;
+        return secondTime - firstTime;
       });
   }, [activeTab, projects, searchTerm, sortBy, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(visibleProjects.length / PROJECTS_PAGE_SIZE));
