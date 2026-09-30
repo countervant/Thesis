@@ -269,11 +269,9 @@ const LeaveRequest = () => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const tabs = ["All", "Pending", "Approved", "Returned", "Rejected"];
   const [requests, setRequests] = useState([]);
-  const [roles, setRoles] = useState([]);
   const [summary, setSummary] = useState({});
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [roleFilter, setRoleFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [isLoading, setIsLoading] = useState(true);
@@ -295,7 +293,6 @@ const LeaveRequest = () => {
       };
 
       if (statusFilter !== "All") params.status = statusFilter;
-      if (roleFilter) params.role = roleFilter;
 
       const response = await leaveRequestAPI.getAll(params);
       const nextRequests = response.leaveRequests.map(normalizeRequest);
@@ -305,7 +302,6 @@ const LeaveRequest = () => {
           ? currentId
           : getRequestId(nextRequests[0])
       );
-      setRoles(response.roles || []);
       setSummary(response.summary || {});
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
@@ -314,7 +310,7 @@ const LeaveRequest = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [roleFilter, monthFilter, statusFilter]);
+  }, [monthFilter, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadLeaveRequests, 0);
@@ -514,16 +510,6 @@ const LeaveRequest = () => {
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-pink-50 px-5 py-4">
             <h2 className="text-base font-black">Leave Requests</h2>
             <div className="flex flex-wrap gap-3">
-              <select
-                className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none"
-                value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value)}
-              >
-                <option value="">All Roles</option>
-                {roles.map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
               <select
                 className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none"
                 value={monthFilter}
