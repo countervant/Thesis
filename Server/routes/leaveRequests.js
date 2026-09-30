@@ -58,7 +58,12 @@ const getMonthRange = (value) => {
   if (!value || value === "all") return null;
 
   const now = new Date();
-  const monthOffset = value === "last" ? -1 : 0;
+  let monthOffset = 0;
+  if (value === "last") monthOffset = -1;
+  else if (value === "next") monthOffset = 1;
+  else if (value === "this") monthOffset = 0;
+  else return null;
+
   const start = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const end = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 1);
 
@@ -80,7 +85,7 @@ const buildRequestQuery = (req) => {
     query.employeeRole = req.query.role;
   }
 
-  const monthRange = getMonthRange(req.query.month || "this");
+  const monthRange = getMonthRange(req.query.month);
   if (monthRange) {
     query.startDate = { $lt: monthRange.end };
     query.endDate = { $gte: monthRange.start };
@@ -205,7 +210,7 @@ router.get("/", protect, async (req, res) => {
             onLeaveToday: [
               {
                 $match: {
-                  ...summaryQuery,
+                  ...baseQuery,
                   status: "Approved",
                   startDate: { $lt: todayRange.end },
                   endDate: { $gte: todayRange.start },
@@ -216,7 +221,7 @@ router.get("/", protect, async (req, res) => {
             approvedThisMonth: [
               {
                 $match: {
-                  ...summaryQuery,
+                  ...baseQuery,
                   status: { $in: ["Approved", "Returned"] },
                   reviewedAt: {
                     $gte: currentMonthStart,

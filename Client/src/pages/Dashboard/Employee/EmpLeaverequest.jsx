@@ -148,6 +148,25 @@ const durationLabel = (days) => `${days || 0} ${Number(days) === 1 ? "day" : "da
 
 const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
 
+const getMonthDate = (monthFilter) => {
+  const now = new Date();
+  if (monthFilter === "last") {
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  }
+  if (monthFilter === "next") {
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
+const monthMatches = (request, monthDate) => {
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
+  const start = new Date(request.startDate);
+  const end = new Date(request.endDate);
+  return start < monthEnd && end >= monthStart;
+};
+
 const isCurrentApprovedLeave = (request) => {
   if (request?.status !== "Approved") return false;
 
@@ -277,6 +296,7 @@ const EmpLeaverequest = () => {
   const [requests, setRequests] = useState([]);
   const [summary, setSummary] = useState({});
   const [statusFilter, setStatusFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [form, setForm] = useState(() => ({
     ...defaultForm,
@@ -322,8 +342,13 @@ const EmpLeaverequest = () => {
   );
 
   const filteredHistory = useMemo(
-    () => requests.filter((request) => !statusFilter || request.status === statusFilter),
-    [requests, statusFilter]
+    () =>
+      requests.filter((request) => {
+        const matchesStatus = !statusFilter || request.status === statusFilter;
+        const matchesMonth = monthFilter === "all" || monthMatches(request, getMonthDate(monthFilter));
+        return matchesStatus && matchesMonth;
+      }),
+    [requests, statusFilter, monthFilter]
   );
   const detailRequest = requests.find((request) => getEntityId(request) === detailRequestId) || null;
 
@@ -403,6 +428,13 @@ const EmpLeaverequest = () => {
 
   const handleNextMonth = () => {
     setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1));
+  };
+
+  const handleMonthFilterChange = (value) => {
+    setMonthFilter(value);
+    if (value !== "all") {
+      setCurrentMonth(getMonthDate(value));
+    }
   };
 
   const handleAddComment = async (request) => {
@@ -564,19 +596,31 @@ const EmpLeaverequest = () => {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5">
           <h2 className="text-xl font-black">Leave History</h2>
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="">All Status</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending</option>
-            <option value="Returned">Returned</option>
-            <option value="Rejected">Rejected</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
+              value={monthFilter}
+              onChange={(event) => handleMonthFilterChange(event.target.value)}
+            >
+              <option value="all">All Months</option>
+              <option value="this">This Month</option>
+              <option value="next">Next Month</option>
+              <option value="last">Last Month</option>
+            </select>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="">All Status</option>
+              <option value="Approved">Approved</option>
+              <option value="Pending">Pending</option>
+              <option value="Returned">Returned</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto px-5 pb-5">
           <table className="w-full min-w-[1120px] text-left text-sm">

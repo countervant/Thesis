@@ -249,6 +249,9 @@ const getMonthDate = (monthFilter) => {
   if (monthFilter === "last") {
     return new Date(now.getFullYear(), now.getMonth() - 1, 1);
   }
+  if (monthFilter === "next") {
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }
   return new Date(now.getFullYear(), now.getMonth(), 1);
 };
 
@@ -269,7 +272,8 @@ const LeaveRequest = () => {
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [roleFilter, setRoleFilter] = useState("");
-  const [monthFilter, setMonthFilter] = useState("this");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
@@ -327,9 +331,15 @@ const LeaveRequest = () => {
     [summary]
   );
 
-  const monthDate = getMonthDate(monthFilter);
-  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-  const firstDayOffset = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getDay();
+  const handleMonthFilterChange = (value) => {
+    setMonthFilter(value);
+    if (value !== "all") {
+      setCalendarMonth(getMonthDate(value));
+    }
+  };
+
+  const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const firstDayOffset = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay();
   const calendarCells = Math.ceil((daysInMonth + firstDayOffset) / 7) * 7;
   const days = Array.from({ length: calendarCells }, (_, index) => index - firstDayOffset + 1);
 
@@ -337,16 +347,16 @@ const LeaveRequest = () => {
     () =>
       requests
         .filter((request) => ["Approved", "Pending"].includes(request.status))
-        .filter((request) => monthMatches(request, monthDate))
+        .filter((request) => monthMatches(request, calendarMonth))
         .flatMap((request) => {
           const start = new Date(request.startDate);
           const end = new Date(request.endDate);
           const startDay =
-            start.getMonth() === monthDate.getMonth() && start.getFullYear() === monthDate.getFullYear()
+            start.getMonth() === calendarMonth.getMonth() && start.getFullYear() === calendarMonth.getFullYear()
               ? start.getDate()
               : 1;
           const endDay =
-            end.getMonth() === monthDate.getMonth() && end.getFullYear() === monthDate.getFullYear()
+            end.getMonth() === calendarMonth.getMonth() && end.getFullYear() === calendarMonth.getFullYear()
               ? end.getDate()
               : daysInMonth;
 
@@ -356,7 +366,7 @@ const LeaveRequest = () => {
             color: typeColors[request.type] || typeColors.Others,
           }));
         }),
-    [daysInMonth, monthDate, requests]
+    [daysInMonth, calendarMonth, requests]
   );
 
   const historyItems = useMemo(
@@ -487,11 +497,12 @@ const LeaveRequest = () => {
               <select
                 className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none"
                 value={monthFilter}
-                onChange={(event) => setMonthFilter(event.target.value)}
+                onChange={(event) => handleMonthFilterChange(event.target.value)}
               >
-                <option value="this">This Month</option>
-                <option value="last">Last Month</option>
                 <option value="all">All Months</option>
+                <option value="this">This Month</option>
+                <option value="next">Next Month</option>
+                <option value="last">Last Month</option>
               </select>
             </div>
           </div>
@@ -526,7 +537,11 @@ const LeaveRequest = () => {
                   </tr>
                 )}
                 {!isLoading && requests.map((request) => (
-                  <tr key={getRequestId(request)} className="hover:bg-pink-50/40">
+                  <tr
+                    key={getRequestId(request)}
+                    onClick={() => setSelectedRequestId(getRequestId(request))}
+                    className={`cursor-pointer transition hover:bg-pink-50/40 ${selectedRequestId === getRequestId(request) ? "bg-pink-50/30" : ""}`}
+                  >
                     <td className="px-3 py-3 font-black text-pink-700">{request.id}</td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
@@ -543,7 +558,7 @@ const LeaveRequest = () => {
                     <td className="px-3 py-3 font-bold text-slate-600">{request.role}</td>
                     <td className="px-3 py-3"><StatusPill status={request.status} /></td>
                     <td className="px-3 py-3">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => handleStatusUpdate(request, "Approved")}
@@ -603,7 +618,31 @@ const LeaveRequest = () => {
           <Card className="order-2 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-black">Team Leave Calendar</h2>
-              <span className="text-sm font-black text-pink-600">{monthFilter === "all" ? "All Months" : formatMonth(monthDate)}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-pink-100 text-slate-600 transition hover:bg-pink-50"
+                  aria-label="Previous month"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <span className="min-w-[120px] text-center text-sm font-black text-pink-600">
+                  {formatMonth(calendarMonth)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-pink-100 text-slate-600 transition hover:bg-pink-50"
+                  aria-label="Next month"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
               {weekDays.map((day) => <span key={day}>{day}</span>)}
@@ -711,11 +750,12 @@ const LeaveRequest = () => {
             <select
               className="h-9 rounded-xl border border-pink-100 bg-white px-4 text-xs font-bold text-slate-700 outline-none"
               value={monthFilter}
-              onChange={(event) => setMonthFilter(event.target.value)}
+              onChange={(event) => handleMonthFilterChange(event.target.value)}
             >
-              <option value="this">This Month</option>
-              <option value="last">Last Month</option>
               <option value="all">All Months</option>
+              <option value="this">This Month</option>
+              <option value="next">Next Month</option>
+              <option value="last">Last Month</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-2 p-2 lg:grid-cols-[1.15fr_1fr_0.62fr] lg:gap-0 lg:p-0">
