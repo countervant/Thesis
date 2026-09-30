@@ -1399,6 +1399,12 @@ export const leaveRequestAPI = {
     clearCache("/leave-requests", "/dashboard");
     return response.data;
   },
+
+  delete: async (id) => {
+    const response = await api.delete(`/leave-requests/${id}`);
+    clearCache("/leave-requests", "/auth/assignees", "/dashboard");
+    return response.data;
+  },
 };
 
 export const dashboardAPI = {

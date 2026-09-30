@@ -5,6 +5,8 @@ import reject from "../assets/reject.png";
 import employees from "../assets/employees.png";
 import view from "../assets/view.png";
 import check from "../assets/check.png";
+import deleteIcon from "../assets/delete.png";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
 import { SkeletonRows } from "../components/Skeleton/Skeleton.jsx";
 import { getApiErrorMessage, leaveRequestAPI } from "../services/api";
@@ -279,6 +281,9 @@ const LeaveRequest = () => {
   const [busyRequestId, setBusyRequestId] = useState("");
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
+  const [requestToDelete, setRequestToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
 
   const loadLeaveRequests = useCallback(async () => {
     try {
@@ -438,6 +443,31 @@ const LeaveRequest = () => {
       setErrorMessage(getApiErrorMessage(error, "Unable to add comment."));
     } finally {
       setBusyRequestId("");
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!requestToDelete || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+      setDeleteErrorMessage("");
+      const targetId = getRequestId(requestToDelete);
+      await leaveRequestAPI.delete(targetId);
+
+      setRequests((current) => current.filter((item) => getRequestId(item) !== targetId));
+      if (selectedRequestId === targetId) {
+        setSelectedRequestId("");
+      }
+      if (detailRequestId === targetId) {
+        setDetailRequestId("");
+      }
+      setRequestToDelete(null);
+      await loadLeaveRequests();
+    } catch (error) {
+      setDeleteErrorMessage(getApiErrorMessage(error, "Unable to delete leave request."));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -605,6 +635,19 @@ const LeaveRequest = () => {
                         >
                           <ImageIcon src={view} className="h-5 w-5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteErrorMessage("");
+                            setRequestToDelete(request);
+                          }}
+                          disabled={busyRequestId === getRequestId(request) || isDeleting}
+                          className="grid h-9 w-9 place-items-center rounded-xl border border-rose-100 bg-rose-50 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="Delete request"
+                          title="Delete request"
+                        >
+                          <ImageIcon src={deleteIcon} className="h-4.5 w-4.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -734,6 +777,17 @@ const LeaveRequest = () => {
                       Reactivate Leave
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteErrorMessage("");
+                      setRequestToDelete(selectedRequest);
+                    }}
+                    disabled={busyRequestId === getRequestId(selectedRequest) || isDeleting}
+                    className="h-10 rounded-xl border border-rose-200 bg-rose-50 text-xs font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
                 </div>
               </>
             ) : (
@@ -1065,10 +1119,39 @@ const LeaveRequest = () => {
                   Reactivate Leave
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteErrorMessage("");
+                  setRequestToDelete(detailRequest);
+                }}
+                disabled={busyRequestId === getRequestId(detailRequest) || isDeleting}
+                className="h-11 rounded-xl border border-rose-200 bg-rose-50 px-8 text-sm font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        confirmLabel="Delete permanently"
+        confirmingLabel="Deleting..."
+        errorMessage={deleteErrorMessage}
+        icon="delete"
+        isConfirming={isDeleting}
+        isOpen={Boolean(requestToDelete)}
+        message={`Are you sure you want to permanently delete leave request "${requestToDelete?.id || ""}" for ${requestToDelete?.employee || "this employee"}? This action cannot be undone.`}
+        onCancel={() => {
+          if (!isDeleting) {
+            setRequestToDelete(null);
+            setDeleteErrorMessage("");
+          }
+        }}
+        onConfirm={handleDeleteRequest}
+        title="Delete Leave Request"
+      />
     </div>
   );
 };

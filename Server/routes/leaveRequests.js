@@ -425,4 +425,32 @@ router.post("/:id/comments", protect, async (req, res) => {
   }
 });
 
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const leaveRequest = await LeaveRequest.findById(req.params.id);
+
+    if (!leaveRequest) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner = String(leaveRequest.employee) === String(req.user._id);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ message: "You cannot delete this leave request" });
+    }
+
+    if (!isAdmin && leaveRequest.status !== "Pending") {
+      return res.status(400).json({ message: "You can only delete pending leave requests" });
+    }
+
+    await LeaveRequest.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ message: "Leave request deleted successfully", id: req.params.id });
+  } catch (error) {
+    console.error("Delete leave request error:", error);
+    res.status(500).json({ message: "Unable to delete leave request" });
+  }
+});
+
 export default router;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { SkeletonRows } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext";
@@ -309,6 +310,9 @@ const EmpLeaverequest = () => {
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
+  const [requestToDelete, setRequestToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
 
   const loadRequests = useCallback(async () => {
     try {
@@ -468,6 +472,29 @@ const EmpLeaverequest = () => {
       setErrorMessage(getApiErrorMessage(error, "Unable to mark this leave as returned."));
     } finally {
       setBusyRequestId("");
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!requestToDelete || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+      setDeleteErrorMessage("");
+      const targetId = getEntityId(requestToDelete);
+      await leaveRequestAPI.delete(targetId);
+
+      setRequests((current) => current.filter((item) => getEntityId(item) !== targetId));
+      if (detailRequestId === targetId) {
+        setDetailRequestId("");
+      }
+      setRequestToDelete(null);
+      setMessage("Leave request deleted successfully.");
+      await loadRequests();
+    } catch (error) {
+      setDeleteErrorMessage(getApiErrorMessage(error, "Unable to delete leave request."));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -678,6 +705,19 @@ const EmpLeaverequest = () => {
                       >
                         <SmallIcon name="calendar" />
                       </button>
+                      {item.status === "Pending" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteErrorMessage("");
+                            setRequestToDelete(item);
+                          }}
+                          disabled={isDeleting || busyRequestId === getEntityId(item)}
+                          className="h-9 rounded-lg border border-rose-100 bg-rose-50 px-3 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -894,10 +934,41 @@ const EmpLeaverequest = () => {
                   {busyRequestId === getEntityId(detailRequest) ? "Updating..." : "Mark as Returned"}
                 </button>
               )}
+              {detailRequest.status === "Pending" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteErrorMessage("");
+                    setRequestToDelete(detailRequest);
+                  }}
+                  disabled={isDeleting || busyRequestId === getEntityId(detailRequest)}
+                  className="h-11 rounded-xl border border-rose-200 bg-rose-50 px-8 text-sm font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete Request
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        confirmLabel="Delete request"
+        confirmingLabel="Deleting..."
+        errorMessage={deleteErrorMessage}
+        icon="delete"
+        isConfirming={isDeleting}
+        isOpen={Boolean(requestToDelete)}
+        message={`Are you sure you want to cancel and delete leave request "${requestToDelete?.id || ""}"? This action cannot be undone.`}
+        onCancel={() => {
+          if (!isDeleting) {
+            setRequestToDelete(null);
+            setDeleteErrorMessage("");
+          }
+        }}
+        onConfirm={handleDeleteRequest}
+        title="Delete Leave Request"
+      />
     </div>
   );
 };
