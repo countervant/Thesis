@@ -17,7 +17,14 @@ const formatInputDate = (value) => {
     return todayInputDate();
   }
 
-  const date = new Date(value);
+  if (typeof value === "string") {
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      return value;
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return todayInputDate();
   }
@@ -85,7 +92,7 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
       return;
     }
 
-    if (isPastInputDate(formData.date)) {
+    if (!isEditing && isPastInputDate(formData.date)) {
       setErrorMessage("Past dates cannot be selected.");
       return;
     }

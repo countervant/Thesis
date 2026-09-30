@@ -887,7 +887,10 @@ router.get("/", protect, async (req, res) => {
         .populate("employeePayments.paidBy", "firstName lastName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
       taskRequest = taskRequest
-        .populate("assignedTo", "firstName lastName email role updatedAt")
+        .populate("assignedTo", "firstName lastName email role position avatar updatedAt")
+        .populate("assignees", "firstName lastName email role position avatar updatedAt")
+        .populate("subtasks.assignedTo", "firstName lastName email role position avatar updatedAt")
+        .populate("requestedBy", "firstName lastName companyName email role updatedAt")
         .populate("createdBy", "firstName lastName companyName email role updatedAt");
     }
 

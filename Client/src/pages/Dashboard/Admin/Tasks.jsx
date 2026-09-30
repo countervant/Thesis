@@ -25,7 +25,14 @@ const statusFromApi = {
   review: "In review",
 };
 
-const formatInputDate = (date) => date.toISOString().slice(0, 10);
+const formatInputDate = (date) => {
+  const target = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(target.getTime())) return "";
+  const year = target.getFullYear();
+  const month = String(target.getMonth() + 1).padStart(2, "0");
+  const day = String(target.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const toInputDate = (date) => {
   if (!date) return formatInputDate(new Date());
