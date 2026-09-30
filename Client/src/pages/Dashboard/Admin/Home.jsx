@@ -672,7 +672,7 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
     <table className="w-full min-w-[520px] text-left text-xs text-[#10172a] dark:text-white">
       <thead className="border-b border-slate-100 text-slate-500 dark:text-white">
         <tr>
-          <th className="px-5 py-2.5 font-extrabold">Employee</th>
+          <th className="px-5 py-2.5 font-extrabold">Name</th>
           <th className="px-3 py-2.5 font-extrabold">Job</th>
           <th className="px-3 py-2.5 font-extrabold">Client</th>
           <th className="px-3 py-2.5 font-extrabold">{tone === "pink" ? "Status" : "Date"}</th>
