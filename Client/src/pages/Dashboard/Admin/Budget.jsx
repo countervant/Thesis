@@ -14,17 +14,31 @@ import {
 const BUDGET_FETCH_PAGE_SIZE = 100;
 const BUDGET_FETCH_CONCURRENCY = 4;
 
+const formatDateValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const formatInputDate = (value) => {
   if (!value) {
-    return new Date().toISOString().slice(0, 10);
+    return formatDateValue(new Date());
   }
 
-  const date = new Date(value);
+  if (typeof value === "string") {
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      return value;
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString().slice(0, 10);
+    return formatDateValue(new Date());
   }
 
-  return date.toISOString().slice(0, 10);
+  return formatDateValue(date);
 };
 
 const formatDisplayDate = (value) => {
@@ -32,7 +46,15 @@ const formatDisplayDate = (value) => {
     return "";
   }
 
-  const date = new Date(value);
+  if (typeof value === "string") {
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      const [, year, month, day] = dateOnly;
+      return `${month}/${day}/${year}`;
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -79,6 +101,7 @@ const getCurrentMonthKey = () => getMonthKey(new Date());
 
 const getLastMonthKey = () => {
   const date = new Date();
+  date.setDate(1);
   date.setMonth(date.getMonth() - 1);
   return getMonthKey(date);
 };

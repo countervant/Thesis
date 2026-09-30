@@ -66,7 +66,7 @@ const parseCalendarDate = (value) => {
   }
 
   if (typeof value === "string") {
-    const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (isoDate) {
       return new Date(
         Number(isoDate[1]),
@@ -141,12 +141,14 @@ const getCurrentMonthKey = () => getMonthKey(new Date());
 
 const getNextMonthKey = () => {
   const date = new Date();
+  date.setDate(1);
   date.setMonth(date.getMonth() + 1);
   return getMonthKey(date);
 };
 
 const getLastMonthKey = () => {
   const date = new Date();
+  date.setDate(1);
   date.setMonth(date.getMonth() - 1);
   return getMonthKey(date);
 };
@@ -163,7 +165,7 @@ const formatMonthLabel = (monthKey) => {
   });
 };
 
-const getUserId = (value) => value?._id || value?.id || value || "";
+const getUserId = (value) => String(value?._id || value?.id || value || "").trim();
 
 const getUserName = (value) => {
   const firstName = value?.firstName || "";
@@ -1164,12 +1166,72 @@ const AdminDashboard = () => {
 
   const { notWorkingEmployees, workingEmployees } = useMemo(() => {
     const activeTaskByAssignee = new Map();
+
+    const getTaskRank = (task) => {
+      if (task.status === "in_progress") return 1;
+      if (task.status === "review") return 2;
+      if (task.status === "pending") return 3;
+      return 4;
+    };
+
+    const isBetterTask = (newTask, currentTask) => {
+      if (!currentTask) return true;
+      const newRank = getTaskRank(newTask);
+      const currentRank = getTaskRank(currentTask);
+      if (newRank !== currentRank) return newRank < currentRank;
+
+      const newDueDate = new Date(newTask.dueDate || 8640000000000000).getTime();
+      const currentDueDate = new Date(currentTask.dueDate || 8640000000000000).getTime();
+      return newDueDate < currentDueDate;
+    };
+
     tasks.forEach((task) => {
-      if (task.status !== "in_progress" && task.status !== "review") return;
-      const assigneeId = getUserId(task.assignedTo);
-      if (assigneeId && !activeTaskByAssignee.has(assigneeId)) {
-        activeTaskByAssignee.set(assigneeId, task);
+      if (task.archived || task.status === "done") return;
+
+      const candidates = [];
+      if (task.assignedTo) {
+        candidates.push({
+          id: getUserId(task.assignedTo),
+          user: typeof task.assignedTo === "object" ? task.assignedTo : null,
+        });
       }
+      if (Array.isArray(task.assignees)) {
+        task.assignees.forEach((assignee) => {
+          if (assignee) {
+            candidates.push({
+              id: getUserId(assignee),
+              user: typeof assignee === "object" ? assignee : null,
+            });
+          }
+        });
+      }
+      if (Array.isArray(task.subtasks)) {
+        task.subtasks.forEach((subtask) => {
+          if (subtask?.assignedTo) {
+            candidates.push({
+              id: getUserId(subtask.assignedTo),
+              user: typeof subtask.assignedTo === "object" ? subtask.assignedTo : null,
+            });
+          }
+        });
+      }
+
+      candidates.forEach(({ id: assigneeId, user: candidateUser }) => {
+        if (!assigneeId) return;
+        const currentEntry = activeTaskByAssignee.get(assigneeId);
+        if (isBetterTask(task, currentEntry?.task)) {
+          activeTaskByAssignee.set(assigneeId, {
+            task,
+            user: candidateUser || currentEntry?.user || null,
+          });
+        }
+      });
+    });
+
+    const employeeById = new Map();
+    employees.forEach((emp) => {
+      const id = getUserId(emp);
+      if (id) employeeById.set(id, emp);
     });
 
     const clientByEmployee = new Map();
@@ -1181,30 +1243,53 @@ const AdminDashboard = () => {
     });
 
     const working = [];
+    const workingAssigneeIds = new Set();
+
+    activeTaskByAssignee.forEach(({ task, user: taskUser }, assigneeId) => {
+      workingAssigneeIds.add(assigneeId);
+      const employee =
+        employeeById.get(assigneeId) ||
+        taskUser ||
+        (getUserId(user) === assigneeId ? user : null);
+
+      const clientName =
+        task.requestedByName ||
+        task.requestedBy?.companyName ||
+        (task.requestedBy?.firstName
+          ? `${task.requestedBy.firstName} ${task.requestedBy.lastName || ""}`.trim()
+          : "") ||
+        clientByEmployee.get(assigneeId)?.companyName ||
+        task.title ||
+        "No client";
+
+      working.push({
+        id: assigneeId,
+        name: getUserName(employee || taskUser),
+        job: employee?.position || taskUser?.position || (employee?.role === "admin" || taskUser?.role === "admin" ? "Admin" : "Employee"),
+        client: clientName,
+        date: formatDate(task.dueDate),
+      });
+    });
+
     const available = [];
     employees.forEach((employee) => {
       const employeeId = getUserId(employee);
-      const task = activeTaskByAssignee.get(employeeId);
-      if (!task) {
+      if (!workingAssigneeIds.has(employeeId)) {
         available.push({
+          id: employeeId,
           name: getUserName(employee),
           job: employee.position || "Employee",
           client: "No active task",
           date: "Available",
         });
-        return;
       }
-
-      working.push({
-        name: getUserName(employee),
-        job: employee.position || "Employee",
-        client: clientByEmployee.get(employeeId)?.companyName || task.title || "No client",
-        date: formatDate(task.dueDate),
-      });
     });
 
+    working.sort((a, b) => a.name.localeCompare(b.name));
+    available.sort((a, b) => a.name.localeCompare(b.name));
+
     return { notWorkingEmployees: available, workingEmployees: working };
-  }, [clients, employees, tasks]);
+  }, [clients, employees, tasks, user]);
 
   useEffect(() => {
     let isMounted = true;
