@@ -40,7 +40,8 @@
     "start": "npm run start --prefix Server",
     "lint": "npm run lint --prefix Client",
     "test": "npm test --prefix Client && npm test --prefix Server",
-    "install:all": "npm install && npm install --prefix Client && npm install --prefix Server"
+    "install:all": "npm install && npm install --prefix Client && npm install --prefix Server",
+    "postinstall": "npm install --prefix Server"
   },
   "engines": {
     "node": "22.x"

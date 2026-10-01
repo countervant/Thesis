@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
+    "render-build": "npm install",
     "db:indexes": "node scripts/createIndexes.js",
     "optimize:avatars": "node scripts/optimizeAvatars.js",
     "test": "node --test tests/*.test.js"
