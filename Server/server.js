@@ -104,8 +104,8 @@ const validateRuntimeConfig = () => {
       throw new Error("OTP_HASH_SECRET must be a unique secret of at least 32 characters");
     }
 
-    requireEnv("BREVO_API_KEY");
-    requireEnv("BREVO_SENDER_EMAIL");
+    requireEnv("RESEND_API_KEY");
+    requireEnv("RESEND_SENDER_EMAIL");
 
     if (
       process.env.ENABLE_DATABASE_DIAGNOSTICS === "true" &&
