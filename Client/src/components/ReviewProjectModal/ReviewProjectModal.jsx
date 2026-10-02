@@ -16,7 +16,10 @@ const formatInputDate = (date) => {
 
 const todayInputDate = () => formatInputDate(new Date());
 
-const ModalLoadingSpinner = ({ message = "Synthesizing project title, tasks, budget, and deadlines...", onClose }) => (
+const ModalLoadingSpinner = ({
+  message = "Synthesizing project timeline, budget, down payment, and deliverables...",
+  onClose,
+}) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 text-neutral-950 dark:text-white">
     <div className="w-full max-w-[420px] rounded-2xl bg-white p-7 text-center shadow-2xl dark:bg-[#0c0c0c] dark:ring-1 dark:ring-neutral-800">
       <Loader2 className="mx-auto h-9 w-9 animate-spin text-[#dc4fb2]" />
@@ -42,6 +45,33 @@ const ModalLoadingSpinner = ({ message = "Synthesizing project title, tasks, bud
   </div>
 );
 
+const mapExtractedToTask = (payload, convId) => {
+  if (!payload) return null;
+  const downPayment = payload.downPayment || null;
+  const mode = downPayment?.mode || payload.downPaymentType || "none";
+  const val = downPayment?.value ?? payload.downPaymentValue ?? "";
+
+  return {
+    title: payload.projectName || "",
+    description: payload.clientSummary || "",
+    amount: payload.budgetCeiling ?? payload.amount ?? "",
+    startDate: payload.startDate || todayInputDate(),
+    dueDate: payload.targetDeadline || payload.dueDate || todayInputDate(),
+    downPayment: downPayment,
+    downPaymentType: mode,
+    downPaymentValue: val,
+    priority: (payload.priority || "medium").toLowerCase(),
+    requestedBy: convId,
+    subtasks: Array.isArray(payload.tasks)
+      ? payload.tasks.map((t) => ({
+          title: t.title || "",
+          completed: false,
+          assignedTo: "",
+        }))
+      : [],
+  };
+};
+
 /**
  * ReviewProjectModal
  * Reuses CLIENTRA's canonical Addtask component pre-filled with Gemini chat extraction.
@@ -56,31 +86,20 @@ export default function ReviewProjectModal({
 }) {
   const [isLoading, setIsLoading] = useState(() => !initialData && Boolean(conversationId));
   const [errorMessage, setErrorMessage] = useState("");
-  const [extractedTask, setExtractedTask] = useState(() => {
-    if (!initialData) return null;
-    return {
-      title: initialData.projectName || "",
-      description: initialData.clientSummary || "",
-      amount: initialData.budgetCeiling ?? "",
-      dueDate: initialData.targetDeadline || todayInputDate(),
-      priority: (initialData.priority || "medium").toLowerCase(),
-      requestedBy: conversationId,
-      subtasks: Array.isArray(initialData.tasks)
-        ? initialData.tasks.map((t) => ({
-            title: t.title || "",
-            completed: false,
-            assignedTo: "",
-          }))
-        : [],
-    };
-  });
+  const [extractedTask, setExtractedTask] = useState(() =>
+    mapExtractedToTask(initialData, conversationId)
+  );
 
   const fetchExtraction = async () => {
     if (!conversationId) {
       setExtractedTask({
         title: "",
         description: "",
+        startDate: todayInputDate(),
         dueDate: todayInputDate(),
+        amount: "",
+        downPaymentType: "none",
+        downPaymentValue: "",
         priority: "medium",
         subtasks: [],
       });
@@ -95,26 +114,16 @@ export default function ReviewProjectModal({
       const response = await api.post(`/chat/${conversationId}/extract-preview`);
       const payload = response.data?.data || response.data;
       if (payload) {
-        setExtractedTask({
-          title: payload.projectName || "",
-          description: payload.clientSummary || "",
-          amount: payload.budgetCeiling ?? "",
-          dueDate: payload.targetDeadline || todayInputDate(),
-          priority: (payload.priority || "medium").toLowerCase(),
-          requestedBy: conversationId,
-          subtasks: Array.isArray(payload.tasks)
-            ? payload.tasks.map((t) => ({
-                title: t.title || "",
-                completed: false,
-                assignedTo: "",
-              }))
-            : [],
-        });
+        setExtractedTask(mapExtractedToTask(payload, conversationId));
       } else {
         setExtractedTask({
           title: "",
           description: "",
+          startDate: todayInputDate(),
           dueDate: todayInputDate(),
+          amount: "",
+          downPaymentType: "none",
+          downPaymentValue: "",
           priority: "medium",
           requestedBy: conversationId,
           subtasks: [],
@@ -173,7 +182,11 @@ export default function ReviewProjectModal({
                 setExtractedTask({
                   title: "",
                   description: "",
+                  startDate: todayInputDate(),
                   dueDate: todayInputDate(),
+                  amount: "",
+                  downPaymentType: "none",
+                  downPaymentValue: "",
                   priority: "medium",
                   requestedBy: conversationId,
                   subtasks: [],

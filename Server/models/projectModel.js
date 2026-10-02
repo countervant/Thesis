@@ -30,9 +30,30 @@ const projectSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    startDate: {
+      type: Date,
+      default: null,
+    },
     deadline: {
       type: Date,
       default: null,
+    },
+    downPayment: {
+      mode: {
+        type: String,
+        enum: ["percentage", "fixed", "none"],
+        default: "none",
+      },
+      value: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
     },
     status: {
       type: String,

@@ -86,7 +86,9 @@ export const commitProject = async (req, res) => {
       projectName,
       clientSummary,
       budgetCeiling,
+      startDate,
       targetDeadline,
+      downPayment,
       clientId,
       tasks,
     } = req.body;
@@ -116,6 +118,15 @@ export const commitProject = async (req, res) => {
       }
     }
 
+    // Parse start date
+    let parsedStartDate = null;
+    if (startDate) {
+      const sDate = new Date(startDate);
+      if (!isNaN(sDate.getTime())) {
+        parsedStartDate = sDate;
+      }
+    }
+
     // Parse target deadline
     let parsedDeadline = null;
     if (targetDeadline) {
@@ -131,13 +142,30 @@ export const commitProject = async (req, res) => {
         ? Math.max(0, budgetCeiling)
         : Number(budgetCeiling) || 0;
 
+    // Parse down payment
+    let downPaymentData = { mode: "none", value: 0, amount: 0 };
+    if (downPayment && ["percentage", "fixed"].includes(downPayment.mode)) {
+      const val = Number(downPayment.value) || 0;
+      const amount =
+        downPayment.mode === "percentage"
+          ? (numericBudget * (val / 100))
+          : val;
+      downPaymentData = {
+        mode: downPayment.mode,
+        value: val,
+        amount,
+      };
+    }
+
     // 1. Create the Project document in MongoDB
     const newProject = await Project.create({
       name: projectName.trim(),
       description: (clientSummary || "").trim(),
       client: resolvedClientId,
       budget: numericBudget,
+      startDate: parsedStartDate,
       deadline: parsedDeadline,
+      downPayment: downPaymentData,
       status: "Planning",
       progress: 0,
     });
@@ -149,9 +177,6 @@ export const commitProject = async (req, res) => {
       project: newProject._id,
       title: String(task.title || "Untitled Task").trim(),
       description: String(task.description || "").trim(),
-      requiredSkills: Array.isArray(task.requiredSkills)
-        ? task.requiredSkills.map((skill) => String(skill).trim()).filter(Boolean)
-        : [],
       priority: validPriorities.includes(task.priority) ? task.priority : "Medium",
       status: "Backlog",
       assignedTo: null,

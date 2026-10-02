@@ -212,10 +212,10 @@ const createInitialForm = (task, user, isAdmin) => {
       title: task.title || "",
       description: task.description || "",
       startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
-      dueDate: toInputDate(task.dueDate),
+      dueDate: toInputDate(task.dueDate || task.targetDeadline),
       amount: task.amount ?? task.budget ?? "",
-      downPaymentType: task.downPayment?.mode || "none",
-      downPaymentValue: task.downPayment?.value ?? "",
+      downPaymentType: task.downPayment?.mode || task.downPaymentType || "none",
+      downPaymentValue: task.downPayment?.value ?? task.downPaymentValue ?? "",
       priority: task.priority || "medium",
       requestedBy:
         getEntityId(task.requestedBy) ||
