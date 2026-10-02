@@ -14,6 +14,7 @@ import MainBars from "./MainBars.jsx";
 import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton/Skeleton.jsx";
+import ReviewProjectModal from "../components/ReviewProjectModal/ReviewProjectModal.jsx";
 import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const AdminDashboard = lazy(() => import("./Dashboard/Admin/Home.jsx"));
@@ -282,6 +283,7 @@ const MessagesPanel = () => {
   const [newMessageSearch, setNewMessageSearch] = useState("");
   const [isMobileThreadOpen, setIsMobileThreadOpen] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const threadEndRef = useRef(null);
   const messageInputRef = useRef(null);
   const activeUserIdRef = useRef("");
@@ -1186,40 +1188,65 @@ const MessagesPanel = () => {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleStartNewMessage}
-          className="grid h-11 w-11 place-items-center rounded-full text-[#ff3faf] transition hover:bg-pink-50 dark:text-[#f472d0] dark:hover:bg-neutral-900"
-          aria-label="New message"
-          title="New message"
-        >
-          <ComposeIcon className="h-6 w-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          {activeParticipant && (
+            <button
+              type="button"
+              onClick={() => setIsProjectModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-[#dc4fb2] px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-pink-500/20 transition hover:brightness-105 active:scale-95"
+              title="Generate Project"
+            >
+              <span className="text-yellow-300">⚡</span>
+              <span>Project</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleStartNewMessage}
+            className="grid h-11 w-11 place-items-center rounded-full text-[#ff3faf] transition hover:bg-pink-50 dark:text-[#f472d0] dark:hover:bg-neutral-900"
+            aria-label="New message"
+            title="New message"
+          >
+            <ComposeIcon className="h-6 w-6" />
+          </button>
+        </div>
       </div>
 
       {activeParticipant && (
-        <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 md:flex">
-          <span className="relative shrink-0">
-            <Avatar className="h-12 w-12" user={activeParticipant} />
-            {(activeParticipant.isOnline || activeParticipant.online) && (
-              <span
-                className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950"
-                aria-label="Online"
-                title="Online"
-              />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-base font-black">{activeName}</p>
-            <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
+        <div className="hidden items-center justify-between border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 md:flex">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="relative shrink-0">
+              <Avatar className="h-12 w-12" user={activeParticipant} />
               {(activeParticipant.isOnline || activeParticipant.online) && (
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span
+                  className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950"
+                  aria-label="Online"
+                  title="Online"
+                />
               )}
-              {activeParticipant.isOnline || activeParticipant.online
-                ? "Online"
-                : activeParticipant.role || "Offline"}
-            </p>
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-base font-black">{activeName}</p>
+              <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
+                {(activeParticipant.isOnline || activeParticipant.online) && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                )}
+                {activeParticipant.isOnline || activeParticipant.online
+                  ? "Online"
+                  : activeParticipant.role || "Offline"}
+              </p>
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsProjectModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-[#dc4fb2] px-4 py-2 text-xs font-bold text-white shadow-md shadow-pink-500/25 transition-all hover:scale-[1.02] hover:brightness-105 active:scale-[0.98]"
+            title="Generate project and backlog tasks from this chat"
+          >
+            <span className="text-yellow-300">⚡</span>
+            <span>Generate Project</span>
+          </button>
         </div>
       )}
 
@@ -1541,6 +1568,15 @@ const MessagesPanel = () => {
         </form>
       </div>
     )}
+
+    <ReviewProjectModal
+      isOpen={isProjectModalOpen}
+      onClose={() => setIsProjectModalOpen(false)}
+      conversationId={activeUserId}
+      onProjectCreated={() => {
+        setIsProjectModalOpen(false);
+      }}
+    />
   </section>
   );
 };
