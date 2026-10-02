@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import done from "../../../assets/done.png";
-import notification from "../../../assets/notification.png";
-import pendingrequest from "../../../assets/pendingrequest.png";
-import progress from "../../../assets/progress.png";
-import taskIcon from "../../../assets/task.png";
+import { Kanban, List } from "lucide-react";
 import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
@@ -13,7 +9,9 @@ import {
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
 } from "../../../services/api.js";
-import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart.jsx";
+import ProjectGroupTable from "../../../components/ProjectGroupTable/ProjectGroupTable.jsx";
+import ProjectBoard from "../../../components/ProjectBoard/ProjectBoard.jsx";
+import { ProjectDetailsModal } from "../../../components/ProjectDetailsModal/ProjectDetailsModal.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -58,21 +56,6 @@ const getTaskProgress = (subtasks) => {
   return Math.round((completedCount / subtasks.length) * 100);
 };
 
-const toneStyles = {
-  blue: "bg-blue-50 text-blue-600 ring-blue-100 dark:!bg-[#1a1a1a] dark:text-blue-400 dark:ring-blue-500",
-  green: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:!bg-[#1a1a1a] dark:text-emerald-400 dark:ring-emerald-500",
-  orange: "bg-orange-50 text-orange-600 ring-orange-100 dark:!bg-[#1a1a1a] dark:text-orange-400 dark:ring-orange-500",
-  pink: "bg-pink-50 text-pink-600 ring-pink-100 dark:!bg-[#1a1a1a] dark:text-pink-400 dark:ring-[#c72fb2]",
-  rose: "bg-red-50 text-red-600 ring-red-100 dark:!bg-[#1a1a1a] dark:text-red-400 dark:ring-red-500",
-};
-
-const statCardStyles = {
-  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
-  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-};
 
 const priorityStyles = {
   High: "border border-pink-600 bg-transparent text-pink-600",
@@ -455,84 +438,6 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
   );
 };
 
-const ProjectDetailsModal = ({
-  currentUserId,
-  item,
-  onClose,
-  onSubmitOutput,
-  onToggleSubtask,
-  onViewCalendar,
-}) => {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      role="presentation"
-    >
-      <section
-        aria-labelledby="employee-project-details-title"
-        aria-modal="true"
-        className="max-h-[92dvh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
-        role="dialog"
-      >
-        <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800 sm:px-7">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">
-              Assigned Project
-            </p>
-            <h2 id="employee-project-details-title" className="mt-1 text-xl font-black text-[#10142d] dark:text-white">
-              Project Details
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:hover:bg-neutral-900"
-            aria-label="Close project details"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </header>
-
-        <div className="max-h-[calc(92dvh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
-          <TaskRow
-            currentUserId={currentUserId}
-            isExpanded
-            isOverlay
-            item={item}
-            onSubmitOutput={onSubmitOutput}
-            onToggleExpand={onClose}
-            onToggleSubtask={onToggleSubtask}
-            onViewCalendar={onViewCalendar}
-          />
-          <div className="mt-4">
-            <ProjectGanttChart item={item} />
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
 const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, onSubmit }) => {
   const [message, setMessage] = useState(
     completion.finalize
@@ -860,6 +765,7 @@ const EmpTask = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Newest to Oldest");
+  const [viewMode, setViewMode] = useState("table");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [completionDraft, setCompletionDraft] = useState(null);
@@ -981,33 +887,9 @@ const EmpTask = () => {
       });
   }, [searchQuery, sortBy, tasks, visibleGroup]);
 
-  const taskStats = [
-    { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
-    { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
-    { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
-    { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
-  ];
   const selectedTask = selectedTaskDetails;
 
-  const renderTaskRows = (items) => {
-    if (items.length === 0) {
-      return <p className="px-4 py-5 text-center text-sm font-bold text-slate-500">No projects found.</p>;
-    }
 
-    return items.map((item) => (
-      <TaskRow
-        currentUserId={currentUserId}
-        isExpanded={false}
-        key={item.id}
-        item={item}
-        onSubmitOutput={handleSubmitOutput}
-        onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
-        onToggleSubtask={handleToggleSubtask}
-        onViewCalendar={handleViewCalendar}
-      />
-    ));
-  };
 
   const updateTaskSubtasks = async (task, nextSubtasks) => {
     if (pendingTaskUpdateIdsRef.current.has(task.id)) return;
@@ -1210,21 +1092,6 @@ const EmpTask = () => {
         </p>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-        {taskStats.map((item) => (
-          <Card key={item.label} className={`p-5 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
-            <div className="flex items-center gap-4">
-              <span className={`grid h-16 w-16 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
-                <ImageIcon src={item.icon} className="h-9 w-9" />
-              </span>
-              <div>
-                <p className="text-4xl font-black text-[#10142d]">{item.value}</p>
-                <p className="mt-1 text-sm font-black text-slate-600">{item.label}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
 
       <Card className="p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1251,6 +1118,34 @@ const EmpTask = () => {
               <option value="Due Date">Due Date</option>
             </select>
           </label>
+          <div className="flex h-12 items-center rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-neutral-800 dark:bg-neutral-900">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-black transition ${
+                viewMode === "table"
+                  ? "bg-white text-[#10142d] shadow-xs dark:bg-neutral-800 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+              }`}
+              title="Table View"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("board")}
+              className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-black transition ${
+                viewMode === "board"
+                  ? "bg-white text-[#10142d] shadow-xs dark:bg-neutral-800 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+              }`}
+              title="Board View"
+            >
+              <Kanban className="h-4 w-4" />
+              <span className="hidden sm:inline">Board</span>
+            </button>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
@@ -1269,11 +1164,19 @@ const EmpTask = () => {
       {isLoading && <TaskListSkeleton rows={5} />}
 
       {!isLoading && (
-        <Card className="overflow-hidden p-0">
-          <div className="divide-y divide-pink-50">
-            {renderTaskRows(visibleTasks)}
-          </div>
-        </Card>
+        viewMode === "table" ? (
+          <ProjectGroupTable
+            tasks={visibleTasks}
+            showAssignee={false}
+            onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+          />
+        ) : (
+          <ProjectBoard
+            tasks={visibleTasks}
+            showAssignee={false}
+            onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+          />
+        )
       )}
       {selectedTaskId && isLoadingTaskDetails && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/65 p-4 backdrop-blur-[2px]">

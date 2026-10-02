@@ -273,14 +273,14 @@ textarea,
 .dark [class~="border-[#f7b7e6]"],
 .dark [class~="border-b-[#f7b7e6]"],
 .dark [class~="border-l-[#d9b8ff]"] {
-  border-color: #DA70D6 !important;
+  border-color: rgba(229, 231, 235, 0.2) !important;
 }
 
 .dark .ring-pink-50,
 .dark .ring-pink-100,
 .dark .ring-neutral-100,
 .dark .ring-black\/10 {
-  --tw-ring-color: rgba(218, 112, 214, 0.72) !important;
+  --tw-ring-color: rgba(229, 231, 235, 0.2) !important;
 }
 
 .dark .login-panel {
@@ -292,13 +292,13 @@ textarea,
 .dark .shadow-lg,
 .dark .shadow-2xl,
 .dark [class*="shadow-["] {
-  box-shadow: 0 0 0 1px rgba(218, 112, 214, 0.72) !important;
+  box-shadow: 0 0 0 1px rgba(229, 231, 235, 0.2) !important;
 }
 
 .dark article,
 .dark [role="dialog"],
 .dark [role="menu"] {
-  box-shadow: 0 0 0 1px rgba(218, 112, 214, 0.72);
+  box-shadow: 0 0 0 1px rgba(229, 231, 235, 0.2);
 }
 
 .dark input,

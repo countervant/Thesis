@@ -131,13 +131,11 @@ const normalizeAssigneeIds = (values, fallback) => {
   const input = Array.isArray(values)
     ? values.length > 0
       ? values
-      : fallback
-        ? [fallback]
-        : []
+      : []
     : values
       ? [values]
       : fallback
-        ? [fallback]
+        ? (Array.isArray(fallback) ? fallback : [fallback])
         : [];
   return [...new Set(input.map((value) => String(value?._id || value?.id || value || "")).filter(Boolean))];
 };
@@ -271,7 +269,10 @@ const validateSubtaskAssignees = (subtasks, assignees) => {
     : "";
 };
 
-const taskAssigneeIds = (task) => normalizeAssigneeIds(task.assignees, task.assignedTo);
+const taskAssigneeIds = (task) =>
+  task?.assignees?.length
+    ? normalizeAssigneeIds(task.assignees)
+    : (task?.assignedTo ? normalizeAssigneeIds([task.assignedTo]) : []);
 
 const canEmployeeUpdateSubtask = (task, subtask, userId) => {
   const assignedUserId = String(subtask?.assignedTo?._id || subtask?.assignedTo || "");
@@ -293,26 +294,25 @@ export const canUserSubmitTaskOutput = (task, user) => {
 };
 
 const validateProjectAssignees = async (assignees, adminUserId, existingAssignees = []) => {
-  if (!assignees.length) return "Select at least one project assignee";
+  if (!assignees.length) return "";
 
-  const employeeAssignees = assignees.filter(
-    (assigneeId) => String(assigneeId) !== String(adminUserId)
-  );
-  const employeeCount = await User.countDocuments({
-    _id: { $in: employeeAssignees },
-    role: "employee",
+  const existingAssigneeIds = new Set(existingAssignees.map(String));
+  const newlyAssignedIds = assignees
+    .map(String)
+    .filter((id) => id !== String(adminUserId) && !existingAssigneeIds.has(id));
+
+  if (newlyAssignedIds.length === 0) return "";
+
+  const validCount = await User.countDocuments({
+    _id: { $in: newlyAssignedIds },
+    role: { $in: ["employee", "admin"] },
     isActive: true,
   }).maxTimeMS(8000);
-  if (employeeCount !== employeeAssignees.length) {
+  if (validCount !== newlyAssignedIds.length) {
     return "Projects can only be assigned to active employees or yourself";
   }
 
-  const existingAssigneeIds = new Set(existingAssignees.map(String));
-  const newlyAssignedEmployeeIds = employeeAssignees.filter(
-    (employeeId) => !existingAssigneeIds.has(String(employeeId))
-  );
-  const approvedLeaves = await getEmployeesOnApprovedLeave(newlyAssignedEmployeeIds);
-
+  const approvedLeaves = await getEmployeesOnApprovedLeave(newlyAssignedIds);
   if (approvedLeaves.length === 0) return "";
 
   const employeeNames = approvedLeaves
@@ -446,7 +446,12 @@ const getStatusFromSubtasks = (subtasks, fallbackStatus) => {
   if (!subtasks.length) return fallbackStatus;
 
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
-  if (completedCount === subtasks.length) return "done";
+  if (fallbackStatus === "review" || fallbackStatus === "pending") {
+    return fallbackStatus;
+  }
+  if (fallbackStatus === "done" || completedCount === subtasks.length) {
+    return "done";
+  }
   if (completedCount > 0) return "in_progress";
   return fallbackStatus;
 };
@@ -464,9 +469,11 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     completed: status === "done" ? true : subtask.completed,
   }));
   const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
+  const explicitAssignees = options.assignees !== undefined ? options.assignees : body.assignees;
+  const explicitAssignedTo = options.assignedTo !== undefined ? options.assignedTo : body.assignedTo;
   const assignees = normalizeAssigneeIds(
-    options.assignees ?? body.assignees,
-    options.assignedTo ?? body.assignedTo ?? userId
+    explicitAssignees,
+    explicitAssignedTo || null
   );
 
   return {
@@ -478,7 +485,7 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     priority: allowedPriorities.includes(priority) ? priority : "medium",
     amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
     paid: Number.isFinite(paid) && paid >= 0 ? paid : 0,
-    assignedTo: assignees[0] || userId,
+    assignedTo: assignees[0] || (explicitAssignedTo !== undefined ? explicitAssignedTo : null),
     assignees,
     requestedBy: optionalId(options.requestedBy ?? body.requestedBy),
     requestedByName: String(options.requestedByName ?? body.requestedByName ?? "").trim(),
@@ -947,9 +954,16 @@ router.post("/", protect, async (req, res) => {
       return res.status(403).json({ message: "Only admins and clients can create tasks" });
     }
 
+    const resolvedAssignees = req.user.role === "admin"
+      ? (req.body.assignees !== undefined
+          ? (Array.isArray(req.body.assignees) ? req.body.assignees : (req.body.assignees ? [req.body.assignees] : []))
+          : (req.body.assignedTo ? [req.body.assignedTo] : []))
+      : [req.user._id];
+    const resolvedAssignedTo = resolvedAssignees[0] || (req.user.role === "admin" ? null : req.user._id);
+
     const payload = normalizeTaskPayload(req.body, req.user._id, {
-      assignedTo: req.user.role === "admin" ? req.body.assignedTo : req.user._id,
-      assignees: req.user.role === "admin" ? req.body.assignees : [req.user._id],
+      assignedTo: resolvedAssignedTo,
+      assignees: resolvedAssignees,
       requestedBy: req.user.role === "admin" ? req.body.requestedBy : req.user._id,
       requestedByName:
         req.user.role === "admin"
@@ -1014,10 +1028,14 @@ router.post("/", protect, async (req, res) => {
     }
 
     if (payload.startDate > payload.dueDate) {
-      return res.status(400).json({ message: "Start date cannot be after due date" });
+      if (req.user.role === "admin") {
+        payload.startDate = payload.dueDate;
+      } else {
+        return res.status(400).json({ message: "Start date cannot be after due date" });
+      }
     }
 
-    if (isPastDate(payload.startDate) || isPastDate(payload.dueDate)) {
+    if (req.user.role !== "admin" && (isPastDate(payload.startDate) || isPastDate(payload.dueDate))) {
       return res.status(400).json({ message: "Past dates cannot be selected" });
     }
 
@@ -1184,13 +1202,7 @@ router.put("/:id", protect, async (req, res) => {
         return res.status(400).json({ message: "Valid due date is required" });
       }
       if (startDate > dueDate) {
-        return res.status(400).json({ message: "Start date cannot be after due date" });
-      }
-      if (
-        (req.body.startDate !== undefined && isPastDate(startDate)) ||
-        (req.body.dueDate !== undefined && isPastDate(dueDate))
-      ) {
-        return res.status(400).json({ message: "Past dates cannot be selected" });
+        startDate = dueDate;
       }
 
       task.title = title;
@@ -1212,6 +1224,15 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(200).json(addTaskAvatarUrls(task.toObject(), req.user));
     }
 
+    const resolvedAssignees = req.user.role === "admin"
+      ? (req.body.assignees !== undefined
+          ? (Array.isArray(req.body.assignees) ? req.body.assignees : (req.body.assignees ? [req.body.assignees] : []))
+          : (req.body.assignedTo !== undefined
+              ? (req.body.assignedTo ? [req.body.assignedTo] : [])
+              : taskAssigneeIds(task)))
+      : taskAssigneeIds(task);
+    const resolvedAssignedTo = resolvedAssignees[0] || null;
+
     const payload = normalizeTaskPayload(
       {
         title: req.body.title ?? task.title,
@@ -1222,8 +1243,8 @@ router.put("/:id", protect, async (req, res) => {
         priority: req.body.priority ?? task.priority,
         amount: req.body.amount ?? task.amount ?? task.budget,
         paid: task.paid,
-        assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
-        assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
+        assignedTo: resolvedAssignedTo,
+        assignees: resolvedAssignees,
         requestedBy:
           req.user.role === "admin" ? req.body.requestedBy ?? task.requestedBy : task.requestedBy,
         requestedByName:
@@ -1234,8 +1255,8 @@ router.put("/:id", protect, async (req, res) => {
       },
       req.user._id,
       {
-        assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
-        assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
+        assignedTo: resolvedAssignedTo,
+        assignees: resolvedAssignees,
         requestedBy:
           req.user.role === "admin" ? req.body.requestedBy ?? task.requestedBy : task.requestedBy,
         requestedByName:
@@ -1292,14 +1313,7 @@ router.put("/:id", protect, async (req, res) => {
     }
 
     if (payload.startDate > payload.dueDate) {
-      return res.status(400).json({ message: "Start date cannot be after due date" });
-    }
-
-    if (
-      (req.body.startDate !== undefined && isPastDate(payload.startDate)) ||
-      (req.body.dueDate !== undefined && isPastDate(payload.dueDate))
-    ) {
-      return res.status(400).json({ message: "Past dates cannot be selected" });
+      payload.startDate = payload.dueDate;
     }
 
     const previousSubtasks = task.subtasks.toObject();
