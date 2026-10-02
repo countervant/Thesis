@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
 import TwoFactorSettings from "../../components/auth/TwoFactorSettings.jsx";
+import { getPasswordValidationMessage } from "../../utils/passwordValidation.js";
 
 const defaultSettings = {
   lastPasswordChange: "Not available",
@@ -99,13 +100,9 @@ const SecuritySettings = ({ user }) => {
       return;
     }
 
-    if (nextPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-
-    if (!/[A-Z]/.test(nextPassword) || !/[a-z]/.test(nextPassword) || !/\d/.test(nextPassword)) {
-      setError("Password must include uppercase, lowercase, and number characters.");
+    const passwordValidationMessage = getPasswordValidationMessage(nextPassword);
+    if (passwordValidationMessage) {
+      setError(passwordValidationMessage);
       return;
     }
 

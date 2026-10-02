@@ -70,11 +70,13 @@ const leaveRequestSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 2000,
     },
     emergencyContact: {
       type: String,
       default: "",
       trim: true,
+      maxlength: 120,
     },
     status: {
       type: String,

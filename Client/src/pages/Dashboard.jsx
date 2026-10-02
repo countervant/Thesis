@@ -11,9 +11,10 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import MainBars from "./MainBars.jsx";
-import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import Skeleton from "../components/Skeleton/Skeleton";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import Skeleton from "../components/Skeleton/Skeleton.jsx";
+import ReviewProjectModal from "../components/ReviewProjectModal/ReviewProjectModal.jsx";
 import { budgetPlannerAPI, getApiErrorMessage, messageAPI } from "../services/api.js";
 
 const AdminDashboard = lazy(() => import("./Dashboard/Admin/Home.jsx"));
@@ -282,6 +283,7 @@ const MessagesPanel = () => {
   const [newMessageSearch, setNewMessageSearch] = useState("");
   const [isMobileThreadOpen, setIsMobileThreadOpen] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const threadEndRef = useRef(null);
   const messageInputRef = useRef(null);
   const activeUserIdRef = useRef("");
@@ -336,7 +338,7 @@ const MessagesPanel = () => {
     setOpenInboxMenuId("");
   };
 
-  const handleDeleteConversation = (participantId) => {
+  const handleHideConversation = (participantId) => {
     updateInboxState((currentState) => ({
       archivedIds: currentState.archivedIds.filter((id) => id !== participantId),
       deletedIds: Array.from(new Set([...currentState.deletedIds, participantId])),
@@ -938,8 +940,8 @@ const MessagesPanel = () => {
   );
 
   return (
-  <section className="messages-workspace relative -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white">
-    <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#DA70D6]/60 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
+  <section className="messages-workspace relative -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#e5e7eb]/20 dark:bg-neutral-950 dark:text-white">
+    <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#e5e7eb]/20 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
       <div className="flex items-center justify-between gap-4">
         <h1 className="page-title text-3xl leading-none md:text-2xl">Messages</h1>
         <button
@@ -953,7 +955,7 @@ const MessagesPanel = () => {
         </button>
       </div>
 
-      <label className="mt-5 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#DA70D6]/80 dark:bg-neutral-900 md:mt-6">
+      <label className="mt-5 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#e5e7eb]/20 dark:bg-neutral-900 md:mt-6">
         <span className="sr-only">Search inbox</span>
         <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.9" />
@@ -1056,16 +1058,19 @@ const MessagesPanel = () => {
           const isOnline = Boolean(participant?.isOnline || participant?.online);
 
           return (
-          <button
+          <div
             key={participantId}
-            type="button"
-            onClick={() => handleSelectConversation(participant)}
-            className={`relative flex w-full items-center gap-3 border px-1 py-3.5 pr-11 text-left transition md:gap-4 md:rounded-2xl md:px-3 md:py-4 md:pr-12 ${
+            className={`relative w-full border text-left transition md:rounded-2xl ${
               isActive
-                ? "border-transparent bg-transparent md:border-pink-200 md:bg-pink-50 md:shadow-[0_10px_28px_rgba(236,72,153,0.12)] md:dark:border-[#DA70D6] md:dark:bg-neutral-900"
-                : "border-transparent bg-transparent hover:bg-pink-50/70 dark:hover:bg-neutral-900 md:border-pink-100 md:bg-white md:shadow-[0_6px_22px_rgba(15,23,42,0.06)] md:dark:border-[#DA70D6]/80 md:dark:bg-neutral-950"
+                ? "border-transparent bg-transparent md:border-pink-200 md:bg-pink-50 md:shadow-[0_10px_28px_rgba(236,72,153,0.12)] md:dark:border-[#e5e7eb]/20 md:dark:bg-neutral-900"
+                : "border-transparent bg-transparent hover:bg-pink-50/70 dark:hover:bg-neutral-900 md:border-pink-100 md:bg-white md:shadow-[0_6px_22px_rgba(15,23,42,0.06)] md:dark:border-[#e5e7eb]/20 md:dark:bg-neutral-950"
             }`}
           >
+            <button
+              type="button"
+              onClick={() => handleSelectConversation(participant)}
+              className="flex w-full items-center gap-3 px-1 py-3.5 pr-11 text-left md:gap-4 md:px-3 md:py-4 md:pr-12"
+            >
             <span className="relative shrink-0">
               <Avatar className="h-14 w-14 md:h-12 md:w-12" user={participant} />
               {isOnline && (
@@ -1098,24 +1103,15 @@ const MessagesPanel = () => {
                 </span>
               )}
             </span>
+            </button>
             <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   setOpenInboxMenuId((currentId) =>
                     currentId === participantId ? "" : participantId
                   );
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setOpenInboxMenuId((currentId) =>
-                      currentId === participantId ? "" : participantId
-                    );
-                  }
                 }}
                 className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-white hover:text-[#ff3faf] dark:hover:bg-neutral-800"
                 aria-label="Conversation options"
@@ -1127,16 +1123,16 @@ const MessagesPanel = () => {
                   <span className="h-1 w-1 rounded-full bg-current" />
                   <span className="h-1 w-1 rounded-full bg-current" />
                 </span>
-              </span>
+              </button>
               {openInboxMenuId === participantId && (
-                <span
+                <div
                   className="absolute right-0 top-9 z-30 w-32 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 text-xs font-black shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
                   role="menu"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <span
+                  <button
+                    type="button"
                     role="menuitem"
-                    tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
                       if (isArchived) {
@@ -1145,25 +1141,25 @@ const MessagesPanel = () => {
                         handleArchiveConversation(participantId);
                       }
                     }}
-                    className="block cursor-pointer px-3 py-2 text-left text-slate-700 hover:bg-pink-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-slate-700 hover:bg-pink-50 hover:text-[#ff3faf] dark:text-white dark:hover:bg-neutral-800"
                   >
                     {isArchived ? "Unarchive" : "Archive"}
-                  </span>
-                  <span
+                  </button>
+                  <button
+                    type="button"
                     role="menuitem"
-                    tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
-                      handleDeleteConversation(participantId);
+                      handleHideConversation(participantId);
                     }}
-                    className="block cursor-pointer px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-neutral-800"
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-neutral-800"
                   >
-                    Delete
-                  </span>
-                </span>
+                    Hide
+                  </button>
+                </div>
               )}
             </span>
-          </button>
+          </div>
           );
         })}
       </div>
@@ -1192,40 +1188,65 @@ const MessagesPanel = () => {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleStartNewMessage}
-          className="grid h-11 w-11 place-items-center rounded-full text-[#ff3faf] transition hover:bg-pink-50 dark:text-[#f472d0] dark:hover:bg-neutral-900"
-          aria-label="New message"
-          title="New message"
-        >
-          <ComposeIcon className="h-6 w-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          {activeParticipant && (
+            <button
+              type="button"
+              onClick={() => setIsProjectModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-[#dc4fb2] px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-pink-500/20 transition hover:brightness-105 active:scale-95"
+              title="Generate Project"
+            >
+              <span className="text-yellow-300">⚡</span>
+              <span>Project</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleStartNewMessage}
+            className="grid h-11 w-11 place-items-center rounded-full text-[#ff3faf] transition hover:bg-pink-50 dark:text-[#f472d0] dark:hover:bg-neutral-900"
+            aria-label="New message"
+            title="New message"
+          >
+            <ComposeIcon className="h-6 w-6" />
+          </button>
+        </div>
       </div>
 
       {activeParticipant && (
-        <div className="hidden items-center gap-3 border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 md:flex">
-          <span className="relative shrink-0">
-            <Avatar className="h-12 w-12" user={activeParticipant} />
-            {(activeParticipant.isOnline || activeParticipant.online) && (
-              <span
-                className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950"
-                aria-label="Online"
-                title="Online"
-              />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-base font-black">{activeName}</p>
-            <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
+        <div className="hidden items-center justify-between border-b border-slate-100 bg-white px-8 py-5 dark:border-neutral-800 dark:bg-neutral-950 md:flex">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="relative shrink-0">
+              <Avatar className="h-12 w-12" user={activeParticipant} />
               {(activeParticipant.isOnline || activeParticipant.online) && (
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span
+                  className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 dark:border-neutral-950"
+                  aria-label="Online"
+                  title="Online"
+                />
               )}
-              {activeParticipant.isOnline || activeParticipant.online
-                ? "Online"
-                : activeParticipant.role || "Offline"}
-            </p>
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-base font-black">{activeName}</p>
+              <p className="flex items-center gap-1.5 truncate text-xs font-semibold capitalize text-slate-500 dark:text-neutral-400">
+                {(activeParticipant.isOnline || activeParticipant.online) && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                )}
+                {activeParticipant.isOnline || activeParticipant.online
+                  ? "Online"
+                  : activeParticipant.role || "Offline"}
+              </p>
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsProjectModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-[#dc4fb2] px-4 py-2 text-xs font-bold text-white shadow-md shadow-pink-500/25 transition-all hover:scale-[1.02] hover:brightness-105 active:scale-[0.98]"
+            title="Generate project and backlog tasks from this chat"
+          >
+            <span className="text-yellow-300">⚡</span>
+            <span>Generate Project</span>
+          </button>
         </div>
       )}
 
@@ -1547,6 +1568,15 @@ const MessagesPanel = () => {
         </form>
       </div>
     )}
+
+    <ReviewProjectModal
+      isOpen={isProjectModalOpen}
+      onClose={() => setIsProjectModalOpen(false)}
+      conversationId={activeUserId}
+      onProjectCreated={() => {
+        setIsProjectModalOpen(false);
+      }}
+    />
   </section>
   );
 };
@@ -1691,7 +1721,7 @@ const Dashboard = () => {
           : adminPage;
 
     let adminContent = (
-      <AdminDashboard activePage={adminPage} />
+      <AdminDashboard />
     );
 
     if (adminPage === "tasks" || adminPage === "add-task" || adminPage === "edit-task") {

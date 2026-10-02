@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
+    "render-build": "npm install",
     "db:indexes": "node scripts/createIndexes.js",
     "optimize:avatars": "node scripts/optimizeAvatars.js",
     "test": "node --test tests/*.test.js"
@@ -18,6 +19,7 @@
     "node": "22.x"
   },
   "dependencies": {
+    "@google/genai": "^2.26.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "compression": "^1.8.1",

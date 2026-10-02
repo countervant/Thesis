@@ -1,11 +1,19 @@
 import express from "express";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import mongoose from "mongoose";
 import NewsfeedPost from "../models/newsfeedModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
+import {
+  deleteCloudinaryAsset,
+  isCloudinaryConfigured,
+  uploadBufferToCloudinary,
+} from "../utils/cloudinary.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
+router.param("commentId", validateObjectIdParam);
 const userPublicFields = "firstName lastName companyName role updatedAt";
 const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
 const MAX_MEDIA_NAME_LENGTH = 180;
@@ -384,7 +392,30 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: mediaValidation.error });
     }
 
-    const media = mediaValidation.media;
+    let media = mediaValidation.media;
+
+    if (media?.url && isCloudinaryConfigured()) {
+      try {
+        const resourceType = media.type === "video" ? "video" : "image";
+        const base64Data = media.url.replace(/^data:[^;]+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+
+        const uploadResult = await uploadBufferToCloudinary(buffer, {
+          folder: "clientra/newsfeed",
+          resourceType,
+        });
+
+        media = {
+          type: media.type,
+          url: uploadResult.secure_url,
+          name: media.name,
+          publicId: uploadResult.public_id,
+        };
+      } catch (uploadError) {
+        console.error("Newsfeed media Cloudinary upload error:", uploadError);
+        return res.status(500).json({ message: "Unable to upload post media" });
+      }
+    }
 
     if (!content && !media) {
       return res.status(400).json({ message: "Post content or media is required" });
@@ -461,6 +492,13 @@ router.delete("/:id", protect, async (req, res) => {
 
     if (!isAuthor && !isAdmin) {
       return res.status(403).json({ message: "You cannot delete this post" });
+    }
+
+    if (post.media?.publicId) {
+      const resourceType = post.media.type === "video" ? "video" : "image";
+      await deleteCloudinaryAsset(post.media.publicId, resourceType).catch((cleanupError) => {
+        console.error("Unable to remove newsfeed post Cloudinary asset:", cleanupError);
+      });
     }
 
     await post.deleteOne();

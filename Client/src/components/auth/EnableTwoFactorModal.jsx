@@ -56,7 +56,7 @@ const EnableTwoFactorModal = ({ onClose, onEnabled, required = false }) => {
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby="enable-2fa-title">
-      <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-pink-100 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-7 dark:border-[#DA70D6]/60 dark:bg-[#141414]">
+      <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-pink-100 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-7 dark:border-[#e5e7eb]/20 dark:bg-[#141414]">
         {!required && <button type="button" onClick={onClose} className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>}
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-br from-pink-500 to-purple-600 text-white">
           {step === "success" ? <CheckCircle2 /> : step === "password" ? <KeyRound /> : <ShieldCheck />}
@@ -71,7 +71,7 @@ const EnableTwoFactorModal = ({ onClose, onEnabled, required = false }) => {
             <input type="password" autoComplete="current-password" value={password} onChange={(event) => { setPassword(event.target.value); setError(""); }} autoFocus className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-pink-400 focus:ring-4 focus:ring-pink-100 dark:border-neutral-700 dark:bg-[#1a1a1d] dark:text-white" />
           </label>
           {error && <p className="mt-3 text-sm font-bold text-red-500">{error}</p>}
-          <button disabled={loading || !password} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-pink-500 to-purple-600 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Send Verification Code</button>
+          <button type="submit" disabled={loading || !password} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-pink-500 to-purple-600 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Send Verification Code</button>
         </form>}
 
         {step === "code" && <form onSubmit={verify} className="mt-5 text-center">
@@ -80,7 +80,7 @@ const EnableTwoFactorModal = ({ onClose, onEnabled, required = false }) => {
           <div className="mt-5"><OtpInput value={code} onChange={(next) => { setCode(next); setError(""); }} disabled={loading} hasError={Boolean(error)} /></div>
           <p className="mt-3 text-xs font-bold text-slate-400">Expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}</p>
           {error && <p className="mt-3 text-sm font-bold text-red-500">{error}</p>}
-          <button disabled={loading || code.length !== 6 || secondsLeft === 0} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-pink-500 to-purple-600 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Verify & Enable</button>
+          <button type="submit" disabled={loading || code.length !== 6 || secondsLeft === 0} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-pink-500 to-purple-600 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Verify & Enable</button>
           <button type="button" onClick={requestCode} disabled={loading} className="mt-4 text-xs font-black text-[#b62ca1]">Send a new code</button>
         </form>}
 

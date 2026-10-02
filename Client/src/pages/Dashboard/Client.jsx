@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Skeleton from "../../components/Skeleton/Skeleton";
+import Skeleton from "../../components/Skeleton/Skeleton.jsx";
 import { getApiErrorMessage, calendarAPI, messageAPI, taskAPI } from "../../services/api.js";
 
 const statusFromApi = {
@@ -126,6 +126,7 @@ const normalizeTask = (task) => {
     status,
     progress: getTaskProgress(subtasks),
     updatedAt: task?.updatedAt || task?.createdAt,
+    createdAt: task?.createdAt,
     amount,
     paid,
     pendingAmount: Math.max(0, amount - paid),
@@ -324,11 +325,16 @@ const ClientDashboard = ({ onNavigate }) => {
   }, []);
 
   const dashboardData = useMemo(() => {
-    const activeProjects = tasks.filter((task) => task.status !== "Completed");
-    const pendingRevisions = tasks.filter(
+    const sortedTasks = [...tasks].sort((first, second) => {
+      const firstTime = parseDate(first.createdAt) || parseDate(first.updatedAt) || 0;
+      const secondTime = parseDate(second.createdAt) || parseDate(second.updatedAt) || 0;
+      return secondTime - firstTime;
+    });
+    const activeProjects = sortedTasks.filter((task) => task.status !== "Completed");
+    const pendingRevisions = sortedTasks.filter(
       (task) => task.status === "Pending" || task.revisionRequests.length > 0
     );
-    const highPriority = tasks.filter((task) => task.priority === "high" && task.status !== "Completed");
+    const highPriority = sortedTasks.filter((task) => task.priority === "high" && task.status !== "Completed");
     const upcomingMeetings = meetings
       .filter((meeting) => {
         const date = parseDate(meeting.date);
@@ -338,10 +344,10 @@ const ClientDashboard = ({ onNavigate }) => {
 
     return {
       activeProjects,
-      completedProjects: tasks.filter((task) => task.status === "Completed"),
+      completedProjects: sortedTasks.filter((task) => task.status === "Completed"),
       highPriority,
       pendingRevisions,
-      projectOverview: tasks.slice(0, 3),
+      projectOverview: sortedTasks.slice(0, 3),
       recentRevisions: pendingRevisions.slice(0, 3),
       upcomingMeetings,
     };

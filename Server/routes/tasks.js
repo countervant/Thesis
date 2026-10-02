@@ -1,4 +1,5 @@
 import express from "express";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import { createHash, randomUUID } from "crypto";
 import fs from "fs/promises";
 import mongoose from "mongoose";
@@ -14,8 +15,15 @@ import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
 import { withAvatarUrl } from "../utils/avatar.js";
 import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
+import {
+  deleteCloudinaryAsset,
+  getCloudinaryResourceType,
+  isCloudinaryConfigured,
+  uploadBufferToCloudinary,
+} from "../utils/cloudinary.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configuredStorageRoot = String(process.env.OUTPUT_STORAGE_ROOT || "").trim();
 const legacyUploadsRoot = path.resolve(__dirname, "../uploads/tasks");
@@ -123,13 +131,11 @@ const normalizeAssigneeIds = (values, fallback) => {
   const input = Array.isArray(values)
     ? values.length > 0
       ? values
-      : fallback
-        ? [fallback]
-        : []
+      : []
     : values
       ? [values]
       : fallback
-        ? [fallback]
+        ? (Array.isArray(fallback) ? fallback : [fallback])
         : [];
   return [...new Set(input.map((value) => String(value?._id || value?.id || value || "")).filter(Boolean))];
 };
@@ -263,7 +269,10 @@ const validateSubtaskAssignees = (subtasks, assignees) => {
     : "";
 };
 
-const taskAssigneeIds = (task) => normalizeAssigneeIds(task.assignees, task.assignedTo);
+const taskAssigneeIds = (task) =>
+  task?.assignees?.length
+    ? normalizeAssigneeIds(task.assignees)
+    : (task?.assignedTo ? normalizeAssigneeIds([task.assignedTo]) : []);
 
 const canEmployeeUpdateSubtask = (task, subtask, userId) => {
   const assignedUserId = String(subtask?.assignedTo?._id || subtask?.assignedTo || "");
@@ -278,27 +287,32 @@ const canUserSubmitTask = (task, userId) =>
     (subtask) => String(subtask?.assignedTo?._id || subtask?.assignedTo || "") === String(userId)
   );
 
-const validateProjectAssignees = async (assignees, adminUserId, existingAssignees = []) => {
-  if (!assignees.length) return "Select at least one project assignee";
+export const canUserSubmitTaskOutput = (task, user) => {
+  if (user?.role === "admin") return true;
+  if (user?.role !== "employee") return false;
+  return canUserSubmitTask(task, user?._id || user?.id);
+};
 
-  const employeeAssignees = assignees.filter(
-    (assigneeId) => String(assigneeId) !== String(adminUserId)
-  );
-  const employeeCount = await User.countDocuments({
-    _id: { $in: employeeAssignees },
-    role: "employee",
+const validateProjectAssignees = async (assignees, adminUserId, existingAssignees = []) => {
+  if (!assignees.length) return "";
+
+  const existingAssigneeIds = new Set(existingAssignees.map(String));
+  const newlyAssignedIds = assignees
+    .map(String)
+    .filter((id) => id !== String(adminUserId) && !existingAssigneeIds.has(id));
+
+  if (newlyAssignedIds.length === 0) return "";
+
+  const validCount = await User.countDocuments({
+    _id: { $in: newlyAssignedIds },
+    role: { $in: ["employee", "admin"] },
     isActive: true,
   }).maxTimeMS(8000);
-  if (employeeCount !== employeeAssignees.length) {
+  if (validCount !== newlyAssignedIds.length) {
     return "Projects can only be assigned to active employees or yourself";
   }
 
-  const existingAssigneeIds = new Set(existingAssignees.map(String));
-  const newlyAssignedEmployeeIds = employeeAssignees.filter(
-    (employeeId) => !existingAssigneeIds.has(String(employeeId))
-  );
-  const approvedLeaves = await getEmployeesOnApprovedLeave(newlyAssignedEmployeeIds);
-
+  const approvedLeaves = await getEmployeesOnApprovedLeave(newlyAssignedIds);
   if (approvedLeaves.length === 0) return "";
 
   const employeeNames = approvedLeaves
@@ -432,7 +446,12 @@ const getStatusFromSubtasks = (subtasks, fallbackStatus) => {
   if (!subtasks.length) return fallbackStatus;
 
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
-  if (completedCount === subtasks.length) return "done";
+  if (fallbackStatus === "review" || fallbackStatus === "pending") {
+    return fallbackStatus;
+  }
+  if (fallbackStatus === "done" || completedCount === subtasks.length) {
+    return "done";
+  }
   if (completedCount > 0) return "in_progress";
   return fallbackStatus;
 };
@@ -450,9 +469,11 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     completed: status === "done" ? true : subtask.completed,
   }));
   const fallbackStatus = allowedStatuses.includes(status) ? status : "in_progress";
+  const explicitAssignees = options.assignees !== undefined ? options.assignees : body.assignees;
+  const explicitAssignedTo = options.assignedTo !== undefined ? options.assignedTo : body.assignedTo;
   const assignees = normalizeAssigneeIds(
-    options.assignees ?? body.assignees,
-    options.assignedTo ?? body.assignedTo ?? userId
+    explicitAssignees,
+    explicitAssignedTo || null
   );
 
   return {
@@ -464,7 +485,7 @@ const normalizeTaskPayload = (body, userId, options = {}) => {
     priority: allowedPriorities.includes(priority) ? priority : "medium",
     amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
     paid: Number.isFinite(paid) && paid >= 0 ? paid : 0,
-    assignedTo: assignees[0] || userId,
+    assignedTo: assignees[0] || (explicitAssignedTo !== undefined ? explicitAssignedTo : null),
     assignees,
     requestedBy: optionalId(options.requestedBy ?? body.requestedBy),
     requestedByName: String(options.requestedByName ?? body.requestedByName ?? "").trim(),
@@ -517,9 +538,6 @@ const OUTPUT_MIME_EXTENSIONS = new Map([
   ["image/webp", ".webp"],
   ["text/csv", ".csv"],
   ["text/plain", ".txt"],
-  ["video/mp4", ".mp4"],
-  ["video/quicktime", ".mov"],
-  ["video/webm", ".webm"],
 ]);
 const RASTER_IMAGE_MIME_TYPES = new Set([
   "image/gif",
@@ -572,9 +590,13 @@ export const parseOutputFile = (file, options = {}) => {
   if (!extension) {
     throw outputValidationError("This file type is not supported for project outputs");
   }
+  if (options.reviewCopy && !RASTER_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw outputValidationError("Review copies must be JPEG, PNG, WebP, or GIF files");
+  }
   if (options.rasterImageOnly && !RASTER_IMAGE_MIME_TYPES.has(mimeType)) {
     throw outputValidationError("Image review copies must be JPEG, PNG, WebP, or GIF files");
   }
+
 
   const encodedData = match[2];
   if (!encodedData || encodedData.length % 4 !== 0) {
@@ -637,6 +659,30 @@ const saveOutputFile = async (taskId, parsedFile, options = {}) => {
   };
 };
 
+const saveTaskOutput = async (taskId, parsedFile, options = {}) => {
+  if (isCloudinaryConfigured()) {
+    const resourceType = getCloudinaryResourceType(parsedFile.mimeType);
+    const folder = `clientra/tasks/${taskId}`;
+    const result = await uploadBufferToCloudinary(parsedFile.buffer, {
+      folder,
+      resourceType,
+    });
+    return {
+      fileName: parsedFile.fileName,
+      mimeType: parsedFile.mimeType,
+      fileUrl: result.secure_url,
+      publicId: result.public_id,
+      resourceType: result.resource_type || resourceType,
+    };
+  }
+
+  const localFile = await saveOutputFile(taskId, parsedFile, options);
+  return {
+    ...localFile,
+    resourceType: getCloudinaryResourceType(parsedFile.mimeType),
+  };
+};
+
 const removeFileIfPresent = async (filePath) => {
   if (!filePath) return;
   try {
@@ -667,8 +713,17 @@ const findStoredTaskFile = async (primaryRoot, legacyRoot, taskId, storedFileNam
 };
 
 const removeStoredTaskOutput = async (taskId, finalOutput) => {
+  if (!finalOutput) return;
   const safeTaskId = String(taskId);
   const paths = [];
+
+  if (finalOutput.publicId) {
+    await deleteCloudinaryAsset(finalOutput.publicId, finalOutput.resourceType || "raw");
+  }
+  if (finalOutput.previewPublicId) {
+    await deleteCloudinaryAsset(finalOutput.previewPublicId, "image");
+  }
+
   const originalName = path.basename(String(finalOutput?.originalStoredName || ""));
   if (originalName && originalName === finalOutput?.originalStoredName) {
     paths.push(path.join(privateUploadsRoot, safeTaskId, originalName));
@@ -688,8 +743,13 @@ const removeStoredTaskOutput = async (taskId, finalOutput) => {
   await Promise.all(paths.map(removeFileIfPresent));
 };
 
-const removeTaskOutputDirectories = async (taskId) => {
+const removeTaskOutputDirectories = async (taskId, finalOutput) => {
   const safeTaskId = String(taskId);
+  if (finalOutput) {
+    await removeStoredTaskOutput(taskId, finalOutput).catch((cleanupError) => {
+      console.error("Unable to remove task Cloudinary assets:", cleanupError);
+    });
+  }
   await Promise.all([
     fs.rm(path.join(privateUploadsRoot, safeTaskId), { recursive: true, force: true }),
     fs.rm(path.join(uploadsRoot, safeTaskId), { recursive: true, force: true }),
@@ -834,7 +894,10 @@ router.get("/", protect, async (req, res) => {
         .populate("employeePayments.paidBy", "firstName lastName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
       taskRequest = taskRequest
-        .populate("assignedTo", "firstName lastName email role updatedAt")
+        .populate("assignedTo", "firstName lastName email role position avatar updatedAt")
+        .populate("assignees", "firstName lastName email role position avatar updatedAt")
+        .populate("subtasks.assignedTo", "firstName lastName email role position avatar updatedAt")
+        .populate("requestedBy", "firstName lastName companyName email role updatedAt")
         .populate("createdBy", "firstName lastName companyName email role updatedAt");
     }
 
@@ -891,9 +954,16 @@ router.post("/", protect, async (req, res) => {
       return res.status(403).json({ message: "Only admins and clients can create tasks" });
     }
 
+    const resolvedAssignees = req.user.role === "admin"
+      ? (req.body.assignees !== undefined
+          ? (Array.isArray(req.body.assignees) ? req.body.assignees : (req.body.assignees ? [req.body.assignees] : []))
+          : (req.body.assignedTo ? [req.body.assignedTo] : []))
+      : [req.user._id];
+    const resolvedAssignedTo = resolvedAssignees[0] || (req.user.role === "admin" ? null : req.user._id);
+
     const payload = normalizeTaskPayload(req.body, req.user._id, {
-      assignedTo: req.user.role === "admin" ? req.body.assignedTo : req.user._id,
-      assignees: req.user.role === "admin" ? req.body.assignees : [req.user._id],
+      assignedTo: resolvedAssignedTo,
+      assignees: resolvedAssignees,
       requestedBy: req.user.role === "admin" ? req.body.requestedBy : req.user._id,
       requestedByName:
         req.user.role === "admin"
@@ -958,10 +1028,14 @@ router.post("/", protect, async (req, res) => {
     }
 
     if (payload.startDate > payload.dueDate) {
-      return res.status(400).json({ message: "Start date cannot be after due date" });
+      if (req.user.role === "admin") {
+        payload.startDate = payload.dueDate;
+      } else {
+        return res.status(400).json({ message: "Start date cannot be after due date" });
+      }
     }
 
-    if (isPastDate(payload.startDate) || isPastDate(payload.dueDate)) {
+    if (req.user.role !== "admin" && (isPastDate(payload.startDate) || isPastDate(payload.dueDate))) {
       return res.status(400).json({ message: "Past dates cannot be selected" });
     }
 
@@ -1128,13 +1202,7 @@ router.put("/:id", protect, async (req, res) => {
         return res.status(400).json({ message: "Valid due date is required" });
       }
       if (startDate > dueDate) {
-        return res.status(400).json({ message: "Start date cannot be after due date" });
-      }
-      if (
-        (req.body.startDate !== undefined && isPastDate(startDate)) ||
-        (req.body.dueDate !== undefined && isPastDate(dueDate))
-      ) {
-        return res.status(400).json({ message: "Past dates cannot be selected" });
+        startDate = dueDate;
       }
 
       task.title = title;
@@ -1156,6 +1224,15 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(200).json(addTaskAvatarUrls(task.toObject(), req.user));
     }
 
+    const resolvedAssignees = req.user.role === "admin"
+      ? (req.body.assignees !== undefined
+          ? (Array.isArray(req.body.assignees) ? req.body.assignees : (req.body.assignees ? [req.body.assignees] : []))
+          : (req.body.assignedTo !== undefined
+              ? (req.body.assignedTo ? [req.body.assignedTo] : [])
+              : taskAssigneeIds(task)))
+      : taskAssigneeIds(task);
+    const resolvedAssignedTo = resolvedAssignees[0] || null;
+
     const payload = normalizeTaskPayload(
       {
         title: req.body.title ?? task.title,
@@ -1166,8 +1243,8 @@ router.put("/:id", protect, async (req, res) => {
         priority: req.body.priority ?? task.priority,
         amount: req.body.amount ?? task.amount ?? task.budget,
         paid: task.paid,
-        assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
-        assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
+        assignedTo: resolvedAssignedTo,
+        assignees: resolvedAssignees,
         requestedBy:
           req.user.role === "admin" ? req.body.requestedBy ?? task.requestedBy : task.requestedBy,
         requestedByName:
@@ -1178,8 +1255,8 @@ router.put("/:id", protect, async (req, res) => {
       },
       req.user._id,
       {
-        assignedTo: req.user.role === "admin" ? req.body.assignedTo ?? task.assignedTo : task.assignedTo,
-        assignees: req.user.role === "admin" ? req.body.assignees ?? taskAssigneeIds(task) : taskAssigneeIds(task),
+        assignedTo: resolvedAssignedTo,
+        assignees: resolvedAssignees,
         requestedBy:
           req.user.role === "admin" ? req.body.requestedBy ?? task.requestedBy : task.requestedBy,
         requestedByName:
@@ -1236,14 +1313,7 @@ router.put("/:id", protect, async (req, res) => {
     }
 
     if (payload.startDate > payload.dueDate) {
-      return res.status(400).json({ message: "Start date cannot be after due date" });
-    }
-
-    if (
-      (req.body.startDate !== undefined && isPastDate(payload.startDate)) ||
-      (req.body.dueDate !== undefined && isPastDate(payload.dueDate))
-    ) {
-      return res.status(400).json({ message: "Past dates cannot be selected" });
+      payload.startDate = payload.dueDate;
     }
 
     const previousSubtasks = task.subtasks.toObject();
@@ -1288,6 +1358,9 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
       return res.status(403).json({ message: "Only admins can mark projects as paid" });
     }
 
+    let removedPreviewPublicId = "";
+    let removedPreviewStoredName = "";
+
     await session.withTransaction(async () => {
       const task = await Task.findById(req.params.id).session(session);
       if (!task) throw outputValidationError("Project not found", 404);
@@ -1320,8 +1393,39 @@ router.post("/:id/mark-paid", protect, async (req, res) => {
       );
 
       task.paid = projectAmount;
+
+      if (task.finalOutput && task.finalOutput.watermarked) {
+        removedPreviewPublicId = task.finalOutput.previewPublicId || "";
+        removedPreviewStoredName = task.finalOutput.previewStoredName || "";
+
+        task.finalOutput.watermarked = false;
+        task.finalOutput.previewFileName = undefined;
+        task.finalOutput.previewStoredName = undefined;
+        task.finalOutput.previewPublicId = undefined;
+        task.finalOutput.previewUrl = undefined;
+      }
+
       await task.save({ session });
     });
+
+    // Clean up watermarked preview files after the transaction commits (best-effort)
+    const cleanupTasks = [];
+    if (removedPreviewPublicId) {
+      cleanupTasks.push(deleteCloudinaryAsset(removedPreviewPublicId, "image"));
+    }
+    if (removedPreviewStoredName) {
+      const previewName = path.basename(String(removedPreviewStoredName));
+      if (previewName && previewName === removedPreviewStoredName) {
+        cleanupTasks.push(
+          removeFileIfPresent(path.join(privateUploadsRoot, String(req.params.id), previewName))
+        );
+      }
+    }
+    if (cleanupTasks.length > 0) {
+      await Promise.all(cleanupTasks).catch((cleanupError) => {
+        console.error("Unable to remove watermarked preview files after marking paid:", cleanupError);
+      });
+    }
 
     const updatedTask = await Task.findById(req.params.id)
       .populate("assignedTo", "firstName lastName email role")
@@ -1615,8 +1719,21 @@ router.post("/:id/revisions", protect, async (req, res) => {
       return res.status(400).json({ message: "Preferred completion date cannot be in the past" });
     }
 
+    let attachment = undefined;
+    if (req.body.file?.dataUrl) {
+      const parsedFile = parseOutputFile(req.body.file);
+      const savedFile = await saveTaskOutput(task._id, parsedFile, { private: true });
+      attachment = {
+        fileName: savedFile.fileName,
+        fileUrl: savedFile.fileUrl,
+        publicId: savedFile.publicId,
+        resourceType: savedFile.resourceType,
+      };
+    }
+
     task.revisionRequests.push({
       ...payload,
+      attachment,
       user: req.user._id,
     });
     addActivity(task, {
@@ -2005,13 +2122,42 @@ router.get("/:id/output/download", protect, async (req, res) => {
 
     const fullyPaid = !isPaymentProtectedTask(task);
     const canAccessOriginal = req.user.role !== "client" || fullyPaid;
-    const canUseOriginal = canAccessOriginal && task.finalOutput.originalStoredName;
-    if (!canAccessOriginal && !task.finalOutput.previewStoredName && !task.finalOutput.fileUrl) {
+    const canUseOriginal = canAccessOriginal && (task.finalOutput.fileUrl || task.finalOutput.originalStoredName);
+    if (!canAccessOriginal && !task.finalOutput.previewUrl && !task.finalOutput.previewStoredName && !task.finalOutput.fileUrl) {
       return res.status(402).json({
         message: "The original output is protected until the project is fully paid",
       });
     }
 
+    const downloadName = canAccessOriginal
+      ? task.finalOutput.fileName
+      : task.finalOutput.previewFileName || `watermarked-${task.finalOutput.fileName}`;
+
+    // Cloudinary remote URL download
+    const cloudinaryFileUrl = canUseOriginal
+      ? (task.finalOutput.fileUrl?.startsWith("http") ? task.finalOutput.fileUrl : null)
+      : (task.finalOutput.previewUrl?.startsWith("http")
+          ? task.finalOutput.previewUrl
+          : (task.finalOutput.fileUrl?.startsWith("http") ? task.finalOutput.fileUrl : null));
+
+    if (cloudinaryFileUrl) {
+      const response = await fetch(cloudinaryFileUrl);
+      if (!response.ok) {
+        return res.status(404).json({ message: "The uploaded output file could not be retrieved" });
+      }
+
+      const contentType =
+        task.finalOutput.mimeType || response.headers.get("content-type") || "application/octet-stream";
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(downloadName)}"`);
+      res.setHeader("Content-Type", contentType);
+      const contentLength = response.headers.get("content-length");
+      if (contentLength) res.setHeader("Content-Length", contentLength);
+
+      const { Readable } = await import("stream");
+      return Readable.fromWeb(response.body).pipe(res);
+    }
+
+    // Local filesystem download fallback
     const hasPrivatePreview = !canUseOriginal && Boolean(task.finalOutput.previewStoredName);
     const selectedRoot = canUseOriginal || hasPrivatePreview ? privateUploadsRoot : uploadsRoot;
     const selectedStoredValue = canUseOriginal
@@ -2039,9 +2185,6 @@ router.get("/:id/output/download", protect, async (req, res) => {
       return res.status(404).json({ message: "The uploaded output file could not be found" });
     }
 
-    const downloadName = canAccessOriginal
-      ? task.finalOutput.fileName
-      : task.finalOutput.previewFileName || `watermarked-${task.finalOutput.fileName}`;
     return res.download(filePath, safeFileName(downloadName || storedFileName));
   } catch (error) {
     console.error("Download task output error:", error);
@@ -2094,6 +2237,7 @@ router.get("/:id/attachments/:index/download", protect, async (req, res) => {
 
 router.post("/:id/submit-output", protect, async (req, res) => {
   const createdFilePaths = [];
+  const createdPublicIds = [];
   let outputCommitted = false;
   try {
     const task = await Task.findById(req.params.id);
@@ -2102,9 +2246,10 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const isAssignedUser = canUserSubmitTask(task, req.user._id);
-    if (req.user.role !== "admin" && !isAssignedUser) {
-      return res.status(403).json({ message: "Only the assigned user can submit this output" });
+    if (!canUserSubmitTaskOutput(task, req.user)) {
+      return res.status(403).json({
+        message: "Only administrators and assigned employees can submit project output",
+      });
     }
 
     const outputMethod = req.body.outputMethod === "link" ? "link" : "file";
@@ -2173,35 +2318,65 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       const parsedOriginalFile = parseOutputFile(req.body.file);
       const requiresPaymentProtection = isPaymentProtectedTask(task);
       if (requiresPaymentProtection) {
-        const parsedReviewFile = RASTER_IMAGE_MIME_TYPES.has(parsedOriginalFile.mimeType)
-          ? await createProtectedImageReview(parsedOriginalFile)
-          : req.body.watermarkedFile?.dataUrl
-            ? parseOutputFile(req.body.watermarkedFile, { rasterImageOnly: true })
+        let parsedReviewFile = null;
+        if (RASTER_IMAGE_MIME_TYPES.has(parsedOriginalFile.mimeType)) {
+          parsedReviewFile = await createProtectedImageReview(parsedOriginalFile);
+        } else {
+          parsedReviewFile = req.body.watermarkedFile?.dataUrl
+            ? parseOutputFile(req.body.watermarkedFile, { reviewCopy: true })
             : null;
+        }
+
         if (!parsedReviewFile) {
           return res.status(400).json({
-            message: "A rasterized JPEG, PNG, WebP, or GIF review copy is required until the project is fully paid",
+            message: "A protected image review copy is required until the project is fully paid",
           });
         }
-        assertDistinctReviewFile(parsedOriginalFile, parsedReviewFile);
 
-        const originalFile = await saveOutputFile(task._id, parsedOriginalFile, { private: true });
-        createdFilePaths.push(originalFile.filePath);
-        const reviewFile = await saveOutputFile(task._id, parsedReviewFile, { private: true });
-        createdFilePaths.push(reviewFile.filePath);
+        if (parsedReviewFile) {
+          assertDistinctReviewFile(parsedOriginalFile, parsedReviewFile);
+        }
+
+        const [originalFile, reviewFile] = await Promise.all([
+          saveTaskOutput(task._id, parsedOriginalFile, { private: true }),
+          parsedReviewFile
+            ? saveTaskOutput(task._id, parsedReviewFile, { private: true })
+            : null,
+        ]);
+        if (originalFile.filePath) createdFilePaths.push(originalFile.filePath);
+        if (originalFile.publicId) {
+          createdPublicIds.push({ id: originalFile.publicId, type: originalFile.resourceType });
+        }
+        if (reviewFile?.filePath) createdFilePaths.push(reviewFile.filePath);
+        if (reviewFile?.publicId) {
+          createdPublicIds.push({ id: reviewFile.publicId, type: reviewFile.resourceType });
+        }
+
         fileOutput = {
           fileName: originalFile.fileName,
-          previewFileName: reviewFile.fileName,
-          previewStoredName: reviewFile.storedName,
+          fileUrl: originalFile.fileUrl,
+          publicId: originalFile.publicId,
+          resourceType: originalFile.resourceType,
+          previewFileName: reviewFile?.fileName,
+          previewStoredName: reviewFile?.storedName,
+          previewPublicId: reviewFile?.publicId,
+          previewUrl: reviewFile?.fileUrl || originalFile.fileUrl,
           originalStoredName: originalFile.storedName,
           mimeType: originalFile.mimeType,
           watermarked: true,
         };
       } else {
-        const originalFile = await saveOutputFile(task._id, parsedOriginalFile, { private: true });
-        createdFilePaths.push(originalFile.filePath);
+        const originalFile = await saveTaskOutput(task._id, parsedOriginalFile, { private: true });
+        if (originalFile.filePath) createdFilePaths.push(originalFile.filePath);
+        if (originalFile.publicId) {
+          createdPublicIds.push({ id: originalFile.publicId, type: originalFile.resourceType });
+        }
+
         fileOutput = {
           fileName: originalFile.fileName,
+          fileUrl: originalFile.fileUrl,
+          publicId: originalFile.publicId,
+          resourceType: originalFile.resourceType,
           originalStoredName: originalFile.storedName,
           mimeType: originalFile.mimeType,
           watermarked: false,
@@ -2228,8 +2403,12 @@ router.post("/:id/submit-output", protect, async (req, res) => {
       outputMethod,
       fileName: fileOutput.fileName,
       fileUrl: fileOutput.fileUrl,
+      publicId: fileOutput.publicId,
+      resourceType: fileOutput.resourceType,
       previewFileName: fileOutput.previewFileName,
       previewStoredName: fileOutput.previewStoredName,
+      previewPublicId: fileOutput.previewPublicId,
+      previewUrl: fileOutput.previewUrl,
       originalStoredName: fileOutput.originalStoredName,
       mimeType: fileOutput.mimeType,
       watermarked: Boolean(fileOutput.watermarked),
@@ -2268,10 +2447,19 @@ router.post("/:id/submit-output", protect, async (req, res) => {
 
     res.status(200).json(addTaskAvatarUrls(updatedTask, req.user));
   } catch (error) {
-    if (!outputCommitted && createdFilePaths.length > 0) {
-      await Promise.all(createdFilePaths.map(removeFileIfPresent)).catch((cleanupError) => {
-        console.error("Unable to roll back task output files after a failed submission:", cleanupError);
-      });
+    if (!outputCommitted) {
+      if (createdFilePaths.length > 0) {
+        await Promise.all(createdFilePaths.map(removeFileIfPresent)).catch((cleanupError) => {
+          console.error("Unable to roll back task output files after a failed submission:", cleanupError);
+        });
+      }
+      if (createdPublicIds.length > 0) {
+        await Promise.all(
+          createdPublicIds.map((item) => deleteCloudinaryAsset(item.id, item.type))
+        ).catch((cleanupError) => {
+          console.error("Unable to roll back Cloudinary assets after a failed submission:", cleanupError);
+        });
+      }
     }
     console.error("Submit task output error:", error);
     const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 500
@@ -2298,7 +2486,7 @@ router.delete("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    await removeTaskOutputDirectories(task._id).catch((cleanupError) => {
+    await removeTaskOutputDirectories(task._id, task.finalOutput).catch((cleanupError) => {
       console.error("Unable to remove deleted task output files:", cleanupError);
     });
 

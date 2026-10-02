@@ -18,7 +18,7 @@ const AuthThemeToggle = () => {
       <button
         type="button"
         onClick={() => setIsDarkMode((currentMode) => !currentMode)}
-        className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border border-pink-200 bg-white text-neutral-950 shadow-[0_8px_24px_rgba(219,74,181,0.25)] transition hover:scale-105 hover:border-[#dc4fb2] dark:border-[#DA70D6] dark:bg-[#101010] dark:shadow-[0_0_0_1px_rgba(236,92,199,0.25),0_10px_28px_rgba(236,92,199,0.28)]"
+        className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full border border-pink-200 bg-white text-neutral-950 shadow-[0_8px_24px_rgba(219,74,181,0.25)] transition hover:scale-105 hover:border-[#dc4fb2] dark:border-[#e5e7eb]/20 dark:bg-[#101010] dark:shadow-[0_0_0_1px_rgba(229,231,235,0.2),0_10px_28px_rgba(0,0,0,0.5)]"
         aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
         title={isDarkMode ? "Light mode" : "Dark mode"}
       >

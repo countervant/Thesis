@@ -7,8 +7,10 @@ import {
   BudgetPlannerEntry,
   BudgetPlannerSettings,
 } from "../models/Employee/budgetPlannerModel.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const allowedTypes = new Set(["income", "expense"]);
 
 router.use(protect, authorize("employee"));

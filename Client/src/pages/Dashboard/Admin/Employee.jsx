@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { employeeAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
-import { PersonGridSkeleton } from "../../../components/Skeleton/Skeleton";
+import { PersonGridSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
+import { downloadCsv } from "../../../utils/csvExport.js";
 
 const filters = [
   { label: "All accounts", value: "All" },
@@ -594,19 +595,7 @@ const AdminEmployees = ({
       employee.phone,
       employee.assignedTasks.map((task) => task.title).join("; "),
     ]);
-    const csv = [header, ...rows]
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "employees.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv([header, ...rows], "employees.csv");
   };
 
   return (
@@ -701,17 +690,17 @@ const AdminEmployees = ({
             ))}
           </section>
           <ConfirmDialog
-            confirmLabel="Yes , delete"
+            confirmLabel="Delete permanently"
             icon="delete"
             isOpen={Boolean(employeeToDelete)}
-            message={`Delete employee "${employeeToDelete?.name || ""}"?`}
+            message={`Permanently delete employee "${employeeToDelete?.name || ""}" and their login account? Existing project records will remain.`}
             onCancel={() => setEmployeeToDelete(null)}
             onConfirm={async () => {
               const employee = employeeToDelete;
               setEmployeeToDelete(null);
               if (employee) await deleteEmployee(employee);
             }}
-            title="Delete"
+            title="Delete Employee"
           />
           </div>
         </div>

@@ -379,6 +379,7 @@ export const resendLoginTwoFactor = async (req, res) => {
     const delivery = await sendOtp(user, "login", true);
     return res.json({ message: "A new code was sent.", ...delivery });
   } catch (error) {
+    console.error("Resend 2FA error:", error);
     if (error.retryAfter) res.set("Retry-After", String(error.retryAfter));
     const expired = error?.name === "TokenExpiredError";
     return res.status(error.status || (expired ? 410 : 401)).json({ message: expired ? "Your verification session has expired. Sign in again." : error.message || "Unable to resend the code." });

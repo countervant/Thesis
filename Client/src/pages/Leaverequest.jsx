@@ -5,8 +5,10 @@ import reject from "../assets/reject.png";
 import employees from "../assets/employees.png";
 import view from "../assets/view.png";
 import check from "../assets/check.png";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import { SkeletonRows } from "../components/Skeleton/Skeleton";
+import deleteIcon from "../assets/delete.png";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { SkeletonRows } from "../components/Skeleton/Skeleton.jsx";
 import { getApiErrorMessage, leaveRequestAPI } from "../services/api";
 
 const toneStyles = {
@@ -17,10 +19,10 @@ const toneStyles = {
 };
 
 const statCardStyles = {
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
 };
 
 const statusStyles = {
@@ -249,6 +251,9 @@ const getMonthDate = (monthFilter) => {
   if (monthFilter === "last") {
     return new Date(now.getFullYear(), now.getMonth() - 1, 1);
   }
+  if (monthFilter === "next") {
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }
   return new Date(now.getFullYear(), now.getMonth(), 1);
 };
 
@@ -264,17 +269,19 @@ const LeaveRequest = () => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const tabs = ["All", "Pending", "Approved", "Returned", "Rejected"];
   const [requests, setRequests] = useState([]);
-  const [roles, setRoles] = useState([]);
   const [summary, setSummary] = useState({});
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [monthFilter, setMonthFilter] = useState("this");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
+  const [requestToDelete, setRequestToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
 
   const loadLeaveRequests = useCallback(async () => {
     try {
@@ -286,7 +293,6 @@ const LeaveRequest = () => {
       };
 
       if (statusFilter !== "All") params.status = statusFilter;
-      if (roleFilter) params.role = roleFilter;
 
       const response = await leaveRequestAPI.getAll(params);
       const nextRequests = response.leaveRequests.map(normalizeRequest);
@@ -296,7 +302,6 @@ const LeaveRequest = () => {
           ? currentId
           : getRequestId(nextRequests[0])
       );
-      setRoles(response.roles || []);
       setSummary(response.summary || {});
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
@@ -305,7 +310,7 @@ const LeaveRequest = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [roleFilter, monthFilter, statusFilter]);
+  }, [monthFilter, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadLeaveRequests, 0);
@@ -327,9 +332,15 @@ const LeaveRequest = () => {
     [summary]
   );
 
-  const monthDate = getMonthDate(monthFilter);
-  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-  const firstDayOffset = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getDay();
+  const handleMonthFilterChange = (value) => {
+    setMonthFilter(value);
+    if (value !== "all") {
+      setCalendarMonth(getMonthDate(value));
+    }
+  };
+
+  const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const firstDayOffset = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay();
   const calendarCells = Math.ceil((daysInMonth + firstDayOffset) / 7) * 7;
   const days = Array.from({ length: calendarCells }, (_, index) => index - firstDayOffset + 1);
 
@@ -337,16 +348,16 @@ const LeaveRequest = () => {
     () =>
       requests
         .filter((request) => ["Approved", "Pending"].includes(request.status))
-        .filter((request) => monthMatches(request, monthDate))
+        .filter((request) => monthMatches(request, calendarMonth))
         .flatMap((request) => {
           const start = new Date(request.startDate);
           const end = new Date(request.endDate);
           const startDay =
-            start.getMonth() === monthDate.getMonth() && start.getFullYear() === monthDate.getFullYear()
+            start.getMonth() === calendarMonth.getMonth() && start.getFullYear() === calendarMonth.getFullYear()
               ? start.getDate()
               : 1;
           const endDay =
-            end.getMonth() === monthDate.getMonth() && end.getFullYear() === monthDate.getFullYear()
+            end.getMonth() === calendarMonth.getMonth() && end.getFullYear() === calendarMonth.getFullYear()
               ? end.getDate()
               : daysInMonth;
 
@@ -356,7 +367,7 @@ const LeaveRequest = () => {
             color: typeColors[request.type] || typeColors.Others,
           }));
         }),
-    [daysInMonth, monthDate, requests]
+    [daysInMonth, calendarMonth, requests]
   );
 
   const historyItems = useMemo(
@@ -431,6 +442,31 @@ const LeaveRequest = () => {
     }
   };
 
+  const handleDeleteRequest = async () => {
+    if (!requestToDelete || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+      setDeleteErrorMessage("");
+      const targetId = getRequestId(requestToDelete);
+      await leaveRequestAPI.delete(targetId);
+
+      setRequests((current) => current.filter((item) => getRequestId(item) !== targetId));
+      if (selectedRequestId === targetId) {
+        setSelectedRequestId("");
+      }
+      if (detailRequestId === targetId) {
+        setDetailRequestId("");
+      }
+      setRequestToDelete(null);
+      await loadLeaveRequests();
+    } catch (error) {
+      setDeleteErrorMessage(getApiErrorMessage(error, "Unable to delete leave request."));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] space-y-4 bg-[#f8f9fd] px-4 py-4 text-[#111936] md:px-5 lg:px-6">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -476,22 +512,13 @@ const LeaveRequest = () => {
             <div className="flex flex-wrap gap-3">
               <select
                 className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none"
-                value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value)}
-              >
-                <option value="">All Roles</option>
-                {roles.map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-xl border border-pink-100 bg-white px-4 text-sm font-bold text-slate-700 outline-none"
                 value={monthFilter}
-                onChange={(event) => setMonthFilter(event.target.value)}
+                onChange={(event) => handleMonthFilterChange(event.target.value)}
               >
-                <option value="this">This Month</option>
-                <option value="last">Last Month</option>
                 <option value="all">All Months</option>
+                <option value="this">This Month</option>
+                <option value="next">Next Month</option>
+                <option value="last">Last Month</option>
               </select>
             </div>
           </div>
@@ -526,7 +553,11 @@ const LeaveRequest = () => {
                   </tr>
                 )}
                 {!isLoading && requests.map((request) => (
-                  <tr key={getRequestId(request)} className="hover:bg-pink-50/40">
+                  <tr
+                    key={getRequestId(request)}
+                    onClick={() => setSelectedRequestId(getRequestId(request))}
+                    className={`cursor-pointer transition hover:bg-pink-50/40 ${selectedRequestId === getRequestId(request) ? "bg-pink-50/30" : ""}`}
+                  >
                     <td className="px-3 py-3 font-black text-pink-700">{request.id}</td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
@@ -543,7 +574,7 @@ const LeaveRequest = () => {
                     <td className="px-3 py-3 font-bold text-slate-600">{request.role}</td>
                     <td className="px-3 py-3"><StatusPill status={request.status} /></td>
                     <td className="px-3 py-3">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => handleStatusUpdate(request, "Approved")}
@@ -590,6 +621,19 @@ const LeaveRequest = () => {
                         >
                           <ImageIcon src={view} className="h-5 w-5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteErrorMessage("");
+                            setRequestToDelete(request);
+                          }}
+                          disabled={busyRequestId === getRequestId(request) || isDeleting}
+                          className="grid h-9 w-9 place-items-center rounded-xl border border-rose-100 bg-rose-50 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="Delete request"
+                          title="Delete request"
+                        >
+                          <ImageIcon src={deleteIcon} className="h-4.5 w-4.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -603,7 +647,31 @@ const LeaveRequest = () => {
           <Card className="order-2 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-black">Team Leave Calendar</h2>
-              <span className="text-sm font-black text-pink-600">{monthFilter === "all" ? "All Months" : formatMonth(monthDate)}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-pink-100 text-slate-600 transition hover:bg-pink-50"
+                  aria-label="Previous month"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <span className="min-w-[120px] text-center text-sm font-black text-pink-600">
+                  {formatMonth(calendarMonth)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-pink-100 text-slate-600 transition hover:bg-pink-50"
+                  aria-label="Next month"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
               {weekDays.map((day) => <span key={day}>{day}</span>)}
@@ -695,6 +763,17 @@ const LeaveRequest = () => {
                       Reactivate Leave
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteErrorMessage("");
+                      setRequestToDelete(selectedRequest);
+                    }}
+                    disabled={busyRequestId === getRequestId(selectedRequest) || isDeleting}
+                    className="h-10 rounded-xl border border-rose-200 bg-rose-50 text-xs font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
                 </div>
               </>
             ) : (
@@ -711,11 +790,12 @@ const LeaveRequest = () => {
             <select
               className="h-9 rounded-xl border border-pink-100 bg-white px-4 text-xs font-bold text-slate-700 outline-none"
               value={monthFilter}
-              onChange={(event) => setMonthFilter(event.target.value)}
+              onChange={(event) => handleMonthFilterChange(event.target.value)}
             >
-              <option value="this">This Month</option>
-              <option value="last">Last Month</option>
               <option value="all">All Months</option>
+              <option value="this">This Month</option>
+              <option value="next">Next Month</option>
+              <option value="last">Last Month</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-2 p-2 lg:grid-cols-[1.15fr_1fr_0.62fr] lg:gap-0 lg:p-0">
@@ -1025,10 +1105,39 @@ const LeaveRequest = () => {
                   Reactivate Leave
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteErrorMessage("");
+                  setRequestToDelete(detailRequest);
+                }}
+                disabled={busyRequestId === getRequestId(detailRequest) || isDeleting}
+                className="h-11 rounded-xl border border-rose-200 bg-rose-50 px-8 text-sm font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        confirmLabel="Delete permanently"
+        confirmingLabel="Deleting..."
+        errorMessage={deleteErrorMessage}
+        icon="delete"
+        isConfirming={isDeleting}
+        isOpen={Boolean(requestToDelete)}
+        message={`Are you sure you want to permanently delete leave request "${requestToDelete?.id || ""}" for ${requestToDelete?.employee || "this employee"}? This action cannot be undone.`}
+        onCancel={() => {
+          if (!isDeleting) {
+            setRequestToDelete(null);
+            setDeleteErrorMessage("");
+          }
+        }}
+        onConfirm={handleDeleteRequest}
+        title="Delete Leave Request"
+      />
     </div>
   );
 };

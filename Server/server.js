@@ -19,6 +19,7 @@ import newsfeed from "./routes/newsfeed.js";
 import messages, { closeMessageClients } from "./routes/messages.js";
 import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
+import chatProject from "./routes/chatProject.routes.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
 import User from "./models/userModel.js";
 import {
@@ -60,6 +61,19 @@ const warmAvatarCache = async () => {
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+app.use((req, res, next) => {
+  res.set({
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+  });
+  if (isProduction) {
+    res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
 
 const requireEnv = (name) => {
   const value = process.env[name];
@@ -73,13 +87,33 @@ const requireEnv = (name) => {
 const validateRuntimeConfig = () => {
   requireEnv("MONGODB_URI");
   const jwtSecret = requireEnv("JWT_SECRET");
+  const otpHashSecret = String(process.env.OTP_HASH_SECRET || "").trim();
 
-  const unsafeJwtPlaceholders = new Set([
+  const unsafeSecretPlaceholders = new Set([
     "replace_this_with_a_long_random_secret",
     "replace-with-a-long-random-secret",
+    "replace-with-a-separate-long-random-secret",
   ]);
-  if (isProduction && unsafeJwtPlaceholders.has(jwtSecret)) {
-    throw new Error("JWT_SECRET must be changed before production deployment");
+  if (isProduction) {
+    if (unsafeSecretPlaceholders.has(jwtSecret) || jwtSecret.length < 32) {
+      throw new Error("JWT_SECRET must be a unique secret of at least 32 characters");
+    }
+    if (
+      otpHashSecret &&
+      (unsafeSecretPlaceholders.has(otpHashSecret) || otpHashSecret.length < 32)
+    ) {
+      throw new Error("OTP_HASH_SECRET must be a unique secret of at least 32 characters");
+    }
+
+    requireEnv("RESEND_API_KEY");
+    requireEnv("RESEND_SENDER_EMAIL");
+
+    if (
+      process.env.ENABLE_DATABASE_DIAGNOSTICS === "true" &&
+      String(process.env.DATABASE_DIAGNOSTICS_TOKEN || "").trim().length < 32
+    ) {
+      throw new Error("DATABASE_DIAGNOSTICS_TOKEN must be at least 32 characters");
+    }
   }
 };
 
@@ -89,6 +123,7 @@ validateRuntimeConfig();
 const applicationOrigins = [
   "https://clientra.me",
   "https://www.clientra.me",
+  "http://localhost:3000",
 ];
 
 const defaultOrigins = [
@@ -96,7 +131,6 @@ const defaultOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:5174",
   "http://127.0.0.1:5174",
-  "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:3001",
   "http://127.0.0.1:3001",
@@ -178,6 +212,10 @@ app.use((req, res, next) =>
   (usesLargeJsonUpload(req) ? largeUploadJsonParser : standardJsonParser)(req, res, next)
 );
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use("/api", (req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
 app.get("/api/health", (req, res) => {
   res.status(isDbConnected() ? 200 : 503).json({
@@ -222,6 +260,7 @@ app.use("/api/leave-requests", leaveRequests);
 app.use("/api/tasks", tasks);
 app.use("/api/newsfeed", newsfeed);
 app.use("/api/messages", messages);
+app.use("/api/chat", chatProject);
 app.use("/api/dashboard", dashboard);
 app.use("/api/users", users);
 

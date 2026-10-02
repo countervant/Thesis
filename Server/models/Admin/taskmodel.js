@@ -134,7 +134,7 @@ const taskSchema = new mongoose.Schema(
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
     },
 
     assignees: [
@@ -260,6 +260,13 @@ const taskSchema = new mongoose.Schema(
           type: Date,
           default: Date.now,
         },
+
+        attachment: {
+          fileName: String,
+          fileUrl: String,
+          publicId: String,
+          resourceType: String,
+        },
       },
     ],
 
@@ -285,8 +292,12 @@ const taskSchema = new mongoose.Schema(
       },
       fileName: String,
       fileUrl: String,
+      publicId: String,
+      resourceType: String,
       previewFileName: String,
       previewStoredName: String,
+      previewPublicId: String,
+      previewUrl: String,
       originalStoredName: String,
       mimeType: String,
       watermarked: {

@@ -19,9 +19,9 @@ import sidebarIcon from "../assets/sidebar.png";
 import settingsIcon from "../assets/settings.png";
 import taskIcon from "../assets/task.png";
 import themeIcon from "../assets/theme.png";
-import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import { NotificationSkeleton } from "../components/Skeleton/Skeleton";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { NotificationSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getApiErrorMessage, messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
 import {
@@ -718,10 +718,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
 
   const requestRemoveAllNotifications = () => {
     setNotificationDeleteAction({
-      confirmLabel: "Yes, remove all",
-      message: "Are you sure you want to remove all notifications?",
+      confirmLabel: "Hide all",
+      message: "Hide all current notifications on this device?",
       onConfirm: removeAllNotifications,
-      title: "Remove Notifications",
+      title: "Hide Notifications",
     });
     setIsNotificationOptionsOpen(false);
   };
@@ -736,10 +736,10 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const requestDeleteNotification = (event, notificationId) => {
     event.stopPropagation();
     setNotificationDeleteAction({
-      confirmLabel: "Yes, delete",
-      message: "Are you sure you want to delete this notification?",
+      confirmLabel: "Hide notification",
+      message: "Hide this notification on this device?",
       onConfirm: () => deleteNotification(notificationId),
-      title: "Delete Notification",
+      title: "Hide Notification",
     });
     setOpenNotificationMenuId("");
   };
@@ -854,7 +854,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             onClick={() => onNavigate?.("messages")}
             className={`relative grid h-10 w-10 cursor-pointer select-none place-items-center rounded-full border caret-transparent transition hover:border-pink-200 hover:text-[#c72fb2] ${
               activePage === "messages"
-                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-pink-500/40 dark:bg-neutral-900 dark:text-[#f472d0]"
+                ? "border-pink-200 bg-pink-50 text-[#c72fb2] dark:border-[#e5e7eb]/20 dark:bg-neutral-900 dark:text-[#f472d0]"
                 : "border-slate-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             }`}
             aria-label="Messages"
@@ -942,7 +942,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                             className="block w-full px-4 py-2.5 text-left font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-neutral-800"
                             role="menuitem"
                           >
-                            Delete all notifications
+                            Hide all notifications
                           </button>
                         </div>
                       )}
@@ -1018,14 +1018,17 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                       const isUnread = !readNotificationSet.has(notification.id);
 
                       return (
-                        <button
+                        <div
                           key={notification.id}
-                          type="button"
-                          onClick={() => handleOpenNotification(notification)}
                           className={`flex w-full items-start gap-3 rounded-xl px-3 py-3.5 text-left transition hover:bg-pink-50 dark:hover:bg-neutral-900 md:px-2 md:py-3 ${
                             isUnread ? "bg-white dark:bg-neutral-950" : "opacity-75"
                           }`}
                         >
+                          <button
+                            type="button"
+                            onClick={() => handleOpenNotification(notification)}
+                            className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                          >
                           <span className="relative shrink-0">
                             <UserAvatar user={notification.actor} />
                             <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white shadow-sm dark:bg-neutral-800">
@@ -1050,24 +1053,15 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                           {isUnread && (
                             <span className="mt-4 h-2.5 w-2.5 shrink-0 rounded-full bg-[#dc4fb2]" />
                           )}
+                          </button>
                           <span className="relative -mr-1 shrink-0">
-                            <span
-                              role="button"
-                              tabIndex={0}
+                            <button
+                              type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setOpenNotificationMenuId((currentId) =>
                                   currentId === notification.id ? "" : notification.id
                                 );
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  setOpenNotificationMenuId((currentId) =>
-                                    currentId === notification.id ? "" : notification.id
-                                  );
-                                }
                               }}
                               className="grid h-8 w-8 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white"
                               aria-label="Notification actions"
@@ -1079,34 +1073,28 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
                                 <circle cx="10" cy="10" r="1.6" fill="currentColor" />
                                 <circle cx="16" cy="10" r="1.6" fill="currentColor" />
                               </svg>
-                            </span>
+                            </button>
 
                             {openNotificationMenuId === notification.id && (
-                              <span
+                              <div
                                 className="absolute right-0 top-9 z-50 w-44 overflow-hidden rounded-lg border border-neutral-200 bg-white py-2 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
                                 role="menu"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <span
+                                <button
+                                  type="button"
                                   role="menuitem"
-                                  tabIndex={0}
                                   onClick={(event) =>
                                     requestDeleteNotification(event, notification.id)
                                   }
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter" || event.key === " ") {
-                                      event.preventDefault();
-                                      requestDeleteNotification(event, notification.id);
-                                    }
-                                  }}
                                   className="block w-full cursor-pointer px-4 py-2 text-left font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-neutral-800"
                                 >
-                                  Delete notification
-                                </span>
-                              </span>
+                                  Hide notification
+                                </button>
+                              </div>
                             )}
                           </span>
-                        </button>
+                        </div>
                       );
                     })}
                 </div>
@@ -1153,7 +1141,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
             {isAccountMenuOpen && (
               <div
                 className="absolute right-0 top-12 z-40 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white px-2 py-2 text-neutral-950 shadow-[0_14px_34px_rgba(0,0,0,0.18)] dark:bg-neutral-900 dark:text-white dark:shadow-[0_14px_34px_rgba(0,0,0,0.5)]"
-                role="menu"dark
+                role="menu"
               >
                 <button
                   type="button"

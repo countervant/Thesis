@@ -6,6 +6,7 @@ import { authorize } from "../middleware/authorize.js";
 import { clearCachedAuthUser, protect } from "../middleware/protectedjwt.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { getPhoneValidationMessage } from "../utils/phoneValidation.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
@@ -14,6 +15,7 @@ import {
   getCachedAvatar,
   isValidAvatarSignature,
   optimizeAvatarDataUrl,
+  optimizeCoverPhotoDataUrl,
   setCachedAvatar,
   withAvatarUrl,
 } from "../utils/avatar.js";
@@ -30,8 +32,17 @@ import {
 import { isUserOnline, PRESENCE_TIMEOUT_MS } from "../utils/presence.js";
 import { getEmployeesOnApprovedLeave } from "../utils/leaveAvailability.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
+import { hashPasswordResetOtp } from "../utils/otp.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
+
+// generate JWT token
+const generateToken = (id) =>
+  jwt.sign({ id, type: "access" }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
 const emailRegex =
   /^[A-Za-z0-9]+(?:[._%+-][A-Za-z0-9]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
 const isMongoTimeoutError = (error) =>
@@ -66,12 +77,29 @@ const findUserAvatarWithRetry = async (userId) => {
 };
 
 const isValidEmail = (email) => {
+  if (typeof email !== "string") return false;
   const trimmedEmail = email.trim();
   return (
     trimmedEmail.length <= 254 &&
     !trimmedEmail.includes("..") &&
     emailRegex.test(trimmedEmail)
   );
+};
+
+const getPasswordValidationMessage = (password) => {
+  if (typeof password !== "string" || password.length < 8) {
+    return "Password must be at least 8 characters";
+  }
+
+  if (Buffer.byteLength(password, "utf8") > 72) {
+    return "Password must be 72 bytes or fewer";
+  }
+
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+    return "Password must include uppercase, lowercase, and number characters";
+  }
+
+  return "";
 };
 
 // Register route
@@ -88,7 +116,21 @@ router.post("/register", registrationLimiter, async (req, res) => {
   } = req.body;
 
   try {
-    if (!firstName || !lastName || !companyName || !email || !password) {
+    if (
+      typeof firstName !== "string" ||
+      typeof middleInitial !== "string" ||
+      typeof lastName !== "string" ||
+      typeof companyName !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      typeof phone !== "string" ||
+      typeof country !== "string" ||
+      !firstName ||
+      !lastName ||
+      !companyName ||
+      !email ||
+      !password
+    ) {
       return res
         .status(400)
         .json({
@@ -117,16 +159,9 @@ router.post("/register", registrationLimiter, async (req, res) => {
         .json({ message: "Enter a valid email" });
     }
 
-    if (password.length < 8) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 8 characters" });
-    }
-
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-      return res.status(400).json({
-        message: "Password must include uppercase, lowercase, and number characters",
-      });
+    const passwordValidationMessage = getPasswordValidationMessage(password);
+    if (passwordValidationMessage) {
+      return res.status(400).json({ message: passwordValidationMessage });
     }
 
     const phoneValidation = getPhoneValidationMessage(phone, country);
@@ -186,7 +221,7 @@ router.post("/backup-codes/regenerate", protect, regenerateBackupCodes);
 router.post("/forgot-password", passwordResetRequestLimiter, async (req, res) => {
   const { email } = req.body;
 
-  if (!email) {
+  if (typeof email !== "string" || !email.trim()) {
     return res.status(400).json({ message: "Email is required" });
   }
 
@@ -213,7 +248,7 @@ router.post("/forgot-password", passwordResetRequestLimiter, async (req, res) =>
     }
 
     const otp = crypto.randomInt(100000, 1000000).toString();
-    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+    const hashedOTP = hashPasswordResetOtp(otp);
 
     user.resetPasswordOTP = hashedOTP;
     user.resetPasswordOTPExpires = new Date(Date.now() + RESET_OTP_TTL_MS);
@@ -243,7 +278,7 @@ router.post("/forgot-password", passwordResetRequestLimiter, async (req, res) =>
 router.post("/reset-password", verificationLimiter, async (req, res) => {
   const { email, otp, password } = req.body;
 
-  if (!email || !otp || !password) {
+  if (typeof email !== "string" || !email.trim() || !otp || !password) {
     return res.status(400).json({ message: "Email, OTP, and new password are required" });
   }
 
@@ -251,14 +286,9 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
     return res.status(400).json({ message: "OTP must be a 6-digit code" });
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ message: "Password must be at least 8 characters" });
-  }
-
-  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-    return res.status(400).json({
-      message: "Password must include uppercase, lowercase, and number characters",
-    });
+  const passwordValidationMessage = getPasswordValidationMessage(password);
+  if (passwordValidationMessage) {
+    return res.status(400).json({ message: passwordValidationMessage });
   }
 
   try {
@@ -275,7 +305,8 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
       return res.status(400).json({ message: "Invalid email or OTP" });
     }
 
-    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+    const hashedOTP = hashPasswordResetOtp(otp);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const consumedOtp = await User.updateOne(
       {
@@ -293,7 +324,13 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           resetPasswordOTPExpires: 1,
           resetPasswordLastSentAt: 1,
         },
-        $set: { resetPasswordAttempts: 0 },
+        $set: {
+          password: hashedPassword,
+          passwordChangedAt: new Date(),
+          trustedDevices: [],
+          backupCodeHashes: [],
+          resetPasswordAttempts: 0,
+        },
       }
     );
 
@@ -318,14 +355,6 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
       return res.status(400).json({ message: "OTP is invalid or has expired" });
     }
 
-    user.password = password;
-    user.trustedDevices = [];
-    user.backupCodeHashes = [];
-    user.resetPasswordOTP = undefined;
-    user.resetPasswordOTPExpires = undefined;
-    user.resetPasswordAttempts = 0;
-    user.resetPasswordLastSentAt = undefined;
-    await user.save();
     clearCachedAuthUser(user._id);
 
     res.status(200).json({ message: "Password has been reset successfully" });
@@ -467,8 +496,10 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
         const currentUserId = String(req.user._id || req.user.id || "");
         const isOwnProfile = String(user._id) === currentUserId;
         const privacy = user.privacySettings || {};
+        const internalRoles = new Set(["admin", "employee"]);
         const isSameTeam =
           req.user.role === "admin" ||
+          (internalRoles.has(req.user.role) && internalRoles.has(user.role)) ||
           (Boolean(req.user.companyName) && req.user.companyName === user.companyName);
         const canViewProfile =
           isOwnProfile ||
@@ -557,7 +588,9 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
 
     router.put("/me", protect, async (req, res) => {
       try {
-        const user = await User.findById(req.user._id).select("+trustedDevices");
+        const user = await User.findById(req.user._id).select(
+          "+trustedDevices +resetPasswordOTP +resetPasswordOTPExpires +resetPasswordAttempts +resetPasswordLastSentAt +twoFactorCodeHash +twoFactorExpiresAt +twoFactorAttempts +twoFactorLastSentAt +twoFactorPurpose"
+        );
 
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -583,28 +616,61 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
         } = req.body;
 
         if (firstName !== undefined) {
-          if (!firstName.trim()) {
+          if (typeof firstName !== "string" || !firstName.trim()) {
             return res.status(400).json({ message: "First name is required" });
           }
           user.firstName = firstName.trim();
         }
 
         if (lastName !== undefined) {
-          if (!lastName.trim()) {
+          if (typeof lastName !== "string" || !lastName.trim()) {
             return res.status(400).json({ message: "Last name is required" });
           }
           user.lastName = lastName.trim();
         }
 
-        if (middleInitial !== undefined) user.middleInitial = middleInitial.trim();
+        if (middleInitial !== undefined) {
+          if (typeof middleInitial !== "string") {
+            return res.status(400).json({ message: "Middle initial must be text" });
+          }
+          user.middleInitial = middleInitial.trim();
+        }
 
-        if (companyName !== undefined) user.companyName = companyName.trim();
+        if (companyName !== undefined) {
+          if (typeof companyName !== "string") {
+            return res.status(400).json({ message: "Company name must be text" });
+          }
+          user.companyName = companyName.trim();
+        }
 
         if (email !== undefined) {
+          if (typeof email !== "string") {
+            return res.status(400).json({ message: "Enter a valid email" });
+          }
           const normalizedEmail = email.trim().toLowerCase();
 
           if (!isValidEmail(normalizedEmail)) {
             return res.status(400).json({ message: "Enter a valid email" });
+          }
+
+          if (normalizedEmail !== user.email) {
+            if (typeof currentPassword !== "string" || !currentPassword) {
+              return res.status(400).json({
+                message: "Current password is required to change your email",
+              });
+            }
+            if (!(await user.matchPassword(currentPassword))) {
+              return res.status(400).json({ message: "Current password is incorrect" });
+            }
+            user.resetPasswordOTP = undefined;
+            user.resetPasswordOTPExpires = undefined;
+            user.resetPasswordAttempts = 0;
+            user.resetPasswordLastSentAt = undefined;
+            user.twoFactorCodeHash = undefined;
+            user.twoFactorExpiresAt = undefined;
+            user.twoFactorAttempts = 0;
+            user.twoFactorLastSentAt = undefined;
+            user.twoFactorPurpose = undefined;
           }
 
           const emailOwner = await User.findOne({
@@ -620,14 +686,27 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
         }
 
         if (phone !== undefined) {
+          if (typeof phone !== "string") {
+            return res.status(400).json({ message: "Enter a valid phone number" });
+          }
           const phoneValidation = getPhoneValidationMessage(phone, country ?? user.country);
           if (phoneValidation) {
             return res.status(400).json({ message: phoneValidation });
           }
           user.phone = phone.trim();
         }
-        if (country !== undefined) user.country = country.trim() || "Philippines";
-        if (position !== undefined) user.position = position.trim();
+        if (country !== undefined) {
+          if (typeof country !== "string") {
+            return res.status(400).json({ message: "Country must be text" });
+          }
+          user.country = country.trim() || "Philippines";
+        }
+        if (position !== undefined) {
+          if (typeof position !== "string") {
+            return res.status(400).json({ message: "Position must be text" });
+          }
+          user.position = position.trim();
+        }
         if (birthday !== undefined) {
           if (!birthday) {
             user.birthday = undefined;
@@ -652,9 +731,9 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
               ? [...new Set(skills.map((skill) => String(skill).trim()).filter(Boolean))].slice(0, 50)
               : [];
           user.skillGroups = {
-            technical: normalizeSkills(skillGroups.technical),
-            soft: normalizeSkills(skillGroups.soft),
-            other: normalizeSkills(skillGroups.other),
+            technical: normalizeSkills(skillGroups?.technical),
+            soft: normalizeSkills(skillGroups?.soft),
+            other: normalizeSkills(skillGroups?.other),
           };
         }
         if (avatar !== undefined) {
@@ -666,7 +745,9 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
             user.avatar = await optimizeAvatarDataUrl(avatar);
           }
         }
-        if (coverPhoto !== undefined) user.coverPhoto = coverPhoto;
+        if (coverPhoto !== undefined) {
+          user.coverPhoto = await optimizeCoverPhotoDataUrl(coverPhoto);
+        }
         if (privacySettings !== undefined) {
           const visibilityOptions = new Set(["Everyone", "Team Only", "Only Me"]);
           const profileVisibility = privacySettings?.profileVisibility;
@@ -686,7 +767,7 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
         }
 
         if (password) {
-          if (!currentPassword) {
+          if (typeof currentPassword !== "string" || !currentPassword) {
             return res.status(400).json({ message: "Current password is required" });
           }
 
@@ -694,16 +775,9 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
             return res.status(400).json({ message: "Current password is incorrect" });
           }
 
-          if (password.length < 8) {
-            return res
-              .status(400)
-              .json({ message: "Password must be at least 8 characters" });
-          }
-
-          if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-            return res.status(400).json({
-              message: "Password must include uppercase, lowercase, and number characters",
-            });
+          const passwordValidationMessage = getPasswordValidationMessage(password);
+          if (passwordValidationMessage) {
+            return res.status(400).json({ message: passwordValidationMessage });
           }
 
           user.password = password;
@@ -741,6 +815,12 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
         });
         res.status(200).json(updatedProfile);
       } catch (error) {
+        if (error.code === 11000) {
+          return res.status(400).json({ message: "Email is already used" });
+        }
+        if (error.name === "ValidationError") {
+          return res.status(400).json({ message: error.message });
+        }
         console.error("Update profile error:", error);
         res.status(error.status || 500).json({
           message: error.status ? error.message : "Unable to update profile",
@@ -890,16 +970,35 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           isActive = true,
         } = req.body;
 
-        if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
+        if (
+          typeof firstName !== "string" ||
+          typeof lastName !== "string" ||
+          typeof email !== "string" ||
+          !firstName.trim() ||
+          !lastName.trim() ||
+          !email.trim() ||
+          !password
+        ) {
           return res.status(400).json({
             message: "First name, last name, email, and password are required",
           });
         }
 
-        if (password.length < 8) {
-          return res
-            .status(400)
-            .json({ message: "Password must be at least 8 characters" });
+        if (
+          typeof phone !== "string" ||
+          typeof country !== "string" ||
+          typeof position !== "string"
+        ) {
+          return res.status(400).json({ message: "Employee details must be text" });
+        }
+
+        if (typeof isActive !== "boolean") {
+          return res.status(400).json({ message: "Employee status must be true or false" });
+        }
+
+        const passwordValidationMessage = getPasswordValidationMessage(password);
+        if (passwordValidationMessage) {
+          return res.status(400).json({ message: passwordValidationMessage });
         }
 
         const normalizedEmail = email.trim().toLowerCase();
@@ -928,7 +1027,7 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           country: country.trim() || "Philippines",
           position: position.trim(),
           role: "employee",
-          isActive: true,
+          isActive,
         });
 
         res.status(201).json({
@@ -944,6 +1043,12 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           isActive: employee.isActive,
         });
       } catch (error) {
+        if (error.code === 11000) {
+          return res.status(400).json({ message: "User already exists" });
+        }
+        if (error.name === "ValidationError") {
+          return res.status(400).json({ message: error.message });
+        }
         console.error("Create employee error:", error);
         res.status(500).json({ message: "Unable to create employee" });
       }
@@ -971,9 +1076,22 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           password,
         } = req.body;
 
-        if (firstName !== undefined) employee.firstName = firstName.trim();
-        if (lastName !== undefined) employee.lastName = lastName.trim();
+        if (firstName !== undefined) {
+          if (typeof firstName !== "string" || !firstName.trim()) {
+            return res.status(400).json({ message: "First name is required" });
+          }
+          employee.firstName = firstName.trim();
+        }
+        if (lastName !== undefined) {
+          if (typeof lastName !== "string" || !lastName.trim()) {
+            return res.status(400).json({ message: "Last name is required" });
+          }
+          employee.lastName = lastName.trim();
+        }
         if (email !== undefined) {
+          if (typeof email !== "string") {
+            return res.status(400).json({ message: "Enter a valid email" });
+          }
           const normalizedEmail = email.trim().toLowerCase();
           if (!isValidEmail(normalizedEmail)) {
             return res.status(400).json({ message: "Enter a valid email" });
@@ -981,20 +1099,37 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           employee.email = normalizedEmail;
         }
         if (phone !== undefined) {
+          if (typeof phone !== "string") {
+            return res.status(400).json({ message: "Enter a valid phone number" });
+          }
           const phoneValidation = getPhoneValidationMessage(phone, country ?? employee.country);
           if (phoneValidation) {
             return res.status(400).json({ message: phoneValidation });
           }
           employee.phone = phone.trim();
         }
-        if (country !== undefined) employee.country = country.trim() || "Philippines";
-        if (position !== undefined) employee.position = position.trim();
-        if (isActive !== undefined) employee.isActive = isActive;
+        if (country !== undefined) {
+          if (typeof country !== "string") {
+            return res.status(400).json({ message: "Country must be text" });
+          }
+          employee.country = country.trim() || "Philippines";
+        }
+        if (position !== undefined) {
+          if (typeof position !== "string") {
+            return res.status(400).json({ message: "Position must be text" });
+          }
+          employee.position = position.trim();
+        }
+        if (isActive !== undefined) {
+          if (typeof isActive !== "boolean") {
+            return res.status(400).json({ message: "Employee status must be true or false" });
+          }
+          employee.isActive = isActive;
+        }
         if (password) {
-          if (password.length < 8) {
-            return res
-              .status(400)
-              .json({ message: "Password must be at least 8 characters" });
+          const passwordValidationMessage = getPasswordValidationMessage(password);
+          if (passwordValidationMessage) {
+            return res.status(400).json({ message: passwordValidationMessage });
           }
           employee.password = password;
           employee.trustedDevices = [];
@@ -1018,6 +1153,9 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
       } catch (error) {
         if (error.code === 11000) {
           return res.status(400).json({ message: "Email is already used" });
+        }
+        if (error.name === "ValidationError") {
+          return res.status(400).json({ message: error.message });
         }
         console.error("Update employee error:", error);
         res.status(500).json({ message: "Unable to update employee" });
@@ -1044,12 +1182,6 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
       }
     });
 
-    // generate JWT token
-      const generateToken = (id) => {
-       return jwt.sign({ id, type: "access" }, process.env.JWT_SECRET, {
-        expiresIn: '30d',
-       });
 
-      }
 
     export default router;

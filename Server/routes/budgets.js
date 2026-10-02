@@ -4,8 +4,10 @@ import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const allowedTypes = ["income", "expense"];
 
 const normalizeBudgetPayload = (body) => {

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
-import CountrySelect from "../components/CountrySelect/CountrySelect";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import { ProfileSkeleton } from "../components/Skeleton/Skeleton";
+import CountrySelect from "../components/CountrySelect/CountrySelect.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { ProfileSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authAPI } from "../services/api.js";
 import { isValidEmail } from "../utils/emailValidation.js";
@@ -24,13 +24,12 @@ const emptyForm = {
   lastName: "",
   companyName: "",
   email: "",
+  currentPassword: "",
   country: defaultCountry,
   phone: "",
   position: "",
   birthday: "",
   gender: "Prefer not to say",
-  password: "",
-  confirmPassword: "",
   avatar: "",
   coverPhoto: "",
 };
@@ -40,6 +39,8 @@ const SKILL_GROUPS = [
   { key: "soft", label: "Soft Skills" },
   { key: "other", label: "Other Expertise" },
 ];
+const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const PROFILE_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 const normalizeSkillGroups = (skillGroups) =>
   SKILL_GROUPS.reduce((groups, { key }) => {
@@ -54,10 +55,9 @@ const fieldNames = {
   lastName: `profile_family_${Date.now()}`,
   companyName: `profile_company_${Date.now()}`,
   email: `profile_contact_${Date.now()}`,
+  currentPassword: `profile_current_secret_${Date.now()}`,
   phone: `profile_optional_line_${Date.now()}`,
   position: `profile_position_${Date.now()}`,
-  password: `profile_secret_${Date.now()}`,
-  confirmPassword: `profile_secret_confirm_${Date.now()}`,
 };
 
 const antiAutofillProps = {
@@ -86,13 +86,12 @@ const profileToForm = (profile) => {
     lastName: profile?.lastName || "",
     companyName: profile?.companyName || "",
     email: profile?.email || "",
+    currentPassword: "",
     country,
     phone: ensureCountryDialCode(profile?.phone || getCountryDialCode(country), country),
     position: role === "client" ? "Client" : profile?.position || "",
     birthday: toDateInputValue(profile?.birthday),
     gender: profile?.gender || "Prefer not to say",
-    password: "",
-    confirmPassword: "",
     avatar: profile?.avatar || "",
     coverPhoto: profile?.coverPhoto || profile?.cover || "",
   };
@@ -232,11 +231,12 @@ const Profile = ({ embedded = false }) => {
 
   const handleAvatarChange = (event) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrorMessage("Please choose an image file.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setErrorMessage("Please choose a PNG, JPEG, WebP, or GIF image.");
       return;
     }
 
@@ -250,6 +250,7 @@ const Profile = ({ embedded = false }) => {
       updateField("avatar", String(reader.result || ""));
       setErrorMessage("");
     };
+    reader.onerror = () => setErrorMessage("Unable to read the selected avatar image.");
     reader.readAsDataURL(file);
   };
 
@@ -259,8 +260,8 @@ const Profile = ({ embedded = false }) => {
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrorMessage("Please choose an image file.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setErrorMessage("Please choose a PNG, JPEG, WebP, or GIF image.");
       return;
     }
 
@@ -274,6 +275,7 @@ const Profile = ({ embedded = false }) => {
       updateField("coverPhoto", String(reader.result || ""));
       setErrorMessage("");
     };
+    reader.onerror = () => setErrorMessage("Unable to read the selected cover image.");
     reader.readAsDataURL(file);
   };
 
@@ -324,27 +326,17 @@ const Profile = ({ embedded = false }) => {
       return;
     }
 
+    const isChangingEmail = formData.email.trim().toLowerCase() !==
+      String(user?.email || "").trim().toLowerCase();
+    if (isChangingEmail && !formData.currentPassword) {
+      setErrorMessage("Enter your current password to change your email address.");
+      return;
+    }
+
     const phoneValidation = getPhoneValidationMessage(formData.phone, formData.country);
     if (phoneValidation) {
       setErrorMessage(phoneValidation);
       return;
-    }
-
-    if (formData.password || formData.confirmPassword) {
-      if (formData.password !== formData.confirmPassword) {
-        setErrorMessage("Passwords do not match.");
-        return;
-      }
-
-      if (formData.password.length < 8) {
-        setErrorMessage("Password must be at least 8 characters.");
-        return;
-      }
-
-      if (!/[A-Z]/.test(formData.password) || !/[a-z]/.test(formData.password) || !/\d/.test(formData.password)) {
-        setErrorMessage("Password must include uppercase, lowercase, and number characters.");
-        return;
-      }
     }
 
     try {
@@ -370,17 +362,13 @@ const Profile = ({ embedded = false }) => {
         payload.coverPhoto = formData.coverPhoto;
       }
 
-      if (formData.password) {
-        payload.password = formData.password;
+      if (isChangingEmail) {
+        payload.currentPassword = formData.currentPassword;
       }
 
       const updatedProfile = await authAPI.updateMe(payload);
       updateUser(updatedProfile);
-      setFormData({
-        ...profileToForm(updatedProfile),
-        password: "",
-        confirmPassword: "",
-      });
+      setFormData(profileToForm(updatedProfile));
       setSkillGroups(normalizeSkillGroups(updatedProfile.skillGroups));
       setHasLoadedAvatar(true);
       setHasChangedAvatar(false);
@@ -394,13 +382,7 @@ const Profile = ({ embedded = false }) => {
     }
   };
 
-  const joinedDate = user?.createdAt
-    ? new Date(user.createdAt).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "May 8, 2026";
+  const joinedDate = formatProfileDate(user?.createdAt);
   const fullName = getFullName(formData);
 
   const content = (
@@ -429,7 +411,6 @@ const Profile = ({ embedded = false }) => {
           className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]"
         >
           <input type="text" name="username" autoComplete="username" tabIndex={-1} aria-hidden="true" className="hidden" />
-          <input type="password" name="password" autoComplete="current-password" tabIndex={-1} aria-hidden="true" className="hidden" />
 
           <aside className="space-y-4">
             <section className="overflow-hidden rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
@@ -443,7 +424,7 @@ const Profile = ({ embedded = false }) => {
                 <label className="absolute right-3 top-3 flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-white/90 px-3 text-xs font-black text-[#c72fb2] shadow-sm ring-1 ring-pink-100 transition hover:bg-white dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                   <FormIcon name="upload" className="h-4 w-4" />
                   Change Cover
-                  <input type="file" accept="image/*" onChange={handleCoverPhotoChange} className="sr-only" />
+                  <input type="file" accept={PROFILE_IMAGE_ACCEPT} onChange={handleCoverPhotoChange} className="sr-only" />
                 </label>
               </div>
               <div className="px-5 pb-5 text-center">
@@ -464,23 +445,20 @@ const Profile = ({ embedded = false }) => {
                   {formatRole(user?.role) || "User"}
                 </span>
                 <p className="mt-4 text-sm font-black text-[#10142d] dark:text-white">
-                  {formData.position || "System Administrator"}
-                </p>
-                <p className="mx-auto mt-2 max-w-[240px] text-xs font-semibold leading-5 text-slate-500">
-                  Managing the system and ensuring everything runs smoothly.
+                  {formData.position || formatRole(user?.role) || "Position not available"}
                 </p>
 
                 <div className="mt-4 space-y-3 border-y border-pink-50 py-4 text-left text-xs font-bold text-slate-600">
-                  <p className="flex min-w-0 items-center gap-3 break-all"><FormIcon name="mail" />{formData.email || "email@example.com"}</p>
-                  <p className="flex items-center gap-3"><FormIcon name="phone" />{formData.phone || "Phone number"}</p>
-                  <p className="flex items-center gap-3"><FormIcon name="location" />{formData.companyName || formData.country || "Manila, Philippines"}</p>
-                  <p className="flex items-center gap-3"><FormIcon name="calendar" />Joined {joinedDate}</p>
+                  <p className="flex min-w-0 items-center gap-3 break-all"><FormIcon name="mail" />{formData.email || "Email not available"}</p>
+                  <p className="flex items-center gap-3"><FormIcon name="phone" />{formData.phone || "Phone not available"}</p>
+                  <p className="flex items-center gap-3"><FormIcon name="location" />{formData.companyName || formData.country || "Location not available"}</p>
+                  <p className="flex items-center gap-3"><FormIcon name="calendar" />{joinedDate === "Not available" ? "Join date not available" : `Joined ${joinedDate}`}</p>
                 </div>
 
                 <label className="mt-4 flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c72fb2] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                   <FormIcon name="upload" className="h-4 w-4" />
                   Change Photo
-                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
+                  <input type="file" accept={PROFILE_IMAGE_ACCEPT} onChange={handleAvatarChange} className="sr-only" />
                 </label>
                 {formData.avatar && (
                   <button
@@ -506,9 +484,9 @@ const Profile = ({ embedded = false }) => {
             <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-4 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
               <h2 className="mb-3 text-base font-black text-[#10142d] dark:text-white">Account Activity</h2>
               {[
-                ["Last profile update", "May 12, 2026 - 7:52 PM"],
-                ["Last login", "May 12, 2026 - 7:50 PM"],
-                ["Account created", `${joinedDate} - 10:44 AM`],
+                ["Last profile update", formatProfileDateTime(user?.updatedAt)],
+                ["Last active", formatProfileDateTime(user?.lastSeen)],
+                ["Account created", formatProfileDateTime(user?.createdAt)],
               ].map(([label, value]) => (
                 <div key={label} className="flex gap-3 border-b border-pink-50 py-3 last:border-b-0">
                   <span className="grid h-8 w-8 place-items-center rounded-xl bg-pink-50 text-[#c72fb2]">
@@ -565,6 +543,18 @@ const Profile = ({ embedded = false }) => {
                       className={iconInputClass}
                     />
                   </Field>
+                  {formData.email.trim().toLowerCase() !== String(user?.email || "").trim().toLowerCase() && (
+                    <Field label="Current Password to Change Email" icon="lock" required>
+                      <input
+                        type="password"
+                        name={fieldNames.currentPassword}
+                        autoComplete="current-password"
+                        value={formData.currentPassword}
+                        onChange={(event) => updateField("currentPassword", event.target.value)}
+                        className={iconInputClass}
+                      />
+                    </Field>
+                  )}
                   <Field label="Phone Number" icon="phone" required>
                     <input
                       type="text"
@@ -794,7 +784,29 @@ const splitFullName = (value) => {
   };
 };
 
-const getEmployeeId = (user) => user?.employeeId || user?.employeeID || user?._id || user?.id || "EMP-000123";
+const getEmployeeId = (user) => user?.employeeId || user?.employeeID || user?._id || user?.id || "Not available";
+
+const formatProfileDate = (value) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatProfileDateTime = (value) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
 
 const getWorkStatus = (user) =>
   user?.workStatus || (user?.isActive === false ? "Inactive" : "Full-time");

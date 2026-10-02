@@ -12,14 +12,27 @@ import { getSafeSearchPattern } from "../utils/search.js";
 import { getAvatarUrl } from "../utils/avatar.js";
 import { isUserOnline } from "../utils/presence.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
+router.param("userId", validateObjectIdParam);
+const MAX_MESSAGE_RECIPIENTS = 100;
 const messageClients = new Map();
 const MESSAGE_EVENTS_AUDIENCE = "clientra-message-events";
 const MESSAGE_EVENT_TICKET_SECONDS = 90;
 const MAX_MESSAGE_CONNECTIONS_PER_USER = 3;
 const MAX_MESSAGE_CONNECTIONS = 1000;
 const messageTicketLimiter = createRateLimiter({ max: 30, windowMs: 60 * 1000 });
+const messageSendLimiter = createRateLimiter({
+  max: 120,
+  windowMs: 60 * 1000,
+  keyGenerator: (req) => getUserId(req.user),
+  requestCost: (req) => new Set([
+    req.body?.recipientId,
+    ...(Array.isArray(req.body?.recipientIds) ? req.body.recipientIds : []),
+  ].filter(Boolean).map(String)).size || 1,
+});
 
 const userFields = "firstName lastName email role companyName isActive isOnline showOnlineStatus lastSeen updatedAt";
 
@@ -464,7 +477,7 @@ router.get("/threads/:userId", protect, async (req, res) => {
   }
 });
 
-router.post("/", protect, async (req, res) => {
+router.post("/", protect, messageSendLimiter, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
     const requestedRecipientIds = [
@@ -472,10 +485,19 @@ router.post("/", protect, async (req, res) => {
       ...(Array.isArray(req.body.recipientIds) ? req.body.recipientIds : []),
     ].filter(Boolean);
     const recipientIds = [...new Set(requestedRecipientIds.map(String))];
-    const text = String(req.body.text || "").trim();
+    if (typeof req.body.text !== "string") {
+      return res.status(400).json({ message: "Message must be text" });
+    }
+    const text = req.body.text.trim();
 
     if (recipientIds.length === 0 || recipientIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
       return res.status(400).json({ message: "Invalid recipient" });
+    }
+
+    if (recipientIds.length > MAX_MESSAGE_RECIPIENTS) {
+      return res.status(400).json({
+        message: `Messages can be sent to at most ${MAX_MESSAGE_RECIPIENTS} recipients at a time`,
+      });
     }
 
     if (recipientIds.includes(currentUserId)) {
@@ -495,7 +517,7 @@ router.post("/", protect, async (req, res) => {
       isActive: true,
     }).select("_id isOnline showOnlineStatus lastSeen").lean();
 
-    if (recipients.length === 0) {
+    if (recipients.length !== recipientIds.length) {
       return res.status(404).json({ message: "Recipient not found" });
     }
 
@@ -529,7 +551,10 @@ router.post("/", protect, async (req, res) => {
 router.put("/:id", protect, async (req, res) => {
   try {
     const currentUserId = getUserId(req.user);
-    const text = String(req.body.text || "").trim();
+    if (typeof req.body.text !== "string") {
+      return res.status(400).json({ message: "Message must be text" });
+    }
+    const text = req.body.text.trim();
 
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Invalid message" });

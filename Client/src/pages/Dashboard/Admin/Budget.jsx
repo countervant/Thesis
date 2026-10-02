@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { budgetAPI, getApiErrorMessage } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import balanceIcon from "../../../assets/balance.png";
 import totalExpenseIcon from "../../../assets/totalexpense.png";
 import totalIncomeIcon from "../../../assets/totalincome.png";
@@ -9,22 +9,36 @@ import {
   BudgetChartsSkeleton,
   BudgetSummarySkeleton,
   SkeletonRows,
-} from "../../../components/Skeleton/Skeleton";
+} from "../../../components/Skeleton/Skeleton.jsx";
 
 const BUDGET_FETCH_PAGE_SIZE = 100;
 const BUDGET_FETCH_CONCURRENCY = 4;
 
+const formatDateValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const formatInputDate = (value) => {
   if (!value) {
-    return new Date().toISOString().slice(0, 10);
+    return formatDateValue(new Date());
   }
 
-  const date = new Date(value);
+  if (typeof value === "string") {
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      return value;
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString().slice(0, 10);
+    return formatDateValue(new Date());
   }
 
-  return date.toISOString().slice(0, 10);
+  return formatDateValue(date);
 };
 
 const formatDisplayDate = (value) => {
@@ -32,7 +46,15 @@ const formatDisplayDate = (value) => {
     return "";
   }
 
-  const date = new Date(value);
+  if (typeof value === "string") {
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      const [, year, month, day] = dateOnly;
+      return `${month}/${day}/${year}`;
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -79,6 +101,7 @@ const getCurrentMonthKey = () => getMonthKey(new Date());
 
 const getLastMonthKey = () => {
   const date = new Date();
+  date.setDate(1);
   date.setMonth(date.getMonth() - 1);
   return getMonthKey(date);
 };
@@ -273,9 +296,9 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const summaryCardStyles = {
-  income: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  expense: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-  balance: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  income: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  expense: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] !ring-[#dc2626]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  balance: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
 };
 
 const summaryIconStyles = {
@@ -978,17 +1001,17 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
             )}
           </section>
           <ConfirmDialog
-            confirmLabel="Yes , delete"
+            confirmLabel="Delete permanently"
             icon="delete"
             isOpen={Boolean(entryToDelete)}
-            message={`Delete "${entryToDelete?.description || "this entry"}"?`}
+            message={`Permanently delete budget entry "${entryToDelete?.description || "this entry"}"? This cannot be undone.`}
             onCancel={() => setEntryToDelete(null)}
             onConfirm={async () => {
               const entry = entryToDelete;
               setEntryToDelete(null);
               if (entry) await deleteEntry(entry.id);
             }}
-            title="Delete"
+            title="Delete Budget Entry"
           />
         </div>
   );

@@ -5,12 +5,13 @@ import {
   getPhoneValidationMessage,
   limitPhoneNumberLength,
 } from "../../../utils/phoneValidation.js";
-import CountrySelect from "../../../components/CountrySelect/CountrySelect";
+import CountrySelect from "../../../components/CountrySelect/CountrySelect.jsx";
 import {
   applyCountryDialCode,
   defaultCountry,
   getCountryDialCode,
 } from "../../../utils/countries.js";
+import { getPasswordValidationMessage } from "../../../utils/passwordValidation.js";
 
 const emptyForm = {
   firstName: "",
@@ -117,6 +118,14 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
     if (!isEditing && !formData.password) {
       setErrorMessage("Password is required for new employees.");
       return;
+    }
+
+    if (formData.password) {
+      const passwordValidationMessage = getPasswordValidationMessage(formData.password);
+      if (passwordValidationMessage) {
+        setErrorMessage(passwordValidationMessage);
+        return;
+      }
     }
 
     try {
@@ -283,7 +292,6 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
                 value={formData.password}
                 onChange={(event) => updateField("password", event.target.value)}
                 placeholder={isEditing ? "Leave blank to keep..." : "Password..."}
-                style={{ WebkitTextSecurity: "disc" }}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
               />
             </div>
