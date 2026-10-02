@@ -126,8 +126,6 @@ const formatInputDate = (date) => {
 
 const todayInputDate = () => formatInputDate(new Date());
 
-const isPastInputDate = (date) => Boolean(date) && date < todayInputDate();
-
 const toInputDate = (date) => {
   if (!date) return todayInputDate();
   const dateValue = String(date);
@@ -293,7 +291,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
                   ? currentData.assignees
                   : existingAssigneeIds.length > 0
                     ? existingAssigneeIds
-                    : [getEntityId(availableAssignees[0])].filter(Boolean),
+                    : [],
             };
           });
         }
@@ -480,20 +478,12 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    if ((!isEditing && isPastInputDate(formData.startDate)) || isPastInputDate(formData.dueDate)) {
-      setErrorMessage("Past dates cannot be selected.");
-      return;
-    }
-
     if (new Date(formData.startDate) > new Date(formData.dueDate)) {
       setErrorMessage("Start date cannot be after due date.");
       return;
     }
 
-    if (formData.assignees.length === 0) {
-      setErrorMessage("Please choose at least one employee for this project.");
-      return;
-    }
+
 
     const unavailableAssignee = safeAssignees.find((assignee) => {
       const assigneeId = getEntityId(assignee);
@@ -587,7 +577,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           : {}),
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
-        assignedTo: formData.assignees[0],
+        assignedTo: formData.assignees[0] || null,
         assignees: formData.assignees,
         requestedBy:
           !isAdmin ||
@@ -785,7 +775,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               <input
                 type="date"
                 disabled={isEditing}
-                min={todayInputDate()}
                 value={formData.startDate}
                 onChange={(event) => updateField("startDate", event.target.value)}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:border-neutral-700 dark:text-neutral-300 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-500 dark:focus:ring-pink-950"
@@ -796,7 +785,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               <FieldLabel>Due Date</FieldLabel>
               <input
                 type="date"
-                min={formData.startDate || todayInputDate()}
                 value={formData.dueDate}
                 onChange={(event) => updateField("dueDate", event.target.value)}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-300 dark:focus:ring-pink-950"
@@ -1022,9 +1010,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           )}
 
           <div className="mt-5 space-y-1">
-            <FieldLabel>Assign Project to:</FieldLabel>
+            <FieldLabel>Assign Project to (Optional):</FieldLabel>
             <p className="text-[11px] font-medium text-neutral-400">
-              Select everyone who will collaborate, then assign individual tasks above.
+              Select everyone who will collaborate, or leave unassigned to add team members later.
             </p>
             <div className="mt-2 grid max-h-40 gap-2 overflow-y-auto rounded-lg border border-neutral-300 bg-white/40 p-3 dark:border-neutral-700 dark:bg-neutral-950 sm:grid-cols-2">
               {safeAssignees.map((assignee) => {

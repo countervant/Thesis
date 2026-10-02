@@ -938,8 +938,8 @@ const MessagesPanel = () => {
   );
 
   return (
-  <section className="messages-workspace relative -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#DA70D6]/70 dark:bg-neutral-950 dark:text-white">
-    <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#DA70D6]/60 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
+  <section className="messages-workspace relative -mb-0 -mt-4 flex select-none overflow-hidden border-y border-slate-100 bg-white text-[#172033] caret-transparent dark:border-[#e5e7eb]/20 dark:bg-neutral-950 dark:text-white">
+    <aside className={`${isMobileThreadOpen ? "hidden" : "flex"} absolute inset-0 z-10 w-full shrink-0 flex-col border-r border-slate-100 bg-white px-4 py-5 dark:border-[#e5e7eb]/20 dark:bg-neutral-950 md:static md:flex md:w-[310px] md:px-5 md:py-7 lg:w-[350px]`}>
       <div className="flex items-center justify-between gap-4">
         <h1 className="page-title text-3xl leading-none md:text-2xl">Messages</h1>
         <button
@@ -953,7 +953,7 @@ const MessagesPanel = () => {
         </button>
       </div>
 
-      <label className="mt-5 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#DA70D6]/80 dark:bg-neutral-900 md:mt-6">
+      <label className="mt-5 flex h-11 items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 text-slate-400 shadow-sm dark:border-[#e5e7eb]/20 dark:bg-neutral-900 md:mt-6">
         <span className="sr-only">Search inbox</span>
         <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.9" />
@@ -1060,8 +1060,8 @@ const MessagesPanel = () => {
             key={participantId}
             className={`relative w-full border text-left transition md:rounded-2xl ${
               isActive
-                ? "border-transparent bg-transparent md:border-pink-200 md:bg-pink-50 md:shadow-[0_10px_28px_rgba(236,72,153,0.12)] md:dark:border-[#DA70D6] md:dark:bg-neutral-900"
-                : "border-transparent bg-transparent hover:bg-pink-50/70 dark:hover:bg-neutral-900 md:border-pink-100 md:bg-white md:shadow-[0_6px_22px_rgba(15,23,42,0.06)] md:dark:border-[#DA70D6]/80 md:dark:bg-neutral-950"
+                ? "border-transparent bg-transparent md:border-pink-200 md:bg-pink-50 md:shadow-[0_10px_28px_rgba(236,72,153,0.12)] md:dark:border-[#e5e7eb]/20 md:dark:bg-neutral-900"
+                : "border-transparent bg-transparent hover:bg-pink-50/70 dark:hover:bg-neutral-900 md:border-pink-100 md:bg-white md:shadow-[0_6px_22px_rgba(15,23,42,0.06)] md:dark:border-[#e5e7eb]/20 md:dark:bg-neutral-950"
             }`}
           >
             <button

@@ -296,9 +296,9 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 };
 
 const summaryCardStyles = {
-  income: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  expense: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-  balance: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+  income: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  expense: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] !ring-[#dc2626]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  balance: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
 };
 
 const summaryIconStyles = {

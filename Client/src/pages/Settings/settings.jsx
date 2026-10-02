@@ -219,7 +219,7 @@ const Settings = () => {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-pink-100 bg-pink-50 p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.05)] dark:border-pink-500 dark:bg-[#141414]">
+            <section className="rounded-2xl border border-pink-100 bg-pink-50 p-4 text-center shadow-[0_4px_16px_rgba(15,23,42,0.05)] dark:border-[#e5e7eb]/20 dark:bg-[#141414]">
               <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-pink-500 text-white shadow-[0_12px_24px_rgba(236,72,153,0.24)]">
                 <Icon name="shield" className="h-8 w-8" />
               </span>
