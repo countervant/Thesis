@@ -83,6 +83,7 @@ const iconInputClass = `${inputClass} pl-10`;
 const ProfileSettings = ({ user }) => {
   const { updateUser } = useAuth();
   const userId = user?._id || user?.id;
+  const isClient = String(user?.role || "").toLowerCase() === "client";
   const localSettings = useMemo(() => loadLocalSettings(user), [user]);
   const initialData = useMemo(
     () => ({
@@ -227,14 +228,17 @@ const ProfileSettings = ({ user }) => {
         country: formData.address.trim(),
         birthday: formData.birthday,
         gender: formData.gender,
-        skillGroups: {
-          technical: skillGroups["Technical Skills"],
-          soft: skillGroups["Soft Skills"],
-          other: skillGroups["Other Expertise"],
-        },
         companyName: formData.companyName.trim(),
         position: formData.role.trim(),
       };
+
+      if (!isClient) {
+        payload.skillGroups = {
+          technical: skillGroups["Technical Skills"],
+          soft: skillGroups["Soft Skills"],
+          other: skillGroups["Other Expertise"],
+        };
+      }
 
       if (hasLoadedAvatar || hasChangedAvatar) {
         payload.avatar = formData.avatar;
@@ -247,7 +251,13 @@ const ProfileSettings = ({ user }) => {
       }
 
       const updatedUser = await authAPI.updateMe(payload);
-      localStorage.setItem(getStorageKey(user), JSON.stringify({ gender: formData.gender, skills: skillGroups }));
+      localStorage.setItem(
+        getStorageKey(user),
+        JSON.stringify({
+          gender: formData.gender,
+          ...(!isClient ? { skills: skillGroups } : {}),
+        })
+      );
       updateUser(updatedUser);
       setFormData((currentData) => ({
         ...currentData,
@@ -379,7 +389,7 @@ const ProfileSettings = ({ user }) => {
             <Icon name="briefcase" className="h-5 w-5" /> Work Information
           </h2>
           <div className="grid gap-3.5 xl:grid-cols-3">
-            <Field label="Employee ID" icon="id">
+            <Field label={isClient ? "Client ID" : "Employee ID"} icon="id">
               <input type="text" value={getEmployeeId(user)} readOnly className={`${iconInputClass} bg-slate-50`} />
             </Field>
             <Field label="Company" icon="briefcase">
@@ -394,42 +404,44 @@ const ProfileSettings = ({ user }) => {
           </div>
         </section>
 
-        <section className="mt-4 border-t border-pink-50 pt-4">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-3 text-base font-black text-[#10142d] dark:text-white">
-                <Icon name="person" className="h-5 w-5" /> Skills & Expertise
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Manage your skills and expertise to showcase your strengths.
-              </p>
-            </div>
-            <button type="button" onClick={() => setShowSkillForm((visible) => !visible)} className="h-9 rounded-lg border border-pink-500 px-4 text-xs font-black text-pink-600 transition hover:bg-pink-50 dark:hover:bg-pink-500 dark:hover:text-white">
-              + Add Skill
-            </button>
-          </div>
-          {showSkillForm && (
-            <div className="mb-4 grid gap-2 rounded-xl bg-pink-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-0 w-full`} />
-              <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-full sm:w-auto`}>
-                {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
-              </select>
-              <button type="button" onClick={addSkill} className="h-10 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Add</button>
-            </div>
-          )}
-          {Object.entries(skillGroups).map(([group, items]) => (
-            <div key={group} className="mb-4 last:mb-0">
-              <h3 className="mb-3 text-sm font-black text-[#10142d] dark:text-white">{group}</h3>
-              <div className="flex flex-wrap gap-2">
-                {items.map((skill) => (
-                  <button type="button" onClick={() => removeSkill(group, skill)} key={skill} aria-label={`Remove ${skill}`} className="rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-pink-600 transition hover:border-pink-300 hover:bg-pink-100">
-                    {skill} <span className="ml-1">×</span>
-                  </button>
-                ))}
+        {!isClient && (
+          <section className="mt-4 border-t border-pink-50 pt-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-3 text-base font-black text-[#10142d] dark:text-white">
+                  <Icon name="person" className="h-5 w-5" /> Skills & Expertise
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Manage your skills and expertise to showcase your strengths.
+                </p>
               </div>
+              <button type="button" onClick={() => setShowSkillForm((visible) => !visible)} className="h-9 rounded-lg border border-pink-500 px-4 text-xs font-black text-pink-600 transition hover:bg-pink-50 dark:hover:bg-pink-500 dark:hover:text-white">
+                + Add Skill
+              </button>
             </div>
-          ))}
-        </section>
+            {showSkillForm && (
+              <div className="mb-4 grid gap-2 rounded-xl bg-pink-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-0 w-full`} />
+                <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-full sm:w-auto`}>
+                  {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
+                </select>
+                <button type="button" onClick={addSkill} className="h-10 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Add</button>
+              </div>
+            )}
+            {Object.entries(skillGroups).map(([group, items]) => (
+              <div key={group} className="mb-4 last:mb-0">
+                <h3 className="mb-3 text-sm font-black text-[#10142d] dark:text-white">{group}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((skill) => (
+                    <button type="button" onClick={() => removeSkill(group, skill)} key={skill} aria-label={`Remove ${skill}`} className="rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-pink-600 transition hover:border-pink-300 hover:bg-pink-100">
+                      {skill} <span className="ml-1">×</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
         <span className="sr-only" aria-live="polite">{isSaving ? "Saving profile settings" : message}</span>
       </form>
     </div>

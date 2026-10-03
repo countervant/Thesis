@@ -1407,9 +1407,24 @@ export const leaveRequestAPI = {
   },
 };
 
-export const dashboardAPI = {
-  getSummary: async () => {
-    return cachedGet("/dashboard");
+export const taskAllocationAPI = {
+  getProjectBacklog: async (projectId) => {
+    const response = await api.get(`/projects/${projectId}/backlog`);
+    return response.data;
+  },
+  previewAllocation: async (projectId, payload = {}) => {
+    const endpoint = projectId && projectId !== "global"
+      ? `/projects/${projectId}/optimize-allocation`
+      : `/projects/optimize-allocation`;
+    const response = await api.post(endpoint, payload);
+    return response.data;
+  },
+  commitAllocation: async (projectId, payload) => {
+    const endpoint = projectId && projectId !== "global"
+      ? `/projects/${projectId}/commit-allocation`
+      : `/projects/commit-allocation`;
+    const response = await api.post(endpoint, payload);
+    return response.data;
   },
 };
 

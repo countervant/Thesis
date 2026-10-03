@@ -128,13 +128,6 @@ const formatDateTime = (value) => {
   });
 };
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 2,
-  }).format(Number(value) || 0);
-
 const getPersonName = (person, fallback = "Clientra Team") => {
   if (!person || typeof person === "string") return fallback;
   return [person.firstName, person.lastName].filter(Boolean).join(" ") || person.companyName || person.email || fallback;
@@ -297,24 +290,6 @@ const ProjectCard = ({ onApprove, onFeedback, onRequestRevision, onToggleArchive
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-3 text-xs font-bold text-slate-500">
-        <span className="min-w-0">
-          <span className="block text-[10px] font-black text-slate-400">Developer</span>
-          <span className="block truncate font-black text-[#10142d] dark:text-white" title={getPersonName(project.assignedTo, "Unassigned")}>
-            {getPersonName(project.assignedTo, "Unassigned")}
-          </span>
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[10px] font-black text-slate-400">Revisions</span>
-          <span className="font-black text-[#10142d] dark:text-white">{project.revisions} pending</span>
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[10px] font-black text-slate-400">Files</span>
-          <span className="inline-flex items-center gap-1 font-black text-[#10142d] dark:text-white">
-            <Icon name="file" className="h-4 w-4 text-blue-500" /> {project.files}
-          </span>
-        </span>
-      </div>
 
       {project.status === "Completed" ? (
         <div className="mt-5">
@@ -367,29 +342,15 @@ const ProjectCard = ({ onApprove, onFeedback, onRequestRevision, onToggleArchive
           )}
         </div>
       </div>
-      {project.status === "Completed" && project.feedback && (
-        <>
-          <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs font-bold text-emerald-700">
-            <span className="inline-flex min-w-0 items-center gap-2"><Icon name="star" className="h-4 w-4 shrink-0" />You've submitted feedback</span>
-          </div>
-          {project.feedback.reply?.message && (
-            <div className="mt-2 rounded-lg border border-pink-100 bg-pink-50/70 px-3 py-2">
-              <p className="text-[10px] font-black uppercase tracking-wide text-[#c72fb2]">Admin replied</p>
-              <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
-            </div>
-          )}
-        </>
+      {project.status === "Completed" && project.feedback?.reply?.message && (
+        <div className="mt-2 rounded-lg border border-pink-100 bg-pink-50/70 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-wide text-[#c72fb2]">Admin replied</p>
+          <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
+        </div>
       )}
     </Card>
   );
 };
-
-const DetailRow = ({ label, value }) => (
-  <p className="grid min-w-0 gap-1 py-2 text-sm font-bold sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
-    <span className="text-slate-500">{label}</span>
-    <span className="min-w-0 break-words text-[#10142d] [overflow-wrap:anywhere] dark:text-white">{value || "N/A"}</span>
-  </p>
-);
 
 const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   <div
@@ -576,51 +537,95 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
   );
 
   const renderOutputs = (items) => (
-    <div className="divide-y divide-pink-50 dark:divide-neutral-800">
+    <div className="space-y-3">
       {items.length === 0 ? (
         <p className="py-8 text-center text-sm font-bold text-slate-500">No submitted output yet.</p>
-      ) : items.map((output) => (
-        <div key={output.id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3 py-3 min-[420px]:grid-cols-[52px_minmax(0,1fr)_auto]">
-          <span className="grid h-12 w-12 place-items-center rounded-lg bg-pink-50 text-[#c72fb2]">
-            <Icon name={output.type === "link" ? "external" : "file"} className="h-6 w-6" />
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-black">{output.title}</span>
-            <span className="block truncate text-xs font-bold text-slate-500">{output.subtitle}</span>
-            {output.protected && (
-              <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
-                {output.watermarked ? "Watermarked" : "Payment pending"}
+      ) : (
+        items.map((output) => (
+          <div
+            key={output.id}
+            className="rounded-xl border border-pink-100/80 bg-pink-50/25 p-3.5 transition hover:border-pink-200 dark:border-neutral-800 dark:bg-neutral-800/40"
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-pink-100/70 text-[#c72fb2] dark:bg-pink-950/40">
+                <Icon name={output.type === "link" ? "external" : "file"} className="h-5 w-5" />
               </span>
-            )}
-            <span className="block text-xs font-bold text-slate-400">{formatDateTime(output.submittedAt)}</span>
-          </span>
-          {output.type === "link" ? (
-            output.url ? (
-              <a href={output.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                Open Link
-                <Icon name="external" className="h-4 w-4" />
-              </a>
-            ) : (
-              <span className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-xs font-black text-slate-400" aria-disabled="true">
-                {output.protected ? "Payment required" : "Link unavailable"}
-              </span>
-            )
-          ) : (
-            <span className="flex items-center gap-2">
-              {(output.available || output.url) && (
-                <button type="button" onClick={() => onViewOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-                  View
-                  <Icon name="eye" className="h-4 w-4" />
-                </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="block truncate text-sm font-black text-[#10142d] dark:text-white" title={output.title}>
+                    {output.title}
+                  </span>
+                  {output.protected && (
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                      {output.watermarked ? "Watermarked" : "Pending"}
+                    </span>
+                  )}
+                </div>
+                {output.subtitle && (
+                  <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500" title={output.subtitle}>
+                    {output.subtitle}
+                  </span>
+                )}
+                <span className="mt-1 block text-[11px] font-bold text-slate-400">
+                  {formatDateTime(output.submittedAt)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2 border-t border-pink-100/60 pt-2.5 dark:border-neutral-800">
+              {output.type === "link" ? (
+                output.url ? (
+                  <a
+                    href={output.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-8.5 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#c72fb2]/40 bg-white px-3 text-xs font-black text-[#c72fb2] shadow-2xs transition hover:bg-pink-50 dark:bg-neutral-900"
+                  >
+                    Open Link
+                    <Icon name="external" className="h-3.5 w-3.5" />
+                  </a>
+                ) : (
+                  <span
+                    className="inline-flex h-8.5 flex-1 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-400 dark:border-neutral-800 dark:bg-neutral-900"
+                    aria-disabled="true"
+                  >
+                    {output.protected ? "Payment required" : "Link unavailable"}
+                  </span>
+                )
+              ) : (
+                <>
+                  {(output.available || output.url) && (
+                    <button
+                      type="button"
+                      onClick={() => onViewOutput(project, output)}
+                      className="inline-flex h-8.5 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#c72fb2]/40 bg-white px-3 text-xs font-black text-[#c72fb2] shadow-2xs transition hover:bg-pink-50 dark:bg-neutral-900"
+                    >
+                      View
+                      <Icon name="eye" className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={(!output.url && output.source === "attachment") || isDownloadingOutput}
+                    onClick={() => onDownloadOutput(project, output)}
+                    className="inline-flex h-8.5 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#c72fb2]/40 bg-white px-3 text-xs font-black text-[#c72fb2] shadow-2xs transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:bg-neutral-900"
+                  >
+                    {output.source === "attachment" && !output.localAttachment
+                      ? "Open"
+                      : isDownloadingOutput
+                        ? "Downloading..."
+                        : "Download"}
+                    <Icon
+                      name={output.source === "attachment" && !output.localAttachment ? "external" : "download"}
+                      className="h-3.5 w-3.5"
+                    />
+                  </button>
+                </>
               )}
-              <button type="button" disabled={(!output.url && output.source === "attachment") || isDownloadingOutput} onClick={() => onDownloadOutput(project, output)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2]/40 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {output.source === "attachment" && !output.localAttachment ? "Open" : isDownloadingOutput ? "Downloading..." : "Download"}
-                <Icon name={output.source === "attachment" && !output.localAttachment ? "external" : "download"} className="h-4 w-4" />
-              </button>
-            </span>
-          )}
-        </div>
-      ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 
@@ -654,27 +659,6 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
       {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
       {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
 
-      <Card className="p-5">
-        <h1 className="page-title text-2xl">Project Overview</h1>
-        <p className="mt-2 text-sm font-semibold text-slate-500">Here's the summary of your project.</p>
-        <div className="mt-5 grid gap-6 rounded-xl border border-pink-100 p-5 lg:grid-cols-2 dark:border-neutral-800">
-          <div>
-            <DetailRow label="Project Name" value={project.title} />
-            <DetailRow label="Client" value={getPersonName(project.requestedBy, project.raw?.requestedByName || "Client")} />
-            <DetailRow label="Developer" value={getPersonName(project.assignedTo, "Unassigned")} />
-            <DetailRow label="Start Date" value={formatDate(project.startDate)} />
-          </div>
-          <div className="lg:border-l lg:border-pink-100 lg:pl-10 dark:lg:border-neutral-800">
-            <DetailRow label="Due Date" value={formatDate(project.dueDate)} />
-            <DetailRow label="Completed Date" value={project.completedAt ? formatDate(project.completedAt) : "Not completed"} />
-            <DetailRow label="Amount" value={formatCurrency(project.amount)} />
-            <DetailRow label="Paid" value={formatCurrency(project.paid)} />
-            <DetailRow label="Pending" value={formatCurrency(project.pendingAmount)} />
-            <DetailRow label="Last Updated" value={formatDateTime(project.updatedAt)} />
-          </div>
-        </div>
-      </Card>
-
       <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr_1fr]">
         <Card className="p-5">
           <h2 className="text-lg font-black">Latest Update</h2>
@@ -690,14 +674,15 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
           <h2 className="text-lg font-black">Submitted Output</h2>
           <p className="mt-1 text-xs font-bold text-slate-500">Here are the latest files and links submitted by your team.</p>
           <div className="mt-4">{renderOutputs(outputItems.slice(0, 3))}</div>
-          <button
-            type="button"
-            disabled={outputItems.length === 0}
-            onClick={() => setOpenActivityPanel("files")}
-            className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
-          >
-            {outputItems.length > 0 ? `View All Files (${outputItems.length})` : "No Files Available"}
-          </button>
+          {outputItems.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setOpenActivityPanel("files")}
+              className="mt-4 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50"
+            >
+              View All Files ({outputItems.length})
+            </button>
+          )}
           {project.clientApproved && project.finalOutput?.submittedAt && (
             <div className={`mt-5 rounded-xl border p-4 ${project.newsfeedPermissionAllowed ? "border-emerald-200 bg-emerald-50/80" : "border-pink-100 bg-pink-50/40"}`}>
               <div className="flex items-start gap-3">
@@ -1800,8 +1785,7 @@ const ClientProjects = () => {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
-          <span>Showing {pageStart} to {pageEnd} of {visibleProjects.length} projects</span>
+        <div className="flex flex-wrap items-center justify-end gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
           <span className="flex items-center gap-2">
             <button type="button" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400" aria-label="Previous page">‹</button>
             <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-[#c72fb2] px-2 text-white">{safeCurrentPage}</span>
