@@ -271,7 +271,7 @@ const EmpDashboard = () => {
     isLoading: isTasksLoading,
     error: tasksError,
   } = useTasksQuery({ view: "employee" }, {
-    refetchInterval: 3000,
+    refetchInterval: 10000,
     refetchIntervalInBackground: true,
   });
 

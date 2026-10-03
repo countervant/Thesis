@@ -10,7 +10,7 @@ export const useTasksQuery = (params = {}, options = {}) => {
       const res = await taskAPI.getAll({ ...params, refresh: true });
       return unwrapData(res);
     },
-    refetchInterval: 3000,
+    refetchInterval: 10000,
     refetchIntervalInBackground: true,
     ...options,
   });
@@ -24,7 +24,7 @@ export const useTaskDetailsQuery = (taskId, options = {}) => {
       return unwrapData(res);
     },
     enabled: Boolean(taskId) && (options.enabled ?? true),
-    refetchInterval: 3000,
+    refetchInterval: 10000,
     refetchIntervalInBackground: true,
     ...options,
   });

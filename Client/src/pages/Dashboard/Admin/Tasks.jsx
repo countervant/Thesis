@@ -1310,7 +1310,7 @@ const Tasks = ({
     isLoading,
     error: tasksError,
   } = useTasksQuery(tasksParams, {
-    refetchInterval: 3000,
+    refetchInterval: 10000,
     refetchIntervalInBackground: true,
   });
 
