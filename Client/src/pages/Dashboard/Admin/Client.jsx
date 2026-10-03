@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { clientAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import { useQueryClient } from "@tanstack/react-query";
+import { clientAPI, getApiErrorMessage } from "../../../services/api.js";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import { useClientsQuery, useClientMutations } from "../../../hooks/useClientsQuery.js";
+import { useTasksQuery } from "../../../hooks/useTasksQuery.js";
 import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
@@ -591,59 +595,46 @@ const ClientCard = ({ client, onDelete, onViewProjects }) => {
 };
 
 const AdminClients = () => {
-  const [clients, setClients] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const clientsParams = useMemo(() => ({ limit: 100 }), []);
+  const tasksParams = useMemo(() => ({ view: "projects", limit: 100 }), []);
+
+  const {
+    data: rawClients = [],
+    isLoading: isClientsLoading,
+    error: clientsError,
+  } = useClientsQuery(clientsParams, { refetchInterval: 30000 });
+
+  const {
+    data: rawTasks = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery(tasksParams);
+
+  const { invalidateClientData } = useClientMutations();
+
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [clientToDelete, setClientToDelete] = useState(null);
   const [selectedClientProjects, setSelectedClientProjects] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const isLoading = isClientsLoading || isTasksLoading;
+  const errorMessage =
+    localErrorMessage ||
+    (clientsError ? getApiErrorMessage(clientsError, "Unable to load clients.") : "") ||
+    (tasksError ? getApiErrorMessage(tasksError, "Unable to load client projects.") : "");
+  const setErrorMessage = setLocalErrorMessage;
 
-    const loadClients = async (showLoading = false) => {
-      try {
-        if (showLoading) {
-          setIsLoading(true);
-          setErrorMessage("");
-        }
-        const [clientData, projectData] = await Promise.all([
-          clientAPI.getAllFresh({ limit: 100 }),
-          taskAPI.getAll({ view: "projects", limit: 100, refresh: true }),
-        ]);
-        const projects = projectData.map(normalizeProject);
-
-        if (isMounted) {
-          setClients(clientData.map((client) => normalizeClient(
-            client,
-            projects.filter((project) => projectBelongsToClient(project, client)),
-          )));
-        }
-      } catch (error) {
-        if (isMounted && showLoading) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load clients."));
-        }
-      } finally {
-        if (isMounted && showLoading) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadClients(true);
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") loadClients(false);
-    };
-    const intervalId = window.setInterval(refreshWhenVisible, 30000);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, []);
+  const clients = useMemo(() => {
+    const projects = (Array.isArray(rawTasks) ? rawTasks : []).map(normalizeProject);
+    return (Array.isArray(rawClients) ? rawClients : []).map((client) =>
+      normalizeClient(
+        client,
+        projects.filter((project) => projectBelongsToClient(project, client))
+      )
+    );
+  }, [rawClients, rawTasks]);
 
   const visibleClients = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -685,11 +676,13 @@ const AdminClients = () => {
     try {
       setErrorMessage("");
       await clientAPI.delete(client.id);
-      setClients((currentClients) =>
-        currentClients.filter((currentClient) => currentClient.id !== client.id)
-      )
+      queryClient.setQueryData(QUERY_KEYS.clients(clientsParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.filter((item) => getEntityId(item) !== client.id);
+      });
+      invalidateClientData();
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to delete client.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to delete client."));
     }
   };
 

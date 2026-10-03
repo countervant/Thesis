@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
@@ -6,7 +6,11 @@ import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { SkeletonRows } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext";
-import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
+import {
+  useLeaveRequestsQuery,
+  useLeaveRequestMutations,
+} from "../../../hooks/index.js";
+import { getApiErrorMessage } from "../../../services/api";
 
 const toneStyles = {
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
@@ -294,8 +298,6 @@ const Calendar = ({ currentMonth, onNextMonth, onPreviousMonth, requests }) => {
 
 const EmpLeaverequest = () => {
   const { user } = useAuth();
-  const [requests, setRequests] = useState([]);
-  const [summary, setSummary] = useState({});
   const [statusFilter, setStatusFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -303,36 +305,56 @@ const EmpLeaverequest = () => {
     ...defaultForm,
     emergencyContact: user?.phone || "",
   }));
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [actionErrorMessage, setActionErrorMessage] = useState("");
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
   const [requestToDelete, setRequestToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
 
-  const loadRequests = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
-      const response = await leaveRequestAPI.getAll({ limit: 100, month: "all" });
-      setRequests(response.leaveRequests.map(normalizeRequest));
-      setSummary(response.summary || {});
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
-      setRequests([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const {
+    data: leaveData,
+    isLoading,
+    error: leaveError,
+  } = useLeaveRequestsQuery({ employeeOnly: true });
 
-  useEffect(() => {
-    const timer = window.setTimeout(loadRequests, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadRequests]);
+  const {
+    createRequest,
+    updateStatus,
+    addComment,
+    deleteRequest,
+  } = useLeaveRequestMutations();
+
+  const isSubmitting = createRequest.isPending;
+  const isDeleting = deleteRequest.isPending;
+
+  const requests = useMemo(() => {
+    if (!leaveData) return [];
+    const list = Array.isArray(leaveData.leaveRequests)
+      ? leaveData.leaveRequests
+      : Array.isArray(leaveData)
+      ? leaveData
+      : [];
+    return list.map(normalizeRequest);
+  }, [leaveData]);
+
+  const summary = useMemo(() => {
+    if (leaveData?.summary && Object.keys(leaveData.summary).length > 0) {
+      return leaveData.summary;
+    }
+    return {
+      pending: requests.filter((r) => r.status === "Pending").length,
+      approved: requests.filter((r) => r.status === "Approved").length,
+      rejected: requests.filter((r) => r.status === "Rejected").length,
+    };
+  }, [leaveData, requests]);
+
+  const queryErrorMessage = leaveError
+    ? getApiErrorMessage(leaveError, "Unable to load leave requests.")
+    : "";
+  const errorMessage = actionErrorMessage || queryErrorMessage;
+  const setErrorMessage = setActionErrorMessage;
 
   const formDuration = calculateDuration(form.startDate, form.endDate);
 
@@ -355,15 +377,6 @@ const EmpLeaverequest = () => {
     [requests, statusFilter, monthFilter]
   );
   const detailRequest = requests.find((request) => getEntityId(request) === detailRequestId) || null;
-
-  const updateRequestInState = (updatedRequest) => {
-    const normalizedRequest = normalizeRequest(updatedRequest);
-    const requestId = getEntityId(normalizedRequest);
-    setRequests((currentRequests) =>
-      currentRequests.map((item) => (getEntityId(item) === requestId ? normalizedRequest : item))
-    );
-    setDetailRequestId((currentId) => (currentId === requestId ? requestId : currentId));
-  };
 
   const updateField = (field, value) => {
     setForm((currentForm) => {
@@ -405,8 +418,7 @@ const EmpLeaverequest = () => {
     }
 
     try {
-      setIsSubmitting(true);
-      await leaveRequestAPI.create({
+      await createRequest.mutateAsync({
         leaveType: form.leaveType,
         startDate: form.startDate,
         endDate: form.endDate,
@@ -418,11 +430,8 @@ const EmpLeaverequest = () => {
         ...defaultForm,
         emergencyContact: user?.phone || "",
       });
-      await loadRequests();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit leave request."));
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -448,8 +457,7 @@ const EmpLeaverequest = () => {
 
     try {
       setErrorMessage("");
-      const updatedRequest = await leaveRequestAPI.comment(requestId, text);
-      updateRequestInState(updatedRequest);
+      await addComment.mutateAsync({ id: requestId, text });
       setCommentText("");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to add comment."));
@@ -464,10 +472,8 @@ const EmpLeaverequest = () => {
       setBusyRequestId(requestId);
       setMessage("");
       setErrorMessage("");
-      const updatedRequest = await leaveRequestAPI.updateStatus(requestId, "Returned");
-      updateRequestInState(updatedRequest);
+      await updateStatus.mutateAsync({ id: requestId, status: "Returned" });
       setMessage("You are marked as returned and can receive new project assignments.");
-      await loadRequests();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to mark this leave as returned."));
     } finally {
@@ -479,22 +485,17 @@ const EmpLeaverequest = () => {
     if (!requestToDelete || isDeleting) return;
 
     try {
-      setIsDeleting(true);
       setDeleteErrorMessage("");
       const targetId = getEntityId(requestToDelete);
-      await leaveRequestAPI.delete(targetId);
+      await deleteRequest.mutateAsync(targetId);
 
-      setRequests((current) => current.filter((item) => getEntityId(item) !== targetId));
       if (detailRequestId === targetId) {
         setDetailRequestId("");
       }
       setRequestToDelete(null);
       setMessage("Leave request deleted successfully.");
-      await loadRequests();
     } catch (error) {
       setDeleteErrorMessage(getApiErrorMessage(error, "Unable to delete leave request."));
-    } finally {
-      setIsDeleting(false);
     }
   };
 

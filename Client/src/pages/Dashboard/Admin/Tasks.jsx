@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
@@ -15,6 +16,12 @@ import ProjectGroupTable from "../../../components/ProjectGroupTable/ProjectGrou
 import ProjectBoard from "../../../components/ProjectBoard/ProjectBoard.jsx";
 import { ProjectDetailsModal } from "../../../components/ProjectDetailsModal/ProjectDetailsModal.jsx";
 import TaskAllocationModal from "../../../components/TaskAllocationModal/TaskAllocationModal.jsx";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useTasksQuery,
+  useTaskDetailsQuery,
+  useTaskMutations,
+} from "../../../hooks/useTasksQuery.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -1294,17 +1301,32 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
 const Tasks = ({
   onEditTask,
   onNavigate,
-  refreshKey = 0,
 }) => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
+  const queryClient = useQueryClient();
+  const tasksParams = useMemo(() => ({ limit: 100, view: "projects" }), []);
+  const {
+    data: rawTasks = [],
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery(tasksParams, {
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true,
+  });
+
+  const tasks = useMemo(
+    () => normalizeTasks(rawTasks).map(normalizeTask),
+    [rawTasks]
+  );
+
+  const { invalidateTaskData } = useTaskMutations();
+
   const [isApprovingCustomClientId, setIsApprovingCustomClientId] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
   const [isMarkingPaidId, setIsMarkingPaidId] = useState("");
   const [isPayingEmployeeId, setIsPayingEmployeeId] = useState("");
   const [employeePaymentTask, setEmployeePaymentTask] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Newest to Oldest");
@@ -1315,41 +1337,60 @@ const Tasks = ({
   const [completionDraft, setCompletionDraft] = useState(null);
   const [isSubmittingOutput, setIsSubmittingOutput] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState("");
-  const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
-  const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
   const [isTaskAllocationOpen, setIsTaskAllocationOpen] = useState(false);
-  const [localRefreshKey, setLocalRefreshKey] = useState(0);
   const pendingTaskUpdateIdsRef = useRef(new Set());
   const currentUserId = getEntityId(user);
 
-  useEffect(() => {
-    let isMounted = true;
+  const {
+    data: rawTaskDetails,
+    isLoading: isLoadingTaskDetails,
+    error: taskDetailsError,
+  } = useTaskDetailsQuery(selectedTaskId);
 
-    const loadTasks = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
-        if (isMounted) {
-          setTasks(normalizeTasks(data).map(normalizeTask));
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+  const errorMessage =
+    localErrorMessage ||
+    (tasksError ? getApiErrorMessage(tasksError, "Unable to load tasks.") : "") ||
+    (taskDetailsError
+      ? getApiErrorMessage(taskDetailsError, "Unable to load project details.")
+      : "");
+  const setErrorMessage = setLocalErrorMessage;
+
+  const selectedTaskDetails = useMemo(() => {
+    if (rawTaskDetails) return normalizeTask(rawTaskDetails);
+    if (selectedTaskId) {
+      return tasks.find((t) => t.id === selectedTaskId) || null;
+    }
+    return null;
+  }, [rawTaskDetails, selectedTaskId, tasks]);
+
+  const updateTaskInCache = useCallback(
+    (updatedTask) => {
+      const normalized = normalizeTask(updatedTask);
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.map((item) =>
+          getEntityId(item) === normalized.id ? normalized : item
+        );
+      });
+      if (selectedTaskId === normalized.id) {
+        queryClient.setQueryData(QUERY_KEYS.taskDetails(normalized.id), normalized);
       }
-    };
+      invalidateTaskData(normalized.id);
+      return normalized;
+    },
+    [invalidateTaskData, queryClient, selectedTaskId, tasksParams]
+  );
 
-    loadTasks();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey, localRefreshKey]);
+  const removeTaskFromCache = useCallback(
+    (taskId) => {
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.filter((item) => getEntityId(item) !== taskId);
+      });
+      invalidateTaskData(taskId);
+    },
+    [invalidateTaskData, queryClient, tasksParams]
+  );
 
   useEffect(() => {
     const focusTarget = () => {
@@ -1376,34 +1417,6 @@ const Tasks = ({
     window.addEventListener("clientra:notification-target", focusTarget);
     return () => window.removeEventListener("clientra:notification-target", focusTarget);
   }, [isLoading]);
-
-  useEffect(() => {
-    if (!selectedTaskId) return undefined;
-
-    let isCurrent = true;
-    const loadTaskDetails = async () => {
-      setSelectedTaskDetails(null);
-      setIsLoadingTaskDetails(true);
-      setErrorMessage("");
-
-      try {
-        const task = await taskAPI.getById(selectedTaskId, { refresh: true });
-        if (isCurrent) setSelectedTaskDetails(normalizeTask(task));
-      } catch (error) {
-        if (!isCurrent) return;
-        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
-        setSelectedTaskId("");
-      } finally {
-        if (isCurrent) setIsLoadingTaskDetails(false);
-      }
-    };
-
-    loadTaskDetails();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedTaskId]);
 
   const isAssignedToMe = useCallback(
     (task) => {
@@ -1540,14 +1553,7 @@ const Tasks = ({
         subtasks: nextSubtasks,
       });
 
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? normalizeTask(updatedTask) : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      updateTaskInCache(updatedTask);
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to update task.");
     } finally {
@@ -1576,16 +1582,7 @@ const Tasks = ({
         subtasks: updatedSubtasks,
       });
 
-      const normalized = normalizeTask(updatedTask);
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? normalized : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalized : currentTask
-      );
-      return normalized;
+      return updateTaskInCache(updatedTask);
     } catch (error) {
       const msg = getApiErrorMessage(error, "Unable to update assignee.");
       setErrorMessage(msg);
@@ -1614,16 +1611,7 @@ const Tasks = ({
         subtasks: task.subtasks,
       });
 
-      const normalized = normalizeTask(updatedTask);
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? normalized : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalized : currentTask
-      );
-      return normalized;
+      return updateTaskInCache(updatedTask);
     } catch (error) {
       const msg = getApiErrorMessage(error, "Unable to update due date.");
       setErrorMessage(msg);
@@ -1653,16 +1641,7 @@ const Tasks = ({
         subtasks: nextSubtasks,
       });
 
-      const normalized = normalizeTask(updatedTask);
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? normalized : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalized : currentTask
-      );
-      return normalized;
+      return updateTaskInCache(updatedTask);
     } catch (error) {
       const msg = getApiErrorMessage(error, "Unable to update project status.");
       setErrorMessage(msg);
@@ -1760,14 +1739,7 @@ const Tasks = ({
         subtasks: draft.nextSubtasks,
         finalize: draft.finalize,
       });
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      updateTaskInCache(updatedTask);
       setCompletionDraft(null);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
@@ -1795,15 +1767,8 @@ const Tasks = ({
       setIsApprovingCustomClientId(task.id);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = normalizeTask(await taskAPI.approve(task.id));
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? updatedTask : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? updatedTask : currentTask
-      );
+      const rawApproved = await taskAPI.approve(task.id);
+      updateTaskInCache(rawApproved);
       setNoticeMessage(`Offline approval was recorded for ${getClientName(task)}.`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to record the custom client's approval."));
@@ -1826,9 +1791,7 @@ const Tasks = ({
     try {
       setErrorMessage("");
       await taskAPI.delete(task.id);
-      setTasks((currentTasks) =>
-        currentTasks.filter((currentTask) => currentTask.id !== task.id)
-      );
+      removeTaskFromCache(task.id);
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete task.");
     }
@@ -1841,13 +1804,8 @@ const Tasks = ({
       setIsMarkingPaidId(task.id);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = normalizeTask(await taskAPI.markPaid(task.id));
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === task.id ? updatedTask : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? updatedTask : currentTask
-      );
+      const rawPaid = await taskAPI.markPaid(task.id);
+      updateTaskInCache(rawPaid);
       setNoticeMessage(
         `${task.title} was marked as paid and added to Budget Management income.`
       );
@@ -1880,13 +1838,8 @@ const Tasks = ({
       setIsPayingEmployeeId(task.id);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = normalizeTask(await taskAPI.payEmployee(task.id, { amount, employeeId }));
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === task.id ? updatedTask : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? updatedTask : currentTask
-      );
+      const rawPaid = await taskAPI.payEmployee(task.id, { amount, employeeId });
+      const updatedTask = updateTaskInCache(rawPaid);
       setEmployeePaymentTask(null);
       setNoticeMessage(
         `${getPersonName(updatedTask.employeePayments.find((payment) => getEntityId(payment.employee) === employeeId)?.employee)} was paid ${formatProjectAmount(amount)}. The payment was added to Budget Management expenses.`
@@ -2149,7 +2102,7 @@ const Tasks = ({
               initialTasks={unassignedTasks}
               onClose={() => setIsTaskAllocationOpen(false)}
               onAllocationCommitted={() => {
-                setLocalRefreshKey((k) => k + 1);
+                invalidateTaskData();
                 setNoticeMessage("Tasks successfully assigned!");
               }}
             />

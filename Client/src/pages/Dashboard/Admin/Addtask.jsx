@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { authAPI, clientAPI, taskAPI } from "../../../services/api.js";
+import { useAssigneesQuery, useClientsQuery, useTaskMutations } from "../../../hooks/index.js";
 
 const priorityOptions = [
   { label: "Low", value: "low" },
@@ -247,9 +247,12 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const isEditing = Boolean(task?.id);
   const [formData, setFormData] = useState(() => createInitialForm(task, user, isAdmin));
-  const [assignees, setAssignees] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [clientSearch, setClientSearch] = useState("");
+  const [clientSearch, setClientSearch] = useState(() => {
+    if (task?.requestedBy) {
+      return formatClientName(task.requestedBy);
+    }
+    return "";
+  });
   const [clientRequestType, setClientRequestType] = useState(
     task?.requestedByName && !getEntityId(task?.requestedBy) ? "custom" : "existing"
   );
@@ -258,102 +261,38 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   );
   const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: rawAssignees = [] } = useAssigneesQuery();
+  const { data: rawClients = [] } = useClientsQuery(
+    { limit: 100 },
+    { enabled: Boolean(isAdmin) }
+  );
+  const { createTask, updateTask } = useTaskMutations();
+  const isSubmitting = createTask.isPending || updateTask.isPending;
 
-    const loadAssignees = async () => {
-      try {
-        const data = await authAPI.getAssignees();
-        const loadedAssignees = normalizeAssignees(data);
-        const availableAssignees = isAdmin
-          ? loadedAssignees.filter(
-              (assignee) =>
-                assignee?.role === "employee" ||
-                (assignee?.role === "admin" && assignee?.isSelf)
-            )
-          : loadedAssignees;
+  const assignees = useMemo(() => {
+    const loadedAssignees = normalizeAssignees(rawAssignees);
+    return isAdmin
+      ? loadedAssignees.filter(
+          (assignee) =>
+            assignee?.role === "employee" ||
+            (assignee?.role === "admin" && assignee?.isSelf)
+        )
+      : loadedAssignees;
+  }, [isAdmin, rawAssignees]);
 
-        if (isMounted) {
-          setAssignees(availableAssignees);
+  const clients = useMemo(() => normalizeClients(rawClients), [rawClients]);
 
-          setFormData((currentData) => {
-            const existingAssigneeIds = (task?.assignees?.length
-              ? task.assignees
-              : [task?.assignedTo]
-            ).map(getEntityId).filter(Boolean);
-
-            return {
-              ...currentData,
-              assignees:
-                currentData.assignees.length > 0
-                  ? currentData.assignees
-                  : existingAssigneeIds.length > 0
-                    ? existingAssigneeIds
-                    : [],
-            };
-          });
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load assignees."
-          );
-        }
-      }
-    };
-
-    loadAssignees();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAdmin, task?.assignedTo, task?.assignees, user]);
-
-  useEffect(() => {
-    if (!isAdmin) {
-      return;
+  const [hasInitializedClientSearch, setHasInitializedClientSearch] = useState(false);
+  if (!hasInitializedClientSearch && !clientSearch && isAdmin && task?.requestedBy && clients.length > 0) {
+    const requestedClient = clients.find(
+      (client) => getEntityId(client) === getEntityId(task?.requestedBy)
+    );
+    if (requestedClient) {
+      setHasInitializedClientSearch(true);
+      setClientSearch(formatClientName(requestedClient));
     }
-
-    let isMounted = true;
-
-    const loadClients = async () => {
-      try {
-        const data = await clientAPI.getAll({ limit: 100 });
-        const loadedClients = normalizeClients(data);
-
-        if (isMounted) {
-          setClients(loadedClients);
-
-          const requestedClient = loadedClients.find(
-            (client) => getEntityId(client) === getEntityId(task?.requestedBy)
-          );
-          if (requestedClient) setClientSearch(formatClientName(requestedClient));
-
-          setFormData((currentData) => ({
-            ...currentData,
-            requestedBy:
-              currentData.requestedBy ||
-              getEntityId(task?.requestedBy) ||
-              "",
-          }));
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load clients."
-          );
-        }
-      }
-    };
-
-    loadClients();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAdmin, task?.requestedBy]);
+  }
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({
@@ -556,7 +495,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     const subtasks = ensureSubmitOutputSubtask(normalizedFormSubtasks);
 
     try {
-      setIsSubmitting(true);
       setErrorMessage("");
 
       const payload = {
@@ -593,9 +531,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       };
 
       if (isEditing) {
-        await taskAPI.update(task.id, payload);
+        await updateTask.mutateAsync({ id: task.id, task: payload });
       } else {
-        await taskAPI.create(payload);
+        await createTask.mutateAsync(payload);
       }
 
       onTaskCreated?.();
@@ -604,8 +542,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         error.response?.data?.message ||
           `Unable to ${isEditing ? "update" : "create"} project.`
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

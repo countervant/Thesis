@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
@@ -6,7 +6,8 @@ import CountrySelect from "../components/CountrySelect/CountrySelect.jsx";
 import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
 import { ProfileSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { authAPI } from "../services/api.js";
+import { getApiErrorMessage } from "../services/api.js";
+import { useProfileQuery, useProfileMutations } from "../hooks/index.js";
 import { isValidEmail } from "../utils/emailValidation.js";
 import {
   getPhoneValidationMessage,
@@ -111,94 +112,31 @@ const formatRole = (role = "") => {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 };
 
-const Profile = ({ embedded = false }) => {
+const ProfileForm = ({
+  initialProfile,
+  user,
+  updateUser,
+  updateProfileMutation,
+}) => {
   const navigate = useNavigate();
-  const { user, updateUser } = useAuth();
-  const isClient = String(user?.role || "").toLowerCase() === "client";
-  const userId = user?.id || user?._id;
-  const hasCachedProfile = Boolean(user?.email);
-  const [formData, setFormData] = useState(() => profileToForm(user) || emptyForm);
+  const isClient = String(user?.role || initialProfile?.role || "").toLowerCase() === "client";
+  const [formData, setFormData] = useState(() => profileToForm(initialProfile) || emptyForm);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(!hasCachedProfile);
-  const [isSaving, setIsSaving] = useState(false);
-  const [skillGroups, setSkillGroups] = useState(() => normalizeSkillGroups(user?.skillGroups));
+  const [skillGroups, setSkillGroups] = useState(() => normalizeSkillGroups(initialProfile?.skillGroups));
   const [isAddingSkill, setIsAddingSkill] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const [newSkillGroup, setNewSkillGroup] = useState("technical");
   const [hasLoadedAvatar, setHasLoadedAvatar] = useState(() =>
-    Object.prototype.hasOwnProperty.call(user || {}, "avatar")
+    Object.prototype.hasOwnProperty.call(initialProfile || {}, "avatar")
   );
   const [hasChangedAvatar, setHasChangedAvatar] = useState(false);
   const [hasLoadedCoverPhoto, setHasLoadedCoverPhoto] = useState(() =>
-    Object.prototype.hasOwnProperty.call(user || {}, "coverPhoto")
+    Object.prototype.hasOwnProperty.call(initialProfile || {}, "coverPhoto")
   );
   const [hasChangedCoverPhoto, setHasChangedCoverPhoto] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadProfile = async () => {
-      try {
-        setIsLoading(!hasCachedProfile);
-        setErrorMessage("");
-        const data = await authAPI.getMe();
-        const profileId = data?._id || data?.id || userId;
-        let nextProfile = data;
-        let avatarIsLoaded = Object.prototype.hasOwnProperty.call(data || {}, "avatar");
-        let coverPhotoIsLoaded = Object.prototype.hasOwnProperty.call(
-          data || {},
-          "coverPhoto"
-        );
-
-        if (profileId) {
-          try {
-            const publicProfile = await authAPI.getPublicProfile(profileId, {
-              refresh: true,
-            });
-            nextProfile = { ...data, ...publicProfile };
-            avatarIsLoaded = true;
-            coverPhotoIsLoaded = true;
-          } catch {
-            if (isMounted) {
-              setErrorMessage(
-                "Profile loaded, but the current profile photos could not be loaded. They will be preserved unless you choose new ones."
-              );
-            }
-          }
-        }
-
-        if (isMounted) {
-          const nextUser = {
-            id: nextProfile._id || nextProfile.id,
-            ...nextProfile,
-          };
-
-          updateUser(nextUser);
-          setFormData(profileToForm(nextProfile));
-          setSkillGroups(normalizeSkillGroups(nextProfile.skillGroups));
-          setHasLoadedAvatar(avatarIsLoaded);
-          setHasChangedAvatar(false);
-          setHasLoadedCoverPhoto(coverPhotoIsLoaded);
-          setHasChangedCoverPhoto(false);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load profile.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [hasCachedProfile, updateUser, userId]);
+  const isSaving = updateProfileMutation.isPending;
 
   const updateField = (field, value) => {
     if (field === "avatar") setHasChangedAvatar(true);
@@ -341,7 +279,6 @@ const Profile = ({ embedded = false }) => {
     }
 
     try {
-      setIsSaving(true);
       const payload = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -367,7 +304,7 @@ const Profile = ({ embedded = false }) => {
         payload.currentPassword = formData.currentPassword;
       }
 
-      const updatedProfile = await authAPI.updateMe(payload);
+      const updatedProfile = await updateProfileMutation.mutateAsync(payload);
       updateUser(updatedProfile);
       setFormData(profileToForm(updatedProfile));
       setSkillGroups(normalizeSkillGroups(updatedProfile.skillGroups));
@@ -377,40 +314,20 @@ const Profile = ({ embedded = false }) => {
       setHasChangedCoverPhoto(false);
       setSuccessMessage("Profile updated successfully.");
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to update profile.");
-    } finally {
-      setIsSaving(false);
+      setErrorMessage(getApiErrorMessage(error, "Unable to update profile."));
     }
   };
 
-  const joinedDate = formatProfileDate(user?.createdAt);
+  const joinedDate = formatProfileDate(user?.createdAt || initialProfile?.createdAt);
   const fullName = getFullName(formData);
 
-  const content = (
-    <main className={embedded ? "w-full" : "w-full px-4 py-6 md:px-5 md:py-10"}>
-      <div className="mb-4">
-        <h1
-          className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-3xl"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-        Profile
-        </h1>
-        <p className="mt-2 text-sm font-semibold text-slate-500">
-          Manage your personal information and account settings.
-        </p>
-      </div>
-
-      {isLoading && !formData.email ? (
-        <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
-          <ProfileSkeleton />
-        </section>
-      ) : (
-        <form
-          onSubmit={handleSubmit}
-          autoComplete="off"
-          data-form-type="other"
-          className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]"
-        >
+  return (
+    <form
+      onSubmit={handleSubmit}
+      autoComplete="off"
+      data-form-type="other"
+      className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]"
+    >
           <input type="text" name="username" autoComplete="username" tabIndex={-1} aria-hidden="true" className="hidden" />
 
           <aside className="space-y-4">
@@ -737,6 +654,44 @@ const Profile = ({ embedded = false }) => {
             </div>
           </section>
         </form>
+  );
+};
+
+const Profile = ({ embedded = false }) => {
+  const navigate = useNavigate();
+  const { user, updateUser } = useAuth();
+  const { data: profile, isLoading } = useProfileQuery();
+  const { updateProfile: updateProfileMutation } = useProfileMutations();
+
+  const activeUser = profile || user;
+  const showSkeleton = isLoading && !activeUser?.email;
+
+  const content = (
+    <main className={embedded ? "w-full" : "w-full px-4 py-6 md:px-5 md:py-10"}>
+      <div className="mb-4">
+        <h1
+          className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-3xl"
+          style={{ fontFamily: "var(--font-bruno)" }}
+        >
+          Profile
+        </h1>
+        <p className="mt-2 text-sm font-semibold text-slate-500">
+          Manage your personal information and account settings.
+        </p>
+      </div>
+
+      {showSkeleton ? (
+        <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
+          <ProfileSkeleton />
+        </section>
+      ) : (
+        <ProfileForm
+          key={activeUser?._id || activeUser?.id || "profile-form"}
+          initialProfile={activeUser}
+          user={user}
+          updateUser={updateUser}
+          updateProfileMutation={updateProfileMutation}
+        />
       )}
     </main>
   );

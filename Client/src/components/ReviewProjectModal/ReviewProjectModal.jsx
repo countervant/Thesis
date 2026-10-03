@@ -1,6 +1,6 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
-import api from "../../services/api.js";
+import { useChatExtractPreviewQuery } from "../../hooks/index.js";
 
 const Addtask = lazy(() => import("../../pages/Dashboard/Admin/Addtask.jsx"));
 
@@ -36,7 +36,7 @@ const ModalLoadingSpinner = ({
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 rounded-lg border border-neutral-300 px-4 py-2 text-xs font-bold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
+          className="mt-6 rounded-lg border border-neutral-300 px-4 text-xs font-bold text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
         >
           Cancel
         </button>
@@ -85,15 +85,21 @@ export default function ReviewProjectModal({
   initialData = null,
   onProjectCreated,
 }) {
-  const [isLoading, setIsLoading] = useState(() => !initialData && Boolean(conversationId));
-  const [errorMessage, setErrorMessage] = useState("");
-  const [extractedTask, setExtractedTask] = useState(() =>
-    mapExtractedToTask(initialData, conversationId)
-  );
+  const [forceBlank, setForceBlank] = useState(false);
 
-  const fetchExtraction = async () => {
-    if (!conversationId) {
-      setExtractedTask({
+  const {
+    data: extractResponse,
+    isLoading: isExtractLoading,
+    error: extractError,
+  } = useChatExtractPreviewQuery({
+    conversationId,
+    isOpen,
+    enabled: Boolean(isOpen && conversationId && !initialData && !forceBlank),
+  });
+
+  const extractedTask = useMemo(() => {
+    if (forceBlank) {
+      return {
         title: "",
         description: "",
         startDate: todayInputDate(),
@@ -102,59 +108,38 @@ export default function ReviewProjectModal({
         downPaymentType: "none",
         downPaymentValue: "",
         priority: "medium",
+        requestedBy: conversationId,
         subtasks: [],
-      });
-      setIsLoading(false);
-      return;
+      };
     }
-
-    setIsLoading(true);
-    setErrorMessage("");
-
-    try {
-      const response = await api.post(`/chat/${conversationId}/extract-preview`);
-      const payload = response.data?.data || response.data;
-      if (payload) {
-        setExtractedTask(mapExtractedToTask(payload, conversationId));
-      } else {
-        setExtractedTask({
-          title: "",
-          description: "",
-          startDate: todayInputDate(),
-          dueDate: todayInputDate(),
-          amount: "",
-          downPaymentType: "none",
-          downPaymentValue: "",
-          priority: "medium",
-          requestedBy: conversationId,
-          subtasks: [],
-        });
-      }
-    } catch (err) {
-      console.error("Failed to extract project proposal:", err);
-      setErrorMessage(
-        err.response?.data?.message ||
-          "Could not automatically extract project details. You can enter them manually."
-      );
-    } finally {
-      setIsLoading(false);
+    if (initialData) return mapExtractedToTask(initialData, conversationId);
+    const payload = extractResponse?.data || extractResponse;
+    if (payload) return mapExtractedToTask(payload, conversationId);
+    if (!conversationId) {
+      return {
+        title: "",
+        description: "",
+        startDate: todayInputDate(),
+        dueDate: todayInputDate(),
+        amount: "",
+        downPaymentType: "none",
+        downPaymentValue: "",
+        priority: "medium",
+        requestedBy: "",
+        subtasks: [],
+      };
     }
-  };
+    return null;
+  }, [conversationId, extractResponse, forceBlank, initialData]);
 
-  useEffect(() => {
-    let isSubscribed = true;
-    if (isOpen && !initialData) {
-      Promise.resolve().then(() => {
-        if (isSubscribed) {
-          fetchExtraction();
-        }
-      });
-    }
-    return () => {
-      isSubscribed = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, conversationId]);
+  const isLoading =
+    !initialData && Boolean(conversationId) && !forceBlank && isExtractLoading;
+
+  const errorMessage = extractError
+    ? (extractError.response?.data?.message ||
+       extractError.message ||
+       "Could not automatically extract project details. You can enter them manually.")
+    : "";
 
   if (!isOpen) return null;
 
@@ -179,21 +164,7 @@ export default function ReviewProjectModal({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setExtractedTask({
-                  title: "",
-                  description: "",
-                  startDate: todayInputDate(),
-                  dueDate: todayInputDate(),
-                  amount: "",
-                  downPaymentType: "none",
-                  downPaymentValue: "",
-                  priority: "medium",
-                  requestedBy: conversationId,
-                  subtasks: [],
-                });
-                setErrorMessage("");
-              }}
+              onClick={() => setForceBlank(true)}
               className="h-9 rounded-lg bg-[#dc4fb2] px-4 text-xs font-bold text-white transition hover:brightness-105"
             >
               Open Blank Project Form

@@ -94,8 +94,7 @@ const RouteErrorBoundary = () => {
   );
 };
 
-const AppRoutes = () => {
-  const router = createBrowserRouter(
+const router = createBrowserRouter(
     createRoutesFromElements(
       <Route element={<AuthLayout />} errorElement={<RouteErrorBoundary />}>
         <Route
@@ -195,6 +194,7 @@ const AppRoutes = () => {
     )
   );
 
+const AppRoutes = () => {
   return (
     <Suspense fallback={<AppLoadingScreen />}>
       <RouterProvider router={router} />

@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kanban, List } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useTasksQuery,
+  useTaskDetailsQuery,
+  useTaskMutations,
+} from "../../../hooks/index.js";
+import { unwrapData } from "../../../utils/queryUtils.js";
 import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
@@ -167,6 +175,13 @@ const getDateStatus = (dueDate) => {
   if (dayDifference < 0) return "Overdue";
   if (dayDifference === 0) return "Today";
   return "Upcoming";
+};
+
+const normalizeTasks = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.tasks)) return data.tasks;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
 };
 
 const normalizeTask = (task) => {
@@ -759,45 +774,95 @@ const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
 
 const EmpTask = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const currentUserId = getEntityId(user);
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const tasksParams = useMemo(() => ({ view: "employee" }), []);
+
+  const {
+    data: rawTasks,
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery(
+    { view: "employee" },
+    {
+      refetchInterval: 3000,
+      refetchIntervalInBackground: true,
+    }
+  );
+
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+
+  const {
+    data: rawTaskDetails,
+    isLoading: isLoadingTaskDetails,
+    error: taskDetailsError,
+  } = useTaskDetailsQuery(selectedTaskId, {
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true,
+  });
+
+  const { updateTask, submitOutput, invalidateTaskData } = useTaskMutations();
+  const isSubmittingOutput = submitOutput.isPending;
+
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Newest to Oldest");
   const [viewMode, setViewMode] = useState("table");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [completionDraft, setCompletionDraft] = useState(null);
-  const [isSubmittingOutput, setIsSubmittingOutput] = useState(false);
   const [revisionDraft, setRevisionDraft] = useState(null);
   const [isStartingRevision, setIsStartingRevision] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState("");
-  const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
-  const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
   const pendingTaskUpdateIdsRef = useRef(new Set());
 
-  useEffect(() => {
-    let isMounted = true;
+  const tasks = useMemo(() => {
+    return normalizeTasks(rawTasks?.tasks || rawTasks || []).map(normalizeTask);
+  }, [rawTasks]);
 
-    const loadTasks = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
-        if (isMounted) setTasks(data.map(normalizeTask));
-      } catch (error) {
-        if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));
-      } finally {
-        if (isMounted) setIsLoading(false);
+  const selectedTaskDetails = useMemo(() => {
+    if (rawTaskDetails) return normalizeTask(rawTaskDetails);
+    if (selectedTaskId) {
+      return tasks.find((t) => t.id === selectedTaskId) || null;
+    }
+    return null;
+  }, [rawTaskDetails, selectedTaskId, tasks]);
+
+  const errorMessage =
+    localErrorMessage ||
+    (tasksError ? getApiErrorMessage(tasksError, "Unable to load tasks.") : "") ||
+    (taskDetailsError
+      ? getApiErrorMessage(taskDetailsError, "Unable to load project details.")
+      : "");
+  const setErrorMessage = setLocalErrorMessage;
+
+  const updateTaskInCache = useCallback(
+    (updatedTask) => {
+      const normalized = normalizeTask(updatedTask);
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((item) =>
+            getEntityId(item) === normalized.id ? normalized : item
+          );
+        }
+        if (Array.isArray(old?.tasks)) {
+          return {
+            ...old,
+            tasks: old.tasks.map((item) =>
+              getEntityId(item) === normalized.id ? normalized : item
+            ),
+          };
+        }
+        return old;
+      });
+      if (selectedTaskId === normalized.id) {
+        queryClient.setQueryData(QUERY_KEYS.taskDetails(normalized.id), normalized);
       }
-    };
-
-    loadTasks();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+      invalidateTaskData(normalized.id);
+      return normalized;
+    },
+    [invalidateTaskData, queryClient, selectedTaskId, tasksParams]
+  );
 
   useEffect(() => {
     const openNotificationTarget = () => {
@@ -824,34 +889,6 @@ const EmpTask = () => {
     window.addEventListener("clientra:notification-target", openNotificationTarget);
     return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
   }, [isLoading, tasks]);
-
-  useEffect(() => {
-    if (!selectedTaskId) return undefined;
-
-    let isCurrent = true;
-    const loadTaskDetails = async () => {
-      setSelectedTaskDetails(null);
-      setIsLoadingTaskDetails(true);
-      setErrorMessage("");
-
-      try {
-        const task = await taskAPI.getById(selectedTaskId, { refresh: true });
-        if (isCurrent) setSelectedTaskDetails(normalizeTask(task));
-      } catch (error) {
-        if (!isCurrent) return;
-        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
-        setSelectedTaskId("");
-      } finally {
-        if (isCurrent) setIsLoadingTaskDetails(false);
-      }
-    };
-
-    loadTaskDetails();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedTaskId]);
 
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -898,16 +935,15 @@ const EmpTask = () => {
     try {
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = await taskAPI.update(task.id, {
-        title: task.title,
-        subtasks: nextSubtasks,
+      const result = await updateTask.mutateAsync({
+        id: task.id,
+        task: {
+          title: task.title,
+          subtasks: nextSubtasks,
+        },
       });
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === task.id ? normalizeTask(updatedTask) : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      const updatedTask = unwrapData(result);
+      updateTaskInCache(updatedTask);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to update task."));
     } finally {
@@ -998,12 +1034,7 @@ const EmpTask = () => {
       setErrorMessage("");
       setNoticeMessage("");
       const updatedTask = await taskAPI.startRevision(revisionDraft.task.id);
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === revisionDraft.task.id ? normalizeTask(updatedTask) : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === revisionDraft.task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      updateTaskInCache(updatedTask);
       setRevisionDraft(null);
       setNoticeMessage(`${revisionDraft.task.title} revision is now in progress.`);
     } catch (error) {
@@ -1038,20 +1069,18 @@ const EmpTask = () => {
     }
 
     try {
-      setIsSubmittingOutput(true);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = await taskAPI.submitOutput(draft.task.id, {
-        ...output,
-        subtasks: draft.nextSubtasks,
-        finalize: draft.finalize,
+      const result = await submitOutput.mutateAsync({
+        id: draft.task.id,
+        output: {
+          ...output,
+          subtasks: draft.nextSubtasks,
+          finalize: draft.finalize,
+        },
       });
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === draft.task.id ? normalizeTask(updatedTask) : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      const updatedTask = unwrapData(result);
+      updateTaskInCache(updatedTask);
       setCompletionDraft(null);
       setNoticeMessage(
         draft.finalize
@@ -1060,8 +1089,6 @@ const EmpTask = () => {
       );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
-    } finally {
-      setIsSubmittingOutput(false);
     }
   };
 

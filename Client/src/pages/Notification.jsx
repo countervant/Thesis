@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import notificationIcon from "../assets/notification.png";
@@ -7,7 +7,11 @@ import heartIcon from "../assets/heart.png";
 import messagesIcon from "../assets/messages.png";
 import MainBars from "./MainBars.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getApiErrorMessage, newsfeedAPI, taskAPI } from "../services/api.js";
+import { getApiErrorMessage } from "../services/api.js";
+import {
+  useNotificationsQuery,
+  useNotificationMutations,
+} from "../hooks/index.js";
 import { NotificationSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import {
   filterNotificationsByPreference,
@@ -165,63 +169,40 @@ const buildTaskNotifications = (tasks, user) => {
 const Notification = () => {
   const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [isAllNotificationsOpen, setIsAllNotificationsOpen] = useState(false);
 
   const currentUserId = useMemo(() => getEntityId(user), [user]);
 
-  useEffect(() => {
-    if (authLoading || !user) return;
+  const {
+    data: notificationData,
+    isLoading: isNotificationsLoading,
+    error: notificationQueryError,
+  } = useNotificationsQuery({
+    enabled: Boolean(!authLoading && user),
+  });
+  const { invalidateNotifications } = useNotificationMutations();
 
-    let isMounted = true;
+  const notifications = useMemo(() => {
+    if (!notificationData || !user) return [];
+    const { posts = [], tasks = [] } = notificationData;
+    return filterNotificationsByPreference(
+      [
+        ...buildNewsfeedNotifications(posts, currentUserId),
+        ...buildTaskNotifications(tasks, user),
+      ],
+      readNotificationSettings(user)
+    ).sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
+  }, [currentUserId, notificationData, user]);
 
-    const loadNotifications = async () => {
-      setIsLoading(true);
-      setErrorMessage("");
+  const isLoading = authLoading || (isNotificationsLoading && notifications.length === 0);
 
-      try {
-        const [postsResult, tasksResult] = await Promise.allSettled([
-          newsfeedAPI.getActivity(),
-          user?.role === "employee"
-            ? taskAPI.getAll({ limit: 50, view: "notification" })
-            : Promise.resolve([]),
-        ]);
-        const posts = postsResult.status === "fulfilled" ? postsResult.value : [];
-        const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
-        const failedCount = [postsResult, tasksResult].filter((result) => result.status === "rejected").length;
-
-        const nextNotifications = filterNotificationsByPreference(
-          [
-            ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], currentUserId),
-            ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], user),
-          ],
-          readNotificationSettings(user)
-        ).sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
-
-        if (isMounted) {
-          setNotifications(nextNotifications);
-          setErrorMessage(failedCount ? "Some notifications could not be loaded. Refresh to retry." : "");
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load notifications."));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadNotifications();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [authLoading, currentUserId, user]);
+  const errorMessage =
+    notificationQueryError
+      ? getApiErrorMessage(notificationQueryError, "Unable to load notifications.")
+      : notificationData?.hasError
+      ? "Some notifications could not be loaded. Refresh to retry."
+      : "";
 
   const handleNavigate = (page) => {
     const dashboardPath = dashboardPathByRole[user?.role] || "/client/dashboard";
@@ -246,6 +227,7 @@ const Notification = () => {
       ? { page: notification.target }
       : notification.target || { page: "newsfeed" };
     sessionStorage.setItem(notificationTargetKey, JSON.stringify(target));
+    invalidateNotifications();
     handleNavigate(target.page);
   };
 

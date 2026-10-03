@@ -22,8 +22,15 @@ import themeIcon from "../assets/theme.png";
 import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
 import { NotificationSkeleton } from "../components/Skeleton/Skeleton.jsx";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../constants/queryKeys.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getApiErrorMessage, messageAPI, newsfeedAPI, taskAPI } from "../services/api.js";
+import {
+  useNotificationMutations,
+  useNotificationsQuery,
+  useUnreadMessagesQuery,
+} from "../hooks/index.js";
+import { messageAPI } from "../services/api.js";
 import {
   filterNotificationsByPreference,
   notificationSettingsChangedEvent,
@@ -461,6 +468,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   const isMessagesPage = activePage === "messages";
   const navigate = useNavigate();
   const { token, user } = useAuth();
+  const userId = getEntityId(user);
   const routeRole = window.location.pathname.split("/").filter(Boolean)[0];
   const userRole = ["admin", "client", "employee"].includes(routeRole)
     ? routeRole
@@ -482,27 +490,69 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   );
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
   const [notificationPreferences, setNotificationPreferences] = useState(() =>
     readNotificationSettings(user)
   );
-  const [readNotificationIds, setReadNotificationIds] = useState([]);
-  const [hiddenNotificationIds, setHiddenNotificationIds] = useState([]);
+  const [readNotificationIds, setReadNotificationIds] = useState(() =>
+    readStoredNotificationIds(userId)
+  );
+  const [hiddenNotificationIds, setHiddenNotificationIds] = useState(() =>
+    readHiddenNotificationIds(userId)
+  );
+  const [prevUserId, setPrevUserId] = useState(userId);
+  if (prevUserId !== userId) {
+    setPrevUserId(userId);
+    setReadNotificationIds(readStoredNotificationIds(userId));
+    setHiddenNotificationIds(readHiddenNotificationIds(userId));
+  }
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [isNotificationOptionsOpen, setIsNotificationOptionsOpen] = useState(false);
   const [openNotificationMenuId, setOpenNotificationMenuId] = useState("");
   const [notificationDeleteAction, setNotificationDeleteAction] = useState(null);
-  const [isNotificationLoading, setIsNotificationLoading] = useState(true);
-  const [notificationError, setNotificationError] = useState("");
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [newsfeedSearch, setNewsfeedSearch] = useState("");
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
-  const userRef = useRef(user);
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-  const userId = getEntityId(user);
+  const queryClient = useQueryClient();
+  const { invalidateNotifications } = useNotificationMutations();
+
+  const {
+    data: notificationData,
+    isLoading: isNotificationLoading,
+    isError: isNotificationQueryError,
+  } = useNotificationsQuery({
+    enabled: Boolean(token && userId),
+  });
+
+  const { data: unreadMessageCount = 0 } = useUnreadMessagesQuery({
+    enabled: Boolean(token && userId && !isMessagesPage),
+  });
+
+  const notifications = useMemo(() => {
+    if (!notificationData) return [];
+    const posts = notificationData.posts || [];
+    const tasks = notificationData.tasks || [];
+    return filterNotificationsByPreference(
+      [
+        ...buildNewsfeedNotifications(posts, userId),
+        ...buildTaskNotifications(tasks, user),
+      ],
+      notificationPreferences
+    ).sort(
+      (first, second) =>
+        new Date(second.date || 0).getTime() - new Date(first.date || 0).getTime()
+    );
+  }, [notificationData, notificationPreferences, user, userId]);
+
+  const notificationError = useMemo(() => {
+    if (isNotificationQueryError) {
+      return "Unable to load notifications.";
+    }
+    if (notificationData?.hasError) {
+      return "Some notifications could not be loaded. Refresh to retry.";
+    }
+    return "";
+  }, [isNotificationQueryError, notificationData?.hasError]);
+
   const readNotificationSet = useMemo(
     () => new Set(readNotificationIds),
     [readNotificationIds]
@@ -568,50 +618,21 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
   }, [activePage, newsfeedSearch]);
 
   useEffect(() => {
-    if (!token || !userId) {
+    if (!token || !userId || isMessagesPage) {
       return undefined;
     }
-
-    // MessagesPanel owns the live connection and thread unread state while it
-    // is mounted. Avoid a duplicate SSE stream and redundant unread polling.
-    if (isMessagesPage) {
-      return undefined;
-    }
-
-    let isMounted = true;
-    let unreadRequest = null;
-
-    const loadUnreadMessages = () => {
-      if (document.visibilityState !== "visible") return;
-      if (unreadRequest) return unreadRequest;
-
-      unreadRequest = messageAPI
-        .getUnreadCount()
-        .then((count) => {
-          if (isMounted) setUnreadMessageCount(count);
-        })
-        // Retain the last confirmed badge value during transient failures.
-        .catch(() => null)
-        .finally(() => {
-          unreadRequest = null;
-        });
-      return unreadRequest;
-    };
-
-    loadUnreadMessages();
 
     const closeMessages = messageAPI.subscribe({
-      onMessage: loadUnreadMessages,
+      onMessage: () => {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.unreadMessages() });
+      },
       onError: () => {},
     });
-    const intervalId = setInterval(loadUnreadMessages, 30000);
 
     return () => {
-      isMounted = false;
-      clearInterval(intervalId);
       closeMessages();
     };
-  }, [isMessagesPage, token, userId]);
+  }, [isMessagesPage, queryClient, token, userId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -628,62 +649,6 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (!token || !userId) {
-      return undefined;
-    }
-
-    let isMounted = true;
-
-    const loadNotifications = async () => {
-      if (document.visibilityState !== "visible") return;
-
-      try {
-        setNotificationError("");
-        const [postsResult, tasksResult] = await Promise.allSettled([
-          newsfeedAPI.getActivity({ refresh: Date.now() }),
-          taskAPI.getAll({ limit: 50, refresh: true, view: "notification" }),
-        ]);
-        const posts = postsResult.status === "fulfilled" ? postsResult.value : [];
-        const tasks = tasksResult.status === "fulfilled" ? tasksResult.value : [];
-        const failedCount = [postsResult, tasksResult].filter((result) => result.status === "rejected").length;
-
-        const nextNotifications = filterNotificationsByPreference(
-          [
-            ...buildNewsfeedNotifications(Array.isArray(posts) ? posts : [], userId),
-            ...buildTaskNotifications(Array.isArray(tasks) ? tasks : [], userRef.current),
-          ],
-          notificationPreferences
-        ).sort((first, second) => new Date(second.date || 0).getTime() - new Date(first.date || 0).getTime());
-
-        if (isMounted) {
-          setNotifications(nextNotifications);
-          setReadNotificationIds(readStoredNotificationIds(userId));
-          setHiddenNotificationIds(readHiddenNotificationIds(userId));
-          setNotificationError(failedCount ? "Some notifications could not be loaded. Refresh to retry." : "");
-        }
-      } catch (error) {
-        if (isMounted) {
-          setNotificationError(
-            getApiErrorMessage(error, "Unable to load notifications.")
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsNotificationLoading(false);
-        }
-      }
-    };
-
-    loadNotifications();
-    const intervalId = window.setInterval(loadNotifications, 60000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [notificationPreferences, token, userId]);
-
   const handleOpenNotification = (notification) => {
     const nextReadIds = Array.from(new Set([...readNotificationIds, notification.id]));
     setReadNotificationIds(nextReadIds);
@@ -691,6 +656,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     sessionStorage.setItem(notificationTargetKey, JSON.stringify(notification.target));
     window.dispatchEvent(new Event("clientra:notification-target"));
     setIsNotificationOpen(false);
+    invalidateNotifications();
     onNavigate?.(notification.target.page);
   };
 
@@ -701,6 +667,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     setReadNotificationIds(nextReadIds);
     localStorage.setItem(getNotificationReadKey(userId), JSON.stringify(nextReadIds));
     setIsNotificationOptionsOpen(false);
+    invalidateNotifications();
   };
 
   const removeAllNotifications = () => {
@@ -714,6 +681,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     localStorage.setItem(getNotificationHiddenKey(userId), JSON.stringify(nextHiddenIds));
     setIsNotificationOptionsOpen(false);
     setOpenNotificationMenuId("");
+    invalidateNotifications();
   };
 
   const requestRemoveAllNotifications = () => {
@@ -731,6 +699,7 @@ const MainBars = ({ activePage, children, onLogout, onNavigate }) => {
     setHiddenNotificationIds(nextHiddenIds);
     localStorage.setItem(getNotificationHiddenKey(userId), JSON.stringify(nextHiddenIds));
     setOpenNotificationMenuId("");
+    invalidateNotifications();
   };
 
   const requestDeleteNotification = (event, notificationId) => {

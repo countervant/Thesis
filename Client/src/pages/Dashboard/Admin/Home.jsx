@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useOnlineTeamQuery } from "../../../hooks/index.js";
 import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/Review.png";
@@ -1146,18 +1148,65 @@ const OnlineTeam = ({ members }) => {
   );
 };
 
+const ADMIN_HOME_QUERY_KEY = ["admin-dashboard"];
+const EMPTY_LIST = [];
+const toList = (value) => (Array.isArray(value) ? value : []);
+
+const loadHomeData = async () => {
+  const results = await Promise.allSettled([
+    taskAPI.getAll({ limit: 100, view: "dashboard" }),
+    employeeAPI.getAll({ limit: 100 }),
+    clientAPI.getAll({ limit: 100 }),
+    budgetAPI.getAll({ limit: 100 }),
+    newsfeedAPI.getActivity({ limit: 20 }),
+    authAPI.getOnlineTeam(),
+    calendarAPI.getAll({ month: getCurrentMonthKey() }),
+    calendarAPI.getAll({ month: getNextMonthKey() }),
+  ]);
+
+  const valueAt = (index) => toList(results[index]?.status === "fulfilled" ? results[index].value : []);
+  const tasks = valueAt(0);
+  const failedCount = results.filter((result) => result.status === "rejected").length;
+
+  return {
+    tasks,
+    employees: valueAt(1),
+    clients: valueAt(2),
+    budgetEntries: valueAt(3),
+    newsfeedActivities: valueAt(4),
+    onlineTeam: valueAt(5),
+    calendarEvents: [...valueAt(6), ...valueAt(7)],
+    taskStatusCounts: tasks.reduce((counts, task) => {
+      const status = task?.status;
+      if (status) counts[status] = (counts[status] || 0) + 1;
+      return counts;
+    }, {}),
+    loadError: failedCount
+      ? `${failedCount} dashboard request${failedCount === 1 ? "" : "s"} could not be loaded. Available data is shown; refresh to retry.`
+      : "",
+  };
+};
+
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [budgetEntries, setBudgetEntries] = useState([]);
-  const [calendarEvents, setCalendarEvents] = useState([]);
-  const [newsfeedActivities, setNewsfeedActivities] = useState([]);
-  const [onlineTeam, setOnlineTeam] = useState([]);
-  const [taskStatusCounts, setTaskStatusCounts] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const { data: homeData, isLoading, error: homeError } = useQuery({
+    queryKey: ADMIN_HOME_QUERY_KEY,
+    queryFn: loadHomeData,
+  });
+  const { data: polledOnlineTeam } = useOnlineTeamQuery();
+  const {
+    tasks = EMPTY_LIST,
+    employees = EMPTY_LIST,
+    clients = EMPTY_LIST,
+    budgetEntries = EMPTY_LIST,
+    calendarEvents = EMPTY_LIST,
+    newsfeedActivities = EMPTY_LIST,
+    taskStatusCounts = {},
+  } = homeData ?? {};
+  const onlineTeam = polledOnlineTeam ?? homeData?.onlineTeam ?? EMPTY_LIST;
+  const loadError = homeError
+    ? getApiErrorMessage(homeError, "Unable to load dashboard data.")
+    : homeData?.loadError ?? "";
 
   const stats = statItems.map((item) => ({
     ...item,
@@ -1291,110 +1340,6 @@ const AdminDashboard = () => {
     return { notWorkingEmployees: available, workingEmployees: working };
   }, [clients, employees, tasks, user]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadHomeData = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError("");
-        const results = await Promise.allSettled([
-          taskAPI.getAll({ limit: 100, view: "dashboard" }),
-          employeeAPI.getAll({ limit: 100 }),
-          clientAPI.getAll({ limit: 100 }),
-          budgetAPI.getAll({ limit: 100 }),
-          newsfeedAPI.getActivity({ limit: 20 }),
-          authAPI.getOnlineTeam(),
-          calendarAPI.getAll({ month: getCurrentMonthKey() }),
-          calendarAPI.getAll({ month: getNextMonthKey() }),
-        ]);
-
-        const valueAt = (index, fallback) => results[index]?.status === "fulfilled" ? results[index].value : fallback;
-        const allTasks = valueAt(0, []);
-        const allEmployees = valueAt(1, []);
-        const allClients = valueAt(2, []);
-        const allBudgetEntries = valueAt(3, []);
-        const newsfeedActivity = valueAt(4, []);
-        const onlineMembers = valueAt(5, []);
-        const currentMonthEvents = valueAt(6, []);
-        const nextMonthEvents = valueAt(7, []);
-        const failedRequests = results.filter((result) => result.status === "rejected");
-
-        if (!isMounted) {
-          return;
-        }
-
-        setTasks(Array.isArray(allTasks) ? allTasks : []);
-        setEmployees(Array.isArray(allEmployees) ? allEmployees : []);
-        setClients(Array.isArray(allClients) ? allClients : []);
-        setBudgetEntries(Array.isArray(allBudgetEntries) ? allBudgetEntries : []);
-        setCalendarEvents([
-          ...(Array.isArray(currentMonthEvents) ? currentMonthEvents : []),
-          ...(Array.isArray(nextMonthEvents) ? nextMonthEvents : []),
-        ]);
-        setNewsfeedActivities(Array.isArray(newsfeedActivity) ? newsfeedActivity : []);
-        setOnlineTeam(Array.isArray(onlineMembers) ? onlineMembers : []);
-        setTaskStatusCounts(
-          (Array.isArray(allTasks) ? allTasks : []).reduce((counts, task) => {
-            const status = task?.status;
-            if (status) counts[status] = (counts[status] || 0) + 1;
-            return counts;
-          }, {}),
-        );
-        setLoadError(
-          failedRequests.length
-            ? `${failedRequests.length} dashboard request${failedRequests.length === 1 ? "" : "s"} could not be loaded. Available data is shown; refresh to retry.`
-            : "",
-        );
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setLoadError(getApiErrorMessage(error, "Unable to load dashboard data."));
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadHomeData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    let onlineTeamRequest = null;
-
-    const refreshOnlineTeam = async () => {
-      if (onlineTeamRequest) return onlineTeamRequest;
-
-      try {
-        onlineTeamRequest = authAPI.getOnlineTeam();
-        const members = await onlineTeamRequest;
-        if (isMounted) setOnlineTeam(Array.isArray(members) ? members : []);
-      } catch {
-        // Keep the last successful presence list until the next refresh.
-      } finally {
-        onlineTeamRequest = null;
-      }
-    };
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshOnlineTeam();
-    };
-    const intervalId = window.setInterval(refreshWhenVisible, 30000);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, []);
 
   if (isLoading) {
     return <DashboardSkeleton />;

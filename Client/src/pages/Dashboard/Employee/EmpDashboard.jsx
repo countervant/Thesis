@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import done from "../../../assets/done.png";
 import pendingRequest from "../../../assets/pendingrequest.png";
 import pending from "../../../assets/pending.png";
 import task from "../../../assets/task.png";
 import Skeleton from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import {
+  useTasksQuery,
+  useCalendarQuery,
+  useLeaveRequestsQuery,
+  useOnlineTeamQuery,
+} from "../../../hooks/index.js";
+import { getApiErrorMessage } from "../../../services/api.js";
 
 const statusFromApi = {
   done: "Done",
@@ -257,31 +263,42 @@ const normalizeTask = (item) => {
 const EmpDashboard = () => {
   const { user } = useAuth();
   const firstName = getDisplayName(user).split(" ")[0];
-  const [tasks, setTasks] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
-  useEffect(() => {
-    let isMounted = true;
+  const {
+    data: rawTasks = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery({ view: "employee" }, {
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true,
+  });
 
-    const loadTasks = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, view: "dashboard" });
-        if (isMounted) setTasks(data.map(normalizeTask));
-      } catch (error) {
-        if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load dashboard."));
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
+  const {
+    isLoading: isCalendarLoading,
+    error: calendarError,
+  } = useCalendarQuery({ month: currentMonthKey });
 
-    loadTasks();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const {
+    isLoading: isLeaveLoading,
+    error: leaveError,
+  } = useLeaveRequestsQuery({ employeeOnly: true });
+
+  const {
+    isLoading: isTeamLoading,
+  } = useOnlineTeamQuery();
+
+  const tasks = useMemo(() => {
+    if (!Array.isArray(rawTasks)) return [];
+    return rawTasks.map(normalizeTask);
+  }, [rawTasks]);
+
+  const queryError = tasksError || calendarError || leaveError;
+  const errorMessage = queryError
+    ? getApiErrorMessage(queryError, "Unable to load dashboard.")
+    : "";
+  const isLoading = isTasksLoading || isCalendarLoading || isLeaveLoading || isTeamLoading;
 
   const dashboardData = useMemo(() => {
     const sortedTasks = [...tasks].sort(
