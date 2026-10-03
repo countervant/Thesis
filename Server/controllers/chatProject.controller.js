@@ -177,6 +177,9 @@ export const commitProject = async (req, res) => {
       project: newProject._id,
       title: String(task.title || "Untitled Task").trim(),
       description: String(task.description || "").trim(),
+      requiredSkills: Array.isArray(task.requiredSkills)
+        ? task.requiredSkills.map((s) => String(s).trim()).filter(Boolean)
+        : [],
       priority: validPriorities.includes(task.priority) ? task.priority : "Medium",
       status: "Backlog",
       assignedTo: null,
