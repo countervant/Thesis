@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Skeleton from "../../components/Skeleton/Skeleton.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.jsx";
 import { fileToDataUrl, getApiErrorMessage, getProjectOutputFileError, PROJECT_OUTPUT_FILE_ACCEPT, taskAPI } from "../../services/api.js";
+import { QUERY_KEYS } from "../../constants/queryKeys.js";
+import {
+  useTasksQuery,
+  useTaskDetailsQuery,
+  useTaskMutations,
+} from "../../hooks/index.js";
+import { unwrapData } from "../../utils/queryUtils.js";
 import progressIcon from "../../assets/progress.png";
 import pendingIcon from "../../assets/pending.png";
 import reviewIcon from "../../assets/Review.png";
@@ -1236,32 +1244,91 @@ const ClientProjectsSkeleton = () => (
 );
 
 const ClientProjects = () => {
+  const queryClient = useQueryClient();
+  const tasksParams = useMemo(() => ({ limit: 100, view: "client-projects" }), []);
+
+  const {
+    data: rawProjects = [],
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery(tasksParams);
+
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+
+  const {
+    data: rawProjectDetails,
+    isLoading: isLoadingProjectDetails,
+    error: projectDetailsError,
+  } = useTaskDetailsQuery(selectedProjectId);
+
+  const {
+    requestRevision: requestRevisionMutation,
+    approveTask: approveTaskMutation,
+    setArchived: setArchivedMutation,
+    setNewsfeedPermission: setNewsfeedPermissionMutation,
+    submitFeedback: submitFeedbackMutation,
+    invalidateTaskData,
+  } = useTaskMutations();
+
+  const isApprovingProject = approveTaskMutation.isPending;
+  const isArchivingProject = setArchivedMutation.isPending;
+  const isSubmittingFeedback = submitFeedbackMutation.isPending;
+  const isSubmittingRevision = requestRevisionMutation.isPending;
+  const isUpdatingPermission = setNewsfeedPermissionMutation.isPending;
+
   const [activeTab, setActiveTab] = useState("All Projects");
   const [approveProject, setApproveProject] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [feedbackProject, setFeedbackProject] = useState(null);
   const [feedbackSuccessProject, setFeedbackSuccessProject] = useState(null);
-  const [isApprovingProject, setIsApprovingProject] = useState(false);
-  const [isArchivingProject, setIsArchivingProject] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [projects, setProjects] = useState([]);
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
   const [revisionMessage, setRevisionMessage] = useState("");
   const [revisionProject, setRevisionProject] = useState(null);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [isLoadingProjectDetails, setIsLoadingProjectDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("Newest to Oldest");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [archiveAction, setArchiveAction] = useState(null);
   const [noticeMessage, setNoticeMessage] = useState("");
   const [permissionAction, setPermissionAction] = useState(null);
-  const [isUpdatingPermission, setIsUpdatingPermission] = useState(false);
   const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
   const noticeTimerRef = useRef(null);
+
+  const errorMessage =
+    localErrorMessage ||
+    (tasksError ? getApiErrorMessage(tasksError, "Unable to load projects.") : "") ||
+    (projectDetailsError ? getApiErrorMessage(projectDetailsError, "Unable to load project details.") : "");
+  const setErrorMessage = setLocalErrorMessage;
+
+  const projects = useMemo(() => {
+    const list = Array.isArray(rawProjects) ? rawProjects : [];
+    return list.map(normalizeProject);
+  }, [rawProjects]);
+
+  const selectedProject = useMemo(() => {
+    if (rawProjectDetails) return normalizeProject(rawProjectDetails);
+    if (selectedProjectId) {
+      return projects.find((item) => item.id === selectedProjectId) || null;
+    }
+    return null;
+  }, [projects, rawProjectDetails, selectedProjectId]);
+
+  const updateProjectInCache = useCallback(
+    (updatedTask) => {
+      const normalized = normalizeProject(updatedTask);
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.map((item) =>
+          getEntityId(item) === normalized.id ? normalized : item
+        );
+      });
+      if (selectedProjectId === normalized.id) {
+        queryClient.setQueryData(QUERY_KEYS.taskDetails(normalized.id), normalized);
+      }
+      invalidateTaskData(normalized.id);
+      return normalized;
+    },
+    [invalidateTaskData, queryClient, selectedProjectId, tasksParams]
+  );
 
   useEffect(() => () => {
     if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
@@ -1275,28 +1342,6 @@ const ClientProjects = () => {
       noticeTimerRef.current = null;
     }, 4000);
   };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadProjects = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
-        if (isMounted) setProjects(data.map(normalizeProject));
-      } catch (error) {
-        if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load projects."));
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    loadProjects();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     const openNotificationTarget = () => {
@@ -1316,34 +1361,6 @@ const ClientProjects = () => {
 
     openNotificationTarget();
   }, [isLoading, projects]);
-
-  useEffect(() => {
-    if (!selectedProjectId) return undefined;
-
-    let isCurrent = true;
-    const loadProjectDetails = async () => {
-      setSelectedProject(null);
-      setIsLoadingProjectDetails(true);
-      setErrorMessage("");
-
-      try {
-        const task = await taskAPI.getById(selectedProjectId, { refresh: true });
-        if (isCurrent) setSelectedProject(normalizeProject(task));
-      } catch (error) {
-        if (!isCurrent) return;
-        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
-        setSelectedProjectId("");
-      } finally {
-        if (isCurrent) setIsLoadingProjectDetails(false);
-      }
-    };
-
-    loadProjectDetails();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedProjectId]);
 
   const visibleProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -1405,17 +1422,16 @@ const ClientProjects = () => {
     const action = archiveAction;
     if (!action || isArchivingProject) return;
     try {
-      setIsArchivingProject(true);
       setErrorMessage("");
-      const updatedTask = await taskAPI.setArchived(action.project.id, action.archived);
-      const updatedProject = normalizeProject(updatedTask);
-      setProjects((currentProjects) => currentProjects.map((project) => project.id === updatedProject.id ? updatedProject : project));
+      const res = await setArchivedMutation.mutateAsync({
+        id: action.project.id,
+        archived: action.archived,
+      });
+      updateProjectInCache(unwrapData(res));
       setArchiveAction(null);
       showNotice(action.archived ? "Project moved to Archived." : "Project restored to My Projects.");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, action.archived ? "Unable to archive the project." : "Unable to restore the project."));
-    } finally {
-      setIsArchivingProject(false);
     }
   };
 
@@ -1423,25 +1439,17 @@ const ClientProjects = () => {
     if (isSubmittingRevision) return;
 
     try {
-      setIsSubmittingRevision(true);
       setErrorMessage("");
-      const updatedTask = await taskAPI.requestRevision(project.id, form);
-      const updatedProject = normalizeProject(updatedTask);
-      setProjects((currentProjects) =>
-        currentProjects.map((currentProject) =>
-          currentProject.id === updatedProject.id ? updatedProject : currentProject
-        )
-      );
-      setSelectedProject((currentProject) =>
-        currentProject?.id === updatedProject.id ? updatedProject : currentProject
-      );
+      const res = await requestRevisionMutation.mutateAsync({
+        id: project.id,
+        revision: form,
+      });
+      updateProjectInCache(unwrapData(res));
       setRevisionProject(null);
       setRevisionMessage(`Revision request submitted for ${project.title}.`);
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit revision request."));
-    } finally {
-      setIsSubmittingRevision(false);
     }
   };
 
@@ -1495,41 +1503,27 @@ const ClientProjects = () => {
     if (!project || isApprovingProject) return;
 
     try {
-      setIsApprovingProject(true);
       setErrorMessage("");
-      const updatedTask = await taskAPI.approve(project.id);
-      const updatedProject = normalizeProject(updatedTask);
-      setProjects((currentProjects) =>
-        currentProjects.map((currentProject) =>
-          currentProject.id === updatedProject.id ? updatedProject : currentProject
-        )
-      );
-      setSelectedProject((currentProject) =>
-        currentProject?.id === updatedProject.id ? updatedProject : currentProject
-      );
+      const res = await approveTaskMutation.mutateAsync(project.id);
+      updateProjectInCache(unwrapData(res));
       setApproveProject(null);
       showNotice(`${project.title} was approved.`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to approve the project."));
-    } finally {
-      setIsApprovingProject(false);
     }
   };
 
   const handleUpdateNewsfeedPermission = async () => {
     const action = permissionAction;
-    if (!action) return;
+    if (!action || isUpdatingPermission) return;
 
     try {
-      setIsUpdatingPermission(true);
       setErrorMessage("");
-      const updatedProject = normalizeProject(
-        await taskAPI.setNewsfeedPermission(action.project.id, action.allowed)
-      );
-      setProjects((currentProjects) =>
-        currentProjects.map((project) => project.id === updatedProject.id ? updatedProject : project)
-      );
-      setSelectedProject((project) => project?.id === updatedProject.id ? updatedProject : project);
+      const res = await setNewsfeedPermissionMutation.mutateAsync({
+        id: action.project.id,
+        allowed: action.allowed,
+      });
+      updateProjectInCache(unwrapData(res));
       setPermissionAction(null);
       showNotice(
         action.allowed
@@ -1539,8 +1533,6 @@ const ClientProjects = () => {
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to update newsfeed posting permission."));
       setPermissionAction(null);
-    } finally {
-      setIsUpdatingPermission(false);
     }
   };
 
@@ -1548,25 +1540,17 @@ const ClientProjects = () => {
     if (isSubmittingFeedback) return;
 
     try {
-      setIsSubmittingFeedback(true);
       setErrorMessage("");
-      const updatedTask = await taskAPI.submitFeedback(project.id, form);
-      const updatedProject = normalizeProject(updatedTask);
-      setProjects((currentProjects) =>
-        currentProjects.map((currentProject) =>
-          currentProject.id === updatedProject.id ? updatedProject : currentProject
-        )
-      );
-      setSelectedProject((currentProject) =>
-        currentProject?.id === updatedProject.id ? updatedProject : currentProject
-      );
+      const res = await submitFeedbackMutation.mutateAsync({
+        id: project.id,
+        feedback: form,
+      });
+      const updatedProject = updateProjectInCache(unwrapData(res));
       setFeedbackProject(null);
       setFeedbackSuccessProject(updatedProject);
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit feedback."));
-    } finally {
-      setIsSubmittingFeedback(false);
     }
   };
 

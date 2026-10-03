@@ -1,6 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { employeeAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useEmployeesQuery,
+  useEmployeeMutations,
+  useTasksQuery,
+} from "../../../hooks/index.js";
+import { getApiErrorMessage } from "../../../services/api.js";
 import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { getCountryFlag } from "../../../utils/countries.js";
@@ -430,112 +437,53 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
 const AdminEmployees = ({
   onAddEmployee,
   onEditEmployee,
-  refreshKey = 0,
 }) => {
-  const [employees, setEmployees] = useState([]);
+  const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const {
+    data: employeeData = [],
+    isLoading: isEmployeesLoading,
+    error: employeesError,
+  } = useEmployeesQuery({ limit: 100 }, { refetchInterval: 30000 });
 
-    const loadEmployees = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const [employeeData, taskData] = await Promise.all([
-          employeeAPI.getAllFresh({ limit: 100 }),
-          taskAPI.getAll({ limit: 100, refresh: true, view: "employee" }),
-        ]);
+  const {
+    data: taskData = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery({ limit: 100, view: "employee" });
 
-        if (isMounted) {
-          const tasksByEmployee = new Map();
+  const { deleteEmployee: deleteEmployeeMutation } = useEmployeeMutations();
 
-          taskData.forEach((sourceTask) => {
-            const task = normalizeAssignedTask(sourceTask);
-            if (task.archived || task.status === "done") return;
+  const employees = useMemo(() => {
+    if (!Array.isArray(employeeData)) return [];
+    const tasksByEmployee = new Map();
+    const safeTaskData = Array.isArray(taskData) ? taskData : [];
 
-            getAssignedEmployeeIds(sourceTask).forEach((employeeId) => {
-              const assignedTasks = tasksByEmployee.get(employeeId) || [];
-              assignedTasks.push(task);
-              tasksByEmployee.set(employeeId, assignedTasks);
-            });
-          });
+    safeTaskData.forEach((sourceTask) => {
+      const task = normalizeAssignedTask(sourceTask);
+      if (task.archived || task.status === "done") return;
 
-          setEmployees(
-            employeeData.map((employee) => {
-              const normalizedEmployee = normalizeEmployee(employee);
-              return {
-                ...normalizedEmployee,
-                assignedTasks: [...(tasksByEmployee.get(normalizedEmployee.id) || [])].sort(
-                  sortAssignedTasks
-                ),
-              };
-            })
-          );
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load employees."));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
+      getAssignedEmployeeIds(sourceTask).forEach((employeeId) => {
+        const assignedTasks = tasksByEmployee.get(employeeId) || [];
+        assignedTasks.push(task);
+        tasksByEmployee.set(employeeId, assignedTasks);
+      });
+    });
 
-    loadEmployees();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const refreshPresence = async () => {
-      try {
-        const employeeData = await employeeAPI.getAllFresh({ limit: 100 });
-        if (!isMounted) return;
-
-        const presenceById = new Map(
-          employeeData.map((employee) => [getEntityId(employee), employee])
-        );
-        setEmployees((currentEmployees) =>
-          currentEmployees.map((employee) => {
-            const freshEmployee = presenceById.get(employee.id);
-            if (!freshEmployee) return employee;
-
-            return {
-              ...employee,
-              isActive: freshEmployee.isActive !== false,
-              status: freshEmployee.isActive ? "Active" : "Inactive",
-              isOnline: freshEmployee.isOnline === true,
-              lastSeen: freshEmployee.lastSeen || "",
-            };
-          })
-        );
-      } catch {
-        // Keep the last known presence until the next refresh.
-      }
-    };
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshPresence();
-    };
-    const intervalId = window.setInterval(refreshWhenVisible, 30000);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, []);
+    return employeeData.map((employee) => {
+      const normalizedEmployee = normalizeEmployee(employee);
+      return {
+        ...normalizedEmployee,
+        assignedTasks: [...(tasksByEmployee.get(normalizedEmployee.id) || [])].sort(
+          sortAssignedTasks
+        ),
+      };
+    });
+  }, [employeeData, taskData]);
 
   const visibleEmployees = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -575,12 +523,13 @@ const AdminEmployees = ({
   const deleteEmployee = async (employee) => {
     try {
       setErrorMessage("");
-      await employeeAPI.delete(employee.id);
-      setEmployees((currentEmployees) =>
-        currentEmployees.filter((currentEmployee) => currentEmployee.id !== employee.id)
-      );
+      await deleteEmployeeMutation.mutateAsync(employee.id);
+      queryClient.setQueryData(QUERY_KEYS.employees({ limit: 100 }), (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((item) => getEntityId(item) !== employee.id);
+      });
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to delete employee.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to delete employee."));
     }
   };
 
@@ -597,6 +546,14 @@ const AdminEmployees = ({
     ]);
     downloadCsv([header, ...rows], "employees.csv");
   };
+
+  const queryError = employeesError || tasksError;
+  const displayErrorMessage =
+    errorMessage ||
+    (queryError
+      ? getApiErrorMessage(queryError, "Unable to load employees.")
+      : "");
+  const isLoading = isEmployeesLoading || isTasksLoading;
 
   return (
         <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 dark:bg-neutral-950 md:px-5 lg:px-6">
@@ -664,9 +621,9 @@ const AdminEmployees = ({
           </section>
 
           <section className="mt-5 grid gap-4 xl:grid-cols-2">
-            {errorMessage && (
+            {displayErrorMessage && (
               <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-100 lg:col-span-2">
-                {errorMessage}
+                {displayErrorMessage}
               </p>
             )}
 

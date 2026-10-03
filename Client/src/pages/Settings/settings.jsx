@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import settingsIcon from "../../assets/settings.png";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useProfileQuery } from "../../hooks/index.js";
 import { authAPI, getApiErrorMessage } from "../../services/api.js";
 import NotificationSettings from "./notification.jsx";
 import PrivacySettings from "./privacy.jsx";
@@ -53,6 +54,8 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
 
 const Settings = () => {
   const { user, logout } = useAuth();
+  const { data: profile } = useProfileQuery();
+  const activeUser = profile || user;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Profile");
   const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
@@ -65,10 +68,10 @@ const Settings = () => {
   const isPrivacyTab = activeTab === "Privacy";
   const usesFullContent = isSecurityTab || isNotificationTab || isPrivacyTab;
   const overviewItems = [
-    ["Account Created", formatAccountDate(user?.createdAt), "calendar"],
-    ["Last Activity", formatAccountDate(user?.lastSeen || user?.updatedAt, true), "clock"],
+    ["Account Created", formatAccountDate(activeUser?.createdAt), "calendar"],
+    ["Last Activity", formatAccountDate(activeUser?.lastSeen || activeUser?.updatedAt, true), "clock"],
     ["Active Session", "This device", "monitor"],
-    ["Security Status", user?.twoFactorEnabled ? "Two-factor enabled" : "Password protected", "shield"],
+    ["Security Status", activeUser?.twoFactorEnabled ? "Two-factor enabled" : "Password protected", "shield"],
   ];
 
   const openPasswordSettings = () => {
@@ -149,14 +152,14 @@ const Settings = () => {
 
           <main className="min-w-0 space-y-3">
             {isSecurityTab ? (
-              <SecuritySettings user={user} />
+              <SecuritySettings user={activeUser} />
             ) : isNotificationTab ? (
-              <NotificationSettings user={user} />
+              <NotificationSettings user={activeUser} />
             ) : isPrivacyTab ? (
-              <PrivacySettings user={user} />
+              <PrivacySettings user={activeUser} />
             ) : (
               <>
-                <ProfileSettings user={user} />
+                <ProfileSettings user={activeUser} />
                 <div className="flex items-center justify-stretch gap-3 md:justify-end">
                   <button
                     type="submit"

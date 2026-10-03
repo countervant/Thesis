@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Skeleton from "../../components/Skeleton/Skeleton.jsx";
-import { getApiErrorMessage, calendarAPI, messageAPI, taskAPI } from "../../services/api.js";
+import { QUERY_KEYS } from "../../constants/queryKeys.js";
+import { useTasksQuery, useCalendarQuery } from "../../hooks/index.js";
+import { getApiErrorMessage, messageAPI } from "../../services/api.js";
 
 const statusFromApi = {
   pending: "Pending",
@@ -271,58 +274,54 @@ const ClientDashboardSkeleton = () => (
 );
 
 const ClientDashboard = ({ onNavigate }) => {
-  const [tasks, setTasks] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [messagePreviews, setMessagePreviews] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
 
-  useEffect(() => {
-    let isMounted = true;
+  const {
+    data: rawTasks = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery({ view: "client" });
 
-    const loadDashboard = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const now = new Date();
-        const currentMonth = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
-        const [taskResult, unreadResult, meetingResult, threadResult] = await Promise.allSettled([
-          taskAPI.getAll({ limit: 100, view: "dashboard" }),
-          messageAPI.getUnreadCount(),
-          calendarAPI.getAll({ month: currentMonth }),
-          messageAPI.getThreads({ limit: 3 }),
-        ]);
+  const {
+    data: rawMeetings = [],
+    isLoading: isCalendarLoading,
+    error: calendarError,
+  } = useCalendarQuery({ month: currentMonth });
 
-        if (!isMounted) return;
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: QUERY_KEYS.unreadMessages(),
+    queryFn: () => messageAPI.getUnreadCount(),
+  });
 
-        if (taskResult.status === "fulfilled") {
-          setTasks(taskResult.value.map(normalizeTask));
-        } else {
-          setErrorMessage(getApiErrorMessage(taskResult.reason, "Unable to load client dashboard."));
-        }
+  const { data: rawThreads = [] } = useQuery({
+    queryKey: ["messages", "threads", JSON.stringify({ limit: 3 })],
+    queryFn: async () => {
+      const res = await messageAPI.getThreads({ limit: 3 });
+      return Array.isArray(res) ? res : [];
+    },
+  });
 
-        if (unreadResult.status === "fulfilled") {
-          setUnreadCount(unreadResult.value);
-        }
+  const tasks = useMemo(() => {
+    const list = Array.isArray(rawTasks) ? rawTasks : [];
+    return list.map(normalizeTask);
+  }, [rawTasks]);
 
-        if (meetingResult.status === "fulfilled") {
-          setMeetings(meetingResult.value.map(normalizeMeeting));
-        }
+  const meetings = useMemo(() => {
+    const list = Array.isArray(rawMeetings) ? rawMeetings : [];
+    return list.map(normalizeMeeting);
+  }, [rawMeetings]);
 
-        if (threadResult.status === "fulfilled") {
-          setMessagePreviews(threadResult.value.map(normalizeMessagePreview));
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
+  const messagePreviews = useMemo(() => {
+    const list = Array.isArray(rawThreads) ? rawThreads : [];
+    return list.map(normalizeMessagePreview);
+  }, [rawThreads]);
 
-    loadDashboard();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const isLoading = isTasksLoading || isCalendarLoading;
+  const queryError = tasksError || calendarError;
+  const errorMessage = queryError
+    ? getApiErrorMessage(queryError, "Unable to load client dashboard.")
+    : "";
 
   const dashboardData = useMemo(() => {
     const sortedTasks = [...tasks].sort((first, second) => {

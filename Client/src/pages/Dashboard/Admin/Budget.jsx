@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { budgetAPI, getApiErrorMessage } from "../../../services/api.js";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { budgetAPI, budgetPlannerAPI, getApiErrorMessage } from "../../../services/api.js";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import { useBudgetMutations } from "../../../hooks/useBudgetQuery.js";
 import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import balanceIcon from "../../../assets/balance.png";
 import totalExpenseIcon from "../../../assets/totalexpense.png";
@@ -559,7 +562,7 @@ const deduplicateBudgetEntries = (pages) => {
   return entries;
 };
 
-const loadAllBudgetEntries = async (dataAPI, isCurrentRequest) => {
+const loadAllBudgetEntries = async (dataAPI) => {
   if (typeof dataAPI.getPage !== "function") {
     const entries = await dataAPI.getAll();
     return {
@@ -574,15 +577,12 @@ const loadAllBudgetEntries = async (dataAPI, isCurrentRequest) => {
     limit: BUDGET_FETCH_PAGE_SIZE,
     refresh: true,
   });
-  if (!isCurrentRequest()) return null;
 
   const totalPages = Math.max(Math.ceil(Number(firstPage.totalPages) || 1), 1);
   const loadedPages = [firstPage];
   const failedPages = [];
 
   for (let page = 2; page <= totalPages; page += BUDGET_FETCH_CONCURRENCY) {
-    if (!isCurrentRequest()) return null;
-
     const pageNumbers = Array.from(
       {
         length: Math.min(
@@ -601,7 +601,6 @@ const loadAllBudgetEntries = async (dataAPI, isCurrentRequest) => {
         })
       )
     );
-    if (!isCurrentRequest()) return null;
 
     results.forEach((result, index) => {
       if (result.status === "fulfilled") {
@@ -622,69 +621,39 @@ const loadAllBudgetEntries = async (dataAPI, isCurrentRequest) => {
   };
 };
 
-const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }) => {
-  const [budgetEntries, setBudgetEntries] = useState([]);
+const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry }) => {
+  const queryClient = useQueryClient();
+  const queryType = dataAPI === budgetPlannerAPI ? "planner" : "admin";
+  const {
+    data: budgetResult,
+    isLoading,
+    error: budgetError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.budget(queryType, "all"),
+    queryFn: () => loadAllBudgetEntries(dataAPI),
+  });
+
+  const { invalidateBudgetData } = useBudgetMutations(dataAPI);
+
+  const budgetEntries = useMemo(() => {
+    if (!budgetResult?.entries) return [];
+    return budgetResult.entries.map(normalizeEntry);
+  }, [budgetResult]);
+
   const [actionErrorMessage, setActionErrorMessage] = useState("");
-  const [loadErrorMessage, setLoadErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [entryToDelete, setEntryToDelete] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("All Types");
   const [sortOrder, setSortOrder] = useState("Newest");
   const [currentPage, setCurrentPage] = useState(1);
-  const loadGeneration = useRef(0);
   const pageSize = 7;
 
-  useEffect(() => {
-    const requestGeneration = loadGeneration.current + 1;
-    loadGeneration.current = requestGeneration;
-    const isCurrentRequest = () => loadGeneration.current === requestGeneration;
-
-    const loadBudgets = async () => {
-      try {
-        setIsLoading(true);
-        setActionErrorMessage("");
-        setLoadErrorMessage("");
-        setBudgetEntries([]);
-        const result = await loadAllBudgetEntries(dataAPI, isCurrentRequest);
-
-        if (!result || !isCurrentRequest()) return;
-
-        setBudgetEntries(result.entries.map(normalizeEntry));
-        if (
-          result.failedPages.length > 0 ||
-          result.entries.length !== result.expectedTotal
-        ) {
-          const failedPageMessage = result.failedPages.length > 0
-            ? `${result.failedPages.length} page${result.failedPages.length === 1 ? "" : "s"} could not be loaded`
-            : "the dataset changed while pages were loading";
-          setLoadErrorMessage(
-            `Budget data is incomplete because ${failedPageMessage}. Totals, charts, filters, month lists, and transactions may be incomplete. Refresh to retry.`
-          );
-        }
-      } catch (error) {
-        if (isCurrentRequest()) {
-          setBudgetEntries([]);
-          setLoadErrorMessage(
-            getApiErrorMessage(error, "Unable to load budget entries.")
-          );
-        }
-      } finally {
-        if (isCurrentRequest()) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadBudgets();
-
-    return () => {
-      if (loadGeneration.current === requestGeneration) {
-        loadGeneration.current += 1;
-      }
-    };
-  }, [dataAPI, refreshKey]);
+  const loadErrorMessage = budgetError
+    ? getApiErrorMessage(budgetError, "Unable to load budget entries.")
+    : budgetResult?.failedPages?.length
+      ? `${budgetResult.failedPages.length} page${budgetResult.failedPages.length === 1 ? "" : "s"} could not be loaded. Totals, charts, filters, month lists, and transactions may be incomplete. Refresh to retry.`
+      : "";
 
   const monthOptions = useMemo(() => {
     const months = Array.from(
@@ -756,9 +725,14 @@ const Budget = ({ dataAPI = budgetAPI, onAddEntry, onEditEntry, refreshKey = 0 }
     try {
       setActionErrorMessage("");
       await dataAPI.delete(entryId);
-      setBudgetEntries((currentEntries) =>
-        currentEntries.filter((entry) => entry.id !== entryId)
-      );
+      queryClient.setQueryData(QUERY_KEYS.budget(queryType, "all"), (old) => {
+        if (!old?.entries) return old;
+        return {
+          ...old,
+          entries: old.entries.filter((entry) => (entry.id || entry._id) !== entryId),
+        };
+      });
+      invalidateBudgetData();
     } catch (error) {
       setActionErrorMessage(
         error.response?.data?.message || "Unable to delete budget entry."

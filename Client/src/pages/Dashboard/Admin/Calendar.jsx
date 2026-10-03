@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { authAPI, calendarAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useCalendarQuery,
+  useCalendarMutations,
+  useTasksQuery,
+  useAssigneesQuery,
+} from "../../../hooks/index.js";
+import { unwrapData } from "../../../utils/queryUtils.js";
+import { getApiErrorMessage } from "../../../services/api.js";
 
 const calendarChecks = [
   ["Company Events", "bg-violet-500"],
@@ -187,32 +196,6 @@ const normalizeTaskEvent = (task) => ({
   calendarClass: calendarStyles["Tasks & Projects"],
 });
 
-const loadCalendarSources = async (currentMonth) => {
-  const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
-  const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
-  const [calendarResult, taskResult] = await Promise.allSettled([
-    calendarAPI.getAll({ month: monthKey(currentMonth) }),
-    taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 100, view: "calendar" }),
-  ]);
-  const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
-  const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];
-
-  const unavailableSources = [
-    calendarResult.status === "rejected" ? "calendar events" : "",
-    taskResult.status === "rejected" ? "project deadlines" : "",
-  ].filter(Boolean);
-
-  return {
-    events: [
-      ...calendarEvents.map(normalizeEvent),
-      ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
-    ],
-    warning: unavailableSources.length
-      ? `Some calendar data could not be loaded (${unavailableSources.join(" and ")}). Refresh to retry.`
-      : "",
-  };
-};
-
 const emptyEventForm = (date) => ({
   id: "",
   title: "",
@@ -332,81 +315,64 @@ const EventListTable = ({ events, onEdit, onDelete, employeeNames, compact = fal
 );
 
 const AdminCalendar = () => {
+  const queryClient = useQueryClient();
   const today = new Date();
   const todayKey = toDateKey(today);
   const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(() => todayKey);
   const [enabledCalendars, setEnabledCalendars] = useState(() => Object.fromEntries(calendarChecks.map(([item]) => [item, true])));
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
-  const [events, setEvents] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [eventForm, setEventForm] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAllEventsPanel, setShowAllEventsPanel] = useState(false);
   const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
-  const [sourceErrorMessage, setSourceErrorMessage] = useState("");
-  const [assigneeErrorMessage, setAssigneeErrorMessage] = useState("");
   const [actionErrorMessage, setActionErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  const employeeNames = useMemo(() => new Map(employees.map((employee) => [getEntityId(employee), getPersonName(employee)])), [employees]);
+  const activeMonthKey = monthKey(currentMonth);
+  const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+  const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
 
-  useEffect(() => {
-    let isActive = true;
+  const {
+    data: rawCalendarEvents = [],
+    isLoading: isCalendarLoading,
+    error: calendarError,
+  } = useCalendarQuery({ month: activeMonthKey });
 
-    const loadCalendarData = async () => {
-      setIsLoading(true);
+  const {
+    data: rawTasks = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery({ dueFrom: monthStart, dueTo: monthEnd, limit: 100, view: "calendar" });
 
-      try {
-        const { events: calendarEvents, warning } = await loadCalendarSources(currentMonth);
+  const {
+    data: rawAssignees = [],
+    isLoading: isAssigneesLoading,
+    error: assigneesError,
+  } = useAssigneesQuery();
 
-        if (isActive) {
-          setEvents(calendarEvents);
-          setSourceErrorMessage(warning);
-        }
-      } catch (error) {
-        if (isActive) {
-          setSourceErrorMessage(getApiErrorMessage(error, "Unable to load calendar."));
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
+  const { createEvent, updateEvent, deleteEvent } = useCalendarMutations();
+  const isSaving = createEvent.isPending || updateEvent.isPending;
+  const isDeleting = deleteEvent.isPending;
 
-    void loadCalendarData();
+  const employees = useMemo(() => {
+    if (!Array.isArray(rawAssignees)) return [];
+    return rawAssignees.filter((person) => person?.role === "employee");
+  }, [rawAssignees]);
 
-    return () => {
-      isActive = false;
-    };
-  }, [currentMonth]);
+  const employeeNames = useMemo(
+    () => new Map(employees.map((employee) => [getEntityId(employee), getPersonName(employee)])),
+    [employees]
+  );
 
-  useEffect(() => {
-    let isActive = true;
+  const events = useMemo(() => {
+    const calendarEvents = Array.isArray(rawCalendarEvents) ? rawCalendarEvents : [];
+    const tasks = Array.isArray(rawTasks) ? rawTasks : [];
 
-    authAPI
-      .getAssignees()
-      .then((data) => {
-        if (isActive) {
-          setEmployees(data.filter((person) => person?.role === "employee"));
-          setAssigneeErrorMessage("");
-        }
-      })
-      .catch((error) => {
-        if (isActive) {
-          setAssigneeErrorMessage(
-            getApiErrorMessage(error, "Unable to load calendar employees.")
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+    return [
+      ...calendarEvents.map(normalizeEvent),
+      ...tasks.filter((task) => task?.dueDate).map(normalizeTaskEvent),
+    ];
+  }, [rawCalendarEvents, rawTasks]);
 
   const monthEvents = useMemo(() => {
     return events.filter((event) => {
@@ -415,12 +381,16 @@ const AdminCalendar = () => {
   }, [enabledCalendars, events]);
 
   const sortedMonthEvents = useMemo(() => {
-    return [...monthEvents].sort((first, second) => first.dateKey.localeCompare(second.dateKey) || first.startTime.localeCompare(second.startTime));
+    return [...monthEvents].sort(
+      (first, second) =>
+        first.dateKey.localeCompare(second.dateKey) ||
+        first.startTime.localeCompare(second.startTime)
+    );
   }, [monthEvents]);
 
   const selectedDayEvents = useMemo(
     () => sortedMonthEvents.filter((event) => event.dateKey === selectedDate),
-    [selectedDate, sortedMonthEvents],
+    [selectedDate, sortedMonthEvents]
   );
 
   const stats = [
@@ -480,23 +450,34 @@ const AdminCalendar = () => {
     };
 
     try {
-      setIsSaving(true);
       setActionErrorMessage("");
-      const savedEvent = eventForm.id
-        ? await calendarAPI.update(eventForm.id, payload)
-        : await calendarAPI.create(payload);
-      const normalizedEvent = normalizeEvent(savedEvent);
-      const belongsToCurrentMonth = sameMonth(new Date(normalizedEvent.date), currentMonth);
+      const savedResult = eventForm.id
+        ? await updateEvent.mutateAsync({ id: eventForm.id, event: payload })
+        : await createEvent.mutateAsync(payload);
+      const savedEvent = unwrapData(savedResult);
 
-      setEvents((currentEvents) => [
-        ...currentEvents.filter((currentEvent) => currentEvent.id !== normalizedEvent.id),
-        ...(belongsToCurrentMonth ? [normalizedEvent] : []),
-      ]);
+      if (savedEvent) {
+        queryClient.setQueryData(
+          QUERY_KEYS.calendar({ month: activeMonthKey }),
+          (old) => {
+            const oldList = Array.isArray(old) ? old : [];
+            const savedId = savedEvent._id || savedEvent.id;
+            const exists = oldList.some((item) => (item._id || item.id) === savedId);
+            if (exists) {
+              return oldList.map((item) =>
+                (item._id || item.id) === savedId ? savedEvent : item
+              );
+            }
+            if (sameMonth(new Date(savedEvent.date), currentMonth)) {
+              return [...oldList, savedEvent];
+            }
+            return oldList;
+          }
+        );
+      }
       setEventForm(null);
     } catch (error) {
       setActionErrorMessage(getApiErrorMessage(error, "Unable to save this event."));
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -504,18 +485,19 @@ const AdminCalendar = () => {
     if (!deleteTarget || isDeleting) return;
 
     try {
-      setIsDeleting(true);
       setActionErrorMessage("");
-      await calendarAPI.delete(deleteTarget.id);
-      setEvents((currentEvents) =>
-        currentEvents.filter((currentEvent) => currentEvent.id !== deleteTarget.id)
+      await deleteEvent.mutateAsync(deleteTarget.id);
+      queryClient.setQueryData(
+        QUERY_KEYS.calendar({ month: activeMonthKey }),
+        (old) => {
+          if (!Array.isArray(old)) return [];
+          return old.filter((item) => (item._id || item.id) !== deleteTarget.id);
+        }
       );
       setDeleteTarget(null);
       setShowAllEventsPanel(false);
     } catch (error) {
       setActionErrorMessage(getApiErrorMessage(error, "Unable to delete this event."));
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -534,13 +516,24 @@ const AdminCalendar = () => {
     setSelectedDate(toDateKey(today));
   };
 
+  const unavailableSources = [
+    calendarError ? "calendar events" : "",
+    tasksError ? "project deadlines" : "",
+  ].filter(Boolean);
+
+  const queryWarning = unavailableSources.length
+    ? `Some calendar data could not be loaded (${unavailableSources.join(" and ")}). Refresh to retry.`
+    : "";
+
   const errorMessage = [
-    sourceErrorMessage,
-    assigneeErrorMessage,
+    queryWarning,
+    assigneesError ? getApiErrorMessage(assigneesError, "Unable to load calendar employees.") : "",
     actionErrorMessage,
   ]
     .filter(Boolean)
     .join(" ");
+
+  const isLoading = isCalendarLoading || isTasksLoading || isAssigneesLoading;
 
   return (
     <div className="-mb-8 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#f8f9fd] px-4 py-4 text-[#111936] md:px-5 lg:px-6">

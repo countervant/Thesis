@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
   ChevronLeft,
@@ -14,10 +15,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { getApiErrorMessage, taskAPI } from "../../services/api.js";
+import { getApiErrorMessage } from "../../services/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar.jsx";
+import { QUERY_KEYS } from "../../constants/queryKeys.js";
+import { useTasksQuery, useTaskMutations } from "../../hooks/index.js";
+import { unwrapData } from "../../utils/queryUtils.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const ratingColors = ["#7c3aed", "#a855f7", "#ec4899", "#fb923c", "#94a3b8"];
@@ -229,8 +233,9 @@ const FeedbackDetails = ({ item, onClose }) => {
 
 const ReplyModal = ({ item, onClose, onSent }) => {
   const [message, setMessage] = useState(item?.reply?.message || "");
-  const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const { replyToFeedback } = useTaskMutations();
+  const isSending = replyToFeedback.isPending;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -241,16 +246,13 @@ const ReplyModal = ({ item, onClose, onSent }) => {
     }
 
     try {
-      setIsSending(true);
       setErrorMessage("");
       const wasEditing = Boolean(item.reply?.message);
-      const updatedTask = await taskAPI.replyToFeedback(item.id, reply);
+      const res = await replyToFeedback.mutateAsync({ id: item.id, message: reply });
       setMessage("");
-      onSent(updatedTask, wasEditing);
+      onSent(unwrapData(res), wasEditing);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to send your reply."));
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -278,9 +280,26 @@ const ReplyModal = ({ item, onClose, onSent }) => {
 
 const Feedback = () => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const queryClient = useQueryClient();
+  const tasksParams = useMemo(() => ({ limit: 100, view: "feedback" }), []);
+
+  const {
+    data: rawTasks = [],
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery(tasksParams);
+
+  const { deleteFeedback: deleteFeedbackMutation, invalidateTaskData } = useTaskMutations();
+  const isDeleting = deleteFeedbackMutation.isPending;
+
+  const tasks = useMemo(() => {
+    return Array.isArray(rawTasks) ? rawTasks : [];
+  }, [rawTasks]);
+
+  const errorMessage = tasksError
+    ? getApiErrorMessage(tasksError, "Unable to load client feedback.")
+    : "";
+
   const [search, setSearch] = useState("");
   const [ratingFilter, setRatingFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -289,7 +308,6 @@ const Feedback = () => {
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [replyTarget, setReplyTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const noticeTimerRef = useRef(null);
@@ -306,24 +324,6 @@ const Feedback = () => {
       noticeTimerRef.current = null;
     }, 4500);
   };
-
-  useEffect(() => {
-    let mounted = true;
-    const loadFeedback = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100 });
-        if (mounted) setTasks(data);
-      } catch (error) {
-        if (mounted) setErrorMessage(getApiErrorMessage(error, "Unable to load client feedback."));
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-    loadFeedback();
-    return () => { mounted = false; };
-  }, []);
 
   const feedback = useMemo(() => tasks.flatMap((task) => {
     const entry = task?.feedback;
@@ -412,9 +412,16 @@ const Feedback = () => {
     setPage(1);
   };
 
-  const handleReplySent = (updatedTask, wasEditing) => {
+  const handleReplySent = (updatedResult, wasEditing) => {
+    const updatedTask = unwrapData(updatedResult);
     const updatedId = updatedTask?._id || updatedTask?.id;
-    setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
+    queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+      const list = Array.isArray(old) ? old : [];
+      return list.map((task) =>
+        (task?._id || task?.id) === updatedId ? updatedTask : task
+      );
+    });
+    invalidateTaskData(updatedId);
     setReplyTarget(null);
     showNotice(wasEditing ? "Reply updated successfully." : "Reply sent. The client can now view it in their project and notifications.");
   };
@@ -423,18 +430,22 @@ const Feedback = () => {
     if (!deleteTarget || isDeleting) return;
 
     try {
-      setIsDeleting(true);
       setDeleteError("");
-      const updatedTask = await taskAPI.deleteFeedback(deleteTarget.id);
-      const updatedId = updatedTask?._id || updatedTask?.id;
-      setTasks((currentTasks) => currentTasks.map((task) => (task?._id || task?.id) === updatedId ? updatedTask : task));
+      const res = await deleteFeedbackMutation.mutateAsync(deleteTarget.id);
+      const updatedTask = unwrapData(res);
+      const updatedId = updatedTask?._id || updatedTask?.id || deleteTarget.id;
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.map((task) =>
+          (task?._id || task?.id) === updatedId ? updatedTask : task
+        );
+      });
+      invalidateTaskData(updatedId);
       setSelectedFeedback((current) => current?.id === deleteTarget.id ? null : current);
       setDeleteTarget(null);
       showNotice("Feedback deleted successfully.");
     } catch (error) {
       setDeleteError(getApiErrorMessage(error, "Unable to delete feedback."));
-    } finally {
-      setIsDeleting(false);
     }
   };
 

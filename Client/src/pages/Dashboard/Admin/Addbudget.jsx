@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBudgetMutations } from "../../../hooks/index.js";
 import { budgetAPI } from "../../../services/api.js";
 
 const formatDateValue = (date) => {
@@ -59,7 +60,8 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
   const isEditing = Boolean(entry?.id);
   const [formData, setFormData] = useState(() => createInitialForm(entry));
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { createEntry, updateEntry } = useBudgetMutations(dataAPI);
+  const isSubmitting = createEntry.isPending || updateEntry.isPending;
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({
@@ -103,7 +105,6 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
     }
 
     try {
-      setIsSubmitting(true);
       setErrorMessage("");
 
       const payload = {
@@ -115,9 +116,9 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
       };
 
       if (isEditing) {
-        await dataAPI.update(entry.id, payload);
+        await updateEntry.mutateAsync({ id: entry.id, entry: payload });
       } else {
-        await dataAPI.create(payload);
+        await createEntry.mutateAsync(payload);
       }
 
       onBudgetSaved?.();
@@ -126,8 +127,6 @@ const Addbudget = ({ dataAPI = budgetAPI, entry, onBudgetSaved, onNavigate }) =>
         error.response?.data?.message ||
           `Unable to ${isEditing ? "update" : "create"} budget entry.`
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

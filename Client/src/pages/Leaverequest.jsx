@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import pendingrequest from "../assets/pendingrequest.png";
 import done from "../assets/done.png";
 import reject from "../assets/reject.png";
@@ -9,7 +10,12 @@ import deleteIcon from "../assets/delete.png";
 import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
 import { SkeletonRows } from "../components/Skeleton/Skeleton.jsx";
-import { getApiErrorMessage, leaveRequestAPI } from "../services/api";
+import { getApiErrorMessage } from "../services/api";
+import { QUERY_KEYS } from "../constants/queryKeys.js";
+import {
+  useLeaveRequestsQuery,
+  useLeaveRequestMutations,
+} from "../hooks/index.js";
 
 const toneStyles = {
   orange: "bg-orange-50 text-orange-500 ring-orange-100",
@@ -266,59 +272,66 @@ const monthMatches = (request, monthDate) => {
 };
 
 const LeaveRequest = () => {
+  const queryClient = useQueryClient();
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const tabs = ["All", "Pending", "Approved", "Returned", "Rejected"];
-  const [requests, setRequests] = useState([]);
-  const [summary, setSummary] = useState({});
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [monthFilter, setMonthFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
   const [requestToDelete, setRequestToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
 
-  const loadLeaveRequests = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
-      const params = {
-        limit: 100,
-        month: monthFilter,
-      };
-
-      if (statusFilter !== "All") params.status = statusFilter;
-
-      const response = await leaveRequestAPI.getAll(params);
-      const nextRequests = response.leaveRequests.map(normalizeRequest);
-      setRequests(nextRequests);
-      setSelectedRequestId((currentId) =>
-        nextRequests.some((request) => getRequestId(request) === currentId)
-          ? currentId
-          : getRequestId(nextRequests[0])
-      );
-      setSummary(response.summary || {});
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
-      setRequests([]);
-      setSelectedRequestId("");
-    } finally {
-      setIsLoading(false);
-    }
+  const leaveParams = useMemo(() => {
+    const params = { limit: 100, month: monthFilter };
+    if (statusFilter !== "All") params.status = statusFilter;
+    return params;
   }, [monthFilter, statusFilter]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(loadLeaveRequests, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadLeaveRequests]);
+  const {
+    data: leaveData,
+    isLoading,
+    error: leaveError,
+  } = useLeaveRequestsQuery(leaveParams);
 
+  const {
+    updateStatus: updateStatusMutation,
+    addComment: addCommentMutation,
+    deleteRequest: deleteRequestMutation,
+  } = useLeaveRequestMutations();
+
+  const isDeleting = deleteRequestMutation.isPending;
+
+  const errorMessage =
+    localErrorMessage ||
+    (leaveError ? getApiErrorMessage(leaveError, "Unable to load leave requests.") : "");
+  const setErrorMessage = setLocalErrorMessage;
+
+  const requests = useMemo(() => {
+    if (!leaveData) return [];
+    const list = Array.isArray(leaveData.leaveRequests)
+      ? leaveData.leaveRequests
+      : Array.isArray(leaveData)
+      ? leaveData
+      : [];
+    return list.map(normalizeRequest);
+  }, [leaveData]);
+
+  const summary = useMemo(() => {
+    if (leaveData?.summary && Object.keys(leaveData.summary).length > 0) {
+      return leaveData.summary;
+    }
+    return {};
+  }, [leaveData]);
+
+  const effectiveSelectedId =
+    selectedRequestId || (requests[0] ? getRequestId(requests[0]) : "");
   const selectedRequest =
-    requests.find((request) => getRequestId(request) === selectedRequestId) || requests[0] || null;
+    requests.find((request) => getRequestId(request) === effectiveSelectedId) || null;
   const detailRequest =
     requests.find((request) => getRequestId(request) === detailRequestId) || null;
 
@@ -390,9 +403,18 @@ const LeaveRequest = () => {
   const updateRequestInState = (updatedRequest) => {
     const normalizedRequest = normalizeRequest(updatedRequest);
     const requestId = getRequestId(normalizedRequest);
-    setRequests((currentRequests) =>
-      currentRequests.map((item) => (getRequestId(item) === requestId ? normalizedRequest : item))
-    );
+    queryClient.setQueryData(QUERY_KEYS.leaveRequests(leaveParams), (old) => {
+      if (!old) return old;
+      const currentList = Array.isArray(old.leaveRequests)
+        ? old.leaveRequests
+        : Array.isArray(old)
+        ? old
+        : [];
+      const updatedList = currentList.map((item) =>
+        getRequestId(item) === requestId ? { ...item, ...normalizedRequest } : item
+      );
+      return Array.isArray(old) ? updatedList : { ...old, leaveRequests: updatedList };
+    });
     setSelectedRequestId(requestId);
     setDetailRequestId((currentId) => (currentId === requestId ? requestId : currentId));
   };
@@ -407,10 +429,9 @@ const LeaveRequest = () => {
     try {
       setBusyRequestId(requestId);
       setErrorMessage("");
-      const updatedRequest = await leaveRequestAPI.updateStatus(requestId, status, comment);
+      const updatedRequest = await updateStatusMutation.mutateAsync({ id: requestId, status, comment });
       updateRequestInState(updatedRequest);
       if (comment) setCommentText("");
-      await loadLeaveRequests();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, `Unable to ${status.toLowerCase()} leave request.`));
     } finally {
@@ -432,7 +453,7 @@ const LeaveRequest = () => {
     try {
       setBusyRequestId(requestId);
       setErrorMessage("");
-      const updatedRequest = await leaveRequestAPI.comment(requestId, text);
+      const updatedRequest = await addCommentMutation.mutateAsync({ id: requestId, text });
       updateRequestInState(updatedRequest);
       setCommentText("");
     } catch (error) {
@@ -446,12 +467,21 @@ const LeaveRequest = () => {
     if (!requestToDelete || isDeleting) return;
 
     try {
-      setIsDeleting(true);
       setDeleteErrorMessage("");
       const targetId = getRequestId(requestToDelete);
-      await leaveRequestAPI.delete(targetId);
+      await deleteRequestMutation.mutateAsync(targetId);
 
-      setRequests((current) => current.filter((item) => getRequestId(item) !== targetId));
+      queryClient.setQueryData(QUERY_KEYS.leaveRequests(leaveParams), (old) => {
+        if (!old) return old;
+        const currentList = Array.isArray(old.leaveRequests)
+          ? old.leaveRequests
+          : Array.isArray(old)
+          ? old
+          : [];
+        const updatedList = currentList.filter((item) => getRequestId(item) !== targetId);
+        return Array.isArray(old) ? updatedList : { ...old, leaveRequests: updatedList };
+      });
+
       if (selectedRequestId === targetId) {
         setSelectedRequestId("");
       }
@@ -459,11 +489,8 @@ const LeaveRequest = () => {
         setDetailRequestId("");
       }
       setRequestToDelete(null);
-      await loadLeaveRequests();
     } catch (error) {
       setDeleteErrorMessage(getApiErrorMessage(error, "Unable to delete leave request."));
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -556,7 +583,7 @@ const LeaveRequest = () => {
                   <tr
                     key={getRequestId(request)}
                     onClick={() => setSelectedRequestId(getRequestId(request))}
-                    className={`cursor-pointer transition hover:bg-pink-50/40 ${selectedRequestId === getRequestId(request) ? "bg-pink-50/30" : ""}`}
+                    className={`cursor-pointer transition hover:bg-pink-50/40 ${effectiveSelectedId === getRequestId(request) ? "bg-pink-50/30" : ""}`}
                   >
                     <td className="px-3 py-3 font-black text-pink-700">{request.id}</td>
                     <td className="px-3 py-3">

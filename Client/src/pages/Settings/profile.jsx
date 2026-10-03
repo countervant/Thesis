@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { authAPI, getApiErrorMessage } from "../../services/api.js";
+import { useProfileMutations, useProfileQuery } from "../../hooks/index.js";
+import { getApiErrorMessage } from "../../services/api.js";
 
 const DEFAULT_SKILLS = {
   "Technical Skills": [],
@@ -82,7 +83,6 @@ const iconInputClass = `${inputClass} pl-10`;
 
 const ProfileSettings = ({ user }) => {
   const { updateUser } = useAuth();
-  const userId = user?._id || user?.id;
   const isClient = String(user?.role || "").toLowerCase() === "client";
   const localSettings = useMemo(() => loadLocalSettings(user), [user]);
   const initialData = useMemo(
@@ -114,7 +114,6 @@ const ProfileSettings = ({ user }) => {
   const [showSkillForm, setShowSkillForm] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [hasLoadedAvatar, setHasLoadedAvatar] = useState(() =>
     Object.prototype.hasOwnProperty.call(user || {}, "avatar")
   );
@@ -124,36 +123,23 @@ const ProfileSettings = ({ user }) => {
   );
   const [hasChangedCoverPhoto, setHasChangedCoverPhoto] = useState(false);
 
-  useEffect(() => {
-    if (!userId) return undefined;
+  const { data: profile } = useProfileQuery();
+  const { updateProfile } = useProfileMutations();
+  const isSaving = updateProfile.isPending;
 
-    let isActive = true;
-
-    authAPI
-      .getPublicProfile(userId, { refresh: true })
-      .then((profile) => {
-        if (!isActive) return;
-
-        setFormData((currentData) => ({
-          ...currentData,
-          avatar: currentData.avatar || profile?.avatar || "",
-          coverPhoto: currentData.coverPhoto || profile?.coverPhoto || "",
-        }));
-        setHasLoadedAvatar(true);
-        setHasLoadedCoverPhoto(true);
-      })
-      .catch(() => {
-        if (isActive) {
-          setError(
-            "Current profile photos could not be loaded. They will be preserved unless you choose new ones."
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [userId]);
+  const [syncedProfileId, setSyncedProfileId] = useState("");
+  const activeProfileId = profile?._id || profile?.id;
+  if (activeProfileId && syncedProfileId !== activeProfileId) {
+    setSyncedProfileId(activeProfileId);
+    if (!hasChangedAvatar && profile?.avatar) {
+      setFormData((current) => ({ ...current, avatar: profile.avatar }));
+      setHasLoadedAvatar(true);
+    }
+    if (!hasChangedCoverPhoto && profile?.coverPhoto) {
+      setFormData((current) => ({ ...current, coverPhoto: profile.coverPhoto }));
+      setHasLoadedCoverPhoto(true);
+    }
+  }
 
   const updateField = (field, value) => {
     if (field === "avatar") setHasChangedAvatar(true);
@@ -216,7 +202,6 @@ const ProfileSettings = ({ user }) => {
       return;
     }
 
-    setIsSaving(true);
     setMessage("");
     setError("");
     try {
@@ -250,7 +235,7 @@ const ProfileSettings = ({ user }) => {
         payload.currentPassword = formData.currentPassword;
       }
 
-      const updatedUser = await authAPI.updateMe(payload);
+      const updatedUser = await updateProfile.mutateAsync(payload);
       localStorage.setItem(
         getStorageKey(user),
         JSON.stringify({
@@ -272,8 +257,6 @@ const ProfileSettings = ({ user }) => {
       setMessage("Profile settings saved.");
     } catch (saveError) {
       setError(getApiErrorMessage(saveError, "Unable to save profile settings."));
-    } finally {
-      setIsSaving(false);
     }
   };
 

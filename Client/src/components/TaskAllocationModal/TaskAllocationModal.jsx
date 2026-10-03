@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -10,8 +10,10 @@ import {
   X,
 } from "lucide-react";
 import InitialsAvatar from "../InitialsAvatar/InitialsAvatar.jsx";
-import { taskAllocationAPI } from "../../services/api.js";
-
+import {
+  useAllocationPreviewQuery,
+  useAllocationMutations,
+} from "../../hooks/index.js";
 
 export default function TaskAllocationModal({
   isOpen,
@@ -20,76 +22,58 @@ export default function TaskAllocationModal({
   initialTasks = null,
   onAllocationCommitted,
 }) {
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isCommitting, setIsCommitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-
-  const [optimizationData, setOptimizationData] = useState(null);
   // Manual overrides map: taskId -> employeeId
   const [manualAssignments, setManualAssignments] = useState({});
 
-  // Run the Hungarian Optimizer
-  const runOptimization = useCallback(async () => {
-    setIsOptimizing(true);
-    setErrorMessage("");
-    setSuccessMessage("");
+  const payload = useMemo(() => {
+    const p = {};
+    if (Array.isArray(initialTasks) && initialTasks.length > 0) {
+      p.tasks = initialTasks.map((t) => ({
+        _id: t._id || t.id,
+        id: t._id || t.id,
+        title: t.title,
+        description: t.description,
+        priority: t.priority,
+        status: t.status || t.apiStatus,
+        subtasks: Array.isArray(t.subtasks)
+          ? t.subtasks.map((st) => (typeof st === "string" ? st : st?.title || ""))
+          : [],
+      }));
+    }
+    return p;
+  }, [initialTasks]);
+
+  const {
+    data: optimizationData,
+    isLoading: isOptimizing,
+    error: optimizationError,
+    refetch: refetchOptimization,
+  } = useAllocationPreviewQuery({
+    projectId,
+    payload,
+    isOpen,
+    enabled: Boolean(isOpen),
+  });
+
+  const { commitAllocation: commitMutation } = useAllocationMutations();
+  const isCommitting = commitMutation.isPending;
+
+  const errorMessage =
+    localErrorMessage ||
+    (optimizationError
+      ? (optimizationError.response?.data?.message ||
+         optimizationError.message ||
+         "Failed to optimize task allocation with Hungarian algorithm.")
+      : "");
+
+  const handleReoptimize = useCallback(() => {
     setManualAssignments({});
-
-    try {
-      const payload = {};
-      if (Array.isArray(initialTasks) && initialTasks.length > 0) {
-        payload.tasks = initialTasks.map((t) => ({
-          _id: t._id || t.id,
-          id: t._id || t.id,
-          title: t.title,
-          description: t.description,
-          priority: t.priority,
-          status: t.status || t.apiStatus,
-          subtasks: Array.isArray(t.subtasks)
-            ? t.subtasks.map((st) => (typeof st === "string" ? st : st?.title || ""))
-            : [],
-        }));
-      }
-
-      const response = await taskAllocationAPI.previewAllocation(
-        projectId || "",
-        payload
-      );
-
-      if (response?.data) {
-        setOptimizationData(response.data);
-      } else {
-        throw new Error("Received empty optimization response from server.");
-      }
-    } catch (err) {
-      console.error("Optimization failed:", err);
-      setErrorMessage(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to optimize task allocation with Hungarian algorithm."
-      );
-    } finally {
-      setIsOptimizing(false);
-    }
-  }, [projectId, initialTasks]);
-
-  // Run automatically when modal opens
-  useEffect(() => {
-    let isSubscribed = true;
-
-    if (isOpen) {
-      Promise.resolve().then(() => {
-        if (isSubscribed) {
-          runOptimization();
-        }
-      });
-    }
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [isOpen, runOptimization]);
+    setLocalErrorMessage("");
+    setSuccessMessage("");
+    refetchOptimization();
+  }, [refetchOptimization]);
 
   // Employee lookup map for O(1) override resolution
   const employeeMap = useMemo(() => {
@@ -135,10 +119,9 @@ export default function TaskAllocationModal({
   }, []);
 
   const handleCommit = async () => {
-    if (effectiveAssignments.length === 0) return;
+    if (effectiveAssignments.length === 0 || isCommitting) return;
 
-    setIsCommitting(true);
-    setErrorMessage("");
+    setLocalErrorMessage("");
 
     try {
       const assignments = effectiveAssignments
@@ -148,14 +131,17 @@ export default function TaskAllocationModal({
           employeeId: String(m.assignedEmployee._id),
         }));
 
-      const res = await taskAllocationAPI.commitAllocation(projectId || "global", {
-        assignments,
-        status: "To Do",
+      const res = await commitMutation.mutateAsync({
+        projectId: projectId || "global",
+        payload: {
+          assignments,
+          status: "To Do",
+        },
       });
 
-      setSuccessMessage(res.message || "Tasks assigned successfully!");
+      setSuccessMessage(res?.message || "Tasks assigned successfully!");
       if (onAllocationCommitted) {
-        onAllocationCommitted(res.data);
+        onAllocationCommitted(res?.data || res);
       }
 
       // Auto close after brief display
@@ -164,13 +150,11 @@ export default function TaskAllocationModal({
       }, 1200);
     } catch (err) {
       console.error("Failed to commit assignments:", err);
-      setErrorMessage(
+      setLocalErrorMessage(
         err.response?.data?.message ||
           err.message ||
           "Failed to commit task assignments to database."
       );
-    } finally {
-      setIsCommitting(false);
     }
   };
 
@@ -395,7 +379,7 @@ export default function TaskAllocationModal({
         <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/80 px-5 py-3.5 dark:border-neutral-800 dark:bg-neutral-900/80">
           <button
             type="button"
-            onClick={() => runOptimization()}
+            onClick={handleReoptimize}
             disabled={isOptimizing || isCommitting}
             className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer"
           >
