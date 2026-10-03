@@ -8,12 +8,13 @@ import {
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
 } from "../../../services/api.js";
-import { Kanban, List } from "lucide-react";
+import { Kanban, List, Sparkles } from "lucide-react";
 import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
 import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import ProjectGroupTable from "../../../components/ProjectGroupTable/ProjectGroupTable.jsx";
 import ProjectBoard from "../../../components/ProjectBoard/ProjectBoard.jsx";
 import { ProjectDetailsModal } from "../../../components/ProjectDetailsModal/ProjectDetailsModal.jsx";
+import TaskAllocationModal from "../../../components/TaskAllocationModal/TaskAllocationModal.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -1316,6 +1317,8 @@ const Tasks = ({
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
   const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
+  const [isTaskAllocationOpen, setIsTaskAllocationOpen] = useState(false);
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
   const pendingTaskUpdateIdsRef = useRef(new Set());
   const currentUserId = getEntityId(user);
 
@@ -1346,7 +1349,7 @@ const Tasks = ({
     return () => {
       isMounted = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, localRefreshKey]);
 
   useEffect(() => {
     const focusTarget = () => {
@@ -1447,6 +1450,14 @@ const Tasks = ({
     }
     return tasks;
   }, [assignmentFilter, isEmployeeAssignedProject, isMyProject, isUnassignedProject, tasks]);
+
+  const unassignedTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const isUnassigned = isUnassignedProject(task);
+      const isNotDone = String(task.status || "").toLowerCase() !== "done";
+      return isUnassigned && isNotDone;
+    });
+  }, [isUnassignedProject, tasks]);
 
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -1921,7 +1932,19 @@ const Tasks = ({
               </p>
             </div>
 
-            <div className="flex items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsTaskAllocationOpen(true)}
+                className="flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-pink-200 bg-pink-50/70 px-3.5 text-xs font-black text-pink-700 transition hover:bg-pink-100 dark:border-pink-900/50 dark:bg-pink-950/30 dark:text-pink-300 dark:hover:bg-pink-950/50 md:px-4 md:text-sm cursor-pointer"
+                title="Auto Assign"
+              >
+                <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-pink-500" />
+                <span>
+                  Auto Assign
+                  {unassignedTasks.length > 0 && ` (${unassignedTasks.length})`}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={handleAddTask}
@@ -2118,6 +2141,17 @@ const Tasks = ({
               }}
               onSubmit={handlePayEmployee}
               task={employeePaymentTask}
+            />
+          )}
+          {isTaskAllocationOpen && (
+            <TaskAllocationModal
+              isOpen={isTaskAllocationOpen}
+              initialTasks={unassignedTasks}
+              onClose={() => setIsTaskAllocationOpen(false)}
+              onAllocationCommitted={() => {
+                setLocalRefreshKey((k) => k + 1);
+                setNoticeMessage("Tasks successfully assigned!");
+              }}
             />
           )}
         </div>

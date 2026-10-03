@@ -114,6 +114,7 @@ const formatRole = (role = "") => {
 const Profile = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuth();
+  const isClient = String(user?.role || "").toLowerCase() === "client";
   const userId = user?.id || user?._id;
   const hasCachedProfile = Boolean(user?.email);
   const [formData, setFormData] = useState(() => profileToForm(user) || emptyForm);
@@ -351,7 +352,7 @@ const Profile = ({ embedded = false }) => {
         position: user?.role === "client" ? "Client" : formData.position.trim(),
         birthday: formData.birthday,
         gender: formData.gender,
-        skillGroups,
+        ...(!isClient ? { skillGroups } : {}),
       };
 
       if (hasLoadedAvatar || hasChangedAvatar) {
@@ -603,7 +604,7 @@ const Profile = ({ embedded = false }) => {
                   <FormIcon name="briefcase" /> Work Information
                 </h2>
                 <div className="grid gap-4 lg:grid-cols-3">
-                  <Field label="Employee ID" icon="id">
+                  <Field label={isClient ? "Client ID" : "Employee ID"} icon="id">
                     <input type="text" value={getEmployeeId(user)} readOnly className={`${readOnlyInputClass} pl-12`} />
                   </Field>
                   <Field label="Department" icon="briefcase">
@@ -629,90 +630,92 @@ const Profile = ({ embedded = false }) => {
                 </div>
               </section>
 
-              <section className="border-t border-pink-50 pt-5">
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h2 className="flex items-center gap-3 text-base font-black">
-                      <FormIcon name="person" /> Skills & Expertise
-                    </h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Manage your skills and expertise to showcase your strengths.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingSkill((isOpen) => !isOpen)}
-                    className="flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white"
-                    aria-expanded={isAddingSkill}
-                  >
-                    <span className="text-lg leading-none">+</span>
-                    Add Skill
-                  </button>
-                </div>
-
-                {isAddingSkill && (
-                  <div className="mb-5 grid gap-2 rounded-xl border border-pink-100 bg-pink-50/40 p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
-                    <select
-                      value={newSkillGroup}
-                      onChange={(event) => setNewSkillGroup(event.target.value)}
-                      className={inputClass}
-                      aria-label="Skill category"
-                    >
-                      {SKILL_GROUPS.map(({ key, label }) => (
-                        <option key={key} value={key}>{label}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      maxLength={80}
-                      value={newSkill}
-                      onChange={(event) => setNewSkill(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          handleAddSkill();
-                        }
-                      }}
-                      placeholder="Enter a skill"
-                      className={inputClass}
-                    />
+              {!isClient && (
+                <section className="border-t border-pink-50 pt-5">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h2 className="flex items-center gap-3 text-base font-black">
+                        <FormIcon name="person" /> Skills & Expertise
+                      </h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                        Manage your skills and expertise to showcase your strengths.
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      onClick={handleAddSkill}
-                      className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white"
+                      onClick={() => setIsAddingSkill((isOpen) => !isOpen)}
+                      className="flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                      aria-expanded={isAddingSkill}
                     >
-                      Add
+                      <span className="text-lg leading-none">+</span>
+                      Add Skill
                     </button>
                   </div>
-                )}
 
-                {SKILL_GROUPS.map(({ key, label }) => (
-                  <div key={key} className="mb-5 last:mb-0">
-                    <h3 className="mb-3 text-sm font-black text-[black] dark:text-white">{label}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {skillGroups[key].length === 0 && (
-                        <span className="text-xs font-semibold text-slate-400">No skills added.</span>
-                      )}
-                      {skillGroups[key].map((skill) => (
-                        <span
-                          key={skill}
-                          className="inline-flex items-center gap-2 rounded-full border border-black-100 bg-black-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
-                        >
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSkill(key, skill)}
-                            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#c72fb2] transition hover:bg-pink-100 hover:text-[#10142d] dark:hover:bg-neutral-800 dark:hover:text-white"
-                            aria-label={`Remove ${skill}`}
-                          >
-                            x
-                          </button>
-                        </span>
-                      ))}
+                  {isAddingSkill && (
+                    <div className="mb-5 grid gap-2 rounded-xl border border-pink-100 bg-pink-50/40 p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
+                      <select
+                        value={newSkillGroup}
+                        onChange={(event) => setNewSkillGroup(event.target.value)}
+                        className={inputClass}
+                        aria-label="Skill category"
+                      >
+                        {SKILL_GROUPS.map(({ key, label }) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={newSkill}
+                        onChange={(event) => setNewSkill(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleAddSkill();
+                          }
+                        }}
+                        placeholder="Enter a skill"
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSkill}
+                        className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white"
+                      >
+                        Add
+                      </button>
                     </div>
-                  </div>
-                ))}
-              </section>
+                  )}
+
+                  {SKILL_GROUPS.map(({ key, label }) => (
+                    <div key={key} className="mb-5 last:mb-0">
+                      <h3 className="mb-3 text-sm font-black text-[black] dark:text-white">{label}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {skillGroups[key].length === 0 && (
+                          <span className="text-xs font-semibold text-slate-400">No skills added.</span>
+                        )}
+                        {skillGroups[key].map((skill) => (
+                          <span
+                            key={skill}
+                            className="inline-flex items-center gap-2 rounded-full border border-black-100 bg-black-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
+                          >
+                            {skill}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSkill(key, skill)}
+                              className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#c72fb2] transition hover:bg-pink-100 hover:text-[#10142d] dark:hover:bg-neutral-800 dark:hover:text-white"
+                              aria-label={`Remove ${skill}`}
+                            >
+                              x
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
 
             </div>
 

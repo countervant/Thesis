@@ -19,8 +19,8 @@ import { useAuth } from "../../../context/AuthContext.jsx";
 
 const statItems = [
   { key: "in_progress", label: "In Progress", icon: "progress" },
-  { key: "pending", label: "Pending", icon: "pending" },
   { key: "review", label: "In Review", icon: "review" },
+  { key: "pending", label: "Revision", icon: "pending" },
   { key: "done", label: "Done", icon: "done" },
 ];
 

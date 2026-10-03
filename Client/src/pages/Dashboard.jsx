@@ -11,6 +11,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import MainBars from "./MainBars.jsx";
+import { Sparkles } from "lucide-react";
 import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
 import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
 import Skeleton from "../components/Skeleton/Skeleton.jsx";
@@ -257,6 +258,7 @@ const MessageThreadSkeleton = () => (
 const MessagesPanel = () => {
   const { user } = useAuth();
   const currentUserId = getEntityId(user);
+  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const [users, setUsers] = useState([]);
   const [threads, setThreads] = useState([]);
   const [activeUserId, setActiveUserId] = useState("");
@@ -1189,14 +1191,14 @@ const MessagesPanel = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {activeParticipant && (
+          {isAdmin && activeParticipant && (
             <button
               type="button"
               onClick={() => setIsProjectModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-[#dc4fb2] px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-pink-500/20 transition hover:brightness-105 active:scale-95"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-pink-200 bg-pink-50/70 px-3 py-1.5 text-xs font-black text-pink-700 transition hover:bg-pink-100 dark:border-pink-900/50 dark:bg-pink-950/30 dark:text-pink-300 dark:hover:bg-pink-950/50 cursor-pointer"
               title="Generate Project"
             >
-              <span className="text-yellow-300">⚡</span>
+              <Sparkles className="h-3.5 w-3.5 text-pink-500" />
               <span>Project</span>
             </button>
           )}
@@ -1238,15 +1240,17 @@ const MessagesPanel = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsProjectModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-[#dc4fb2] px-4 py-2 text-xs font-bold text-white shadow-md shadow-pink-500/25 transition-all hover:scale-[1.02] hover:brightness-105 active:scale-[0.98]"
-            title="Generate project and backlog tasks from this chat"
-          >
-            <span className="text-yellow-300">⚡</span>
-            <span>Generate Project</span>
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsProjectModalOpen(true)}
+              className="flex items-center gap-2 whitespace-nowrap rounded-xl border border-pink-200 bg-pink-50/70 px-4 py-2 text-xs font-black text-pink-700 transition hover:bg-pink-100 dark:border-pink-900/50 dark:bg-pink-950/30 dark:text-pink-300 dark:hover:bg-pink-950/50 cursor-pointer"
+              title="Generate project and backlog tasks from this chat"
+            >
+              <Sparkles className="h-4 w-4 text-pink-500" />
+              <span>Generate Project</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -1569,14 +1573,16 @@ const MessagesPanel = () => {
       </div>
     )}
 
-    <ReviewProjectModal
-      isOpen={isProjectModalOpen}
-      onClose={() => setIsProjectModalOpen(false)}
-      conversationId={activeUserId}
-      onProjectCreated={() => {
-        setIsProjectModalOpen(false);
-      }}
-    />
+    {isAdmin && (
+      <ReviewProjectModal
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
+        conversationId={activeUserId}
+        onProjectCreated={() => {
+          setIsProjectModalOpen(false);
+        }}
+      />
+    )}
   </section>
   );
 };

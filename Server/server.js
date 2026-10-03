@@ -20,6 +20,7 @@ import messages, { closeMessageClients } from "./routes/messages.js";
 import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
 import chatProject from "./routes/chatProject.routes.js";
+import taskAllocation from "./routes/taskAllocation.routes.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
 import User from "./models/userModel.js";
 import {
@@ -261,6 +262,7 @@ app.use("/api/tasks", tasks);
 app.use("/api/newsfeed", newsfeed);
 app.use("/api/messages", messages);
 app.use("/api/chat", chatProject);
+app.use("/api/projects", taskAllocation);
 app.use("/api/dashboard", dashboard);
 app.use("/api/users", users);
 
