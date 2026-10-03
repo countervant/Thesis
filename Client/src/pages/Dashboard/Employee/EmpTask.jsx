@@ -785,7 +785,7 @@ const EmpTask = () => {
   } = useTasksQuery(
     { view: "employee" },
     {
-      refetchInterval: 3000,
+      refetchInterval: 10000,
       refetchIntervalInBackground: true,
     }
   );
@@ -797,7 +797,7 @@ const EmpTask = () => {
     isLoading: isLoadingTaskDetails,
     error: taskDetailsError,
   } = useTaskDetailsQuery(selectedTaskId, {
-    refetchInterval: 3000,
+    refetchInterval: 10000,
     refetchIntervalInBackground: true,
   });
 
