@@ -67,6 +67,7 @@ const mapExtractedToTask = (payload, convId) => {
           title: t.title || "",
           completed: false,
           assignedTo: "",
+          requiredSkills: Array.isArray(t.requiredSkills) ? t.requiredSkills : [],
         }))
       : [],
   };

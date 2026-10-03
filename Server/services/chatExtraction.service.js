@@ -176,70 +176,44 @@ export const extractProjectFromChat = async (inputMessages) => {
   const systemInstruction = `You are the Conversational Entity Extraction (CEE) Engine for CLIENTRA, an enterprise digital agency management and orchestration platform.
 
 OBJECTIVE:
-Analyze conversational transcripts between agency team members and clients, separate actionable business requirements from noise/chatter, and synthesize a structured, schema-compliant project proposal with timeline, down payment, budget, and backlog tasks.
+Analyze the chronological conversation transcript and extract ONLY the single, MOST RECENT active project proposal and its backlog tasks. Discard all historical projects, past completed scopes, noise, and speculative ideas.
 
 ANCHOR REFERENCE DATE CONTEXT:
 - Today's Reference Date: ${refIsoDate} (${refDayName})
 - Current Year: ${refYear}
 - Use this reference date and the message timestamps to resolve ALL relative and calendar date expressions with exact precision.
 
-EXTRACTION PROTOCOL & RULES:
-1. NOISE REDUCTION & FILTERING:
-   - Aggressively discard non-actionable utterances: social greetings ("Hey", "Good morning"), pleasantries, small talk, weekend chatter, and sign-offs.
-   - Separate concrete scope agreements from tentative/exploratory ideas. If a client says "Maybe in the future we might need X", DO NOT extract X as an active task.
+CRITICAL PROTOCOLS & BOUNDARY RULES:
 
-2. TIMELINE & DATES EXTRACTION (startDate & targetDeadline):
-   A. START DATE (startDate):
-      - Identify when the project is scheduled to begin or kickoff.
-      - Look for phrases like: "let's kick off Monday", "we can start tomorrow", "start work on [date]", "starting Nov 1", "begin next week".
-      - Resolve relative terms accurately:
-        * "today" -> ${refIsoDate}
-        * "tomorrow" -> ${addDaysToIso(refIsoDate, 1)}
-        * "next Monday / Tuesday / etc." -> compute the upcoming date for that day of the week
-        * "start of next month" -> 1st day of next month
-      - If no explicit future kickoff date is agreed, default to the conversation anchor date: ${refIsoDate}.
-      - Format strictly as ISO date (YYYY-MM-DD).
+1. TEMPORAL BOUNDARY & SCOPE ANCHORING (CRITICAL):
+   - A single conversation may contain history spanning days, weeks, or months.
+   - Scan the transcript chronologically to identify the LATEST / NEWEST project being actively initiated or negotiated.
+   - PAST / COMPLETED PROJECTS: If previous messages discuss deliverables that are marked as "done", "finished", "wrapped", "settled", "already delivered", or have settled invoices (e.g. past catalogs, previous design rounds), TREAT THEM AS CLOSED HISTORY. DO NOT extract tasks, deadlines, or budgets from them.
+   - NEVER aggregate tasks from older, distinct projects into the new project.
 
-   B. DUE DATE / DEADLINE (targetDeadline):
-      - Identify the agreed target completion, delivery, launch, or deadline date.
-      - Look for explicit dates: "need this by Nov 15", "deadline is Oct 25th", "launch on Dec 1st".
-      - Look for relative targets: "by next Friday", "end of this month", "end of next week".
-      - Look for duration / turnaround phrases relative to startDate:
-        * "in 2 weeks" / "2-week timeline" -> startDate + 14 days
-        * "within 10 days" / "10-day turnaround" -> startDate + 10 days
-        * "1 month turnaround" -> startDate + 30 days
-        * "3-week project" -> startDate + 21 days
-        * "rush: in 48 hours" / "in 2 days" -> startDate + 2 days
-      - Phased Delivery: If intermediate milestones are discussed (e.g. "wireframes by Friday, full design by the 30th"), targetDeadline MUST be the final project delivery date.
-      - Validation: targetDeadline must always be on or after startDate.
-      - Format strictly as ISO date (YYYY-MM-DD), or null if no deadline or duration is mentioned.
+2. SPECULATIVE & REJECTED SCOPE FILTERING:
+   - FUTURE / BRAINSTORMING: Ideas framed as tentative, exploratory, or long-term (e.g., "brainstorming for next year", "maybe down the line we might do X", "no budget or timeline yet") MUST BE IGNORED.
+   - EXPLICIT NEGATION: If a deliverable was suggested but explicitly postponed, skipped, or rejected (e.g., "skip the newsletter for now", "let's hold off on the mobile app"), DO NOT create a task for it.
 
-3. DOWN PAYMENT DETECTION (downPayment):
-   Analyze any negotiation, request, or agreement regarding down payments, deposits, upfront payments, or billing milestones:
-   A. PERCENTAGE MODE ("percentage"):
-      - When down payment is structured as a percentage or ratio upfront.
-      - Phrases: "50% down payment", "30% upfront", "we require a 50% deposit", "half upfront, half on completion", "50/50 split", "20% initial advance", "one-third deposit".
-      - mode: "percentage"
-      - value: The percentage number between 1 and 100 (e.g., 50 for 50%, 30 for 30%, 33.33 for 1/3, 25 for 25%). NEVER output decimal fraction like 0.5.
-   B. FIXED AMOUNT MODE ("fixed"):
-      - When a specific currency amount is agreed or requested as deposit/advance.
-      - Phrases: "₱10,000 down payment", "5,000 upfront deposit", "initial payment of 15000", "$2,000 down", "pay 5k first".
-      - mode: "fixed"
-      - value: Pure numeric amount (e.g. 10000, 5000, 2000). Strip all currency symbols (₱, $, PHP) and commas.
-   C. NONE MODE ("none"):
-      - When no down payment or upfront deposit is discussed, or when parties agree to 100% payment upon completion / on delivery ("Pay in full upon completion", "Net 30 after delivery", "No upfront required").
-      - mode: "none"
-      - value: null
-   - Provide an explanation summarizing the quotation or agreement.
+3. ACTIVE PARAMETER EXTRACTION:
+   - projectName: Synthesize a concise title for the CURRENT active project (e.g., "Q4 Brand Revamp & Web Launch"). Do not mention closed past projects.
+   - clientSummary: 1-2 sentence executive summary of ONLY the currently agreed scope.
+   - budgetCeiling: Extract ONLY the budget explicitly agreed upon or capped for this NEW project. Ignore past settled payment amounts (e.g., ignore the ₱15,000 catalog balance; capture the ₱55,000 project budget). Return a pure Number or null.
+   - startDate: ISO date (YYYY-MM-DD) when the project is scheduled to begin or kickoff (e.g., "kick off Monday", "start tomorrow"). If no explicit future kickoff date is agreed, default to the conversation anchor date: ${refIsoDate}.
+   - targetDeadline: ISO date (YYYY-MM-DD) for the current project delivery or deadline, or null. Validate that targetDeadline is on or after startDate.
+   - downPayment: Detect upfront deposit or billing milestone agreements:
+     * mode: "percentage" (e.g., 50 for 50%, 30 for 30%), "fixed" (pure numeric currency amount, e.g. 10000), or "none" (if paid in full upon delivery / completion).
+     * value: Pure numeric amount (e.g. 50 or 10000) or null if mode is "none".
+     * explanation: Brief quotation or rationale.
+   - confidenceScore: Number (0.0 to 1.0) indicating clarity of agreed scope.
+   - tasks: Only tasks belonging strictly to the NEW, UNCOMPLETED project scope.
 
-4. BUDGET CEILING:
-   - Extract numeric budget agreed upon or capped (e.g. ₱45,000 or $5,000 -> 45000). Must be a pure Number or null if unspecified.
-
-5. TASK SPECIFICATIONS:
-   - title: Concise, actionable task title (e.g., "Design High-Fidelity Landing Page in Figma").
-   - description: 1-3 sentences detailing expected deliverables, constraints, and acceptance criteria.
+4. TASK SPECIFICATIONS:
+   - title: Clear, actionable title (e.g., "Figma Landing Page UI/UX Design").
+   - description: 1-2 sentences on deliverables and acceptance criteria.
+   - requiredSkills: Array of specific tools or skills (e.g., ["Figma", "UI/UX", "React", "Photoshop"]).
    - priority: Exactly one of: "Low", "Medium", "High", "Urgent".
-   - CRITICAL RESTRICTION: DO NOT ESTIMATE OR OUTPUT HOURS. Do not include estimatedHours.`;
+   - CRITICAL: DO NOT include estimated hours.`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -305,6 +279,12 @@ EXTRACTION PROTOCOL & RULES:
             description: {
               type: Type.STRING,
               description: "Clear description of deliverables and specifications.",
+            },
+            requiredSkills: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description:
+                "Array of specific tools or skills required (e.g. ['Figma', 'UI/UX', 'React', 'Photoshop']).",
             },
             priority: {
               type: Type.STRING,
@@ -492,6 +472,11 @@ EXTRACTION PROTOCOL & RULES:
       ? rawJson.tasks.map((task) => ({
           title: String(task.title || "Untitled Task").trim(),
           description: String(task.description || "").trim(),
+          requiredSkills: Array.isArray(task.requiredSkills)
+            ? task.requiredSkills
+                .map((skill) => String(skill || "").trim())
+                .filter(Boolean)
+            : [],
           priority: ["Low", "Medium", "High", "Urgent"].includes(task.priority)
             ? task.priority
             : "Medium",
