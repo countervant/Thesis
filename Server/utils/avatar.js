@@ -91,8 +91,14 @@ export const withAvatarUrl = (user) => {
 
   const userId = getEntityId(user);
   const version = getAvatarVersion(user);
-  if (Object.prototype.hasOwnProperty.call(user, "avatar")) {
+  const hasAvatarProp = Object.prototype.hasOwnProperty.call(user, "avatar");
+  if (hasAvatarProp) {
     setCachedAvatar(userId, version, user.avatar);
+    if (!user.avatar) {
+      const profile = { ...user };
+      delete profile.avatar;
+      return { ...profile, avatar: "" };
+    }
   }
 
   const profile = { ...user };

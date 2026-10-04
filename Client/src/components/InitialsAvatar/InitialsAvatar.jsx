@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { resolveApiAssetUrl } from "../../utils/apiAssets.js";
 
-const AVATAR_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000];
+const AVATAR_RETRY_DELAYS_MS = [2000, 5000, 10000];
+const failedAvatarUrls = new Set();
 
 const getInitials = (userOrName, fallback = "U") => {
   const firstName = userOrName?.firstName || "";
@@ -36,65 +37,62 @@ const InitialsAvatar = ({
 }) => {
   const avatarSrc = resolveApiAssetUrl(src || user?.avatar || "");
   const retryTimerRef = useRef(null);
-  const [failure, setFailure] = useState({
-    src: "",
-    attempt: 0,
-    retryReady: false,
-    exhausted: false,
-  });
-  const isCurrentFailure = failure.src === avatarSrc;
-  const imageFailed =
-    isCurrentFailure && (failure.exhausted || !failure.retryReady);
-  const retrySuffix =
-    isCurrentFailure && failure.attempt > 0
-      ? `${avatarSrc.includes("?") ? "&" : "?"}_avatarRetry=${failure.attempt}`
-      : "";
-  const imageSrc = `${avatarSrc}${retrySuffix}`;
+  const retryAttemptRef = useRef(0);
+  const [failedSrc, setFailedSrc] = useState("");
+  const isFailed = Boolean(avatarSrc && (failedAvatarUrls.has(avatarSrc) || failedSrc === avatarSrc));
 
-  useEffect(() => () => {
+  useEffect(() => {
+    retryAttemptRef.current = 0;
+    return () => {
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    };
+  }, [avatarSrc]);
+
+  const scheduleBackgroundRetry = (url) => {
     if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
-  }, []);
+
+    const attempt = retryAttemptRef.current;
+    if (attempt >= AVATAR_RETRY_DELAYS_MS.length) return;
+
+    const delay = AVATAR_RETRY_DELAYS_MS[attempt];
+    retryAttemptRef.current += 1;
+
+    retryTimerRef.current = window.setTimeout(() => {
+      retryTimerRef.current = null;
+      const testImg = new Image();
+      testImg.onload = () => {
+        failedAvatarUrls.delete(url);
+        setFailedSrc("");
+      };
+      testImg.onerror = () => {
+        scheduleBackgroundRetry(url);
+      };
+      const retrySuffix = `${url.includes("?") ? "&" : "?"}_retry=${retryAttemptRef.current}`;
+      testImg.src = `${url}${retrySuffix}`;
+    }, delay);
+  };
 
   const handleImageError = () => {
-    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
-
-    const previousAttempt = isCurrentFailure ? failure.attempt : 0;
-    const nextAttempt = previousAttempt + 1;
-    if (nextAttempt > AVATAR_RETRY_DELAYS_MS.length) {
-      setFailure({
-        src: avatarSrc,
-        attempt: previousAttempt,
-        retryReady: false,
-        exhausted: true,
-      });
-      return;
+    if (avatarSrc) {
+      failedAvatarUrls.add(avatarSrc);
+      setFailedSrc(avatarSrc);
+      scheduleBackgroundRetry(avatarSrc);
     }
-
-    setFailure({
-      src: avatarSrc,
-      attempt: nextAttempt,
-      retryReady: false,
-      exhausted: false,
-    });
-    retryTimerRef.current = window.setTimeout(() => {
-      setFailure((currentFailure) =>
-        currentFailure.src === avatarSrc && currentFailure.attempt === nextAttempt
-          ? { ...currentFailure, retryReady: true }
-          : currentFailure
-      );
-      retryTimerRef.current = null;
-    }, AVATAR_RETRY_DELAYS_MS[nextAttempt - 1]);
   };
 
   const handleImageLoad = () => {
     if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
     retryTimerRef.current = null;
+    if (avatarSrc) {
+      failedAvatarUrls.delete(avatarSrc);
+      setFailedSrc("");
+    }
   };
 
-  if (avatarSrc && !imageFailed) {
+  if (avatarSrc && !isFailed) {
     return (
       <img
-        src={imageSrc}
+        src={avatarSrc}
         alt={alt}
         onError={handleImageError}
         onLoad={handleImageLoad}
