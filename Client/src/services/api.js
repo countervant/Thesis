@@ -1428,4 +1428,15 @@ export const taskAllocationAPI = {
   },
 };
 
+export const chatProjectAPI = {
+  extractPreview: async (conversationId) => {
+    const response = await api.post(`/chat/${conversationId}/extract-preview`);
+    return response.data;
+  },
+  commitProject: async (conversationId, payload) => {
+    const response = await api.post(`/chat/${conversationId}/commit-project`, payload);
+    return response.data;
+  },
+};
+
 export default api;

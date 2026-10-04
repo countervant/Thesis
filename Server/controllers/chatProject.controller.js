@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Project, ProjectTask as Task } from "../models/projectModel.js";
 import Message from "../models/messageModel.js";
 import Client from "../models/Admin/Clientmodel.js";
+import User from "../models/userModel.js";
 import { extractProjectFromChat } from "../services/chatExtraction.service.js";
 
 /**
@@ -21,17 +22,27 @@ export const previewProjectExtraction = async (req, res) => {
 
     const convId = new mongoose.Types.ObjectId(conversationId);
 
-    // Fetch up to 50 recent messages from the conversation.
-    // Supports both direct conversation reference and participant user threads.
-    const messages = await Message.find({
-      $or: [
-        { conversation: convId },
-        { sender: convId },
-        { recipient: convId },
-      ],
-    })
+    // Fetch up to 60 most recent messages from the conversation thread,
+    // then reverse to present in clean chronological order for the LLM.
+    const messageFilter = req.user?._id
+      ? {
+          $or: [
+            { sender: req.user._id, recipient: convId },
+            { sender: convId, recipient: req.user._id },
+            { sender: convId },
+            { recipient: convId },
+          ],
+        }
+      : {
+          $or: [
+            { sender: convId },
+            { recipient: convId },
+          ],
+        };
+
+    const messages = await Message.find(messageFilter)
       .populate("sender", "firstName lastName companyName role email")
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .limit(60)
       .lean();
 
@@ -43,8 +54,11 @@ export const previewProjectExtraction = async (req, res) => {
       });
     }
 
+    // Reverse to chronological order for the LLM transcript
+    const chronologicalMessages = messages.reverse();
+
     // Call the LLM extraction service
-    const extractedProposal = await extractProjectFromChat(messages);
+    const extractedProposal = await extractProjectFromChat(chronologicalMessages);
 
     return res.status(200).json({
       success: true,
@@ -109,12 +123,16 @@ export const commitProject = async (req, res) => {
 
     // Resolve client reference if valid
     let resolvedClientId = null;
-    if (clientId && mongoose.Types.ObjectId.isValid(clientId)) {
-      resolvedClientId = new mongoose.Types.ObjectId(clientId);
-    } else if (conversationId && mongoose.Types.ObjectId.isValid(conversationId)) {
-      const clientDoc = await Client.findById(conversationId).select("_id").lean();
+    const candidateId = clientId || conversationId;
+    if (candidateId && mongoose.Types.ObjectId.isValid(candidateId)) {
+      const clientDoc = await Client.findById(candidateId).select("_id").lean();
       if (clientDoc) {
         resolvedClientId = clientDoc._id;
+      } else {
+        const userClientDoc = await User.findOne({ _id: candidateId, role: "client" }).select("_id").lean();
+        if (userClientDoc) {
+          resolvedClientId = userClientDoc._id;
+        }
       }
     }
 
@@ -185,8 +203,15 @@ export const commitProject = async (req, res) => {
       assignedTo: null,
     }));
 
-    // 3. Insert tasks into MongoDB
-    const createdTasks = await Task.insertMany(taskDocs);
+    // 3. Insert tasks into MongoDB with rollback safety
+    let createdTasks;
+    try {
+      createdTasks = await Task.insertMany(taskDocs);
+    } catch (insertError) {
+      console.error("[chatProjectController.commitProject] Failed inserting tasks, rolling back project:", insertError);
+      await Project.findByIdAndDelete(newProject._id);
+      throw insertError;
+    }
 
     return res.status(201).json({
       success: true,

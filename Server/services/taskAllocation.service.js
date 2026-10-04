@@ -193,17 +193,31 @@ export const calculateSkillMatch = (requiredSkills = [], employee = {}, taskTitl
   const matchedSkills = [];
   const missingSkills = [];
 
+const isSkillMatch = (skillA, skillB) => {
+  if (!skillA || !skillB) return false;
+  if (skillA === skillB) return true;
+  // If either string is 3 characters or fewer (e.g., "ai", "ui", "ux", "ad"), require exact match or word boundary
+  if (skillA.length <= 3 || skillB.length <= 3) {
+    const escapedA = skillA.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedB = skillB.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regexA = new RegExp(`(?:^|\\s)${escapedA}(?:$|\\s)`, "i");
+    const regexB = new RegExp(`(?:^|\\s)${escapedB}(?:$|\\s)`, "i");
+    return regexA.test(skillB) || regexB.test(skillA);
+  }
+  return skillA.includes(skillB) || skillB.includes(skillA);
+};
+
   normRequired.forEach((req) => {
     let matched = false;
-    // 1. Exact or substring match in employee skills set
+    // 1. Exact or bounded word match in employee skills set
     for (const skill of empSkills) {
-      if (skill === req || skill.includes(req) || req.includes(skill)) {
+      if (isSkillMatch(skill, req)) {
         matched = true;
         break;
       }
     }
     // 2. Position match (e.g. "Designer" matches "UI/UX" or "Design")
-    if (!matched && positionNorm && (positionNorm.includes(req) || req.includes(positionNorm))) {
+    if (!matched && positionNorm && isSkillMatch(positionNorm, req)) {
       matched = true;
     }
 
@@ -674,7 +688,8 @@ export const optimizeTaskAllocation = async (projectId, customTasks = null, opti
 export const commitTaskAllocation = async (
   projectId,
   assignments = [],
-  updatedStatus = "To Do"
+  updatedStatus = "To Do",
+  actingUser = null
 ) => {
   if (!Array.isArray(assignments) || assignments.length === 0) {
     throw new Error("No assignments provided to commit.");
@@ -691,6 +706,21 @@ export const commitTaskAllocation = async (
   const validAdminOps = [];
   const validProjectOps = [];
 
+  const adminTaskStatus = ["pending", "in_progress"].includes(updatedStatus)
+    ? updatedStatus
+    : "in_progress";
+
+  const actorId = actingUser?._id && mongoose.Types.ObjectId.isValid(actingUser._id)
+    ? new mongoose.Types.ObjectId(actingUser._id)
+    : null;
+
+  const actorName = actingUser
+    ? [actingUser.firstName, actingUser.lastName].filter(Boolean).join(" ").trim() ||
+      actingUser.companyName ||
+      actingUser.email ||
+      "Administrator"
+    : "Administrator";
+
   for (const a of validAssignments) {
     if (!mongoose.Types.ObjectId.isValid(a.taskId) || !mongoose.Types.ObjectId.isValid(a.employeeId)) {
       continue;
@@ -705,13 +735,15 @@ export const commitTaskAllocation = async (
           $set: {
             assignedTo: eId,
             assignees: [eId],
+            status: adminTaskStatus,
           },
           $push: {
             activities: {
               type: "task_created",
               title: "Task Assigned",
               details: "Assigned via Hungarian Task Allocation Optimizer",
-              actor: eId,
+              actor: actorId || eId,
+              actorName,
               createdAt: new Date(),
             },
           },

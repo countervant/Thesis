@@ -11,7 +11,7 @@ export const useTasksQuery = (params = {}, options = {}) => {
       return unwrapData(res);
     },
     refetchInterval: 10000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     ...options,
   });
 };
@@ -25,7 +25,7 @@ export const useTaskDetailsQuery = (taskId, options = {}) => {
     },
     enabled: Boolean(taskId) && (options.enabled ?? true),
     refetchInterval: 10000,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     ...options,
   });
 };

@@ -2477,7 +2477,7 @@ router.delete("/:id", protect, async (req, res) => {
       return res.status(403).json({ message: "Only admins and task owners can delete tasks" });
     }
 
-    const task = await Task.findOneAndDelete({
+    const task = await Task.findOne({
       _id: req.params.id,
       ...taskQueryForUser(req.user),
     });
@@ -2485,6 +2485,24 @@ router.delete("/:id", protect, async (req, res) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+
+    if (req.user.role !== "admin") {
+      const hasPayments =
+        (Number(task.paid) > 0) ||
+        (Array.isArray(task.employeePayments) && task.employeePayments.length > 0);
+      if (hasPayments) {
+        return res.status(400).json({
+          message: "Tasks with recorded payments or disbursements cannot be deleted",
+        });
+      }
+      if (["in_progress", "done"].includes(task.status)) {
+        return res.status(400).json({
+          message: "Tasks in progress or completed cannot be deleted by clients",
+        });
+      }
+    }
+
+    await Task.deleteOne({ _id: task._id });
 
     await removeTaskOutputDirectories(task._id, task.finalOutput).catch((cleanupError) => {
       console.error("Unable to remove deleted task output files:", cleanupError);

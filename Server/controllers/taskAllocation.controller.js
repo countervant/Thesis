@@ -64,7 +64,8 @@ export const commitAllocation = async (req, res) => {
     const result = await commitTaskAllocation(
       parseProjectId(req.params.projectId),
       assignments,
-      status || "To Do"
+      status || "To Do",
+      req.user
     );
 
     return res.status(200).json({
