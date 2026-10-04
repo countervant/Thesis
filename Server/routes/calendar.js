@@ -175,13 +175,22 @@ router.get("/", protect, async (req, res) => {
   try {
     const query = { ...eventQueryForUser(req.user) };
     const month = String(req.query.month || "").trim();
+    const now = new Date();
+
+    let birthdayYear = now.getFullYear();
+    let birthdayMonthIndex = now.getMonth();
 
     if (month) {
-      const [year, monthIndex] = month.split("-").map(Number);
-      if (year && monthIndex) {
-        const from = new Date(year, monthIndex - 1, 1);
-        const to = new Date(year, monthIndex, 1);
-        query.date = { $gte: from, $lt: to };
+      const parts = month.split("-").map(Number);
+      if (parts.length === 2 && Number.isInteger(parts[0]) && Number.isInteger(parts[1])) {
+        const [year, monthIndex] = parts;
+        if (monthIndex >= 1 && monthIndex <= 12) {
+          const from = new Date(year, monthIndex - 1, 1);
+          const to = new Date(year, monthIndex, 1);
+          query.date = { $gte: from, $lt: to };
+          birthdayYear = year;
+          birthdayMonthIndex = monthIndex - 1;
+        }
       }
     }
 
@@ -198,10 +207,6 @@ router.get("/", protect, async (req, res) => {
       ];
     }
 
-    const now = new Date();
-    const [requestedYear, requestedMonth] = month.split("-").map(Number);
-    const birthdayYear = requestedYear || now.getFullYear();
-    const birthdayMonthIndex = requestedMonth ? requestedMonth - 1 : now.getMonth();
     const [events, birthdayEvents] = await Promise.all([
       CalendarEvent.find(query)
         .sort({ date: 1, startTime: 1, createdAt: 1 })

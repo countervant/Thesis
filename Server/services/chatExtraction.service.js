@@ -301,8 +301,13 @@ CRITICAL PROTOCOLS & BOUNDARY RULES:
 
   const userPrompt = `Analyze the following client conversation transcript and extract the project proposal, timeline, down payment, and backlog tasks:\n\n--- TRANSCRIPT START ---\n${transcript}\n--- TRANSCRIPT END ---`;
 
-  const configuredModel = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
-  const fallbackModels = ["gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-3.5-flash"];
+  const configuredModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const fallbackModels = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-2.0-flash",
+  ];
   const candidateModels = [
     configuredModel,
     ...fallbackModels.filter((m) => m !== configuredModel),
@@ -332,14 +337,17 @@ CRITICAL PROTOCOLS & BOUNDARY RULES:
         err?.status === 429 ||
         err?.message?.includes("quota") ||
         err?.message?.includes("RESOURCE_EXHAUSTED");
-      const isHighDemand =
+      const isHighDemandOrNotFound =
         err?.status === 503 ||
+        err?.status === 404 ||
         err?.message?.includes("high demand") ||
+        err?.message?.includes("not found") ||
+        err?.message?.includes("NotFound") ||
         err?.message?.includes("temporarily unavailable");
 
-      if (isQuotaExceeded || isHighDemand) {
+      if (isQuotaExceeded || isHighDemandOrNotFound) {
         console.warn(
-          `[chatExtraction] Model ${currentModel} returned ${err?.status || "busy"}. Trying fallback model...`
+          `[chatExtraction] Model ${currentModel} returned ${err?.status || "busy/not found"}. Trying fallback model...`
         );
         continue;
       }

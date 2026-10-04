@@ -22,7 +22,7 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
       Budget.countDocuments().maxTimeMS(8000),
       Task.aggregate([{ $group: { _id: "$status", total: { $sum: 1 } } }]).option({ maxTimeMS: 8000 }),
       Task.find()
-        .select("-comments -attachments")
+        .select("-comments -attachments -activities -feedback -finalOutput")
         .populate("assignedTo", userFields)
         .populate("assignees", userFields)
         .populate("subtasks.assignedTo", userFields)

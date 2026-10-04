@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../constants/queryKeys.js";
-import api, { taskAllocationAPI } from "../services/api.js";
+import api, { taskAllocationAPI, chatProjectAPI } from "../services/api.js";
 import { unwrapData } from "../utils/queryUtils.js";
 
 /**
@@ -67,13 +67,31 @@ export const useChatExtractPreviewQuery = ({
   return useQuery({
     queryKey: QUERY_KEYS.chatExtractPreview(conversationId),
     queryFn: async () => {
-      const response = await api.post(
-        `/chat/${conversationId}/extract-preview`
-      );
-      return unwrapData(response.data);
+      const response = await chatProjectAPI.extractPreview(conversationId);
+      return unwrapData(response);
     },
     enabled: isQueryEnabled,
     staleTime: 0,
     ...options,
+  });
+};
+
+/**
+ * Commit extracted project and backlog tasks from chat conversation.
+ */
+export const useCommitChatProjectMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversationId, payload }) => {
+      const response = await chatProjectAPI.commitProject(conversationId, payload);
+      return unwrapData(response);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDashboard() });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["client-projects"] });
+    },
   });
 };

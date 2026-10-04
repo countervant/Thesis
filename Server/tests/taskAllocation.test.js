@@ -64,6 +64,18 @@ test("calculateSkillMatch - Accurately computes exact, partial and role synergy 
   // Case 3: No required skills specified (uses position relevance)
   const res3 = calculateSkillMatch([], employee, "UI Redesign Mockup");
   assert.ok(res3.score >= 0.5, "Should return baseline or role synergy when no skills are specified");
+
+  // Case 4: Prevents short acronym false positives (e.g. 'ai' must not match 'email' or 'domain')
+  const emailSpecialist = {
+    position: "Domain Administrator",
+    skillGroups: {
+      technical: ["Email Configuration", "Domain Routing"],
+      soft: ["Writing"],
+    },
+  };
+  const res4 = calculateSkillMatch(["AI", "UI"], emailSpecialist, "Marketing Campaign");
+  assert.equal(res4.matchedSkills.length, 0, "Short acronyms must not false-match words like email, domain, or writing");
+  assert.equal(res4.missingSkills.length, 2);
 });
 
 test("getPriorityWeight - Correctly weights priority levels", () => {

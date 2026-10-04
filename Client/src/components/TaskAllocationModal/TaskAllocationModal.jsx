@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -26,6 +26,22 @@ export default function TaskAllocationModal({
   const [successMessage, setSuccessMessage] = useState("");
   // Manual overrides map: taskId -> employeeId
   const [manualAssignments, setManualAssignments] = useState({});
+  const closeTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    onClose();
+  }, [onClose]);
 
   const payload = useMemo(() => {
     const p = {};
@@ -145,7 +161,7 @@ export default function TaskAllocationModal({
       }
 
       // Auto close after brief display
-      setTimeout(() => {
+      closeTimeoutRef.current = setTimeout(() => {
         onClose();
       }, 1200);
     } catch (err) {
@@ -186,7 +202,7 @@ export default function TaskAllocationModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-neutral-800 dark:hover:text-white"
           >
             <X className="h-5 w-5" />
@@ -392,7 +408,7 @@ export default function TaskAllocationModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isCommitting}
               className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
