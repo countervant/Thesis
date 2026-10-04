@@ -23,6 +23,7 @@ const SESSION_USER_FIELDS = [
   "gender",
   "skillGroups",
   "privacySettings",
+  "avatar",
   "isActive",
   "isOnline",
   "showOnlineStatus",
@@ -151,12 +152,10 @@ export const AuthProvider = ({ children }) => {
 
     let isActive = true;
     let presenceRequest = null;
-    const syncPresence = () => {
+    const syncPresence = (isOnline = showOnlineStatus) => {
       if (presenceRequest) return presenceRequest;
-      const shouldBeOnline =
-        showOnlineStatus && document.visibilityState === "visible";
       presenceRequest = authAPI
-        .updatePresence(shouldBeOnline, token)
+        .updatePresence(isOnline, token)
         .catch((error) => {
           if (import.meta.env.DEV) {
             console.debug("Presence update was not delivered:", error);
@@ -169,14 +168,18 @@ export const AuthProvider = ({ children }) => {
       return presenceRequest;
     };
 
-    syncPresence();
+    syncPresence(showOnlineStatus);
     const intervalId = window.setInterval(() => {
-      if (isActive && document.visibilityState === "visible") syncPresence();
+      if (isActive) syncPresence(showOnlineStatus);
     }, PRESENCE_HEARTBEAT_MS);
 
-    const handleVisibilityChange = () => syncPresence();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncPresence(showOnlineStatus);
+      }
+    };
     const handlePageHide = () => authAPI.markOfflineOnPageHide(token);
-    const handlePageShow = () => syncPresence();
+    const handlePageShow = () => syncPresence(showOnlineStatus);
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pagehide", handlePageHide);

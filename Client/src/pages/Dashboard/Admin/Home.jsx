@@ -319,8 +319,8 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
   return <img src={done} alt="" className={className} aria-hidden="true" />;
 };
 
-const Avatar = ({ name }) => (
-  <InitialsAvatar className="h-8 w-8" name={name} textClassName="text-xs" />
+const Avatar = ({ name, user }) => (
+  <InitialsAvatar className="h-8 w-8" name={name} user={user} textClassName="text-xs" />
 );
 
 const StatCard = ({ item }) => {
@@ -1075,28 +1075,28 @@ const UpcomingEvents = ({ events }) => {
   );
 };
 
+const MemberRow = ({ member, index }) => (
+  <div key={member._id || member.id || `${member.email}-${index}`} className="flex w-full min-w-0 items-center gap-3 overflow-hidden py-2.5 first:pt-0 last:pb-0">
+    <span className="relative shrink-0">
+      <Avatar name={getUserName(member)} user={member} />
+      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+        {getUserName(member)}
+      </span>
+      <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
+        {member.role || "Team member"}
+      </span>
+    </span>
+  </div>
+);
+
 const OnlineTeam = ({ members }) => {
   const [isViewingAll, setIsViewingAll] = useState(false);
   const canViewAll = members.length > compactListVisibleRows;
   const listMaxHeight = compactListVisibleRows * 54;
   const modalListMaxHeight = modalListVisibleRows * 54;
-
-  const MemberRow = ({ member, index }) => (
-    <div key={member._id || member.id || `${member.email}-${index}`} className="flex w-full min-w-0 items-center gap-3 overflow-hidden py-2.5 first:pt-0 last:pb-0">
-      <span className="relative shrink-0">
-        <Avatar name={getUserName(member)} />
-        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
-          {getUserName(member)}
-        </span>
-        <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
-          {member.role || "Team member"}
-        </span>
-      </span>
-    </div>
-  );
 
   return (
     <section className={`min-w-0 overflow-hidden rounded-3xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 ${dashboardCardShadow}`}>

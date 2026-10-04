@@ -420,7 +420,7 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           lastSeen: { $gte: onlineSince },
           isActive: { $ne: false },
         })
-          .select("firstName lastName email role companyName isActive isOnline showOnlineStatus lastSeen updatedAt")
+          .select("firstName lastName email role companyName avatar isActive isOnline showOnlineStatus lastSeen updatedAt")
           .sort({ lastSeen: -1, firstName: 1, lastName: 1 })
           .maxTimeMS(8000)
           .lean();
