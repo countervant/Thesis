@@ -1439,4 +1439,26 @@ export const chatProjectAPI = {
   },
 };
 
+export const paymentAPI = {
+  createCheckoutSession: async ({ taskId, paymentType }) => {
+    const response = await api.post("/payments/create-checkout-session", {
+      taskId,
+      paymentType,
+    });
+    return response.data;
+  },
+  verifyCheckoutSession: async ({ sessionId, taskId, paymentId }) => {
+    const response = await api.post("/payments/verify-checkout-session", {
+      sessionId,
+      taskId,
+      paymentId,
+    });
+    return response.data;
+  },
+  getTaskPayments: async (taskId) => {
+    const response = await api.get(`/payments/history/${taskId}`);
+    return response.data;
+  },
+};
+
 export default api;

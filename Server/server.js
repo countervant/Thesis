@@ -21,6 +21,7 @@ import dashboard from "./routes/dashboard.js";
 import users from "./routes/users.js";
 import chatProject from "./routes/chatProject.routes.js";
 import taskAllocation from "./routes/taskAllocation.routes.js";
+import payments from "./routes/payments.js";
 import databaseDiagnostics from "./routes/databaseDiagnostics.js";
 import User from "./models/userModel.js";
 import {
@@ -198,8 +199,18 @@ app.use(
       req.path.endsWith("/events") ? false : compression.filter(req, res),
   })
 );
-const standardJsonParser = express.json({ limit: "1mb" });
-const largeUploadJsonParser = express.json({ limit: "30mb" });
+const standardJsonParser = express.json({
+  limit: "1mb",
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  },
+});
+const largeUploadJsonParser = express.json({
+  limit: "30mb",
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  },
+});
 const usesLargeJsonUpload = (req) => {
   const requestPath = req.path;
   return (
@@ -263,6 +274,7 @@ app.use("/api/newsfeed", newsfeed);
 app.use("/api/messages", messages);
 app.use("/api/chat", chatProject);
 app.use("/api/projects", taskAllocation);
+app.use("/api/payments", payments);
 app.use("/api/dashboard", dashboard);
 app.use("/api/users", users);
 

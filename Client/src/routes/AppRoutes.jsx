@@ -7,6 +7,7 @@ import {
   Outlet,
   Navigate,
   Link,
+  useLocation,
   useRouteError,
 } from "react-router-dom";
 
@@ -43,6 +44,12 @@ const AuthLayout = () => {
 const RoleDashboardRedirect = () => {
   const { user } = useAuth();
   return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
+};
+
+const ClientProjectsRedirect = () => {
+  const location = useLocation();
+  const search = location.search ? location.search.replace(/^\?/, "&") : "";
+  return <Navigate to={`/client/dashboard?page=projects${search}`} replace />;
 };
 
 const AuthPageRoute = ({ children }) => {
@@ -167,6 +174,14 @@ const router = createBrowserRouter(
           element={
             <ProtectedRoute allowedRoles={["client"]}>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/client/projects"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <ClientProjectsRedirect />
             </ProtectedRoute>
           }
         />

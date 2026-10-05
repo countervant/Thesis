@@ -12,6 +12,7 @@ import "../models/calendarEventModel.js";
 import "../models/leaveRequestModel.js";
 import "../models/messageModel.js";
 import "../models/newsfeedModel.js";
+import "../models/paymentModel.js";
 import "../models/projectModel.js";
 import "../models/userModel.js";
 

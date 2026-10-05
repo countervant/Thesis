@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  Archive,
   Calendar,
   CalendarPlus,
   Check,
@@ -54,9 +55,21 @@ const GROUPS = [
     badgeClass: "bg-[#16a34a] text-white shadow-xs",
     dotClass: "text-[#16a34a]",
   },
+  {
+    id: "archived",
+    apiStatus: "archived",
+    title: "ARCHIVED",
+    icon: Archive,
+    badgeClass: "bg-slate-400 text-white shadow-xs",
+    dotClass: "text-slate-400",
+  },
 ];
 
 const isTaskInGroup = (task, groupId) => {
+  const isArchived = Boolean(task.archived);
+  if (groupId === "archived") return isArchived;
+  if (isArchived) return false;
+
   const status = String(task.status || "").toLowerCase();
   const apiStatus = String(task.apiStatus || task.raw?.status || "").toLowerCase();
 
@@ -299,6 +312,8 @@ const MiniCalendar = ({ selectedDate, onSelectDate, isUpdating }) => {
 const ProjectGroupTable = ({
   tasks = [],
   showAssignee = true,
+  showProgress = false,
+  hideEmptyGroups = false,
   onSelectTask,
   onUpdateAssignees,
   onUpdateDueDate,
@@ -661,6 +676,8 @@ const ProjectGroupTable = ({
     <div className="w-full space-y-6">
       {GROUPS.map((group) => {
         const groupTasks = tasks.filter((task) => isTaskInGroup(task, group.id));
+        if (group.id === "archived" && groupTasks.length === 0) return null;
+        if (hideEmptyGroups && groupTasks.length === 0) return null;
         const isCollapsed = Boolean(collapsed[group.id]);
         const isDragOver = dragOverGroupId === group.id;
 
@@ -711,7 +728,11 @@ const ProjectGroupTable = ({
                   <thead>
                     <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-neutral-800 dark:text-neutral-500">
                       <th className="py-2.5 pl-6 pr-4">Name</th>
-                      {showAssignee && <th className="w-36 px-4 py-2.5">Assignee</th>}
+                      {showProgress ? (
+                        <th className="w-36 px-4 py-2.5">Progress</th>
+                      ) : showAssignee ? (
+                        <th className="w-36 px-4 py-2.5">Assignee</th>
+                      ) : null}
                       <th className="w-32 px-4 py-2.5">Due Date</th>
                       <th className="w-24 px-4 py-2.5">Priority</th>
                       <th className="w-40 py-2.5 pl-4 pr-6">Status</th>
@@ -721,7 +742,7 @@ const ProjectGroupTable = ({
                     {groupTasks.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={showAssignee ? 5 : 4}
+                          colSpan={showProgress || showAssignee ? 5 : 4}
                           className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500"
                         >
                           No tasks in this group
@@ -770,8 +791,43 @@ const ProjectGroupTable = ({
                               </div>
                             </td>
 
+                            {/* Progress Column (Client) */}
+                            {showProgress && (
+                              <td className="w-36 px-4 py-3">
+                                {(() => {
+                                  const progressValue =
+                                    task.status === "Completed" || task.apiStatus === "done" || group.id === "done"
+                                      ? 100
+                                      : Math.round(Number(task.progress || 0));
+                                  return (
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-300 ${
+                                            progressValue === 100
+                                              ? "bg-emerald-500"
+                                              : group.id === "in_progress"
+                                              ? "bg-[#0070f3]"
+                                              : group.id === "review"
+                                              ? "bg-orange-500"
+                                              : "bg-[#c72fb2]"
+                                          }`}
+                                          style={{
+                                            width: `${Math.min(100, Math.max(0, progressValue))}%`,
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-bold text-slate-700 dark:text-neutral-200">
+                                        {progressValue}%
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
+                              </td>
+                            )}
+
                             {/* Assignee Column (Admin only) */}
-                            {showAssignee && (
+                            {!showProgress && showAssignee && (
                               <td className="w-36 px-4 py-3">
                                 {assigneeLabel ? (
                                   <button

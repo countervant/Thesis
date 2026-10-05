@@ -344,7 +344,7 @@ router.post("/reset-password", verificationLimiter, async (req, res) => {
           ],
         },
         { $inc: { resetPasswordAttempts: 1 } },
-        { new: true }
+        { returnDocument: "after" }
       ).select("+resetPasswordAttempts");
       if ((failedAttempt?.resetPasswordAttempts || RESET_OTP_MAX_ATTEMPTS) >= RESET_OTP_MAX_ATTEMPTS) {
         await User.updateOne(
