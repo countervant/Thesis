@@ -202,7 +202,7 @@ const validateCode = async (user, code, purpose) => {
         ],
       },
       { $inc: { twoFactorAttempts: 1 } },
-      { new: true }
+      { returnDocument: "after" }
     ).select("+twoFactorAttempts +twoFactorCodeHash");
     if (!failedAttempt) {
       return { status: 400, message: "This verification code is no longer valid." };
@@ -280,7 +280,7 @@ const validateBackupCode = async (user, backupCode) => {
         ],
       },
       { $inc: { twoFactorAttempts: 1 } },
-      { new: true }
+      { returnDocument: "after" }
     ).select("+twoFactorAttempts");
     user.twoFactorAttempts = failedAttempt?.twoFactorAttempts || OTP_MAX_ATTEMPTS;
     logSecurityEvent("2fa_backup_code_rejected", user._id, `attempt=${user.twoFactorAttempts}`);

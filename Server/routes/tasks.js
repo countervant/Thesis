@@ -10,6 +10,7 @@ import Budget from "../models/Admin/budgetmodel.js";
 import { BudgetPlannerEntry } from "../models/Employee/budgetPlannerModel.js";
 import Task from "../models/Admin/taskmodel.js";
 import User from "../models/userModel.js";
+import Payment from "../models/paymentModel.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
@@ -379,18 +380,20 @@ const addTaskAvatarUrls = (task, viewer) => {
         submittedBy: withAvatarUrl(task.finalOutput.submittedBy),
       }
     : task.finalOutput,
-  employeePayments: Array.isArray(task.employeePayments)
+  employeePayments: viewer?.role === "client" ? [] : (Array.isArray(task.employeePayments)
     ? task.employeePayments.map((payment) => ({
         ...payment,
         employee: withAvatarUrl(payment.employee),
         paidBy: withAvatarUrl(payment.paidBy),
       }))
-    : [],
+    : []),
   activities: Array.isArray(task.activities)
-    ? task.activities.map((activity) => ({
-        ...activity,
-        actor: withAvatarUrl(activity.actor),
-      }))
+    ? task.activities
+        .filter((activity) => viewer?.role !== "client" || activity?.type !== "employee_paid")
+        .map((activity) => ({
+          ...activity,
+          actor: withAvatarUrl(activity.actor),
+        }))
     : [],
   feedback: task.feedback
     ? {
@@ -2487,22 +2490,26 @@ router.delete("/:id", protect, async (req, res) => {
     }
 
     if (req.user.role !== "admin") {
-      const hasPayments =
-        (Number(task.paid) > 0) ||
-        (Array.isArray(task.employeePayments) && task.employeePayments.length > 0);
-      if (hasPayments) {
-        return res.status(400).json({
-          message: "Tasks with recorded payments or disbursements cannot be deleted",
-        });
-      }
-      if (["in_progress", "done"].includes(task.status)) {
-        return res.status(400).json({
-          message: "Tasks in progress or completed cannot be deleted by clients",
+      const isOwner =
+        String(task.requestedBy || "") === String(req.user._id) ||
+        String(task.createdBy || "") === String(req.user._id);
+
+      if (!isOwner) {
+        return res.status(403).json({
+          message: "You are not authorized to delete this project",
         });
       }
     }
 
     await Task.deleteOne({ _id: task._id });
+
+    await Budget.deleteMany({ sourceTask: task._id }).catch((cleanupError) => {
+      console.warn("Unable to remove budget entry for deleted task:", cleanupError?.message);
+    });
+
+    await Payment.deleteMany({ task: task._id }).catch((cleanupError) => {
+      console.warn("Unable to remove payments for deleted task:", cleanupError?.message);
+    });
 
     await removeTaskOutputDirectories(task._id, task.finalOutput).catch((cleanupError) => {
       console.error("Unable to remove deleted task output files:", cleanupError);

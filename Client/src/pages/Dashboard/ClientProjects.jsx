@@ -2,7 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Skeleton from "../../components/Skeleton/Skeleton.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog/ConfirmDialog.jsx";
-import { fileToDataUrl, getApiErrorMessage, getProjectOutputFileError, PROJECT_OUTPUT_FILE_ACCEPT, taskAPI } from "../../services/api.js";
+import PayMongoModal from "../../components/PayMongoModal/PayMongoModal.jsx";
+import ProjectGroupTable from "../../components/ProjectGroupTable/ProjectGroupTable.jsx";
+import {
+  fileToDataUrl,
+  getApiErrorMessage,
+  getProjectOutputFileError,
+  paymentAPI,
+  PROJECT_OUTPUT_FILE_ACCEPT,
+  taskAPI,
+} from "../../services/api.js";
 import { QUERY_KEYS } from "../../constants/queryKeys.js";
 import {
   useTasksQuery,
@@ -31,13 +40,6 @@ const statusStyles = {
   "Pending Revisions": "bg-pink-50 text-pink-600",
 };
 
-const progressColors = {
-  "In Progress": "bg-[#c72fb2]",
-  "In Review": "bg-orange-500",
-  Completed: "bg-emerald-500",
-  "Pending Revisions": "bg-pink-500",
-};
-
 const statStyles = {
   "In Progress": "bg-pink-50 text-[#c72fb2] ring-[#c72fb2]/20",
   "In Review": "bg-orange-50 text-orange-500 ring-orange-500/20",
@@ -45,10 +47,15 @@ const statStyles = {
   "Pending Revisions": "bg-pink-50 text-pink-500 ring-pink-500/20",
 };
 
-const tabs = ["All Projects", "In Progress", "In Review", "Completed", "Archived"];
-const statusFilters = ["All Status", "In Progress", "In Review", "Completed", "Pending Revisions"];
+const statusFilters = [
+  "All Status",
+  "In Progress",
+  "In Review",
+  "Completed",
+  "Pending Revisions",
+  "Archived",
+];
 const sortOptions = ["Newest to Oldest", "Oldest to Newest", "Due Date", "Progress"];
-const PROJECTS_PAGE_SIZE = 6;
 const API_ROOT = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
 const todayInputDate = () => {
@@ -82,7 +89,21 @@ const Icon = ({ name, className = "h-5 w-5" }) => {
   if (name === "message") return <svg {...props}><path d="M5 5h14v11H9l-4 3V5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M8 9h8M8 12h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
   if (name === "upload") return <svg {...props}><path d="M12 16V5M8 9l4-4 4 4M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (name === "dots") return <svg {...props}><path d="M12 6h.01M12 12h.01M12 18h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>;
+  if (name === "credit-card") return <svg {...props}><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" strokeWidth="1.8" /><path d="M7 15h2M12 15h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  if (name === "archive") return <svg {...props}><rect x="3" y="4" width="18" height="4" rx="1" stroke="currentColor" strokeWidth="1.8" /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  if (name === "delete") return <svg {...props}><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   return <svg {...props}><path d="M5 12h14M12 5v14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+};
+
+const getPayButtonLabel = (project) => {
+  if (!project) return "Pay Balance";
+  const downPaymentAmount = Number(project.downPayment?.amount) || 0;
+  const isDownPaymentPending = downPaymentAmount > 0 && !project.downPayment?.paidAt && project.paid < downPaymentAmount;
+
+  if (isDownPaymentPending) {
+    return "Pay Down Payment";
+  }
+  return "Pay Balance";
 };
 
 const getEntityId = (entity) => {
@@ -173,7 +194,7 @@ const normalizeProject = (task) => {
   const finalOutput = task?.finalOutput || null;
   const amount = Number(task?.amount ?? task?.budget ?? 0);
   const paid = Number(task?.paid ?? 0);
-  const fullyPaid = amount > 0 && paid >= amount;
+  const fullyPaid = (amount > 0 && paid >= amount) || (paid > 0 && amount === 0) || Boolean(task?.isPaid);
   const feedback = task?.feedback;
   const hasSubmittedFeedback = Boolean(
     feedback?.submittedAt &&
@@ -200,9 +221,10 @@ const normalizeProject = (task) => {
     pendingAmount: Math.max(0, amount - paid),
     fullyPaid,
     paymentPending: !fullyPaid,
+    downPayment: task?.downPayment,
     files: uploadedFileIds.size,
     priority: task?.priority || "medium",
-    progress: getTaskProgress(subtasks),
+    progress: status === "Completed" ? 100 : getTaskProgress(subtasks),
     subtasks,
     revisions: Array.isArray(task?.revisionRequests) ? task.revisionRequests.length : 0,
     revisionRequests: Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
@@ -255,110 +277,6 @@ const ProjectStats = ({ projects }) => {
   );
 };
 
-const ProjectCard = ({ onApprove, onFeedback, onRequestRevision, onToggleArchive, onViewDetails, project }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const statusClass = statusStyles[project.status] || statusStyles["Pending Revisions"];
-  const progressClass = progressColors[project.status] || progressColors["Pending Revisions"];
-
-  return (
-    <Card className="overflow-hidden p-4">
-      <div>
-        <span className="min-w-0">
-          <span className="flex items-start justify-between gap-3">
-            <span className="min-w-0">
-              <span className="block truncate text-base font-black text-[#10142d] dark:text-white">{project.title}</span>
-              <span className="mt-1 block truncate text-xs font-bold text-slate-500">{project.description}</span>
-            </span>
-            <span className="flex shrink-0 flex-col items-end gap-1">
-              <span className={`rounded-full px-3 py-1 text-[10px] font-black ${statusClass}`}>{project.status}</span>
-              {project.archived && <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500 dark:bg-neutral-800">Archived</span>}
-            </span>
-          </span>
-
-          <span className="mt-4 block">
-            <span className="mb-2 flex items-center justify-between text-xs font-black text-slate-500">
-              <span>Progress</span>
-              <span>{project.progress}%</span>
-            </span>
-            <span className="block h-2 rounded-full bg-slate-100 dark:bg-neutral-800">
-              <span className={`block h-2 rounded-full ${progressClass}`} style={{ width: `${Math.max(project.progress, project.status === "Completed" ? 100 : 10)}%` }} />
-            </span>
-          </span>
-        </span>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-4 text-xs font-bold text-slate-500">
-        <span className="flex items-center gap-2">
-          <Icon name="calendar" className="h-4 w-4" />
-          <span><span className="block text-[10px] font-black text-slate-400">Start Date</span>{formatDate(project.startDate)}</span>
-        </span>
-        <span className="flex items-center gap-2">
-          <Icon name="calendar" className="h-4 w-4" />
-          <span><span className="block text-[10px] font-black text-slate-400">Due Date</span>{formatDate(project.dueDate)}</span>
-        </span>
-      </div>
-
-
-      {project.status === "Completed" ? (
-        <div className="mt-5">
-          <button
-            type="button"
-            onClick={() => onFeedback(project)}
-            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.2)] transition hover:brightness-105"
-          >
-            <Icon name="star" className="h-4 w-4" />
-            {project.feedback ? "Edit Feedback" : "Give Feedback"}
-          </button>
-        </div>
-      ) : project.awaitingClientDecision ? (
-        <div className="mt-5 grid gap-2 min-[400px]:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => onRequestRevision(project)}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e347a8]/40 bg-white px-3 text-xs font-black text-[#e347a8] transition hover:bg-pink-50 dark:bg-[#141414]"
-            >
-              <Icon name="refresh" className="h-4 w-4" />
-              Request Revision
-            </button>
-            <button
-              type="button"
-              onClick={() => onApprove(project)}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 text-xs font-black text-white transition hover:bg-emerald-600"
-            >
-              <Icon name="check" className="h-4 w-4" />
-              Approve
-            </button>
-        </div>
-      ) : null}
-
-      <div className={`${project.status === "Completed" || project.awaitingClientDecision ? "mt-2" : "mt-5"} grid grid-cols-[1fr_36px] gap-2`}>
-        <button type="button" onClick={() => onViewDetails(project)} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#c72fb2]/40 bg-pink-50/70 px-3 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">
-          <Icon name="eye" className="h-4 w-4" />
-          View Details
-        </button>
-        <div className="relative">
-          <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-9 w-full place-items-center rounded-lg bg-slate-50 text-slate-500 transition hover:bg-pink-50 hover:text-[#e347a8] dark:bg-neutral-900" aria-label={`More options for ${project.title}`} aria-expanded={menuOpen}>
-            <Icon name="dots" className="h-5 w-5" />
-          </button>
-          {menuOpen && (
-            <div className="absolute bottom-11 right-0 z-20 w-44 rounded-xl border border-pink-100 bg-white p-1.5 shadow-[0_14px_34px_rgba(30,20,45,0.18)] dark:border-neutral-700 dark:bg-neutral-900">
-              <button type="button" onClick={() => { setMenuOpen(false); onToggleArchive(project, !project.archived); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-[#c72fb2] dark:text-slate-300 dark:hover:bg-neutral-800">
-                <Icon name={project.archived ? "refresh" : "folder"} className="h-4 w-4" />
-                {project.archived ? "Restore Project" : "Archive Project"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-      {project.status === "Completed" && project.feedback?.reply?.message && (
-        <div className="mt-2 rounded-lg border border-pink-100 bg-pink-50/70 px-3 py-2">
-          <p className="text-[10px] font-black uppercase tracking-wide text-[#c72fb2]">Admin replied</p>
-          <p className="mt-1 line-clamp-2 text-xs font-bold text-slate-600 dark:text-slate-300">{project.feedback.reply.message}</p>
-        </div>
-      )}
-    </Card>
-  );
-};
 
 const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   <div
@@ -386,7 +304,23 @@ const ProjectActivityPanel = ({ children, count, onClose, title }) => (
   </div>
 );
 
-const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onApprove, onBack, onDownloadOutput, onFeedback, onRequestRevision, onSetNewsfeedPermission, onViewOutput, project }) => {
+const ProjectDetails = ({
+  errorMessage,
+  isDownloadingOutput,
+  isVerifyingPayment = false,
+  noticeMessage,
+  onApprove,
+  onBack,
+  onDelete,
+  onDownloadOutput,
+  onFeedback,
+  onPay,
+  onRequestRevision,
+  onSetNewsfeedPermission,
+  onToggleArchive,
+  onViewOutput,
+  project,
+}) => {
   const [openActivityPanel, setOpenActivityPanel] = useState(null);
   const rawFinalOutputLink = String(project.finalOutput?.link || "").trim();
   const safeFinalOutputLink = getSafeOutputLink(rawFinalOutputLink);
@@ -446,50 +380,17 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
     seenOutputs.add(key);
     return true;
   });
-  const fallbackUpdates = [
-    project.status === "Completed" && {
-      id: "completed",
-      title: "Project marked as completed",
-      text: `by ${getPersonName(project.assignedTo, "Team")}`,
-      date: project.completedAt || project.updatedAt,
-      tone: "green",
-    },
-    project.finalOutput && {
-      id: "output",
-      title: `${getPersonName(project.assignedTo, "Team")} submitted final output`,
-      text: project.finalOutput.message || "Project files were submitted.",
-      date: project.finalOutput.submittedAt || project.updatedAt,
-      tone: "pink",
-    },
-    ...project.revisionRequests.map((revision, index) => ({
-      id: `revision-${index}`,
-      title: "Client requested revision",
-      text: revision.description,
-      date: revision.createdAt,
-      tone: "blue",
-    })),
-  ].filter(Boolean);
-  const updates = project.activities.length > 0
-    ? [...project.activities]
-        .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt))
-        .map((activity, index) => ({
-          id: activity._id || `${activity.type}-${activity.createdAt}-${index}`,
-          title: activity.title,
-          text: [activity.actorName, activity.details].filter(Boolean).join(" - "),
-          date: activity.createdAt,
-          tone: activity.type === "subtask_completed" || activity.type === "output_submitted"
-            ? "green"
-            : activity.type === "revision_requested"
-              ? "blue"
-              : "pink",
-        }))
-    : fallbackUpdates;
-  const timeline = project.activities.length > 0
-    ? [...project.activities]
+  const clientActivities = (project.activities || []).filter(
+    (activity) =>
+      activity?.type !== "employee_paid" &&
+      !String(activity?.title || "").toLowerCase().startsWith("paid employee")
+  );
+  const timeline = clientActivities.length > 0
+    ? [...clientActivities]
         .sort((first, second) => new Date(first.createdAt) - new Date(second.createdAt))
         .map((activity) => ({
           label: activity.title,
-          details: activity.actorName || activity.details,
+          details: "",
           date: activity.createdAt,
           done: activity.type !== "subtask_reopened",
           final: activity.type === "output_submitted",
@@ -497,31 +398,13 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
     : project.subtasks.length > 0
       ? project.subtasks.map((subtask) => ({
           label: `${subtask.completed ? "Completed" : "Pending"} task: ${subtask.title}`,
-          details: subtask.completed ? "Marked as done" : "Awaiting completion",
+          details: "",
           date: subtask.completed ? project.updatedAt : project.dueDate,
           done: subtask.completed,
           final: false,
         }))
       : [{ label: "No task activity yet", details: "", date: project.updatedAt, done: false, final: false }];
-  const visibleUpdates = updates.slice(0, 6);
   const visibleTimeline = timeline.slice(0, 6);
-
-  const renderUpdates = (items) => (
-    <div className="space-y-3">
-      {items.map((update) => (
-        <div key={update.id} className="flex gap-3 rounded-xl bg-pink-50/40 p-3 dark:bg-neutral-800/70">
-          <span className={`mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full ${update.tone === "green" ? "bg-emerald-100 text-emerald-600" : update.tone === "blue" ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-[#c72fb2]"}`}>
-            <Icon name={update.tone === "green" ? "check" : update.tone === "blue" ? "file" : "upload"} className="h-4 w-4" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-black">{update.title}</span>
-            <span className="mt-1 block text-xs font-bold leading-5 text-slate-500">{update.text}</span>
-            <span className="mt-1 block text-xs font-bold text-slate-400">{formatDateTime(update.date)}</span>
-          </span>
-        </div>
-      ))}
-    </div>
-  );
 
   const renderTimeline = (items) => (
     <div className="space-y-0">
@@ -536,7 +419,7 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
           <span className="pb-4">
             <span className="block text-sm font-black">{item.label}</span>
             <span className="block text-xs font-bold leading-5 text-slate-500">
-              {item.details ? `${item.details} - ` : ""}{formatDateTime(item.date)}
+              {formatDateTime(item.date)}
             </span>
           </span>
         </div>
@@ -645,6 +528,38 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
           Back to My Projects
         </button>
         <span className="flex flex-wrap gap-3">
+          {project.fullyPaid ? (
+            <span
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-xs font-black text-emerald-700 shadow-2xs dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400"
+              title={`Project is fully paid (₱${(project.paid || project.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+            >
+              <Icon name="check" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Marked as Paid</span>
+            </span>
+          ) : (
+            <>
+              {project.paid > 0 && (
+                <span
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-black text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
+                  title={`Down payment received: ₱${project.paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                >
+                  <Icon name="check" className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>Down Payment Paid</span>
+                </span>
+              )}
+              {project.amount > 0 && onPay && (
+                <button
+                  type="button"
+                  onClick={() => onPay(project)}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-linear-to-r from-emerald-600 to-teal-600 px-5 text-xs font-black text-white shadow-[0_8px_20px_rgba(16,185,129,0.25)] transition hover:brightness-105 active:scale-98"
+                  title="Pay securely with PayMongo (GCash, Maya, Cards, GrabPay)"
+                >
+                  <Icon name="credit-card" className="h-4 w-4" />
+                  <span>{getPayButtonLabel(project)}</span>
+                </button>
+              )}
+            </>
+          )}
           {project.status === "Completed" ? (
             <button type="button" onClick={onFeedback} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.22)] transition hover:brightness-105">
               <Icon name="star" className="h-4 w-4" />
@@ -662,22 +577,41 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
               </button>
             </>
           ) : null}
+          {onToggleArchive && (
+            <button
+              type="button"
+              onClick={() => onToggleArchive(project, !project.archived)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition hover:bg-slate-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300"
+              title={project.archived ? "Restore to active projects" : "Move project to archive"}
+            >
+              <Icon name="archive" className="h-4 w-4" />
+              <span>{project.archived ? "Restore" : "Archive"}</span>
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(project)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-4 text-xs font-black text-rose-600 transition hover:bg-rose-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-rose-400"
+              title="Delete project"
+            >
+              <Icon name="delete" className="h-4 w-4" />
+              <span>Delete</span>
+            </button>
+          )}
         </span>
       </header>
       {errorMessage && <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{errorMessage}</p>}
       {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
+      {isVerifyingPayment && (
+        <div className="flex items-center gap-3 rounded-xl border border-[#c72fb2]/30 bg-pink-50/80 px-4 py-3 text-sm font-bold text-[#c72fb2]">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span>Verifying PayMongo transaction... Please wait a moment while your project records update.</span>
+        </div>
+      )}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr_1fr]">
-        <Card className="p-5">
-          <h2 className="text-lg font-black">Latest Update</h2>
-          <div className="mt-4">
-            {updates.length === 0 ? (
-              <p className="py-8 text-center text-sm font-bold text-slate-500">No updates yet.</p>
-            ) : renderUpdates(visibleUpdates)}
-          </div>
-          {updates.length > 6 && <button type="button" onClick={() => setOpenActivityPanel("updates")} className="mt-5 h-10 w-full rounded-lg border border-[#c72fb2]/40 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50">View All Updates ({updates.length})</button>}
-        </Card>
 
+      <div className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
         <Card className="p-5">
           <h2 className="text-lg font-black">Submitted Output</h2>
           <p className="mt-1 text-xs font-bold text-slate-500">Here are the latest files and links submitted by your team.</p>
@@ -757,11 +691,6 @@ const ProjectDetails = ({ errorMessage, isDownloadingOutput, noticeMessage, onAp
             </div>
           </div>
         </Card>
-      )}
-      {openActivityPanel === "updates" && (
-        <ProjectActivityPanel title="All Project Updates" count={updates.length} onClose={() => setOpenActivityPanel(null)}>
-          {renderUpdates(updates)}
-        </ProjectActivityPanel>
       )}
       {openActivityPanel === "milestones" && (
         <ProjectActivityPanel title="Project Milestones" count={timeline.length} onClose={() => setOpenActivityPanel(null)}>
@@ -1267,18 +1196,18 @@ const ClientProjects = () => {
     setArchived: setArchivedMutation,
     setNewsfeedPermission: setNewsfeedPermissionMutation,
     submitFeedback: submitFeedbackMutation,
+    deleteTask: deleteTaskMutation,
     invalidateTaskData,
   } = useTaskMutations();
 
   const isApprovingProject = approveTaskMutation.isPending;
   const isArchivingProject = setArchivedMutation.isPending;
+  const isDeletingProject = deleteTaskMutation.isPending;
   const isSubmittingFeedback = submitFeedbackMutation.isPending;
   const isSubmittingRevision = requestRevisionMutation.isPending;
   const isUpdatingPermission = setNewsfeedPermissionMutation.isPending;
 
-  const [activeTab, setActiveTab] = useState("All Projects");
   const [approveProject, setApproveProject] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [feedbackProject, setFeedbackProject] = useState(null);
   const [feedbackSuccessProject, setFeedbackSuccessProject] = useState(null);
@@ -1288,9 +1217,12 @@ const ClientProjects = () => {
   const [sortBy, setSortBy] = useState("Newest to Oldest");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [archiveAction, setArchiveAction] = useState(null);
+  const [deleteAction, setDeleteAction] = useState(null);
   const [noticeMessage, setNoticeMessage] = useState("");
   const [permissionAction, setPermissionAction] = useState(null);
   const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
+  const [payMongoTask, setPayMongoTask] = useState(null);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const noticeTimerRef = useRef(null);
 
   const errorMessage =
@@ -1344,6 +1276,69 @@ const ClientProjects = () => {
   };
 
   useEffect(() => {
+    const handlePaymentRedirect = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const paymentStatus = params.get("payment");
+      const taskId = params.get("taskId");
+      const sessionId = params.get("session_id");
+      const paymentId = params.get("paymentId");
+
+      if (!paymentStatus) return;
+
+      if (paymentStatus === "cancelled") {
+        showNotice("Payment was cancelled. You can resume checkout at any time.");
+        params.delete("payment");
+        params.delete("taskId");
+        params.delete("session_id");
+        params.delete("paymentId");
+        params.delete("simulated");
+        const newSearch = params.toString() ? `?${params.toString()}` : "";
+        window.history.replaceState({}, document.title, `${window.location.pathname}${newSearch}`);
+        return;
+      }
+
+      if (
+        paymentStatus === "success" &&
+        (paymentId || taskId || (sessionId && sessionId !== "{CHECKOUT_SESSION_ID}"))
+      ) {
+        try {
+          setIsVerifyingPayment(true);
+          const response = await paymentAPI.verifyCheckoutSession({ sessionId, taskId, paymentId });
+          if (response?.data?.task) {
+            updateProjectInCache(response.data.task);
+          }
+          invalidateTaskData(taskId || response?.data?.task?._id);
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks() });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.clientDashboard() });
+          queryClient.invalidateQueries({ queryKey: ["budget"] });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDashboard() });
+
+          const amountPaid = response?.data?.payment?.amount;
+          const formatted = amountPaid
+            ? `₱${Number(amountPaid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "";
+          showNotice(`Payment confirmed! ${formatted ? `${formatted} received` : "Transaction complete"} via PayMongo.`);
+          if (taskId) setSelectedProjectId(taskId);
+        } catch (error) {
+          console.error("Payment verification failed:", error);
+          setLocalErrorMessage(getApiErrorMessage(error, "Failed to verify PayMongo payment session."));
+        } finally {
+          setIsVerifyingPayment(false);
+          params.delete("payment");
+          params.delete("taskId");
+          params.delete("session_id");
+          params.delete("paymentId");
+          params.delete("simulated");
+          const newSearch = params.toString() ? `?${params.toString()}` : "";
+          window.history.replaceState({}, document.title, `${window.location.pathname}${newSearch}`);
+        }
+      }
+    };
+
+    handlePaymentRedirect();
+  }, [invalidateTaskData, queryClient, setLocalErrorMessage, updateProjectInCache]);
+
+  useEffect(() => {
     const openNotificationTarget = () => {
       if (isLoading || projects.length === 0) return;
       try {
@@ -1367,19 +1362,19 @@ const ClientProjects = () => {
 
     return projects
       .filter((project) => {
-        const matchesTab =
-          activeTab === "Archived"
-            ? project.archived
-            : !project.archived && (activeTab === "All Projects" || project.status === activeTab);
         const matchesStatus =
-          statusFilter === "All Status" || project.status === statusFilter;
+          statusFilter === "All Status"
+            ? !project.archived
+            : statusFilter === "Archived"
+            ? project.archived
+            : !project.archived && project.status === statusFilter;
         const matchesSearch =
           !normalizedSearch ||
           [project.title, project.description, project.status]
             .filter(Boolean)
             .some((value) => value.toLowerCase().includes(normalizedSearch));
 
-        return matchesTab && matchesStatus && matchesSearch;
+        return matchesStatus && matchesSearch;
       })
       .sort((first, second) => {
         if (sortBy === "Oldest to Newest" || sortBy === "Oldest") {
@@ -1397,14 +1392,7 @@ const ClientProjects = () => {
         const secondTime = parseDate(second.createdAt) || parseDate(second.startDate) || parseDate(second.updatedAt) || 0;
         return secondTime - firstTime;
       });
-  }, [activeTab, projects, searchTerm, sortBy, statusFilter]);
-  const totalPages = Math.max(1, Math.ceil(visibleProjects.length / PROJECTS_PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = visibleProjects.length === 0
-    ? 0
-    : (safeCurrentPage - 1) * PROJECTS_PAGE_SIZE + 1;
-  const pageEnd = Math.min(safeCurrentPage * PROJECTS_PAGE_SIZE, visibleProjects.length);
-  const paginatedProjects = visibleProjects.slice(pageStart ? pageStart - 1 : 0, pageEnd);
+  }, [projects, searchTerm, sortBy, statusFilter]);
 
   const handleOpenFeedback = async (project) => {
     try {
@@ -1432,6 +1420,30 @@ const ClientProjects = () => {
       showNotice(action.archived ? "Project moved to Archived." : "Project restored to My Projects.");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, action.archived ? "Unable to archive the project." : "Unable to restore the project."));
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const project = deleteAction;
+    if (!project || isDeletingProject) return;
+    try {
+      setErrorMessage("");
+      await deleteTaskMutation.mutateAsync(project.id);
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.filter((item) => getEntityId(item) !== project.id);
+      });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.clientDashboard() });
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDashboard() });
+      if (selectedProjectId === project.id) {
+        setSelectedProjectId("");
+      }
+      setDeleteAction(null);
+      showNotice(`“${project.title}” was permanently deleted.`);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to delete the project."));
     }
   };
 
@@ -1568,16 +1580,22 @@ const ClientProjects = () => {
         <ProjectDetails
           errorMessage={errorMessage}
           isDownloadingOutput={isDownloadingOutputId === selectedProject.id}
+          isVerifyingPayment={isVerifyingPayment}
           noticeMessage={noticeMessage}
           onApprove={(project) => {
             setErrorMessage("");
             setApproveProject(project);
           }}
           onBack={() => setSelectedProjectId("")}
-          onDownloadOutput={handleDownloadOutput}
-          onFeedback={() => {
+          onDelete={(project) => {
             setErrorMessage("");
-            setFeedbackProject(selectedProject);
+            setDeleteAction(project);
+          }}
+          onDownloadOutput={handleDownloadOutput}
+          onFeedback={() => handleOpenFeedback(selectedProject)}
+          onPay={(project) => {
+            setErrorMessage("");
+            setPayMongoTask(project);
           }}
           onRequestRevision={(project) => {
             setErrorMessage("");
@@ -1585,9 +1603,29 @@ const ClientProjects = () => {
             setRevisionProject(project);
           }}
           onSetNewsfeedPermission={(project, allowed) => setPermissionAction({ project, allowed })}
+          onToggleArchive={(project, archived) => {
+            setErrorMessage("");
+            setArchiveAction({ project, archived });
+          }}
           onViewOutput={handleViewOutput}
           project={selectedProject}
         />
+        {payMongoTask && (
+          <PayMongoModal
+            isOpen={Boolean(payMongoTask)}
+            onClose={() => setPayMongoTask(null)}
+            onSuccess={() => {
+              setPayMongoTask(null);
+              invalidateTaskData(payMongoTask.id);
+              queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks() });
+              queryClient.invalidateQueries({ queryKey: QUERY_KEYS.clientDashboard() });
+              queryClient.invalidateQueries({ queryKey: ["budget"] });
+              queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDashboard() });
+              showNotice("Payment session completed!");
+            }}
+            task={payMongoTask}
+          />
+        )}
         {revisionProject && (
           <RevisionModal
             errorMessage={errorMessage}
@@ -1616,6 +1654,37 @@ const ClientProjects = () => {
         {feedbackSuccessProject && (
           <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
         )}
+        <ConfirmDialog
+          confirmLabel={archiveAction?.archived ? "Archive" : "Restore"}
+          confirmingLabel={archiveAction?.archived ? "Archiving..." : "Restoring..."}
+          errorMessage={errorMessage}
+          icon="done"
+          isConfirming={isArchivingProject}
+          isOpen={Boolean(archiveAction)}
+          message={archiveAction?.archived ? `Archive “${archiveAction.project.title}”? You can restore it later from the Archived filter.` : `Restore “${archiveAction?.project.title}” to My Projects?`}
+          onCancel={() => {
+            setErrorMessage("");
+            setArchiveAction(null);
+          }}
+          onConfirm={handleArchiveProject}
+          title={archiveAction?.archived ? "Archive Project" : "Restore Project"}
+        />
+        <ConfirmDialog
+          cancelLabel="Cancel"
+          confirmLabel="Delete"
+          confirmingLabel="Deleting..."
+          errorMessage={errorMessage}
+          icon="delete"
+          isConfirming={isDeletingProject}
+          isOpen={Boolean(deleteAction)}
+          message={`Permanently delete “${deleteAction?.title || "this project"}”? This cannot be undone.`}
+          onCancel={() => {
+            setErrorMessage("");
+            setDeleteAction(null);
+          }}
+          onConfirm={handleDeleteProject}
+          title="Delete Project"
+        />
         <ConfirmDialog
           confirmLabel="Approve"
           confirmingLabel="Approving..."
@@ -1663,10 +1732,7 @@ const ClientProjects = () => {
             <input
               type="search"
               value={searchTerm}
-              onChange={(event) => {
-                setSearchTerm(event.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search projects..."
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-bold text-[#10142d] outline-none transition placeholder:text-slate-400 focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
             />
@@ -1676,10 +1742,7 @@ const ClientProjects = () => {
             <span className="sr-only">Status filter</span>
             <select
               value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(event) => setStatusFilter(event.target.value)}
               className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-black text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
             >
               {statusFilters.map((status) => (
@@ -1692,10 +1755,7 @@ const ClientProjects = () => {
             <span className="sr-only">Sort projects</span>
             <select
               value={sortBy}
-              onChange={(event) => {
-                setSortBy(event.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(event) => setSortBy(event.target.value)}
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none transition focus:border-[#e347a8] focus:ring-2 focus:ring-pink-100 dark:border-neutral-800 dark:bg-[#141414] dark:text-white"
             >
               {sortOptions.map((option) => (
@@ -1717,66 +1777,31 @@ const ClientProjects = () => {
         </p>
       )}
       {noticeMessage && <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{noticeMessage}</p>}
+      {isVerifyingPayment && (
+        <div className="flex items-center gap-3 rounded-xl border border-[#c72fb2]/30 bg-pink-50/80 px-4 py-3 text-sm font-bold text-[#c72fb2]">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span>Verifying PayMongo transaction... Please wait a moment while your project records update.</span>
+        </div>
+      )}
       <ProjectStats projects={projects.filter((project) => !project.archived)} />
 
-      <Card className="overflow-hidden">
-        <div className="flex gap-4 overflow-x-auto border-b border-pink-50 px-5 dark:border-neutral-800">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab);
-                setCurrentPage(1);
-              }}
-              className={`relative h-12 whitespace-nowrap px-2 text-xs font-black transition ${
-                activeTab === tab ? "text-[#c72fb2]" : "text-slate-500 hover:text-[#e347a8]"
-              }`}
-            >
-              {tab}
-              {activeTab === tab && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#c72fb2]" />}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-5">
-          {visibleProjects.length === 0 ? (
-            <p className="py-12 text-center text-sm font-bold text-slate-500">No projects found.</p>
-          ) : (
-            <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-              {paginatedProjects.map((project) => (
-                <ProjectCard
-                  key={project.id || project.title}
-                  onApprove={(selectedProject) => {
-                    setErrorMessage("");
-                    setApproveProject(selectedProject);
-                  }}
-                  onFeedback={handleOpenFeedback}
-                  onRequestRevision={(selectedProject) => {
-                    setErrorMessage("");
-                    setRevisionMessage("");
-                    setRevisionProject(selectedProject);
-                  }}
-                  onToggleArchive={(selectedProject, archived) => {
-                    setErrorMessage("");
-                    setArchiveAction({ project: selectedProject, archived });
-                  }}
-                  onViewDetails={(project) => setSelectedProjectId(project.id)}
-                  project={project}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-4 border-t border-pink-50 px-5 py-4 text-xs font-bold text-slate-500 dark:border-neutral-800">
-          <span className="flex items-center gap-2">
-            <button type="button" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400" aria-label="Previous page">‹</button>
-            <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-[#c72fb2] px-2 text-white">{safeCurrentPage}</span>
-            <button type="button" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-pink-50 hover:text-[#e347a8] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400" aria-label="Next page">›</button>
-          </span>
-        </div>
-      </Card>
+      <section className="space-y-4">
+        {visibleProjects.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200/70 bg-white p-12 text-center shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
+            <p className="text-sm font-bold text-slate-500 dark:text-neutral-400">
+              No projects found.
+            </p>
+          </div>
+        ) : (
+          <ProjectGroupTable
+            tasks={visibleProjects}
+            showAssignee={false}
+            showProgress={true}
+            hideEmptyGroups={statusFilter !== "All Status"}
+            onSelectTask={(taskId) => setSelectedProjectId(String(taskId))}
+          />
+        )}
+      </section>
       <ConfirmDialog
         confirmLabel={archiveAction?.archived ? "Archive" : "Restore"}
         confirmingLabel={archiveAction?.archived ? "Archiving..." : "Restoring..."}
@@ -1784,13 +1809,29 @@ const ClientProjects = () => {
         icon="done"
         isConfirming={isArchivingProject}
         isOpen={Boolean(archiveAction)}
-        message={archiveAction?.archived ? `Archive “${archiveAction.project.title}”? You can restore it later from the Archived tab.` : `Restore “${archiveAction?.project.title}” to My Projects?`}
+        message={archiveAction?.archived ? `Archive “${archiveAction.project.title}”? You can restore it later from the Archived filter.` : `Restore “${archiveAction?.project.title}” to My Projects?`}
         onCancel={() => {
           setErrorMessage("");
           setArchiveAction(null);
         }}
         onConfirm={handleArchiveProject}
         title={archiveAction?.archived ? "Archive Project" : "Restore Project"}
+      />
+      <ConfirmDialog
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        errorMessage={errorMessage}
+        icon="delete"
+        isConfirming={isDeletingProject}
+        isOpen={Boolean(deleteAction)}
+        message={`Permanently delete “${deleteAction?.title || "this project"}”? This cannot be undone.`}
+        onCancel={() => {
+          setErrorMessage("");
+          setDeleteAction(null);
+        }}
+        onConfirm={handleDeleteProject}
+        title="Delete Project"
       />
       <ConfirmDialog
         confirmLabel="Approve"
@@ -1834,6 +1875,22 @@ const ClientProjects = () => {
       )}
       {feedbackSuccessProject && (
         <FeedbackSuccessModal onClose={() => setFeedbackSuccessProject(null)} />
+      )}
+      {payMongoTask && (
+        <PayMongoModal
+          isOpen={Boolean(payMongoTask)}
+          onClose={() => setPayMongoTask(null)}
+          onSuccess={() => {
+            setPayMongoTask(null);
+            invalidateTaskData(payMongoTask.id);
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks() });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.clientDashboard() });
+            queryClient.invalidateQueries({ queryKey: ["budget"] });
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminDashboard() });
+            showNotice("Payment session completed!");
+          }}
+          task={payMongoTask}
+        />
       )}
     </div>
   );

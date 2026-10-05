@@ -463,7 +463,7 @@ router.patch("/:id/heart", protect, async (req, res) => {
       : { $addToSet: { hearts: userId } };
 
     const updatedPost = await populatePost(
-      NewsfeedPost.findByIdAndUpdate(req.params.id, updateOperator, { new: true })
+      NewsfeedPost.findByIdAndUpdate(req.params.id, updateOperator, { returnDocument: "after" })
         .select("-media.url")
         .maxTimeMS(8000)
     );

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Skeleton from "../../components/Skeleton/Skeleton.jsx";
 import { QUERY_KEYS } from "../../constants/queryKeys.js";
-import { useTasksQuery, useCalendarQuery } from "../../hooks/index.js";
+import { useTasksQuery } from "../../hooks/index.js";
 import { getApiErrorMessage, messageAPI } from "../../services/api.js";
 
 const statusFromApi = {
@@ -30,7 +30,6 @@ const statStyles = {
   projects: "bg-[#f0e9ff] text-[#754de8] ring-[#754de8]/20",
   revisions: "bg-pink-50 text-[#e347a8] ring-[#e347a8]/20",
   messages: "bg-[#f0e9ff] text-[#754de8] ring-[#754de8]/20",
-  meetings: "bg-orange-50 text-orange-500 ring-orange-500/20",
 };
 
 const Card = ({ children, className = "" }) => (
@@ -136,12 +135,6 @@ const normalizeTask = (task) => {
   };
 };
 
-const normalizeMeeting = (event) => ({
-  id: getEntityId(event),
-  title: event?.title || "Client meeting",
-  date: event?.date,
-});
-
 const getDisplayName = (profile) => {
   const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ");
   return name || profile?.companyName || profile?.email || "Unknown User";
@@ -176,8 +169,8 @@ const ClientDashboardSkeleton = () => (
       <Skeleton className="mt-3 h-4 w-96 max-w-full" />
     </header>
 
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, index) => (
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, index) => (
         <Card key={index} className="p-5">
           <div className="flex items-center gap-4">
             <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" />
@@ -274,20 +267,11 @@ const ClientDashboardSkeleton = () => (
 );
 
 const ClientDashboard = ({ onNavigate }) => {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
-
   const {
     data: rawTasks = [],
-    isLoading: isTasksLoading,
+    isLoading,
     error: tasksError,
   } = useTasksQuery({ view: "client" });
-
-  const {
-    data: rawMeetings = [],
-    isLoading: isCalendarLoading,
-    error: calendarError,
-  } = useCalendarQuery({ month: currentMonth });
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: QUERY_KEYS.unreadMessages(),
@@ -307,20 +291,13 @@ const ClientDashboard = ({ onNavigate }) => {
     return list.map(normalizeTask);
   }, [rawTasks]);
 
-  const meetings = useMemo(() => {
-    const list = Array.isArray(rawMeetings) ? rawMeetings : [];
-    return list.map(normalizeMeeting);
-  }, [rawMeetings]);
-
   const messagePreviews = useMemo(() => {
     const list = Array.isArray(rawThreads) ? rawThreads : [];
     return list.map(normalizeMessagePreview);
   }, [rawThreads]);
 
-  const isLoading = isTasksLoading || isCalendarLoading;
-  const queryError = tasksError || calendarError;
-  const errorMessage = queryError
-    ? getApiErrorMessage(queryError, "Unable to load client dashboard.")
+  const errorMessage = tasksError
+    ? getApiErrorMessage(tasksError, "Unable to load client dashboard.")
     : "";
 
   const dashboardData = useMemo(() => {
@@ -334,12 +311,6 @@ const ClientDashboard = ({ onNavigate }) => {
       (task) => task.status === "Pending" || task.revisionRequests.length > 0
     );
     const highPriority = sortedTasks.filter((task) => task.priority === "high" && task.status !== "Completed");
-    const upcomingMeetings = meetings
-      .filter((meeting) => {
-        const date = parseDate(meeting.date);
-        return date && date >= new Date(new Date().toDateString());
-      })
-      .sort((first, second) => parseDate(first.date) - parseDate(second.date));
 
     return {
       activeProjects,
@@ -348,9 +319,8 @@ const ClientDashboard = ({ onNavigate }) => {
       pendingRevisions,
       projectOverview: sortedTasks.slice(0, 3),
       recentRevisions: pendingRevisions.slice(0, 3),
-      upcomingMeetings,
     };
-  }, [meetings, tasks]);
+  }, [tasks]);
 
   const stats = [
     {
@@ -373,13 +343,6 @@ const ClientDashboard = ({ onNavigate }) => {
       detail: "From conversations",
       icon: "message",
       tone: "messages",
-    },
-    {
-      label: "Upcoming Meetings",
-      value: dashboardData.upcomingMeetings.length,
-      detail: "This week",
-      icon: "calendar",
-      tone: "meetings",
     },
   ];
 
@@ -411,7 +374,7 @@ const ClientDashboard = ({ onNavigate }) => {
         </p>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((item) => (
           <Card key={item.label} className="p-5">
             <div className="flex items-center gap-4">
@@ -422,7 +385,7 @@ const ClientDashboard = ({ onNavigate }) => {
                 <p className="text-sm font-black text-slate-600 dark:text-slate-300">{item.label}</p>
                 <p className="mt-1 text-4xl font-black text-[#10142d] dark:text-white">{item.value}</p>
                 <p className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                  <span className={`h-2 w-2 rounded-full ${item.tone === "meetings" ? "bg-orange-500" : item.tone === "revisions" ? "bg-pink-500" : "bg-emerald-500"}`} />
+                  <span className={`h-2 w-2 rounded-full ${item.tone === "revisions" ? "bg-pink-500" : "bg-emerald-500"}`} />
                   {item.detail}
                 </p>
               </div>

@@ -56,4 +56,8 @@ export const QUERY_KEYS = {
     "extract-preview",
     String(conversationId || ""),
   ],
+  taskPayments: (taskId) => [
+    "payments",
+    String(taskId || ""),
+  ],
 };

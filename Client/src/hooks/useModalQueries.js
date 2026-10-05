@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../constants/queryKeys.js";
-import api, { taskAllocationAPI, chatProjectAPI } from "../services/api.js";
+import { taskAllocationAPI, chatProjectAPI } from "../services/api.js";
 import { unwrapData } from "../utils/queryUtils.js";
 
 /**

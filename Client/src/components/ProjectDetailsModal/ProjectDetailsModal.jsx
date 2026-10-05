@@ -102,6 +102,7 @@ export const ProjectDetailsModal = ({
   onDownloadOutput,
   onEdit,
   onMarkPaid,
+  onPayWithPayMongo,
   onPayEmployee,
   onSubmitOutput,
   onToggleSubtask,
@@ -168,6 +169,18 @@ export const ProjectDetailsModal = ({
     (item.revisionRequests || []).length > 0;
 
   const isPaid = Number(item.amount || 0) > 0 && Number(item.paid || 0) >= Number(item.amount || 0);
+  const isDownPaymentSettled = Boolean(
+    item.downPayment?.paidAt ||
+    (Number(item.downPayment?.amount || 0) > 0 && Number(item.paid || 0) >= Number(item.downPayment.amount))
+  );
+  const isPartiallyPaid = !isPaid && Number(item.paid || 0) > 0;
+  const paymentBadgeLabel = isPaid
+    ? "Paid"
+    : isDownPaymentSettled
+      ? "Down Payment Paid"
+      : isPartiallyPaid
+        ? "Partially Paid"
+        : "Not paid";
 
   const priorityKey = String(item.priority || "low").toLowerCase();
   const priorityStyle = priorityBadgeStyles[priorityKey] || priorityBadgeStyles.low;
@@ -260,28 +273,47 @@ export const ProjectDetailsModal = ({
                       className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1 text-xs font-semibold text-white shadow-sm transition ${
                         isPaid
                           ? "bg-emerald-600 cursor-default"
-                          : "bg-[#7c3aed] hover:bg-[#6d28d9] disabled:cursor-not-allowed disabled:opacity-60"
+                          : isPartiallyPaid
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-[#7c3aed] hover:bg-[#6d28d9] disabled:cursor-not-allowed disabled:opacity-60"
                       }`}
                       title={
                         isPaid
-                          ? "Project is paid"
-                          : Number(item.amount || 0) <= 0
-                            ? "Set project amount first"
-                            : isMarkingPaid
-                              ? "Recording payment..."
-                              : "Click to mark as paid"
+                          ? "Project is fully paid"
+                          : isPartiallyPaid
+                            ? "Partial payment received. Click to record remaining balance"
+                            : Number(item.amount || 0) <= 0
+                              ? "Set project amount first"
+                              : isMarkingPaid
+                                ? "Recording payment..."
+                                : "Click to mark as paid"
                       }
                     >
-                      {isPaid ? "Paid" : isMarkingPaid ? "Saving..." : "Not paid"}
+                      {isMarkingPaid ? "Saving..." : paymentBadgeLabel}
                     </button>
                   ) : (
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1 text-xs font-semibold text-white shadow-sm ${
-                        isPaid ? "bg-emerald-600" : "bg-[#7c3aed]"
+                        isPaid ? "bg-emerald-600" : isPartiallyPaid ? "bg-blue-600" : "bg-[#7c3aed]"
                       }`}
                     >
-                      {isPaid ? "Paid" : "Not paid"}
+                      {paymentBadgeLabel}
                     </span>
+                  )}
+                  {Number(item.amount || 0) > 0 && (
+                    <span className="text-xs font-bold text-slate-500 dark:text-neutral-400">
+                      ₱{Number(item.paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ₱{Number(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  )}
+                  {!isPaid && Number(item.amount || 0) > 0 && onPayWithPayMongo && (
+                    <button
+                      type="button"
+                      onClick={() => onPayWithPayMongo(item)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-emerald-600 to-teal-600 px-3 py-1 text-xs font-bold text-white shadow-xs transition hover:brightness-105"
+                      title="Pay via PayMongo"
+                    >
+                      Pay via PayMongo
+                    </button>
                   )}
                 </div>
 
