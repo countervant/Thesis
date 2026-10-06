@@ -8,8 +8,10 @@ const APP_URL = "https://clientra.me";
 // Configure side panel behavior on installation
 chrome.runtime.onInstalled.addListener(async () => {
   try {
-    // Enable side panel to open on action icon click (no default_popup)
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    // Enable side panel to open on action icon click (Chrome)
+    if (chrome.sidePanel?.setPanelBehavior) {
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    }
   } catch (error) {
     console.warn("[CLIENTRA SW] setPanelBehavior error:", error);
   }
@@ -29,6 +31,21 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
+// Fallback toolbar button handler (for Firefox or Chromium browsers where setPanelBehavior is not active)
+if (chrome.action?.onClicked) {
+  chrome.action.onClicked.addListener(async (tab) => {
+    try {
+      if (chrome.sidePanel?.open && tab?.windowId) {
+        await chrome.sidePanel.open({ windowId: tab.windowId });
+      } else if (typeof browser !== "undefined" && browser.sidebarAction?.open) {
+        await browser.sidebarAction.open();
+      }
+    } catch (err) {
+      console.warn("[CLIENTRA SW] action.onClicked error:", err);
+    }
+  });
+}
+
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "clientra_extract_selection" && info.selectionText) {
@@ -44,13 +61,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       pendingTimestamp: Date.now(),
     });
 
-    // Open side panel in the active window
-    if (tab?.windowId) {
-      try {
+    // Open side panel in the active window (Chrome or Firefox)
+    try {
+      if (chrome.sidePanel?.open && tab?.windowId) {
         await chrome.sidePanel.open({ windowId: tab.windowId });
-      } catch (err) {
-        console.warn("[CLIENTRA SW] sidePanel.open error:", err);
+      } else if (typeof browser !== "undefined" && browser.sidebarAction?.open) {
+        await browser.sidebarAction.open();
       }
+    } catch (err) {
+      console.warn("[CLIENTRA SW] side panel opening error:", err);
     }
 
     // Notify side panel if it's already active
