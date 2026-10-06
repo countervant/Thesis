@@ -495,16 +495,18 @@ async function fetchClients() {
     const list = json?.data?.clients || json?.data || [];
     state.clients = Array.isArray(list) ? list : [];
 
-    // Populate dropdown
-    elements.clientSelect.innerHTML = '<option value="">-- No Client (Assign Later) --</option>';
-    state.clients.forEach((c) => {
-      const opt = document.createElement("option");
-      opt.value = c._id;
-      const name = c.companyName || c.contactPerson || "Unnamed Client";
-      const person = c.contactPerson && c.companyName ? ` (${c.contactPerson})` : "";
-      opt.textContent = `${name}${person}`;
-      elements.clientSelect.appendChild(opt);
-    });
+    // Populate dropdown if present
+    if (elements.clientSelect) {
+      elements.clientSelect.innerHTML = '<option value="">-- No Client (Assign Later) --</option>';
+      state.clients.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c._id;
+        const name = c.companyName || c.contactPerson || "Unnamed Client";
+        const person = c.contactPerson && c.companyName ? ` (${c.contactPerson})` : "";
+        opt.textContent = `${name}${person}`;
+        elements.clientSelect.appendChild(opt);
+      });
+    }
   } catch (err) {
     console.warn("[CLIENTRA] Failed to fetch clients:", err);
   }
@@ -645,7 +647,8 @@ function renderProposal(proposal) {
   elements.deadlineInput.value = proposal.targetDeadline || "";
 
   // Match client if clientHint matches any client name
-  const hint = elements.clientHintInput.value.toLowerCase();
+  const hint = (elements.clientHintInput?.value || "").toLowerCase();
+  state.matchedClientId = null;
   if (hint && state.clients.length > 0) {
     const matched = state.clients.find(
       (c) =>
@@ -653,7 +656,10 @@ function renderProposal(proposal) {
         (c.contactPerson && hint.includes(c.contactPerson.toLowerCase()))
     );
     if (matched) {
-      elements.clientSelect.value = matched._id;
+      state.matchedClientId = matched._id;
+      if (elements.clientSelect) {
+        elements.clientSelect.value = matched._id;
+      }
     }
   }
 
@@ -772,7 +778,7 @@ async function handleCommit() {
     return;
   }
 
-  const clientId = elements.clientSelect.value || null;
+  const clientId = elements.clientSelect?.value || state.matchedClientId || null;
   const clientSummary = elements.projectSummaryInput.value.trim();
   const budgetCeiling = parseFloat(elements.budgetInput.value) || 0;
   const startDate = elements.startDateInput.value || null;
