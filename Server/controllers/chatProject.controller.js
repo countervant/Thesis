@@ -231,7 +231,59 @@ export const commitProject = async (req, res) => {
   }
 };
 
+/**
+ * Controller: Preview Project Extraction from External Transcript (Browser Extension / Paste)
+ * Route: POST /api/chat/external-preview
+ */
+export const previewExternalProjectExtraction = async (req, res) => {
+  try {
+    const { transcript, clientHint } = req.body;
+
+    if (!transcript || typeof transcript !== "string" || transcript.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Transcript text is required and must contain at least 10 characters.",
+      });
+    }
+
+    let inputForLlm = transcript.trim();
+    if (clientHint && typeof clientHint === "string" && clientHint.trim()) {
+      inputForLlm = `[Context Note: Client name/platform hint: ${clientHint.trim()}]\n\n${inputForLlm}`;
+    }
+
+    const extractedProposal = await extractProjectFromChat(inputForLlm);
+
+    return res.status(200).json({
+      success: true,
+      message: "External project proposal extracted successfully.",
+      data: extractedProposal,
+    });
+  } catch (error) {
+    console.error("[chatProjectController.previewExternalProjectExtraction] Error:", error);
+    let cleanMessage = error?.message || "An unexpected error occurred.";
+    if (typeof cleanMessage === "string" && cleanMessage.startsWith("{") && cleanMessage.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(cleanMessage);
+        if (parsed?.error?.message) {
+          cleanMessage = parsed.error.message;
+        }
+      } catch {
+        // use raw message
+      }
+    }
+    if (error?.status === 429 || cleanMessage.includes("quota") || cleanMessage.includes("RESOURCE_EXHAUSTED")) {
+      cleanMessage = "Gemini API rate limit or free-tier quota reached. Please wait a few seconds and try again.";
+    }
+
+    return res.status(error?.status || 500).json({
+      success: false,
+      message: cleanMessage,
+    });
+  }
+};
+
 export default {
   previewProjectExtraction,
+  previewExternalProjectExtraction,
   commitProject,
 };
