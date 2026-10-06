@@ -9,8 +9,9 @@ const APP_URL = "https://clientra.me";
 chrome.runtime.onInstalled.addListener(async () => {
   try {
     // Enable side panel to open on action icon click (Chrome)
-    if (chrome.sidePanel?.setPanelBehavior) {
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    const sp = chrome["sidePanel"];
+    if (sp && typeof sp.setPanelBehavior === "function") {
+      await sp.setPanelBehavior({ openPanelOnActionClick: true });
     }
   } catch (error) {
     console.warn("[CLIENTRA SW] setPanelBehavior error:", error);
@@ -35,8 +36,9 @@ chrome.runtime.onInstalled.addListener(async () => {
 if (chrome.action?.onClicked) {
   chrome.action.onClicked.addListener(async (tab) => {
     try {
-      if (chrome.sidePanel?.open && tab?.windowId) {
-        await chrome.sidePanel.open({ windowId: tab.windowId });
+      const sp = chrome["sidePanel"];
+      if (sp?.open && tab?.windowId) {
+        await sp.open({ windowId: tab.windowId });
       } else if (typeof browser !== "undefined" && browser.sidebarAction?.open) {
         await browser.sidebarAction.open();
       }
@@ -63,8 +65,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     // Open side panel in the active window (Chrome or Firefox)
     try {
-      if (chrome.sidePanel?.open && tab?.windowId) {
-        await chrome.sidePanel.open({ windowId: tab.windowId });
+      const sp = chrome["sidePanel"];
+      if (sp?.open && tab?.windowId) {
+        await sp.open({ windowId: tab.windowId });
       } else if (typeof browser !== "undefined" && browser.sidebarAction?.open) {
         await browser.sidebarAction.open();
       }
