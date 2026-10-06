@@ -608,17 +608,27 @@ function updateDownPaymentPreview() {
   const budget = parseFloat(elements.budgetInput.value) || 0;
   const val = parseFloat(elements.downPaymentValueInput.value) || 0;
 
-  if (mode === "none") {
-    elements.downPaymentPreview.textContent = "₱0.00 (Paid upon completion)";
-    return;
+  let downPayment = 0;
+  if (mode === "percentage") {
+    downPayment = budget * (val / 100);
+    elements.downPaymentPreview.textContent = `₱${downPayment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${val}%)`;
+  } else if (mode === "fixed") {
+    downPayment = val;
+    elements.downPaymentPreview.textContent = `₱${val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fixed)`;
+  } else {
+    elements.downPaymentPreview.textContent = "₱0.00 (None)";
   }
 
-  if (mode === "percentage") {
-    const calculated = (budget * (val / 100));
-    elements.downPaymentPreview.textContent = `₱${calculated.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${val}%)`;
-  } else {
-    elements.downPaymentPreview.textContent = `₱${val.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Fixed)`;
-  }
+  const remaining = Math.max(0, budget - downPayment);
+  const formatPHP = (num) => `₱${Number(num || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const elBudget = document.getElementById("summaryProjectAmount");
+  const elDown = document.getElementById("summaryDownPayment");
+  const elRemaining = document.getElementById("summaryRemainingBalance");
+
+  if (elBudget) elBudget.textContent = formatPHP(budget);
+  if (elDown) elDown.textContent = downPayment > 0 ? `− ${formatPHP(downPayment)}` : formatPHP(0);
+  if (elRemaining) elRemaining.textContent = formatPHP(remaining);
 }
 
 /**
@@ -753,20 +763,21 @@ function renderTasks(tasks) {
 
     item.innerHTML = `
       <div class="task-top">
-        <input type="text" class="task-title-input" value="${escapeHtml(task.title || "")}" placeholder="Task Title">
-        <select class="task-priority-select" style="width: auto; padding: 4px 6px; font-size: 11px;">
+        <span class="task-pill-tag">Deliverable ${String(index + 1).padStart(2, "0")}</span>
+        <input type="text" class="task-title-input" value="${escapeHtml(task.title || "")}" placeholder="Deliverable Title" style="flex: 1;">
+        <select class="task-priority-select" style="width: auto; padding: 4px 8px; font-size: 11px;">
           <option value="Low" ${task.priority === "Low" ? "selected" : ""}>Low</option>
           <option value="Medium" ${task.priority === "Medium" ? "selected" : ""}>Medium</option>
           <option value="High" ${task.priority === "High" ? "selected" : ""}>High</option>
           <option value="Urgent" ${task.priority === "Urgent" ? "selected" : ""}>Urgent</option>
         </select>
-        <button type="button" class="btn-icon delete-task-btn" title="Remove Task" style="width: 24px; height: 24px; font-size: 12px; color: #ef4444;">
+        <button type="button" class="btn-icon delete-task-btn" title="Remove Task" style="width: 26px; height: 26px; font-size: 11px; color: #ef4444; border-radius: 6px;">
           ✕
         </button>
       </div>
-      <textarea class="task-desc-input" rows="2" placeholder="Task deliverables / criteria...">${escapeHtml(task.description || "")}</textarea>
-      <div class="form-group">
-        <label style="font-size: 10px;">Required Skills (comma separated):</label>
+      <textarea class="task-desc-input" rows="2" placeholder="Task deliverables / scope criteria...">${escapeHtml(task.description || "")}</textarea>
+      <div class="form-group" style="margin-top: 2px;">
+        <label style="font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Required Skills / Tech Stack:</label>
         <input type="text" class="task-skills-input" value="${escapeHtml((task.requiredSkills || []).join(", "))}" placeholder="e.g. React, Figma, Node.js">
       </div>
     `;

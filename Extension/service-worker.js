@@ -112,19 +112,20 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Listen for messages from side panel or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "GET_ACTIVE_TAB_INFO") {
-    (async () => {
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs
+      .query({ active: true, currentWindow: true })
+      .then(([tab]) => {
         sendResponse({
           success: true,
           url: tab?.url || "",
           title: tab?.title || "",
           tabId: tab?.id || null,
         });
-      } catch (err) {
+      })
+      .catch((err) => {
         sendResponse({ success: false, error: err.message });
-      }
-    })();
+      });
+
     return true; // Keep message channel open for async response
   }
 });
