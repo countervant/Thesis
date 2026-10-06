@@ -1,15 +1,13 @@
 import express from "express";
 import {
   previewProjectExtraction,
+  previewExternalProjectExtraction,
   commitProject,
 } from "../controllers/chatProject.controller.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
-
-// Parameter validation
-router.param("conversationId", validateObjectIdParam);
 
 const adminOnly = (req, res, next) => {
   if (req.user?.role !== "admin") {
@@ -20,6 +18,15 @@ const adminOnly = (req, res, next) => {
   }
   next();
 };
+
+// Route: Extract project proposal from external transcript (Chrome Extension / Raw Text)
+router.post("/external-preview", protect, adminOnly, previewExternalProjectExtraction);
+
+// Route: Commit project and backlog tasks directly (Chrome Extension / External)
+router.post("/external-commit", protect, adminOnly, commitProject);
+
+// Parameter validation for internal conversation routes
+router.param("conversationId", validateObjectIdParam);
 
 // Route 1: Extract project proposal and tasks preview from chat conversation
 router.post("/:conversationId/extract-preview", protect, adminOnly, previewProjectExtraction);
