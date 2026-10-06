@@ -86,7 +86,7 @@ const getPersonName = (person) => {
   );
 };
 
-const getAssignedEmployees = (task) => {
+const getAssignedEmployees = (task, adminId = "") => {
   const employees = [...(task?.assignees || []), task?.assignedTo].filter(Boolean);
   const uniqueEmployees = new Map();
 
@@ -95,9 +95,11 @@ const getAssignedEmployees = (task) => {
     if (employeeId && !uniqueEmployees.has(employeeId)) uniqueEmployees.set(employeeId, employee);
   });
 
-  return [...uniqueEmployees.values()].filter(
-    (employee) => typeof employee === "string" || !employee?.role || employee.role === "employee"
-  );
+  return [...uniqueEmployees.values()].filter((employee) => {
+    const id = getEntityId(employee);
+    if (adminId && id === adminId) return false;
+    return typeof employee === "string" || !employee?.role || employee.role === "employee";
+  });
 };
 
 const isClientReviewSubtask = (subtask) =>
@@ -485,6 +487,8 @@ const EmployeePaymentButton = ({ isPayingEmployee, item, onPayEmployee }) => {
   if (!onPayEmployee) return null;
 
   const assignedEmployees = getAssignedEmployees(item);
+  if (assignedEmployees.length === 0) return null;
+
   const paidEmployeeIds = new Set(
     (item.employeePayments || []).map((payment) => getEntityId(payment.employee))
   );
@@ -2047,6 +2051,7 @@ const Tasks = ({
           {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
             <ProjectDetailsModal
               canAccessTasks={isOwnedByCurrentUser(selectedTask)}
+              currentUserId={currentUserId}
               isApprovingCustomClient={isApprovingCustomClientId === selectedTask.id}
               isDownloadingOutput={isDownloadingOutputId === selectedTask.id}
               isMarkingPaid={isMarkingPaidId === selectedTask.id}
@@ -2057,7 +2062,13 @@ const Tasks = ({
               onDownloadOutput={handleDownloadOutput}
               onEdit={handleEditTask}
               onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
-              onPayEmployee={user?.role === "admin" ? setEmployeePaymentTask : undefined}
+              onPayEmployee={
+                user?.role === "admin" &&
+                !isAssignedToMe(selectedTask) &&
+                getAssignedEmployees(selectedTask, currentUserId).length > 0
+                  ? setEmployeePaymentTask
+                  : undefined
+              }
               onApproveCustomClient={requestCustomClientApproval}
               onSubmitOutput={handleSubmitOutput}
               onToggleTask={handleToggleSubtask}
