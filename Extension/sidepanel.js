@@ -322,12 +322,33 @@ async function syncWithClientraTab() {
       try {
         const res = await chrome.tabs.sendMessage(tab.id, { action: "GET_CLIENTRA_AUTH" });
         if (res?.token) {
+          const userRole = res.user?.role;
+          if (userRole && userRole !== "admin") {
+            showNotice(`Access denied: The open CLIENTRA tab is logged in as ${userRole}. Only Administrators can use this extension to create projects.`, "error");
+            return;
+          }
+
+          // Verify with server that this token has administrator privileges
+          const verifyRes = await fetch(`${state.apiUrl}/api/clients?limit=1`, {
+            headers: { Authorization: `Bearer ${res.token}` },
+          });
+
+          if (verifyRes.status === 403) {
+            showNotice("Access denied: Only Administrators can use this extension to create projects.", "error");
+            return;
+          }
+          if (verifyRes.status === 401) {
+            showNotice("Session expired on clientra.me tab. Please log in again.", "warning");
+            return;
+          }
+
           state.token = res.token;
-          state.user = res.user || { role: "admin", email: "clientra-admin" };
+          state.user = res.user || { role: "admin", email: "admin@clientra.me" };
+          state.user.role = "admin";
           await chrome.storage.local.set({ token: state.token, user: state.user });
 
           authFound = true;
-          showNotice("Synced credentials from clientra.me!", "success");
+          showNotice("Synced Admin session from clientra.me!", "success");
           updateAuthUI();
           await fetchClients();
           break;
@@ -348,15 +369,36 @@ async function syncWithClientraTab() {
           });
           const result = results?.[0]?.result;
           if (result?.token) {
-            state.token = result.token;
-            let parsedUser = { role: "admin", email: "clientra-admin" };
+            let parsedUser = null;
             try {
               if (result.user) parsedUser = JSON.parse(result.user);
             } catch {}
-            state.user = parsedUser;
+
+            if (parsedUser?.role && parsedUser.role !== "admin") {
+              showNotice(`Access denied: The open CLIENTRA tab is logged in as ${parsedUser.role}. Only Administrators can use this extension to create projects.`, "error");
+              return;
+            }
+
+            // Verify with server that this token has administrator privileges
+            const verifyRes = await fetch(`${state.apiUrl}/api/clients?limit=1`, {
+              headers: { Authorization: `Bearer ${result.token}` },
+            });
+
+            if (verifyRes.status === 403) {
+              showNotice("Access denied: Only Administrators can use this extension to create projects.", "error");
+              return;
+            }
+            if (verifyRes.status === 401) {
+              showNotice("Session expired on clientra.me tab. Please log in again.", "warning");
+              return;
+            }
+
+            state.token = result.token;
+            state.user = parsedUser || { role: "admin", email: "admin@clientra.me" };
+            state.user.role = "admin";
             await chrome.storage.local.set({ token: state.token, user: state.user });
             authFound = true;
-            showNotice("Synced credentials from clientra.me!", "success");
+            showNotice("Synced Admin session from clientra.me!", "success");
             updateAuthUI();
             await fetchClients();
             break;
@@ -366,7 +408,7 @@ async function syncWithClientraTab() {
     }
 
     if (!authFound) {
-      showNotice("Could not find logged-in session on clientra.me tab. Please log in on clientra.me or below.", "warning");
+      showNotice("Could not find logged-in Admin session on clientra.me tab. Please log in on clientra.me or below.", "warning");
     }
   } catch (err) {
     showNotice(`Sync failed: ${err.message}`, "error");
@@ -386,7 +428,7 @@ async function handleLogin() {
   }
 
   elements.loginBtn.disabled = true;
-  elements.loginBtn.textContent = "Authenticating...";
+  elements.loginBtn.textContent = "Authenticating Admin...";
 
   try {
     const res = await fetch(`${state.apiUrl}/api/auth/login`, {
@@ -400,11 +442,20 @@ async function handleLogin() {
       throw new Error(data.message || "Invalid credentials.");
     }
 
+    if (data.requiresTwoFactor) {
+      throw new Error("2-Factor Authentication is active for this account. Please log in on https://clientra.me first, then click '⚡ Auto-Sync from clientra.me Tab'.");
+    }
+
+    // Role check: ONLY administrator accounts are authorized to use this extension
+    if (data.role !== "admin") {
+      throw new Error("Access denied: Only Administrators can log in to this extension because only admins can create projects.");
+    }
+
     state.token = data.token;
     state.user = { id: data.id, email: data.email, role: data.role };
     await chrome.storage.local.set({ token: state.token, user: state.user });
 
-    showNotice("Logged in successfully!", "success");
+    showNotice("Logged in successfully as Administrator!", "success");
     elements.settingsDrawer.classList.remove("open");
     updateAuthUI();
     await fetchClients();
@@ -412,7 +463,7 @@ async function handleLogin() {
     showNotice(err.message, "error");
   } finally {
     elements.loginBtn.disabled = false;
-    elements.loginBtn.textContent = "Log In to CLIENTRA";
+    elements.loginBtn.textContent = "Log In as Admin";
   }
 }
 
@@ -428,11 +479,21 @@ async function handleLogout() {
 }
 
 /**
- * Check if the stored token is still valid
+ * Check if the stored token is still valid and has administrator privileges
  */
 async function verifyAuthentication() {
   if (!state.token) {
     updateAuthUI();
+    return;
+  }
+
+  // Pre-check: reject immediately if stored role is not admin
+  if (state.user?.role && state.user.role !== "admin") {
+    state.token = null;
+    state.user = null;
+    await chrome.storage.local.remove(["token", "user"]);
+    updateAuthUI();
+    showNotice("Access denied: Only Administrators can use this extension to create projects.", "warning");
     return;
   }
 
@@ -442,11 +503,14 @@ async function verifyAuthentication() {
     });
 
     if (res.status === 401 || res.status === 403) {
-      // Token expired
+      // Token expired or non-admin user
       state.token = null;
       state.user = null;
       await chrome.storage.local.remove(["token", "user"]);
       updateAuthUI();
+      if (res.status === 403) {
+        showNotice("Access denied: Only Administrators can use this extension to create projects.", "warning");
+      }
       return;
     }
 
@@ -464,12 +528,12 @@ async function verifyAuthentication() {
 function updateAuthUI(isOnline = true) {
   if (state.token) {
     elements.statusBadge.classList.add("connected");
-    elements.statusText.textContent = isOnline ? "Connected" : "Server Offline";
+    elements.statusText.textContent = isOnline ? "Connected (Admin)" : "Server Offline";
     elements.sessionInfo.classList.remove("hidden");
     elements.loginForm.classList.add("hidden");
     elements.userGreeting.textContent = state.user?.email
-      ? `Logged in: ${state.user.email} (${state.user.role || "Admin"})`
-      : "Connected to CLIENTRA";
+      ? `Logged in: ${state.user.email} (Admin)`
+      : "Connected as Administrator";
   } else {
     elements.statusBadge.classList.remove("connected");
     elements.statusText.textContent = "Not Connected";
@@ -571,7 +635,12 @@ async function handleAnalyze() {
 
   if (!state.token) {
     elements.settingsDrawer.classList.add("open");
-    showNotice("Please connect or log in to CLIENTRA first.", "warning");
+    showNotice("Please log in as Administrator or sync your active tab first.", "warning");
+    return;
+  }
+
+  if (state.user?.role && state.user.role !== "admin") {
+    showNotice("Access denied: Only Administrators can generate and create projects.", "error");
     return;
   }
 
@@ -766,6 +835,17 @@ function collectTasksFromDOM() {
  * Commit the reviewed project and tasks to MongoDB via backend
  */
 async function handleCommit() {
+  if (!state.token) {
+    elements.settingsDrawer.classList.add("open");
+    showNotice("Please log in as Administrator or sync your active tab first.", "warning");
+    return;
+  }
+
+  if (state.user?.role && state.user.role !== "admin") {
+    showNotice("Access denied: Only Administrators can create projects.", "error");
+    return;
+  }
+
   const projectName = elements.projectNameInput.value.trim();
   if (!projectName) {
     showNotice("Project Name is required.", "error");

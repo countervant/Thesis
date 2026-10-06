@@ -31,7 +31,10 @@
   <!-- Settings & Authentication Drawer -->
   <div id="settingsDrawer" class="settings-drawer">
     <div id="authSection">
-      <h4>Account & Authentication</h4>
+      <h4>Admin Authentication</h4>
+      <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.4;">
+        Only Administrator accounts can log in to generate and create projects.
+      </p>
       <div style="margin-bottom: 12px;">
         <button id="syncTabBtn" class="btn btn-secondary btn-sm" style="width: 100%;">
           ⚡ Auto-Sync from clientra.me Tab
@@ -39,15 +42,15 @@
       </div>
       <div id="loginForm">
         <div class="drawer-field">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" placeholder="admin@clientra.com">
+          <label for="loginEmail">Admin Email</label>
+          <input type="email" id="loginEmail" placeholder="admin@clientra.me">
         </div>
         <div class="drawer-field">
           <label for="loginPassword">Password</label>
           <input type="password" id="loginPassword" placeholder="••••••••">
         </div>
         <button id="loginBtn" class="btn btn-primary btn-sm" style="width: 100%; margin-top: 6px;">
-          Log In to CLIENTRA
+          Log In as Admin
         </button>
       </div>
 
