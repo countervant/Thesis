@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import { Project, ProjectTask as Task } from "../models/projectModel.js";
+import AdminTask from "../models/Admin/taskmodel.js";
+import Budget from "../models/Admin/budgetmodel.js";
 import Message from "../models/messageModel.js";
 import Client from "../models/Admin/Clientmodel.js";
 import User from "../models/userModel.js";
@@ -123,16 +125,20 @@ export const commitProject = async (req, res) => {
 
     // Resolve client reference if valid
     let resolvedClientId = null;
+    let resolvedClientName = "Client";
     const candidateId = clientId || conversationId;
     if (candidateId && mongoose.Types.ObjectId.isValid(candidateId)) {
-      const clientDoc = await Client.findById(candidateId).select("_id").lean();
+      const clientDoc = await Client.findById(candidateId).lean();
       if (clientDoc) {
-        resolvedClientId = clientDoc._id;
-      } else {
-        const userClientDoc = await User.findOne({ _id: candidateId, role: "client" }).select("_id").lean();
-        if (userClientDoc) {
-          resolvedClientId = userClientDoc._id;
-        }
+        resolvedClientName = clientDoc.companyName || clientDoc.contactPerson || "Client";
+      }
+      const userClientDoc = await User.findOne({ _id: candidateId, role: "client" }).lean();
+      if (userClientDoc) {
+        resolvedClientId = userClientDoc._id;
+        resolvedClientName =
+          userClientDoc.companyName ||
+          [userClientDoc.firstName, userClientDoc.lastName].filter(Boolean).join(" ") ||
+          resolvedClientName;
       }
     }
 
@@ -154,6 +160,9 @@ export const commitProject = async (req, res) => {
       }
     }
 
+    const effectiveStartDate = parsedStartDate || new Date();
+    const effectiveDueDate = parsedDeadline || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
     // Parse numeric budget
     const numericBudget =
       typeof budgetCeiling === "number" && !isNaN(budgetCeiling)
@@ -162,63 +171,125 @@ export const commitProject = async (req, res) => {
 
     // Parse down payment
     let downPaymentData = { mode: "none", value: 0, amount: 0 };
+    let taskDownPayment = undefined;
     if (downPayment && ["percentage", "fixed"].includes(downPayment.mode)) {
       const val = Number(downPayment.value) || 0;
-      const amount =
-        downPayment.mode === "percentage"
-          ? (numericBudget * (val / 100))
-          : val;
-      downPaymentData = {
-        mode: downPayment.mode,
-        value: val,
-        amount,
-      };
+      if (val > 0) {
+        const amount =
+          downPayment.mode === "percentage"
+            ? (numericBudget * (val / 100))
+            : val;
+        downPaymentData = {
+          mode: downPayment.mode,
+          value: val,
+          amount,
+        };
+        taskDownPayment = {
+          mode: downPayment.mode,
+          value: val,
+          amount,
+          paidAt: new Date(),
+        };
+      }
     }
 
-    // 1. Create the Project document in MongoDB
-    const newProject = await Project.create({
-      name: projectName.trim(),
+    // Prepare Subtasks for AdminTask (CLIENTRA project standard)
+    const adminUser = req.user?._id || null;
+    const subtaskDocs = tasks.map((task) => ({
+      title: String(task.title || "Untitled Deliverable").trim(),
+      completed: false,
+      assignedTo: adminUser,
+    }));
+    if (!subtaskDocs.some((s) => s.title.toLowerCase() === "submit output")) {
+      subtaskDocs.push({
+        title: "Submit Output",
+        completed: false,
+        assignedTo: adminUser,
+      });
+    }
+
+    // 1. Create the primary Task (Project) document in Admin Task collection (used by Dashboard Projects page)
+    const adminTask = await AdminTask.create({
+      title: projectName.trim(),
       description: (clientSummary || "").trim(),
-      client: resolvedClientId,
-      budget: numericBudget,
-      startDate: parsedStartDate,
-      deadline: parsedDeadline,
-      downPayment: downPaymentData,
-      status: "Planning",
-      progress: 0,
+      status: "in_progress",
+      priority: "medium",
+      startDate: effectiveStartDate,
+      dueDate: effectiveDueDate,
+      amount: numericBudget,
+      paid: taskDownPayment?.amount || 0,
+      downPayment: taskDownPayment,
+      subtasks: subtaskDocs,
+      assignees: adminUser ? [adminUser] : [],
+      assignedTo: adminUser,
+      requestedBy: resolvedClientId || undefined,
+      requestedByName: resolvedClientName,
+      createdBy: adminUser || (new mongoose.Types.ObjectId()),
+      activities: [
+        {
+          type: "task_created",
+          title: "Task created",
+          details: "Project was created via CLIENTRA Assistant",
+          actor: adminUser || undefined,
+          actorName: req.user
+            ? `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() || req.user.email
+            : "Admin",
+        },
+      ],
     });
 
-    // 2. Prepare Task documents matching Task Schema
-    // (assignedTo: null, status: 'Backlog', NO estimated hours)
-    const validPriorities = ["Low", "Medium", "High", "Urgent"];
-    const taskDocs = tasks.map((task) => ({
-      project: newProject._id,
-      title: String(task.title || "Untitled Task").trim(),
-      description: String(task.description || "").trim(),
-      requiredSkills: Array.isArray(task.requiredSkills)
-        ? task.requiredSkills.map((s) => String(s).trim()).filter(Boolean)
-        : [],
-      priority: validPriorities.includes(task.priority) ? task.priority : "Medium",
-      status: "Backlog",
-      assignedTo: null,
-    }));
+    if (taskDownPayment?.amount > 0) {
+      try {
+        await Budget.create({
+          type: "income",
+          description: `Project down payment: ${adminTask.title}`,
+          category: "Project Down Payment",
+          date: taskDownPayment.paidAt,
+          amount: taskDownPayment.amount,
+          sourceTask: adminTask._id,
+        });
+      } catch (budgetError) {
+        console.warn("[commitProject] Failed creating down payment budget entry:", budgetError);
+      }
+    }
 
-    // 3. Insert tasks into MongoDB with rollback safety
-    let createdTasks;
+    // 2. Also keep Project and ProjectTask synchronized in projectModel.js
     try {
-      createdTasks = await Task.insertMany(taskDocs);
-    } catch (insertError) {
-      console.error("[chatProjectController.commitProject] Failed inserting tasks, rolling back project:", insertError);
-      await Project.findByIdAndDelete(newProject._id);
-      throw insertError;
+      const newProject = await Project.create({
+        _id: adminTask._id,
+        name: projectName.trim(),
+        description: (clientSummary || "").trim(),
+        client: resolvedClientId,
+        budget: numericBudget,
+        startDate: effectiveStartDate,
+        deadline: effectiveDueDate,
+        downPayment: downPaymentData,
+        status: "Planning",
+        progress: 0,
+      });
+
+      const validPriorities = ["Low", "Medium", "High", "Urgent"];
+      const legacyTaskDocs = tasks.map((task) => ({
+        project: newProject._id,
+        title: String(task.title || "Untitled Task").trim(),
+        description: String(task.description || "").trim(),
+        requiredSkills: Array.isArray(task.requiredSkills)
+          ? task.requiredSkills.map((s) => String(s).trim()).filter(Boolean)
+          : [],
+        priority: validPriorities.includes(task.priority) ? task.priority : "Medium",
+        status: "Backlog",
+        assignedTo: null,
+      }));
+      await Task.insertMany(legacyTaskDocs);
+    } catch (legacyErr) {
+      console.warn("[commitProject] Legacy project sync note:", legacyErr.message);
     }
 
     return res.status(201).json({
       success: true,
-      message: "Project and backlog tasks created successfully.",
+      message: "Project and tasks created successfully.",
       data: {
-        project: newProject,
-        tasks: createdTasks,
+        project: adminTask,
       },
     });
   } catch (error) {
