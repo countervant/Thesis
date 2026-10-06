@@ -763,24 +763,30 @@ function renderTasks(tasks) {
 
     item.innerHTML = `
       <div class="task-top">
-        <span class="task-pill-tag">Deliverable ${String(index + 1).padStart(2, "0")}</span>
-        <input type="text" class="task-title-input" value="${escapeHtml(task.title || "")}" placeholder="Deliverable Title" style="flex: 1;">
+        <span class="task-pill-tag"></span>
+        <input type="text" class="task-title-input" placeholder="Deliverable Title" style="flex: 1;">
         <select class="task-priority-select" style="width: auto; padding: 4px 8px; font-size: 11px;">
-          <option value="Low" ${task.priority === "Low" ? "selected" : ""}>Low</option>
-          <option value="Medium" ${task.priority === "Medium" ? "selected" : ""}>Medium</option>
-          <option value="High" ${task.priority === "High" ? "selected" : ""}>High</option>
-          <option value="Urgent" ${task.priority === "Urgent" ? "selected" : ""}>Urgent</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Urgent">Urgent</option>
         </select>
         <button type="button" class="btn-icon delete-task-btn" title="Remove Task" style="width: 26px; height: 26px; font-size: 11px; color: #ef4444; border-radius: 6px;">
           ✕
         </button>
       </div>
-      <textarea class="task-desc-input" rows="2" placeholder="Task deliverables / scope criteria...">${escapeHtml(task.description || "")}</textarea>
+      <textarea class="task-desc-input" rows="2" placeholder="Task deliverables / scope criteria..."></textarea>
       <div class="form-group" style="margin-top: 2px;">
         <label style="font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Required Skills / Tech Stack:</label>
-        <input type="text" class="task-skills-input" value="${escapeHtml((task.requiredSkills || []).join(", "))}" placeholder="e.g. React, Figma, Node.js">
+        <input type="text" class="task-skills-input" placeholder="e.g. React, Figma, Node.js">
       </div>
     `;
+
+    item.querySelector(".task-pill-tag").textContent = `Deliverable ${String(index + 1).padStart(2, "0")}`;
+    item.querySelector(".task-title-input").value = task.title || "";
+    item.querySelector(".task-priority-select").value = task.priority || "Medium";
+    item.querySelector(".task-desc-input").value = task.description || "";
+    item.querySelector(".task-skills-input").value = (task.requiredSkills || []).join(", ");
 
     // Bind delete button
     item.querySelector(".delete-task-btn").addEventListener("click", () => {
