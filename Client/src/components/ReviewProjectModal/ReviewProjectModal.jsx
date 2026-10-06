@@ -45,11 +45,26 @@ const ModalLoadingSpinner = ({
   </div>
 );
 
-const mapExtractedToTask = (payload, convId) => {
+const formatClientDisplay = (client) => {
+  if (!client) return "";
+  if (typeof client === "string") return client;
+  const personName =
+    client.contactPerson ||
+    [client.firstName, client.lastName].filter(Boolean).join(" ");
+  const companyName = client.companyName || "";
+  if (companyName && personName) return `${companyName} - ${personName}`;
+  return companyName || personName || client.email || "";
+};
+
+const mapExtractedToTask = (payload, convId, client = null) => {
   if (!payload) return null;
   const downPayment = payload.downPayment || null;
   const mode = downPayment?.mode || payload.downPaymentType || "none";
   const val = downPayment?.value ?? payload.downPaymentValue ?? "";
+
+  const effectiveClient =
+    client || (payload.client && typeof payload.client === "object" ? payload.client : null);
+  const clientName = formatClientDisplay(effectiveClient) || payload.clientName || "";
 
   return {
     title: payload.projectName || "",
@@ -61,7 +76,8 @@ const mapExtractedToTask = (payload, convId) => {
     downPaymentType: mode,
     downPaymentValue: val,
     priority: (payload.priority || "medium").toLowerCase(),
-    requestedBy: convId,
+    requestedBy: effectiveClient || convId,
+    requestedByName: clientName,
     subtasks: Array.isArray(payload.tasks)
       ? payload.tasks.map((t) => ({
           title: t.title || "",
@@ -82,6 +98,7 @@ export default function ReviewProjectModal({
   isOpen,
   onClose,
   conversationId,
+  client = null,
   initialData = null,
   onProjectCreated,
 }) {
@@ -108,13 +125,14 @@ export default function ReviewProjectModal({
         downPaymentType: "none",
         downPaymentValue: "",
         priority: "medium",
-        requestedBy: conversationId,
+        requestedBy: client || conversationId,
+        requestedByName: formatClientDisplay(client),
         subtasks: [],
       };
     }
-    if (initialData) return mapExtractedToTask(initialData, conversationId);
+    if (initialData) return mapExtractedToTask(initialData, conversationId, client);
     const payload = extractResponse?.data || extractResponse;
-    if (payload) return mapExtractedToTask(payload, conversationId);
+    if (payload) return mapExtractedToTask(payload, conversationId, client);
     if (!conversationId) {
       return {
         title: "",
@@ -125,12 +143,13 @@ export default function ReviewProjectModal({
         downPaymentType: "none",
         downPaymentValue: "",
         priority: "medium",
-        requestedBy: "",
+        requestedBy: client || "",
+        requestedByName: formatClientDisplay(client),
         subtasks: [],
       };
     }
     return null;
-  }, [conversationId, extractResponse, forceBlank, initialData]);
+  }, [client, conversationId, extractResponse, forceBlank, initialData]);
 
   const isLoading =
     !initialData && Boolean(conversationId) && !forceBlank && isExtractLoading;
@@ -180,6 +199,7 @@ export default function ReviewProjectModal({
       <Addtask
         key={`addtask-${conversationId}-${extractedTask?.title || "blank"}`}
         task={extractedTask}
+        initialClient={client}
         onNavigate={() => onClose()}
         onTaskCreated={() => {
           onProjectCreated?.();

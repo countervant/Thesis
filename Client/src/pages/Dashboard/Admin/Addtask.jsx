@@ -190,6 +190,7 @@ const normalizeClients = (data) => {
 
 const formatClientName = (client) => {
   if (!client) return "";
+  if (typeof client === "string") return client.trim();
 
   const personName =
     client.contactPerson ||
@@ -197,16 +198,20 @@ const formatClientName = (client) => {
   const companyName = client.companyName || "";
 
   if (companyName && personName) return `${companyName} - ${personName}`;
-  return companyName || personName || client.email || "Unnamed client";
+  return companyName || personName || client.email || "";
 };
 
-const isRegisteredClientUser = (client) => client?.source === "user" || client?.role === "client";
+const isRegisteredClientUser = (client) =>
+  client?.source === "user" || client?.role === "client" || Boolean(client?.hasLoginAccount);
 
 const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
-const createInitialForm = (task, user, isAdmin) => {
+const createInitialForm = (task, user, isAdmin, initialClient = null) => {
+  const targetClient = task?.requestedBy || initialClient;
+  const targetClientId = getEntityId(targetClient);
+
   if (task) {
     return {
       title: task.title || "",
@@ -218,7 +223,7 @@ const createInitialForm = (task, user, isAdmin) => {
       downPaymentValue: task.downPayment?.value ?? task.downPaymentValue ?? "",
       priority: task.priority || "medium",
       requestedBy:
-        getEntityId(task.requestedBy) ||
+        targetClientId ||
         (task.createdBy?.role === "client" ? getEntityId(task.createdBy) : ""),
       assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
         .map(getEntityId)
@@ -236,29 +241,43 @@ const createInitialForm = (task, user, isAdmin) => {
     downPaymentType: "none",
     downPaymentValue: "",
     priority: "medium",
-    requestedBy: isAdmin ? "" : getEntityId(user),
+    requestedBy: isAdmin ? targetClientId : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
     subtasks: [createSubmitOutputSubtask()],
   };
 };
 
-const Addtask = ({ onNavigate, onTaskCreated, task }) => {
+const Addtask = ({ initialClient = null, onNavigate, onTaskCreated, task }) => {
   const { user } = useAuth();
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const isEditing = Boolean(task?.id);
-  const [formData, setFormData] = useState(() => createInitialForm(task, user, isAdmin));
+  const targetClient = useMemo(() => {
+    if (initialClient && typeof initialClient === "object") return initialClient;
+    if (task?.requestedBy && typeof task.requestedBy === "object") return task.requestedBy;
+    return null;
+  }, [initialClient, task?.requestedBy]);
+
+  const [formData, setFormData] = useState(() => createInitialForm(task, user, isAdmin, initialClient));
   const [clientSearch, setClientSearch] = useState(() => {
-    if (task?.requestedBy) {
-      return formatClientName(task.requestedBy);
+    if (targetClient) {
+      return formatClientName(targetClient);
+    }
+    if (task?.requestedByName) {
+      return task.requestedByName;
     }
     return "";
   });
-  const [clientRequestType, setClientRequestType] = useState(
-    task?.requestedByName && !getEntityId(task?.requestedBy) ? "custom" : "existing"
-  );
-  const [customClientName, setCustomClientName] = useState(
-    task?.requestedByName && !getEntityId(task?.requestedBy) ? task.requestedByName : ""
-  );
+  const [clientRequestType, setClientRequestType] = useState(() => {
+    if (targetClient || formData.requestedBy) return "existing";
+    if (task?.requestedByName && !getEntityId(task?.requestedBy)) return "custom";
+    return "existing";
+  });
+  const [customClientName, setCustomClientName] = useState(() => {
+    if (task?.requestedByName && !getEntityId(task?.requestedBy) && !targetClient) {
+      return task.requestedByName;
+    }
+    return "";
+  });
   const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -281,16 +300,29 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       : loadedAssignees;
   }, [isAdmin, rawAssignees]);
 
-  const clients = useMemo(() => normalizeClients(rawClients), [rawClients]);
+  const clients = useMemo(() => {
+    const list = normalizeClients(rawClients);
+    if (targetClient) {
+      const targetId = getEntityId(targetClient);
+      if (targetId && !list.some((client) => getEntityId(client) === targetId)) {
+        return [targetClient, ...list];
+      }
+    }
+    return list;
+  }, [rawClients, targetClient]);
 
   const [hasInitializedClientSearch, setHasInitializedClientSearch] = useState(false);
-  if (!hasInitializedClientSearch && !clientSearch && isAdmin && task?.requestedBy && clients.length > 0) {
+  if (!hasInitializedClientSearch && !clientSearch && isAdmin && (task?.requestedBy || initialClient) && clients.length > 0) {
+    const targetId = getEntityId(task?.requestedBy) || getEntityId(initialClient);
     const requestedClient = clients.find(
-      (client) => getEntityId(client) === getEntityId(task?.requestedBy)
+      (client) => getEntityId(client) === targetId
     );
     if (requestedClient) {
       setHasInitializedClientSearch(true);
       setClientSearch(formatClientName(requestedClient));
+      if (!formData.requestedBy) {
+        setFormData((current) => ({ ...current, requestedBy: getEntityId(requestedClient) }));
+      }
     }
   }
 
@@ -553,7 +585,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   );
   const isUnavailableForNewAssignment = (assignee) =>
     Boolean(assignee?.isOnLeave) && !originalAssigneeIds.has(getEntityId(assignee));
-  const safeClients = normalizeClients(clients);
+  const safeClients = clients;
   const currentClient = safeClients.find(
     (client) => getEntityId(client) === formData.requestedBy
   );

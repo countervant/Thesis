@@ -15,10 +15,15 @@ const getPersonName = (person) => {
 
 const getClientName = (task) => {
   if (!task) return "No client";
+  if (String(task.requestedByName || "").trim()) return task.requestedByName;
   if (task.clientName) return task.clientName;
   if (task.client?.name) return task.client.name;
   if (typeof task.client === "string") return task.client;
-  if (task.requestedBy?.name) return task.requestedBy.name;
+  if (task.requestedBy && typeof task.requestedBy !== "string") {
+    return task.requestedBy.companyName
+      ? `${task.requestedBy.companyName} - ${getPersonName(task.requestedBy)}`
+      : getPersonName(task.requestedBy);
+  }
   if (task.createdBy?.role === "client") return getPersonName(task.createdBy);
   return "Unassigned client";
 };
@@ -143,7 +148,7 @@ export const ProjectDetailsModal = ({
     ];
   }, [subtasks]);
 
-  const assignedEmployees = useMemo(() => {
+  const allAssignees = useMemo(() => {
     if (!item) return [];
     const employees = [...(item.assignees || []), item.assignedTo].filter(Boolean);
     const uniqueEmployees = new Map();
@@ -153,6 +158,17 @@ export const ProjectDetailsModal = ({
     });
     return [...uniqueEmployees.values()];
   }, [item]);
+
+  const assignedEmployees = useMemo(() => {
+    return allAssignees.filter((emp) => {
+      const id = getEntityId(emp);
+      if (currentUserId && id === currentUserId) return false;
+      if (typeof emp === "object" && emp?.role) {
+        return emp.role === "employee";
+      }
+      return true;
+    });
+  }, [allAssignees, currentUserId]);
 
   if (!item) return null;
 
@@ -403,6 +419,7 @@ export const ProjectDetailsModal = ({
                         const canSubmit =
                           canAccessTasks &&
                           !isDone &&
+                          !subtask.completed &&
                           isSubmissionSubtask &&
                           subtasks.slice(0, originalIndex).every((prev) => prev.completed);
                         const isSubmissionBlockedByReview =
@@ -472,8 +489,8 @@ export const ProjectDetailsModal = ({
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
-                    {assignedEmployees.length > 0 ? (
-                      assignedEmployees.map((emp) => (
+                    {allAssignees.length > 0 ? (
+                      allAssignees.map((emp) => (
                         <span
                           key={getEntityId(emp)}
                           className="inline-flex items-center rounded-full border border-pink-200 bg-pink-50/60 px-3 py-0.5 text-xs font-semibold text-pink-700 dark:border-pink-900/50 dark:bg-pink-950/20 dark:text-pink-300"
@@ -523,12 +540,12 @@ export const ProjectDetailsModal = ({
                   </p>
                 </div>
 
-                {/* Employee Payment Action (if present) */}
-                {onPayEmployee && (
+                {/* Employee Payment Action (only rendered when an employee is assigned) */}
+                {onPayEmployee && assignedEmployees.length > 0 && (
                   <div className="pt-1">
                     <button
                       type="button"
-                      disabled={isPayingEmployee || assignedEmployees.length === 0}
+                      disabled={isPayingEmployee}
                       onClick={() => onPayEmployee(item)}
                       className="w-full rounded-lg border border-pink-200 bg-pink-50 px-3 py-1.5 text-xs font-bold text-[#b524a2] transition hover:bg-pink-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >

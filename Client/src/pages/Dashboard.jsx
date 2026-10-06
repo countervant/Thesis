@@ -1578,6 +1578,7 @@ const MessagesPanel = () => {
         isOpen={isProjectModalOpen}
         onClose={() => setIsProjectModalOpen(false)}
         conversationId={activeUserId}
+        client={activeParticipant}
         onProjectCreated={() => {
           setIsProjectModalOpen(false);
         }}
