@@ -43,7 +43,10 @@ const AuthLayout = () => {
 
 const RoleDashboardRedirect = () => {
   const { user } = useAuth();
-  return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
+  const location = useLocation();
+  const search = location.search || "";
+  const basePath = dashboardPathByRole[user?.role] || "/client/dashboard";
+  return <Navigate to={`${basePath}${search}`} replace />;
 };
 
 const ClientProjectsRedirect = () => {
@@ -147,6 +150,22 @@ const router = createBrowserRouter(
           element={
             <ProtectedRoute>
               <RoleDashboardRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/tasks"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Navigate to="/admin/dashboard?page=tasks" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tasks"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Navigate to="/admin/dashboard?page=tasks" replace />
             </ProtectedRoute>
           }
         />

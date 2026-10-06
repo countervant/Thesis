@@ -159,10 +159,23 @@ function setupEventListeners() {
   });
 
   // Open Project in CLIENTRA
-  elements.openProjectBtn.addEventListener("click", () => {
-    const targetUrl = state.createdProject
-      ? `${state.appUrl}/dashboard/tasks?projectId=${state.createdProject._id}`
-      : `${state.appUrl}/dashboard/tasks`;
+  elements.openProjectBtn.addEventListener("click", async () => {
+    const targetUrl = `${state.appUrl}/admin/dashboard?page=tasks`;
+    try {
+      const tabs = await chrome.tabs.query({});
+      const clientraTab = tabs.find(
+        (t) => t.url && (t.url.includes("clientra.me") || t.url.includes("localhost:5173"))
+      );
+      if (clientraTab?.id) {
+        await chrome.tabs.update(clientraTab.id, { url: targetUrl, active: true });
+        if (clientraTab.windowId) {
+          await chrome.windows.update(clientraTab.windowId, { focused: true });
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn("Tab switch error:", e);
+    }
     chrome.tabs.create({ url: targetUrl });
   });
 
