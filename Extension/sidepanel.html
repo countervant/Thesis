@@ -13,8 +13,8 @@
     <div class="brand">
       <img src="icons/icon-48.png" alt="CLIENTRA" class="brand-icon-img">
       <div class="brand-text">
-        <span class="brand-title">CLIENTRA AI</span>
-        <span class="brand-subtitle">Project Generator</span>
+        <span class="brand-title">CLIENTRA</span>
+        <span class="brand-subtitle">Project Assistant</span>
       </div>
     </div>
     <div class="header-actions">
@@ -31,7 +31,10 @@
   <!-- Settings & Authentication Drawer -->
   <div id="settingsDrawer" class="settings-drawer">
     <div id="authSection">
-      <h4>Account & Authentication</h4>
+      <h4>Admin Authentication</h4>
+      <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.4;">
+        Only Administrator accounts can log in to generate and create projects.
+      </p>
       <div style="margin-bottom: 12px;">
         <button id="syncTabBtn" class="btn btn-secondary btn-sm" style="width: 100%;">
           ⚡ Auto-Sync from clientra.me Tab
@@ -39,15 +42,15 @@
       </div>
       <div id="loginForm">
         <div class="drawer-field">
-          <label for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" placeholder="admin@clientra.com">
+          <label for="loginEmail">Admin Email</label>
+          <input type="email" id="loginEmail" placeholder="admin@clientra.me">
         </div>
         <div class="drawer-field">
           <label for="loginPassword">Password</label>
           <input type="password" id="loginPassword" placeholder="••••••••">
         </div>
         <button id="loginBtn" class="btn btn-primary btn-sm" style="width: 100%; margin-top: 6px;">
-          Log In to CLIENTRA
+          Log In as Admin
         </button>
       </div>
 
@@ -74,7 +77,7 @@
         <span style="font-size: 14px;">🌐</span>
         <span id="activeTabTitle" class="active-tab-title">Detecting active tab...</span>
       </div>
-      <button id="grabSelectionBtn" class="btn btn-secondary btn-sm" title="Capture highlighted text from current page">
+      <button id="grabSelectionBtn" class="btn btn-accent-subtle btn-sm" title="Capture highlighted text from current page">
         📋 Grab Selection
       </button>
     </div>
@@ -113,7 +116,7 @@
       </button>
 
       <div id="analyzingProgress" class="notice notice-info hidden">
-        <span class="spinner" style="border-top-color: #60a5fa;"></span>
+        <span class="spinner"></span>
         <span>Synthesizing deliverables, timeline, milestones, and backlog tasks...</span>
       </div>
     </section>
@@ -122,7 +125,7 @@
     <section class="card hidden" id="previewCard">
       <div class="card-header">
         <h3 class="card-title">
-          <span>📋</span> AI Generated Project Proposal
+          <span>📋</span> Project proposal
         </h3>
         <span id="confidenceBadge" class="badge badge-confidence">95% Match</span>
       </div>
@@ -130,13 +133,6 @@
       <div class="form-group">
         <label for="projectNameInput">Project Name *</label>
         <input type="text" id="projectNameInput" placeholder="Project Name">
-      </div>
-
-      <div class="form-group">
-        <label for="clientSelect">Assign to Client</label>
-        <select id="clientSelect">
-          <option value="">-- No Client (Assign Later) --</option>
-        </select>
       </div>
 
       <div class="form-group">
@@ -167,9 +163,25 @@
         </div>
         <div class="form-group">
           <label>Calculated Upfront</label>
-          <div id="downPaymentPreview" style="padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; font-weight: 600; color: #34d399;">
+          <div id="downPaymentPreview" class="financial-val text-emerald" style="padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--border-card); border-radius: 8px;">
             ₱0.00
           </div>
+        </div>
+      </div>
+
+      <!-- Financial Breakdown Snapshot (Matching CLIENTRA Addtask.jsx) -->
+      <div class="financial-summary-card">
+        <div class="financial-col">
+          <span class="financial-label">Project Budget</span>
+          <span id="summaryProjectAmount" class="financial-val">₱0.00</span>
+        </div>
+        <div class="financial-col">
+          <span class="financial-label">Down Payment</span>
+          <span id="summaryDownPayment" class="financial-val text-emerald">− ₱0.00</span>
+        </div>
+        <div class="financial-col">
+          <span class="financial-label">Remaining Balance</span>
+          <span id="summaryRemainingBalance" class="financial-val text-pink">₱0.00</span>
         </div>
       </div>
 
@@ -186,12 +198,12 @@
       </div>
 
       <!-- Backlog Tasks Section -->
-      <div style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 4px;">
-        <div class="card-header" style="margin-bottom: 10px;">
-          <h4 style="font-size: 12px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 6px;">
-            <span>⚡</span> Extracted Backlog Tasks (<span id="taskCount">0</span>)
+      <div style="border-top: 1px solid var(--border-card); padding-top: 14px; margin-top: 4px;">
+        <div class="card-header" style="margin-bottom: 12px; border-bottom: none; padding-bottom: 0;">
+          <h4 style="font-family: var(--font-bruno); font-size: 11px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>⚡</span> Deliverables & Tasks (<span id="taskCount">0</span>)
           </h4>
-          <button id="addTaskBtn" class="btn btn-secondary btn-sm">
+          <button id="addTaskBtn" class="btn btn-accent-subtle btn-sm">
             + Add Task
           </button>
         </div>
@@ -202,10 +214,10 @@
       </div>
 
       <!-- Commit Action -->
-      <div class="action-row" style="margin-top: 8px;">
-        <button id="commitBtn" class="btn btn-primary" style="flex: 1; padding: 10px; font-size: 13px;">
+      <div class="action-row" style="margin-top: 10px;">
+        <button id="commitBtn" class="btn btn-primary" style="flex: 1; padding: 11px; font-size: 13px;">
           <span id="commitSpinner" class="spinner hidden"></span>
-          <span id="commitBtnText">🚀 Create Project in CLIENTRA</span>
+          <span id="commitBtnText">Create Project in CLIENTRA</span>
         </button>
         <button id="discardBtn" class="btn btn-secondary">
           Discard

@@ -200,7 +200,7 @@ export const commitProject = async (req, res) => {
       completed: false,
       assignedTo: adminUser,
     }));
-    if (!subtaskDocs.some((s) => s.title.toLowerCase() === "submit output")) {
+    if (!subtaskDocs.some((s) => String(s.title || "").toLowerCase() === "submit output")) {
       subtaskDocs.push({
         title: "Submit Output",
         completed: false,

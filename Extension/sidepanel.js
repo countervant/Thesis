@@ -322,12 +322,33 @@ async function syncWithClientraTab() {
       try {
         const res = await chrome.tabs.sendMessage(tab.id, { action: "GET_CLIENTRA_AUTH" });
         if (res?.token) {
+          const userRole = res.user?.role;
+          if (userRole && userRole !== "admin") {
+            showNotice(`Access denied: The open CLIENTRA tab is logged in as ${userRole}. Only Administrators can use this extension to create projects.`, "error");
+            return;
+          }
+
+          // Verify with server that this token has administrator privileges
+          const verifyRes = await fetch(`${state.apiUrl}/api/clients?limit=1`, {
+            headers: { Authorization: `Bearer ${res.token}` },
+          });
+
+          if (verifyRes.status === 403) {
+            showNotice("Access denied: Only Administrators can use this extension to create projects.", "error");
+            return;
+          }
+          if (verifyRes.status === 401) {
+            showNotice("Session expired on clientra.me tab. Please log in again.", "warning");
+            return;
+          }
+
           state.token = res.token;
-          state.user = res.user || { role: "admin", email: "clientra-admin" };
+          state.user = res.user || { role: "admin", email: "admin@clientra.me" };
+          state.user.role = "admin";
           await chrome.storage.local.set({ token: state.token, user: state.user });
 
           authFound = true;
-          showNotice("Synced credentials from clientra.me!", "success");
+          showNotice("Synced Admin session from clientra.me!", "success");
           updateAuthUI();
           await fetchClients();
           break;
@@ -348,15 +369,36 @@ async function syncWithClientraTab() {
           });
           const result = results?.[0]?.result;
           if (result?.token) {
-            state.token = result.token;
-            let parsedUser = { role: "admin", email: "clientra-admin" };
+            let parsedUser = null;
             try {
               if (result.user) parsedUser = JSON.parse(result.user);
             } catch {}
-            state.user = parsedUser;
+
+            if (parsedUser?.role && parsedUser.role !== "admin") {
+              showNotice(`Access denied: The open CLIENTRA tab is logged in as ${parsedUser.role}. Only Administrators can use this extension to create projects.`, "error");
+              return;
+            }
+
+            // Verify with server that this token has administrator privileges
+            const verifyRes = await fetch(`${state.apiUrl}/api/clients?limit=1`, {
+              headers: { Authorization: `Bearer ${result.token}` },
+            });
+
+            if (verifyRes.status === 403) {
+              showNotice("Access denied: Only Administrators can use this extension to create projects.", "error");
+              return;
+            }
+            if (verifyRes.status === 401) {
+              showNotice("Session expired on clientra.me tab. Please log in again.", "warning");
+              return;
+            }
+
+            state.token = result.token;
+            state.user = parsedUser || { role: "admin", email: "admin@clientra.me" };
+            state.user.role = "admin";
             await chrome.storage.local.set({ token: state.token, user: state.user });
             authFound = true;
-            showNotice("Synced credentials from clientra.me!", "success");
+            showNotice("Synced Admin session from clientra.me!", "success");
             updateAuthUI();
             await fetchClients();
             break;
@@ -366,7 +408,7 @@ async function syncWithClientraTab() {
     }
 
     if (!authFound) {
-      showNotice("Could not find logged-in session on clientra.me tab. Please log in on clientra.me or below.", "warning");
+      showNotice("Could not find logged-in Admin session on clientra.me tab. Please log in on clientra.me or below.", "warning");
     }
   } catch (err) {
     showNotice(`Sync failed: ${err.message}`, "error");
@@ -386,7 +428,7 @@ async function handleLogin() {
   }
 
   elements.loginBtn.disabled = true;
-  elements.loginBtn.textContent = "Authenticating...";
+  elements.loginBtn.textContent = "Authenticating Admin...";
 
   try {
     const res = await fetch(`${state.apiUrl}/api/auth/login`, {
@@ -400,11 +442,20 @@ async function handleLogin() {
       throw new Error(data.message || "Invalid credentials.");
     }
 
+    if (data.requiresTwoFactor) {
+      throw new Error("2-Factor Authentication is active for this account. Please log in on https://clientra.me first, then click '⚡ Auto-Sync from clientra.me Tab'.");
+    }
+
+    // Role check: ONLY administrator accounts are authorized to use this extension
+    if (data.role !== "admin") {
+      throw new Error("Access denied: Only Administrators can log in to this extension because only admins can create projects.");
+    }
+
     state.token = data.token;
     state.user = { id: data.id, email: data.email, role: data.role };
     await chrome.storage.local.set({ token: state.token, user: state.user });
 
-    showNotice("Logged in successfully!", "success");
+    showNotice("Logged in successfully as Administrator!", "success");
     elements.settingsDrawer.classList.remove("open");
     updateAuthUI();
     await fetchClients();
@@ -412,7 +463,7 @@ async function handleLogin() {
     showNotice(err.message, "error");
   } finally {
     elements.loginBtn.disabled = false;
-    elements.loginBtn.textContent = "Log In to CLIENTRA";
+    elements.loginBtn.textContent = "Log In as Admin";
   }
 }
 
@@ -428,11 +479,21 @@ async function handleLogout() {
 }
 
 /**
- * Check if the stored token is still valid
+ * Check if the stored token is still valid and has administrator privileges
  */
 async function verifyAuthentication() {
   if (!state.token) {
     updateAuthUI();
+    return;
+  }
+
+  // Pre-check: reject immediately if stored role is not admin
+  if (state.user?.role && state.user.role !== "admin") {
+    state.token = null;
+    state.user = null;
+    await chrome.storage.local.remove(["token", "user"]);
+    updateAuthUI();
+    showNotice("Access denied: Only Administrators can use this extension to create projects.", "warning");
     return;
   }
 
@@ -442,11 +503,14 @@ async function verifyAuthentication() {
     });
 
     if (res.status === 401 || res.status === 403) {
-      // Token expired
+      // Token expired or non-admin user
       state.token = null;
       state.user = null;
       await chrome.storage.local.remove(["token", "user"]);
       updateAuthUI();
+      if (res.status === 403) {
+        showNotice("Access denied: Only Administrators can use this extension to create projects.", "warning");
+      }
       return;
     }
 
@@ -464,12 +528,12 @@ async function verifyAuthentication() {
 function updateAuthUI(isOnline = true) {
   if (state.token) {
     elements.statusBadge.classList.add("connected");
-    elements.statusText.textContent = isOnline ? "Connected" : "Server Offline";
+    elements.statusText.textContent = isOnline ? "Connected (Admin)" : "Server Offline";
     elements.sessionInfo.classList.remove("hidden");
     elements.loginForm.classList.add("hidden");
     elements.userGreeting.textContent = state.user?.email
-      ? `Logged in: ${state.user.email} (${state.user.role || "Admin"})`
-      : "Connected to CLIENTRA";
+      ? `Logged in: ${state.user.email} (Admin)`
+      : "Connected as Administrator";
   } else {
     elements.statusBadge.classList.remove("connected");
     elements.statusText.textContent = "Not Connected";
@@ -495,16 +559,18 @@ async function fetchClients() {
     const list = json?.data?.clients || json?.data || [];
     state.clients = Array.isArray(list) ? list : [];
 
-    // Populate dropdown
-    elements.clientSelect.innerHTML = '<option value="">-- No Client (Assign Later) --</option>';
-    state.clients.forEach((c) => {
-      const opt = document.createElement("option");
-      opt.value = c._id;
-      const name = c.companyName || c.contactPerson || "Unnamed Client";
-      const person = c.contactPerson && c.companyName ? ` (${c.contactPerson})` : "";
-      opt.textContent = `${name}${person}`;
-      elements.clientSelect.appendChild(opt);
-    });
+    // Populate dropdown if present
+    if (elements.clientSelect) {
+      elements.clientSelect.innerHTML = '<option value="">-- No Client (Assign Later) --</option>';
+      state.clients.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c._id;
+        const name = c.companyName || c.contactPerson || "Unnamed Client";
+        const person = c.contactPerson && c.companyName ? ` (${c.contactPerson})` : "";
+        opt.textContent = `${name}${person}`;
+        elements.clientSelect.appendChild(opt);
+      });
+    }
   } catch (err) {
     console.warn("[CLIENTRA] Failed to fetch clients:", err);
   }
@@ -542,17 +608,27 @@ function updateDownPaymentPreview() {
   const budget = parseFloat(elements.budgetInput.value) || 0;
   const val = parseFloat(elements.downPaymentValueInput.value) || 0;
 
-  if (mode === "none") {
-    elements.downPaymentPreview.textContent = "₱0.00 (Paid upon completion)";
-    return;
+  let downPayment = 0;
+  if (mode === "percentage") {
+    downPayment = budget * (val / 100);
+    elements.downPaymentPreview.textContent = `₱${downPayment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${val}%)`;
+  } else if (mode === "fixed") {
+    downPayment = val;
+    elements.downPaymentPreview.textContent = `₱${val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Fixed)`;
+  } else {
+    elements.downPaymentPreview.textContent = "₱0.00 (None)";
   }
 
-  if (mode === "percentage") {
-    const calculated = (budget * (val / 100));
-    elements.downPaymentPreview.textContent = `₱${calculated.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${val}%)`;
-  } else {
-    elements.downPaymentPreview.textContent = `₱${val.toLocaleString("en-US", { minimumFractionDigits: 2 })} (Fixed)`;
-  }
+  const remaining = Math.max(0, budget - downPayment);
+  const formatPHP = (num) => `₱${Number(num || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const elBudget = document.getElementById("summaryProjectAmount");
+  const elDown = document.getElementById("summaryDownPayment");
+  const elRemaining = document.getElementById("summaryRemainingBalance");
+
+  if (elBudget) elBudget.textContent = formatPHP(budget);
+  if (elDown) elDown.textContent = downPayment > 0 ? `− ${formatPHP(downPayment)}` : formatPHP(0);
+  if (elRemaining) elRemaining.textContent = formatPHP(remaining);
 }
 
 /**
@@ -569,7 +645,12 @@ async function handleAnalyze() {
 
   if (!state.token) {
     elements.settingsDrawer.classList.add("open");
-    showNotice("Please connect or log in to CLIENTRA first.", "warning");
+    showNotice("Please log in as Administrator or sync your active tab first.", "warning");
+    return;
+  }
+
+  if (state.user?.role && state.user.role !== "admin") {
+    showNotice("Access denied: Only Administrators can generate and create projects.", "error");
     return;
   }
 
@@ -645,7 +726,8 @@ function renderProposal(proposal) {
   elements.deadlineInput.value = proposal.targetDeadline || "";
 
   // Match client if clientHint matches any client name
-  const hint = elements.clientHintInput.value.toLowerCase();
+  const hint = (elements.clientHintInput?.value || "").toLowerCase();
+  state.matchedClientId = null;
   if (hint && state.clients.length > 0) {
     const matched = state.clients.find(
       (c) =>
@@ -653,7 +735,10 @@ function renderProposal(proposal) {
         (c.contactPerson && hint.includes(c.contactPerson.toLowerCase()))
     );
     if (matched) {
-      elements.clientSelect.value = matched._id;
+      state.matchedClientId = matched._id;
+      if (elements.clientSelect) {
+        elements.clientSelect.value = matched._id;
+      }
     }
   }
 
@@ -678,20 +763,21 @@ function renderTasks(tasks) {
 
     item.innerHTML = `
       <div class="task-top">
-        <input type="text" class="task-title-input" value="${escapeHtml(task.title || "")}" placeholder="Task Title">
-        <select class="task-priority-select" style="width: auto; padding: 4px 6px; font-size: 11px;">
+        <span class="task-pill-tag">Deliverable ${String(index + 1).padStart(2, "0")}</span>
+        <input type="text" class="task-title-input" value="${escapeHtml(task.title || "")}" placeholder="Deliverable Title" style="flex: 1;">
+        <select class="task-priority-select" style="width: auto; padding: 4px 8px; font-size: 11px;">
           <option value="Low" ${task.priority === "Low" ? "selected" : ""}>Low</option>
           <option value="Medium" ${task.priority === "Medium" ? "selected" : ""}>Medium</option>
           <option value="High" ${task.priority === "High" ? "selected" : ""}>High</option>
           <option value="Urgent" ${task.priority === "Urgent" ? "selected" : ""}>Urgent</option>
         </select>
-        <button type="button" class="btn-icon delete-task-btn" title="Remove Task" style="width: 24px; height: 24px; font-size: 12px; color: #ef4444;">
+        <button type="button" class="btn-icon delete-task-btn" title="Remove Task" style="width: 26px; height: 26px; font-size: 11px; color: #ef4444; border-radius: 6px;">
           ✕
         </button>
       </div>
-      <textarea class="task-desc-input" rows="2" placeholder="Task deliverables / criteria...">${escapeHtml(task.description || "")}</textarea>
-      <div class="form-group">
-        <label style="font-size: 10px;">Required Skills (comma separated):</label>
+      <textarea class="task-desc-input" rows="2" placeholder="Task deliverables / scope criteria...">${escapeHtml(task.description || "")}</textarea>
+      <div class="form-group" style="margin-top: 2px;">
+        <label style="font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Required Skills / Tech Stack:</label>
         <input type="text" class="task-skills-input" value="${escapeHtml((task.requiredSkills || []).join(", "))}" placeholder="e.g. React, Figma, Node.js">
       </div>
     `;
@@ -760,6 +846,17 @@ function collectTasksFromDOM() {
  * Commit the reviewed project and tasks to MongoDB via backend
  */
 async function handleCommit() {
+  if (!state.token) {
+    elements.settingsDrawer.classList.add("open");
+    showNotice("Please log in as Administrator or sync your active tab first.", "warning");
+    return;
+  }
+
+  if (state.user?.role && state.user.role !== "admin") {
+    showNotice("Access denied: Only Administrators can create projects.", "error");
+    return;
+  }
+
   const projectName = elements.projectNameInput.value.trim();
   if (!projectName) {
     showNotice("Project Name is required.", "error");
@@ -772,7 +869,7 @@ async function handleCommit() {
     return;
   }
 
-  const clientId = elements.clientSelect.value || null;
+  const clientId = elements.clientSelect?.value || state.matchedClientId || null;
   const clientSummary = elements.projectSummaryInput.value.trim();
   const budgetCeiling = parseFloat(elements.budgetInput.value) || 0;
   const startDate = elements.startDateInput.value || null;

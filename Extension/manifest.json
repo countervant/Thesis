@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
+  "minimum_chrome_version": "114",
   "name": "CLIENTRA - AI Project Generator",
   "version": "1.0.0",
-  "description": "Extract project scopes, milestones, budgets, and deadlines from client chats (Upwork, WhatsApp, Gmail, Slack, Fiverr) into CLIENTRA.",
+  "description": "Extract project scopes, milestones, budgets, and deadlines from client chats into your CLIENTRA workspace.",
   "permissions": [
     "sidePanel",
     "storage",
