@@ -182,6 +182,7 @@ app.use(
       if (
         !origin ||
         normalizedOrigin.startsWith("chrome-extension://") ||
+        normalizedOrigin.startsWith("moz-extension://") ||
         allowedOrigins.includes(normalizedOrigin) ||
         allowedOriginPatterns.some((pattern) => pattern.test(normalizedOrigin))
       ) {
