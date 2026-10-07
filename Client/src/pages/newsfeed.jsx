@@ -948,15 +948,16 @@ const Newsfeed = () => {
           const isPostMenuOpen = openPostMenuId === post.id;
 
           return (
-            <article
-              key={post.id}
-              id={`newsfeed-post-${post.id}`}
-              className={`rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition ${
-                focusedTarget?.postId === post.id
-                  ? "ring-2 ring-pink-200"
-                  : ""
-              }`}
-            >
+            <>
+              <article
+                key={post.id}
+                id={`newsfeed-post-${post.id}`}
+                className={`rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition ${
+                  focusedTarget?.postId === post.id
+                    ? "ring-2 ring-pink-200"
+                    : ""
+                }`}
+              >
               <div className="relative">
                 {canDeletePost && (
                   <div className="absolute right-0 top-0">
@@ -1175,15 +1176,16 @@ const Newsfeed = () => {
                                   const replyId = reply._id || reply.id;
 
                                   return (
-                                  <div
-                                    key={replyId}
-                                    id={`newsfeed-reply-${replyId}`}
-                                    className={`flex gap-3 rounded-lg transition ${
-                                      focusedTarget?.replyId === replyId
-                                        ? "bg-blue-50/70 p-2"
-                                        : ""
-                                    }`}
-                                  >
+                                  <>
+                                    <div
+                                      key={replyId}
+                                      id={`newsfeed-reply-${replyId}`}
+                                      className={`flex gap-3 rounded-lg transition ${
+                                        focusedTarget?.replyId === replyId
+                                          ? "bg-blue-50/70 p-2"
+                                          : ""
+                                      }`}
+                                    >
                                     <ProfileButton
                                       user={reply.user}
                                       className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
@@ -1205,7 +1207,8 @@ const Newsfeed = () => {
                                       </div>
                                       <p className="mt-1 break-words text-sm text-neutral-800 [overflow-wrap:anywhere]">{reply.text}</p>
                                     </div>
-                                  </div>
+                                    </div>
+                                  </>
                                   );
                                 })}
                               </div>
@@ -1304,7 +1307,8 @@ const Newsfeed = () => {
                   </span>
                 </label>
               </form>
-            </article>
+              </article>
+            </>
           );
         })}
         {!isLoading && (hasNextPage || loadMoreError) && (
