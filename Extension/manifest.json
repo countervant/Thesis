@@ -18,8 +18,7 @@
     "default_title": "Open CLIENTRA Project Assistant"
   },
   "background": {
-    "service_worker": "service-worker.js",
-    "scripts": ["service-worker.js"]
+    "service_worker": "service-worker.js"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

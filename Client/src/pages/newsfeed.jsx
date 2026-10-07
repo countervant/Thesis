@@ -202,26 +202,6 @@ const mergePostPage = (currentPosts, incomingPosts) => {
   return mergedPosts;
 };
 
-const copyShareUrl = async (url) => {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(url);
-    return;
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = url;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const didCopy = document.execCommand("copy");
-  textarea.remove();
-
-  if (!didCopy) {
-    throw new Error("Clipboard access is unavailable");
-  }
-};
 
 
 const extractPostHashtags = (post) => {
@@ -336,7 +316,6 @@ const Newsfeed = () => {
   const [focusedTarget, setFocusedTarget] = useState(null);
   const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [loadMoreError, setLoadMoreError] = useState("");
-  const [shareNotice, setShareNotice] = useState(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -602,38 +581,7 @@ const Newsfeed = () => {
     }
   };
 
-  const handleSharePost = async (post) => {
-    const shareUrl = new URL(window.location.href);
-    shareUrl.hash = `newsfeed-post-${post.id}`;
-    const shareData = {
-      title: "Clientra Newsfeed",
-      text: post.content?.trim().slice(0, 180) || "View this Clientra post.",
-      url: shareUrl.toString(),
-    };
 
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        setShareNotice({ type: "success", message: "Post shared." });
-        return;
-      } catch (error) {
-        if (error?.name === "AbortError") return;
-      }
-    }
-
-    try {
-      await copyShareUrl(shareData.url);
-      setShareNotice({
-        type: "success",
-        message: "Post link copied to your clipboard.",
-      });
-    } catch {
-      setShareNotice({
-        type: "error",
-        message: "Unable to share this post or copy its link.",
-      });
-    }
-  };
 
   const handleMediaChange = (event) => {
     const file = event.target.files?.[0];
@@ -886,18 +834,6 @@ const Newsfeed = () => {
         </p>
       )}
 
-      {shareNotice && (
-        <p
-          className={`rounded-md px-4 py-3 text-sm font-medium ring-1 ${
-            shareNotice.type === "success"
-              ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-              : "bg-red-50 text-red-700 ring-red-100"
-          }`}
-          role={shareNotice.type === "error" ? "alert" : "status"}
-        >
-          {shareNotice.message}
-        </p>
-      )}
 
       {canPost && (
         <form
@@ -1126,16 +1062,9 @@ const Newsfeed = () => {
                     >
                       {post.comments.length} comments
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSharePost(post)}
-                      className="transition hover:text-pink-600"
-                    >
-                      Share
-                    </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200">
+                <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200">
                   <button
                     type="button"
                     onClick={() => handleToggleHeart(post.id)}
@@ -1148,22 +1077,12 @@ const Newsfeed = () => {
                   <button
                     type="button"
                     onClick={() => toggleComments(post.id)}
-                    className="flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                       <path d="M5 6h14v10H9l-4 3V6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Comment
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSharePost(post)}
-                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-                      <path d="M20 12 4 5l3 7-3 7 16-7zM7 12h13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Share
                   </button>
                 </div>
               </div>
