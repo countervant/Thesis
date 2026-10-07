@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLIENTRA AI Project Generator</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="header">
+    <div class="brand">
+      <img src="icons/icon-48.png" alt="CLIENTRA" class="brand-icon-img">
+      <div class="brand-text">
+        <span class="brand-title">CLIENTRA</span>
+        <span class="brand-subtitle">Project Assistant</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="statusBadge" class="status-badge" title="Connection Status">
+        <span class="status-dot"></span>
+        <span id="statusText">Connecting...</span>
+      </div>
+      <button id="toggleSettingsBtn" class="btn-icon" title="Settings & Authentication">
+        ⚙
+      </button>
+    </div>
+  </header>
+
+  <!-- Settings & Authentication Drawer -->
+  <div id="settingsDrawer" class="settings-drawer">
+    <div id="authSection">
+      <h4>Admin Authentication</h4>
+      <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.4;">
+        Only Administrator accounts can log in to generate and create projects.
+      </p>
+      <div style="margin-bottom: 12px;">
+        <button id="syncTabBtn" class="btn btn-secondary btn-sm" style="width: 100%;">
+          ⚡ Auto-Sync from clientra.me Tab
+        </button>
+      </div>
+      <div id="loginForm">
+        <div class="drawer-field">
+          <label for="loginEmail">Admin Email</label>
+          <input type="email" id="loginEmail" placeholder="admin@clientra.me">
+        </div>
+        <div class="drawer-field">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••">
+        </div>
+        <button id="loginBtn" class="btn btn-primary btn-sm" style="width: 100%; margin-top: 6px;">
+          Log In as Admin
+        </button>
+      </div>
+
+      <div id="sessionInfo" class="hidden" style="margin-top: 8px;">
+        <div class="notice notice-success" style="padding: 8px 10px;">
+          <span id="userGreeting">Authenticated</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 8px;">
+          Disconnect / Switch Account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Notifications Banner -->
+  <div id="globalNotice" class="notice notice-info hidden" style="margin: 12px 16px 0 16px;">
+    <span id="globalNoticeText"></span>
+  </div>
+
+  <main class="container">
+    <!-- Active Tab Context & Selection Capture -->
+    <div class="active-tab-banner">
+      <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+        <span style="font-size: 14px;">🌐</span>
+        <span id="activeTabTitle" class="active-tab-title">Detecting active tab...</span>
+      </div>
+      <button id="grabSelectionBtn" class="btn btn-accent-subtle btn-sm" title="Capture highlighted text from current page">
+        📋 Grab Selection
+      </button>
+    </div>
+
+    <!-- Step 1: Input & Transcript Section -->
+    <section class="card" id="inputCard">
+      <div class="card-header">
+        <h3 class="card-title">
+          <span>💬</span> Chat / Brief Transcript
+        </h3>
+        <div class="action-row">
+          <button id="clearBtn" class="btn btn-secondary btn-sm" title="Clear transcript">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="transcriptInput">
+          <span>Conversation History / Requirements</span>
+          <span id="charCount" style="color: var(--text-muted); font-size: 10px;">0 chars</span>
+        </label>
+        <textarea id="transcriptInput" class="transcript-area" placeholder="Highlight conversation on Upwork, WhatsApp Web, Gmail, Slack, or Fiverr and click 'Grab Selection', or paste text here..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="clientHintInput">
+          <span>Client Name or Platform Context (Optional)</span>
+        </label>
+        <input type="text" id="clientHintInput" placeholder="e.g. Upwork: TechSolutions Inc. / John Smith">
+      </div>
+
+      <button id="analyzeBtn" class="btn btn-primary" style="padding: 10px; font-size: 13px;">
+        <span id="analyzeSpinner" class="spinner hidden"></span>
+        <span id="analyzeBtnText">Generate project</span>
+      </button>
+
+      <div id="analyzingProgress" class="notice notice-info hidden">
+        <span class="spinner"></span>
+        <span>Synthesizing deliverables, timeline, milestones, and backlog tasks...</span>
+      </div>
+    </section>
+
+    <!-- Step 2: Extracted Project Proposal Card -->
+    <section class="card hidden" id="previewCard">
+      <div class="card-header">
+        <h3 class="card-title">
+          <span>📋</span> Project proposal
+        </h3>
+        <span id="confidenceBadge" class="badge badge-confidence">95% Match</span>
+      </div>
+
+      <div class="form-group">
+        <label for="projectNameInput">Project Name *</label>
+        <input type="text" id="projectNameInput" placeholder="Project Name">
+      </div>
+
+      <div class="form-group">
+        <label for="projectSummaryInput">Executive Scope & Deliverables</label>
+        <textarea id="projectSummaryInput" rows="3" placeholder="Executive summary of agreed scope..."></textarea>
+      </div>
+
+      <!-- Financials -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="budgetInput">Total Budget (₱)</label>
+          <input type="number" id="budgetInput" placeholder="0" min="0" step="any">
+        </div>
+        <div class="form-group">
+          <label for="downPaymentModeSelect">Down Payment Type</label>
+          <select id="downPaymentModeSelect">
+            <option value="none">None (Full upon completion)</option>
+            <option value="percentage">Percentage (%)</option>
+            <option value="fixed">Fixed Amount (₱)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="downPaymentValueRow" class="grid-2 hidden">
+        <div class="form-group">
+          <label id="downPaymentValueLabel" for="downPaymentValueInput">Down Payment Value</label>
+          <input type="number" id="downPaymentValueInput" placeholder="0" min="0" step="any">
+        </div>
+        <div class="form-group">
+          <label>Calculated Upfront</label>
+          <div id="downPaymentPreview" class="financial-val text-emerald" style="padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--border-card); border-radius: 8px;">
+            ₱0.00
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial Breakdown Snapshot (Matching CLIENTRA Addtask.jsx) -->
+      <div class="financial-summary-card">
+        <div class="financial-col">
+          <span class="financial-label">Project Budget</span>
+          <span id="summaryProjectAmount" class="financial-val">₱0.00</span>
+        </div>
+        <div class="financial-col">
+          <span class="financial-label">Down Payment</span>
+          <span id="summaryDownPayment" class="financial-val text-emerald">− ₱0.00</span>
+        </div>
+        <div class="financial-col">
+          <span class="financial-label">Remaining Balance</span>
+          <span id="summaryRemainingBalance" class="financial-val text-pink">₱0.00</span>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="startDateInput">Start / Kickoff Date</label>
+          <input type="date" id="startDateInput">
+        </div>
+        <div class="form-group">
+          <label for="deadlineInput">Target Deadline</label>
+          <input type="date" id="deadlineInput">
+        </div>
+      </div>
+
+      <!-- Backlog Tasks Section -->
+      <div style="border-top: 1px solid var(--border-card); padding-top: 14px; margin-top: 4px;">
+        <div class="card-header" style="margin-bottom: 12px; border-bottom: none; padding-bottom: 0;">
+          <h4 style="font-family: var(--font-bruno); font-size: 11px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>⚡</span> Deliverables & Tasks (<span id="taskCount">0</span>)
+          </h4>
+          <button id="addTaskBtn" class="btn btn-accent-subtle btn-sm">
+            + Add Task
+          </button>
+        </div>
+
+        <div id="tasksList" class="tasks-container">
+          <!-- Dynamic tasks rendered here -->
+        </div>
+      </div>
+
+      <!-- Commit Action -->
+      <div class="action-row" style="margin-top: 10px;">
+        <button id="commitBtn" class="btn btn-primary" style="flex: 1; padding: 11px; font-size: 13px;">
+          <span id="commitSpinner" class="spinner hidden"></span>
+          <span id="commitBtnText">Create Project in CLIENTRA</span>
+        </button>
+        <button id="discardBtn" class="btn btn-secondary">
+          Discard
+        </button>
+      </div>
+    </section>
+
+    <!-- Step 3: Success Confirmation Card -->
+    <section class="card hidden" id="successCard">
+      <div class="notice notice-success">
+        <div style="font-size: 18px;">🎉</div>
+        <div>
+          <strong style="display: block; font-size: 13px; margin-bottom: 2px;">Project Created Successfully!</strong>
+          <span id="successDetails">The project and all backlog tasks have been committed to MongoDB.</span>
+        </div>
+      </div>
+
+      <div class="action-row" style="margin-top: 8px;">
+        <button id="openProjectBtn" class="btn btn-primary" style="flex: 1;">
+          Open in CLIENTRA ↗
+        </button>
+        <button id="extractAnotherBtn" class="btn btn-secondary">
+          Extract Another
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

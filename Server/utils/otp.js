@@ -13,6 +13,12 @@ const otpSecret = () => process.env.OTP_HASH_SECRET || process.env.JWT_SECRET;
 export const hashOtp = (otp) =>
   crypto.createHmac("sha256", otpSecret()).update(String(otp)).digest("hex");
 
+export const hashPasswordResetOtp = (otp) =>
+  crypto
+    .createHmac("sha256", otpSecret())
+    .update(`password-reset:${String(otp)}`)
+    .digest("hex");
+
 export const verifyOtpHash = (otp, expectedHash) => {
   if (!expectedHash) return false;
   const received = Buffer.from(hashOtp(otp), "hex");

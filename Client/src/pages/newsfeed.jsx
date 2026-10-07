@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import emojiIcon from "../assets/emoji.png";
 import heartIcon from "../assets/heart.png";
 import insertImageIcon from "../assets/insertimage.png";
 import redHeartIcon from "../assets/redheart.png";
 import sendIcon from "../assets/send.png";
 import { useAuth } from "../context/AuthContext.jsx";
-import { authAPI, newsfeedAPI } from "../services/api.js";
-import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import { FeedSkeleton } from "../components/Skeleton/Skeleton";
+import { newsfeedAPI } from "../services/api.js";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { FeedSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { getCountryFlag } from "../utils/countries.js";
+import { QUERY_KEYS } from "../constants/queryKeys.js";
+import {
+  useNewsfeedQuery,
+  useNewsfeedMutations,
+  useOnlineTeamQuery,
+} from "../hooks/index.js";
+import { unwrapData } from "../utils/queryUtils.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const NEWSFEED_PAGE_SIZE = 10;
@@ -194,38 +202,7 @@ const mergePostPage = (currentPosts, incomingPosts) => {
   return mergedPosts;
 };
 
-const copyShareUrl = async (url) => {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(url);
-    return;
-  }
 
-  const textarea = document.createElement("textarea");
-  textarea.value = url;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const didCopy = document.execCommand("copy");
-  textarea.remove();
-
-  if (!didCopy) {
-    throw new Error("Clipboard access is unavailable");
-  }
-};
-
-const toggleUserHeart = (hearts, user) => {
-  const userId = getEntityId(user);
-  const safeHearts = Array.isArray(hearts) ? hearts : [];
-  const hasHearted = safeHearts.some((heart) => getEntityId(heart) === userId);
-
-  if (hasHearted) {
-    return safeHearts.filter((heart) => getEntityId(heart) !== userId);
-  }
-
-  return [...safeHearts, user];
-};
 
 const extractPostHashtags = (post) => {
   const tags = post.content.match(/#[a-z0-9][a-z0-9_-]*/gi) || [];
@@ -289,7 +266,41 @@ const HeartIcon = ({ filled }) => (
 
 const Newsfeed = () => {
   const { user, loading: authLoading } = useAuth();
-  const [posts, setPosts] = useState([]);
+  const queryClient = useQueryClient();
+  const feedParams = useMemo(() => ({ page: 1, limit: NEWSFEED_PAGE_SIZE }), []);
+  const userId = getEntityId(user);
+  const canPost = ["admin", "client", "employee"].includes(
+    String(user?.role || "").toLowerCase()
+  );
+
+  const {
+    data: feedData,
+    isLoading: isFeedLoading,
+    error: feedError,
+  } = useNewsfeedQuery(feedParams, { enabled: !authLoading });
+
+  const { data: rawOnlineTeam = [] } = useOnlineTeamQuery({
+    enabled: Boolean(!authLoading && userId),
+  });
+
+  const onlineTeam = useMemo(() => {
+    const members = Array.isArray(rawOnlineTeam) ? rawOnlineTeam : [];
+    const filtered = members.filter((member) => canShowInOnlineTeam(member, userId));
+    return filtered.length > 0 ? filtered : [user].filter(Boolean);
+  }, [rawOnlineTeam, user, userId]);
+
+  const {
+    createPost: createPostMutation,
+    deletePost: deletePostMutation,
+    toggleHeart: toggleHeartMutation,
+    addComment: addCommentMutation,
+    deleteComment: deleteCommentMutation,
+    toggleCommentHeart: toggleCommentHeartMutation,
+    replyComment: replyCommentMutation,
+  } = useNewsfeedMutations();
+
+  const isPosting = createPostMutation.isPending;
+
   const [searchTerm, setSearchTerm] = useState("");
   const [postContent, setPostContent] = useState("");
   const [postMedia, setPostMedia] = useState(null);
@@ -303,127 +314,49 @@ const Newsfeed = () => {
   const [postToDelete, setPostToDelete] = useState(null);
   const [commentToDelete, setCommentToDelete] = useState(null);
   const [focusedTarget, setFocusedTarget] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [loadMoreError, setLoadMoreError] = useState("");
-  const [shareNotice, setShareNotice] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isPosting, setIsPosting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [showAllTeamMembers, setShowAllTeamMembers] = useState(false);
-  const [onlineTeam, setOnlineTeam] = useState([]);
   const focusTimerRef = useRef(null);
   const sharedPostTimerRef = useRef(null);
   const notificationRequestRef = useRef(false);
 
+  const posts = useMemo(() => {
+    const list = Array.isArray(feedData?.posts) ? feedData.posts : [];
+    return list.map(normalizePost);
+  }, [feedData]);
+
+  const isLoading = authLoading || (isFeedLoading && posts.length === 0);
+  const errorMessage =
+    localErrorMessage ||
+    (feedError ? (feedError.response?.data?.message || "Unable to load newsfeed.") : "");
+  const setErrorMessage = useCallback((msg) => setLocalErrorMessage(msg), []);
+
+  const updateFeedCache = useCallback((updater) => {
+    queryClient.setQueryData(QUERY_KEYS.newsfeed(feedParams), (old) => {
+      const current = old && Array.isArray(old.posts) ? old : { posts: [], page: 1, totalPages: 1 };
+      return updater(current);
+    });
+  }, [feedParams, queryClient]);
+
+  const replacePost = useCallback((updatedPost) => {
+    const normalizedPost = normalizePost(updatedPost);
+    updateFeedCache((old) => ({
+      ...old,
+      posts: old.posts.map((post) =>
+        getEntityId(post) === normalizedPost.id
+          ? mergePostPreservingMedia(normalizePost(post), normalizedPost)
+          : post
+      ),
+    }));
+  }, [updateFeedCache]);
+
   useEffect(() => () => {
     if (sharedPostTimerRef.current) window.clearTimeout(sharedPostTimerRef.current);
   }, []);
-  const canPost = ["admin", "client", "employee"].includes(
-    String(user?.role || "").toLowerCase()
-  );
-  const userId = getEntityId(user);
-
-  useEffect(() => {
-    const handleNewsfeedSearch = (event) => {
-      setSearchTerm(event.detail?.value || "");
-    };
-
-    window.addEventListener("clientra:newsfeed-search", handleNewsfeedSearch);
-    return () => window.removeEventListener("clientra:newsfeed-search", handleNewsfeedSearch);
-  }, []);
-
-  useEffect(() => {
-    if (!shareNotice) return undefined;
-    const timer = window.setTimeout(() => setShareNotice(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [shareNotice]);
-
-  useEffect(() => {
-    if (authLoading) return;
-
-    let isMounted = true;
-
-    const loadPosts = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        setLoadMoreError("");
-        setCurrentPage(1);
-        setHasNextPage(false);
-        setIsLoadingMore(false);
-        // The newsfeed is shared by all account roles. Always fetch a current
-        // list when opening it so posts made by another user are not hidden by
-        // the short-lived API cache.
-        newsfeedAPI.clearCachedPosts();
-        const pageData = await newsfeedAPI.getPage({
-          page: 1,
-          limit: NEWSFEED_PAGE_SIZE,
-          refresh: true,
-        });
-
-        if (isMounted) {
-          setPosts(pageData.posts.map(normalizePost));
-          setCurrentPage(pageData.page);
-          setHasNextPage(pageData.page < pageData.totalPages);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load newsfeed.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadPosts();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [authLoading]);
-
-  useEffect(() => {
-    if (authLoading || !userId) return undefined;
-
-    let isMounted = true;
-    let onlineTeamRequest = null;
-    const loadOnlineTeam = async () => {
-      if (onlineTeamRequest) return onlineTeamRequest;
-
-      onlineTeamRequest = authAPI.getOnlineTeam();
-      try {
-        const members = await onlineTeamRequest;
-        if (isMounted) {
-          setOnlineTeam(members.filter((member) => canShowInOnlineTeam(member, userId)));
-        }
-      } catch {
-        if (isMounted) {
-          setOnlineTeam((currentMembers) =>
-            currentMembers.length > 0 ? currentMembers : [user].filter(Boolean)
-          );
-        }
-      } finally {
-        onlineTeamRequest = null;
-      }
-    };
-
-    loadOnlineTeam();
-    const refreshOnlineTeam = () => {
-      if (document.visibilityState === "visible") loadOnlineTeam();
-    };
-    const intervalId = window.setInterval(refreshOnlineTeam, 30000);
-    document.addEventListener("visibilitychange", refreshOnlineTeam);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", refreshOnlineTeam);
-    };
-  }, [authLoading, user, userId]);
 
   useEffect(() => {
     const postsMissingMedia = posts.filter(
@@ -432,13 +365,13 @@ const Newsfeed = () => {
 
     if (postsMissingMedia.length === 0) return;
 
-    let isMounted = true;
+    let isActive = true;
 
     const loadMissingMedia = async () => {
       const result = await newsfeedAPI.getMediaBatch(
         postsMissingMedia.map((post) => post.id)
       );
-      if (!isMounted) return;
+      if (!isActive) return;
 
       const mediaByPostId = new Map(
         Object.entries(result.mediaById).map(([postId, media]) => [
@@ -452,13 +385,15 @@ const Newsfeed = () => {
       );
 
       if (mediaByPostId.size > 0) {
-        setPosts((currentPosts) =>
-          currentPosts.map((currentPost) =>
-            mediaByPostId.has(currentPost.id)
-              ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
-              : currentPost
-          )
-        );
+        updateFeedCache((old) => ({
+          ...old,
+          posts: old.posts.map((post) => {
+            const id = getEntityId(post);
+            return mediaByPostId.has(id)
+              ? { ...post, media: mediaByPostId.get(id) }
+              : post;
+          }),
+        }));
       }
 
       if (result.failedBatchCount > 0) {
@@ -467,15 +402,14 @@ const Newsfeed = () => {
     };
 
     loadMissingMedia().catch(() => {
-      if (isMounted) {
-        setErrorMessage("Post media could not be loaded. Refresh to retry.");
-      }
+      if (!isActive) return;
+      setErrorMessage("Post media could not be loaded. Refresh to retry.");
     });
 
     return () => {
-      isMounted = false;
+      isActive = false;
     };
-  }, [posts]);
+  }, [posts, setErrorMessage, updateFeedCache]);
 
   const focusNotificationTarget = useCallback(async () => {
       const rawTarget = sessionStorage.getItem(notificationTargetKey);
@@ -488,9 +422,12 @@ const Newsfeed = () => {
         let targetPost = posts.find((post) => String(post.id) === String(target.postId));
         if (!targetPost) {
           notificationRequestRef.current = true;
-          const fetchedPost = await newsfeedAPI.getById(target.postId, { refresh: true });
-          targetPost = normalizePost(fetchedPost);
-          setPosts((currentPosts) => mergePostPage([targetPost], currentPosts));
+          const fetchedPost = normalizePost(await newsfeedAPI.getById(target.postId, { refresh: true }));
+          targetPost = fetchedPost;
+          updateFeedCache((old) => ({
+            ...old,
+            posts: mergePostPage([targetPost], old.posts),
+          }));
         }
 
         setVisibleComments((currentVisibility) => ({
@@ -529,7 +466,7 @@ const Newsfeed = () => {
       } finally {
         notificationRequestRef.current = false;
       }
-  }, [posts]);
+  }, [posts, setErrorMessage, updateFeedCache]);
 
   useEffect(() => {
     const focusTarget = () => {
@@ -553,7 +490,10 @@ const Newsfeed = () => {
 
       try {
         const fetchedPost = normalizePost(await newsfeedAPI.getById(postId, { refresh: true }));
-        setPosts((currentPosts) => mergePostPage([fetchedPost], currentPosts));
+        updateFeedCache((old) => ({
+          ...old,
+          posts: mergePostPage([fetchedPost], old.posts),
+        }));
         if (sharedPostTimerRef.current) window.clearTimeout(sharedPostTimerRef.current);
         sharedPostTimerRef.current = window.setTimeout(() => {
           document.getElementById(`newsfeed-post-${postId}`)?.scrollIntoView({
@@ -568,7 +508,7 @@ const Newsfeed = () => {
     };
 
     if (!isLoading) focusSharedPost();
-  }, [isLoading, posts]);
+  }, [isLoading, posts, setErrorMessage, updateFeedCache]);
 
   const hasAnyPosts = useMemo(() => posts.length > 0, [posts]);
   const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -611,17 +551,6 @@ const Newsfeed = () => {
       .slice(0, 5);
   }, [posts]);
 
-  const replacePost = (updatedPost) => {
-    const normalizedPost = normalizePost(updatedPost);
-    setPosts((currentPosts) =>
-      currentPosts.map((post) =>
-        post.id === normalizedPost.id
-          ? mergePostPreservingMedia(post, normalizedPost)
-          : post
-      )
-    );
-  };
-
   const handleLoadMore = async () => {
     if (!hasNextPage || isLoadingMore) return;
 
@@ -635,7 +564,12 @@ const Newsfeed = () => {
         refresh: true,
       });
 
-      setPosts((currentPosts) => mergePostPage(currentPosts, pageData.posts));
+      updateFeedCache((old) => ({
+        ...old,
+        posts: mergePostPage(old.posts, pageData.posts),
+        page: pageData.page,
+        totalPages: pageData.totalPages,
+      }));
       setCurrentPage(pageData.page);
       setHasNextPage(pageData.page < pageData.totalPages);
     } catch (error) {
@@ -647,38 +581,7 @@ const Newsfeed = () => {
     }
   };
 
-  const handleSharePost = async (post) => {
-    const shareUrl = new URL(window.location.href);
-    shareUrl.hash = `newsfeed-post-${post.id}`;
-    const shareData = {
-      title: "Clientra Newsfeed",
-      text: post.content?.trim().slice(0, 180) || "View this Clientra post.",
-      url: shareUrl.toString(),
-    };
 
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        setShareNotice({ type: "success", message: "Post shared." });
-        return;
-      } catch (error) {
-        if (error?.name === "AbortError") return;
-      }
-    }
-
-    try {
-      await copyShareUrl(shareData.url);
-      setShareNotice({
-        type: "success",
-        message: "Post link copied to your clipboard.",
-      });
-    } catch {
-      setShareNotice({
-        type: "error",
-        message: "Unable to share this post or copy its link.",
-      });
-    }
-  };
 
   const handleMediaChange = (event) => {
     const file = event.target.files?.[0];
@@ -756,40 +659,29 @@ const Newsfeed = () => {
     }
 
     try {
-      setIsPosting(true);
       setErrorMessage("");
-      const createdPost = await newsfeedAPI.create({
+      const createdPost = await createPostMutation.mutateAsync({
         content: postContent.trim(),
         media: postMedia,
       });
-      setPosts((currentPosts) => [normalizePost(createdPost), ...currentPosts]);
+      const normalizedCreated = normalizePost(unwrapData(createdPost));
+      updateFeedCache((old) => ({
+        ...old,
+        posts: [normalizedCreated, ...old.posts.filter((p) => getEntityId(p) !== normalizedCreated.id)],
+      }));
       setPostContent("");
       setPostMedia(null);
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to create post.");
-    } finally {
-      setIsPosting(false);
     }
   };
 
   const handleToggleHeart = async (postId) => {
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? { ...post, hearts: toggleUserHeart(post.hearts, user) }
-            : post
-        );
-      });
-
-      const updatedPost = await newsfeedAPI.toggleHeart(postId);
-      replacePost(updatedPost);
+      const updatedPost = await toggleHeartMutation.mutateAsync(postId);
+      replacePost(unwrapData(updatedPost));
     } catch (error) {
-      setPosts(previousPosts);
       setErrorMessage(error.response?.data?.message || "Unable to update heart.");
     }
   };
@@ -798,10 +690,11 @@ const Newsfeed = () => {
     try {
       setErrorMessage("");
       setOpenPostMenuId("");
-      await newsfeedAPI.delete(post.id);
-      setPosts((currentPosts) =>
-        currentPosts.filter((currentPost) => currentPost.id !== post.id)
-      );
+      await deletePostMutation.mutateAsync(post.id);
+      updateFeedCache((old) => ({
+        ...old,
+        posts: old.posts.filter((currentPost) => getEntityId(currentPost) !== post.id),
+      }));
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete post.");
     }
@@ -844,66 +737,28 @@ const Newsfeed = () => {
       return;
     }
 
-    const optimisticComment = normalizeComment({
-      id: `temp-comment-${Date.now()}`,
-      text,
-      user,
-      hearts: [],
-      replies: [],
-      createdAt: new Date().toISOString(),
-    });
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? { ...post, comments: [...post.comments, optimisticComment] }
-            : post
-        );
-      });
       handleCommentChange(postId, "");
       setVisibleComments((currentVisibility) => ({
         ...currentVisibility,
         [postId]: true,
       }));
 
-      const updatedPost = await newsfeedAPI.comment(postId, text);
-      replacePost(updatedPost);
+      const updatedPost = await addCommentMutation.mutateAsync({ postId, text });
+      replacePost(unwrapData(updatedPost));
     } catch (error) {
-      setPosts(previousPosts);
       handleCommentChange(postId, text);
       setErrorMessage(error.response?.data?.message || "Unable to add comment.");
     }
   };
 
   const handleToggleCommentHeart = async (postId, commentId) => {
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                comments: post.comments.map((comment) =>
-                  (comment.id || comment._id) === commentId
-                    ? { ...comment, hearts: toggleUserHeart(comment.hearts, user) }
-                    : comment
-                ),
-              }
-            : post
-        );
-      });
-
-      const updatedPost = await newsfeedAPI.toggleCommentHeart(postId, commentId);
-      replacePost(updatedPost);
+      const updatedPost = await toggleCommentHeartMutation.mutateAsync({ postId, commentId });
+      replacePost(unwrapData(updatedPost));
     } catch (error) {
-      setPosts(previousPosts);
       setErrorMessage(error.response?.data?.message || "Unable to update comment heart.");
     }
   };
@@ -911,8 +766,8 @@ const Newsfeed = () => {
   const handleDeleteComment = async (postId, commentId) => {
     try {
       setErrorMessage("");
-      const updatedPost = await newsfeedAPI.deleteComment(postId, commentId);
-      replacePost(updatedPost);
+      const updatedPost = await deleteCommentMutation.mutateAsync({ postId, commentId });
+      replacePost(unwrapData(updatedPost));
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete comment.");
     }
@@ -927,31 +782,8 @@ const Newsfeed = () => {
       return;
     }
 
-    const optimisticReply = {
-      id: `temp-reply-${Date.now()}`,
-      text,
-      user,
-      createdAt: new Date().toISOString(),
-    };
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                comments: post.comments.map((comment) =>
-                  (comment.id || comment._id) === commentId
-                    ? { ...comment, replies: [...comment.replies, optimisticReply] }
-                    : comment
-                ),
-              }
-            : post
-        );
-      });
       handleReplyChange(commentId, "");
       setVisibleComments((currentVisibility) => ({
         ...currentVisibility,
@@ -962,10 +794,9 @@ const Newsfeed = () => {
         [commentId]: true,
       }));
 
-      const updatedPost = await newsfeedAPI.reply(postId, commentId, text);
-      replacePost(updatedPost);
+      const updatedPost = await replyCommentMutation.mutateAsync({ postId, commentId, text });
+      replacePost(unwrapData(updatedPost));
     } catch (error) {
-      setPosts(previousPosts);
       handleReplyChange(commentId, text);
       setErrorMessage(error.response?.data?.message || "Unable to add reply.");
     }
@@ -1003,18 +834,6 @@ const Newsfeed = () => {
         </p>
       )}
 
-      {shareNotice && (
-        <p
-          className={`rounded-md px-4 py-3 text-sm font-medium ring-1 ${
-            shareNotice.type === "success"
-              ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-              : "bg-red-50 text-red-700 ring-red-100"
-          }`}
-          role={shareNotice.type === "error" ? "alert" : "status"}
-        >
-          {shareNotice.message}
-        </p>
-      )}
 
       {canPost && (
         <form
@@ -1129,15 +948,16 @@ const Newsfeed = () => {
           const isPostMenuOpen = openPostMenuId === post.id;
 
           return (
-            <article
-              key={post.id}
-              id={`newsfeed-post-${post.id}`}
-              className={`rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition ${
-                focusedTarget?.postId === post.id
-                  ? "ring-2 ring-pink-200"
-                  : ""
-              }`}
-            >
+            <>
+              <article
+                key={post.id}
+                id={`newsfeed-post-${post.id}`}
+                className={`rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition ${
+                  focusedTarget?.postId === post.id
+                    ? "ring-2 ring-pink-200"
+                    : ""
+                }`}
+              >
               <div className="relative">
                 {canDeletePost && (
                   <div className="absolute right-0 top-0">
@@ -1243,16 +1063,9 @@ const Newsfeed = () => {
                     >
                       {post.comments.length} comments
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSharePost(post)}
-                      className="transition hover:text-pink-600"
-                    >
-                      Share
-                    </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200">
+                <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200">
                   <button
                     type="button"
                     onClick={() => handleToggleHeart(post.id)}
@@ -1265,22 +1078,12 @@ const Newsfeed = () => {
                   <button
                     type="button"
                     onClick={() => toggleComments(post.id)}
-                    className="flex h-9 items-center justify-center gap-2 border-r border-slate-200 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
                       <path d="M5 6h14v10H9l-4 3V6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Comment
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSharePost(post)}
-                    className="flex h-9 items-center justify-center gap-2 text-xs font-black text-slate-600 transition hover:bg-pink-50 hover:text-pink-600 dark:text-white dark:hover:!bg-[#c72fb2] dark:hover:text-white"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-                      <path d="M20 12 4 5l3 7-3 7 16-7zM7 12h13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Share
                   </button>
                 </div>
               </div>
@@ -1373,15 +1176,16 @@ const Newsfeed = () => {
                                   const replyId = reply._id || reply.id;
 
                                   return (
-                                  <div
-                                    key={replyId}
-                                    id={`newsfeed-reply-${replyId}`}
-                                    className={`flex gap-3 rounded-lg transition ${
-                                      focusedTarget?.replyId === replyId
-                                        ? "bg-blue-50/70 p-2"
-                                        : ""
-                                    }`}
-                                  >
+                                  <>
+                                    <div
+                                      key={replyId}
+                                      id={`newsfeed-reply-${replyId}`}
+                                      className={`flex gap-3 rounded-lg transition ${
+                                        focusedTarget?.replyId === replyId
+                                          ? "bg-blue-50/70 p-2"
+                                          : ""
+                                      }`}
+                                    >
                                     <ProfileButton
                                       user={reply.user}
                                       className="rounded-full transition hover:ring-2 hover:ring-[#dc4fb2]"
@@ -1403,7 +1207,8 @@ const Newsfeed = () => {
                                       </div>
                                       <p className="mt-1 break-words text-sm text-neutral-800 [overflow-wrap:anywhere]">{reply.text}</p>
                                     </div>
-                                  </div>
+                                    </div>
+                                  </>
                                   );
                                 })}
                               </div>
@@ -1502,7 +1307,8 @@ const Newsfeed = () => {
                   </span>
                 </label>
               </form>
-            </article>
+              </article>
+            </>
           );
         })}
         {!isLoading && (hasNextPage || loadMoreError) && (

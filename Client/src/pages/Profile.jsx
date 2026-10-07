@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CLIENTRA2 from "../assets/CLIENTRA2.png";
 import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
-import CountrySelect from "../components/CountrySelect/CountrySelect";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import { ProfileSkeleton } from "../components/Skeleton/Skeleton";
+import CountrySelect from "../components/CountrySelect/CountrySelect.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { ProfileSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { authAPI } from "../services/api.js";
+import { getApiErrorMessage } from "../services/api.js";
+import { useProfileQuery, useProfileMutations } from "../hooks/index.js";
 import { isValidEmail } from "../utils/emailValidation.js";
 import {
   getPhoneValidationMessage,
@@ -24,13 +25,12 @@ const emptyForm = {
   lastName: "",
   companyName: "",
   email: "",
+  currentPassword: "",
   country: defaultCountry,
   phone: "",
   position: "",
   birthday: "",
   gender: "Prefer not to say",
-  password: "",
-  confirmPassword: "",
   avatar: "",
   coverPhoto: "",
 };
@@ -40,6 +40,8 @@ const SKILL_GROUPS = [
   { key: "soft", label: "Soft Skills" },
   { key: "other", label: "Other Expertise" },
 ];
+const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const PROFILE_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 const normalizeSkillGroups = (skillGroups) =>
   SKILL_GROUPS.reduce((groups, { key }) => {
@@ -54,10 +56,9 @@ const fieldNames = {
   lastName: `profile_family_${Date.now()}`,
   companyName: `profile_company_${Date.now()}`,
   email: `profile_contact_${Date.now()}`,
+  currentPassword: `profile_current_secret_${Date.now()}`,
   phone: `profile_optional_line_${Date.now()}`,
   position: `profile_position_${Date.now()}`,
-  password: `profile_secret_${Date.now()}`,
-  confirmPassword: `profile_secret_confirm_${Date.now()}`,
 };
 
 const antiAutofillProps = {
@@ -86,13 +87,12 @@ const profileToForm = (profile) => {
     lastName: profile?.lastName || "",
     companyName: profile?.companyName || "",
     email: profile?.email || "",
+    currentPassword: "",
     country,
     phone: ensureCountryDialCode(profile?.phone || getCountryDialCode(country), country),
     position: role === "client" ? "Client" : profile?.position || "",
     birthday: toDateInputValue(profile?.birthday),
     gender: profile?.gender || "Prefer not to say",
-    password: "",
-    confirmPassword: "",
     avatar: profile?.avatar || "",
     coverPhoto: profile?.coverPhoto || profile?.cover || "",
   };
@@ -112,93 +112,31 @@ const formatRole = (role = "") => {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 };
 
-const Profile = ({ embedded = false }) => {
+const ProfileForm = ({
+  initialProfile,
+  user,
+  updateUser,
+  updateProfileMutation,
+}) => {
   const navigate = useNavigate();
-  const { user, updateUser } = useAuth();
-  const userId = user?.id || user?._id;
-  const hasCachedProfile = Boolean(user?.email);
-  const [formData, setFormData] = useState(() => profileToForm(user) || emptyForm);
+  const isClient = String(user?.role || initialProfile?.role || "").toLowerCase() === "client";
+  const [formData, setFormData] = useState(() => profileToForm(initialProfile) || emptyForm);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(!hasCachedProfile);
-  const [isSaving, setIsSaving] = useState(false);
-  const [skillGroups, setSkillGroups] = useState(() => normalizeSkillGroups(user?.skillGroups));
+  const [skillGroups, setSkillGroups] = useState(() => normalizeSkillGroups(initialProfile?.skillGroups));
   const [isAddingSkill, setIsAddingSkill] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const [newSkillGroup, setNewSkillGroup] = useState("technical");
   const [hasLoadedAvatar, setHasLoadedAvatar] = useState(() =>
-    Object.prototype.hasOwnProperty.call(user || {}, "avatar")
+    Object.prototype.hasOwnProperty.call(initialProfile || {}, "avatar")
   );
   const [hasChangedAvatar, setHasChangedAvatar] = useState(false);
   const [hasLoadedCoverPhoto, setHasLoadedCoverPhoto] = useState(() =>
-    Object.prototype.hasOwnProperty.call(user || {}, "coverPhoto")
+    Object.prototype.hasOwnProperty.call(initialProfile || {}, "coverPhoto")
   );
   const [hasChangedCoverPhoto, setHasChangedCoverPhoto] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadProfile = async () => {
-      try {
-        setIsLoading(!hasCachedProfile);
-        setErrorMessage("");
-        const data = await authAPI.getMe();
-        const profileId = data?._id || data?.id || userId;
-        let nextProfile = data;
-        let avatarIsLoaded = Object.prototype.hasOwnProperty.call(data || {}, "avatar");
-        let coverPhotoIsLoaded = Object.prototype.hasOwnProperty.call(
-          data || {},
-          "coverPhoto"
-        );
-
-        if (profileId) {
-          try {
-            const publicProfile = await authAPI.getPublicProfile(profileId, {
-              refresh: true,
-            });
-            nextProfile = { ...data, ...publicProfile };
-            avatarIsLoaded = true;
-            coverPhotoIsLoaded = true;
-          } catch {
-            if (isMounted) {
-              setErrorMessage(
-                "Profile loaded, but the current profile photos could not be loaded. They will be preserved unless you choose new ones."
-              );
-            }
-          }
-        }
-
-        if (isMounted) {
-          const nextUser = {
-            id: nextProfile._id || nextProfile.id,
-            ...nextProfile,
-          };
-
-          updateUser(nextUser);
-          setFormData(profileToForm(nextProfile));
-          setSkillGroups(normalizeSkillGroups(nextProfile.skillGroups));
-          setHasLoadedAvatar(avatarIsLoaded);
-          setHasChangedAvatar(false);
-          setHasLoadedCoverPhoto(coverPhotoIsLoaded);
-          setHasChangedCoverPhoto(false);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error.response?.data?.message || "Unable to load profile.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [hasCachedProfile, updateUser, userId]);
+  const isSaving = updateProfileMutation.isPending;
 
   const updateField = (field, value) => {
     if (field === "avatar") setHasChangedAvatar(true);
@@ -232,11 +170,12 @@ const Profile = ({ embedded = false }) => {
 
   const handleAvatarChange = (event) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrorMessage("Please choose an image file.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setErrorMessage("Please choose a PNG, JPEG, WebP, or GIF image.");
       return;
     }
 
@@ -250,6 +189,7 @@ const Profile = ({ embedded = false }) => {
       updateField("avatar", String(reader.result || ""));
       setErrorMessage("");
     };
+    reader.onerror = () => setErrorMessage("Unable to read the selected avatar image.");
     reader.readAsDataURL(file);
   };
 
@@ -259,8 +199,8 @@ const Profile = ({ embedded = false }) => {
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrorMessage("Please choose an image file.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setErrorMessage("Please choose a PNG, JPEG, WebP, or GIF image.");
       return;
     }
 
@@ -274,6 +214,7 @@ const Profile = ({ embedded = false }) => {
       updateField("coverPhoto", String(reader.result || ""));
       setErrorMessage("");
     };
+    reader.onerror = () => setErrorMessage("Unable to read the selected cover image.");
     reader.readAsDataURL(file);
   };
 
@@ -324,31 +265,20 @@ const Profile = ({ embedded = false }) => {
       return;
     }
 
+    const isChangingEmail = formData.email.trim().toLowerCase() !==
+      String(user?.email || "").trim().toLowerCase();
+    if (isChangingEmail && !formData.currentPassword) {
+      setErrorMessage("Enter your current password to change your email address.");
+      return;
+    }
+
     const phoneValidation = getPhoneValidationMessage(formData.phone, formData.country);
     if (phoneValidation) {
       setErrorMessage(phoneValidation);
       return;
     }
 
-    if (formData.password || formData.confirmPassword) {
-      if (formData.password !== formData.confirmPassword) {
-        setErrorMessage("Passwords do not match.");
-        return;
-      }
-
-      if (formData.password.length < 8) {
-        setErrorMessage("Password must be at least 8 characters.");
-        return;
-      }
-
-      if (!/[A-Z]/.test(formData.password) || !/[a-z]/.test(formData.password) || !/\d/.test(formData.password)) {
-        setErrorMessage("Password must include uppercase, lowercase, and number characters.");
-        return;
-      }
-    }
-
     try {
-      setIsSaving(true);
       const payload = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -359,7 +289,7 @@ const Profile = ({ embedded = false }) => {
         position: user?.role === "client" ? "Client" : formData.position.trim(),
         birthday: formData.birthday,
         gender: formData.gender,
-        skillGroups,
+        ...(!isClient ? { skillGroups } : {}),
       };
 
       if (hasLoadedAvatar || hasChangedAvatar) {
@@ -370,17 +300,13 @@ const Profile = ({ embedded = false }) => {
         payload.coverPhoto = formData.coverPhoto;
       }
 
-      if (formData.password) {
-        payload.password = formData.password;
+      if (isChangingEmail) {
+        payload.currentPassword = formData.currentPassword;
       }
 
-      const updatedProfile = await authAPI.updateMe(payload);
+      const updatedProfile = await updateProfileMutation.mutateAsync(payload);
       updateUser(updatedProfile);
-      setFormData({
-        ...profileToForm(updatedProfile),
-        password: "",
-        confirmPassword: "",
-      });
+      setFormData(profileToForm(updatedProfile));
       setSkillGroups(normalizeSkillGroups(updatedProfile.skillGroups));
       setHasLoadedAvatar(true);
       setHasChangedAvatar(false);
@@ -388,48 +314,21 @@ const Profile = ({ embedded = false }) => {
       setHasChangedCoverPhoto(false);
       setSuccessMessage("Profile updated successfully.");
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to update profile.");
-    } finally {
-      setIsSaving(false);
+      setErrorMessage(getApiErrorMessage(error, "Unable to update profile."));
     }
   };
 
-  const joinedDate = user?.createdAt
-    ? new Date(user.createdAt).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "May 8, 2026";
+  const joinedDate = formatProfileDate(user?.createdAt || initialProfile?.createdAt);
   const fullName = getFullName(formData);
 
-  const content = (
-    <main className={embedded ? "w-full" : "w-full px-4 py-6 md:px-5 md:py-10"}>
-      <div className="mb-4">
-        <h1
-          className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-3xl"
-          style={{ fontFamily: "var(--font-bruno)" }}
-        >
-        Profile
-        </h1>
-        <p className="mt-2 text-sm font-semibold text-slate-500">
-          Manage your personal information and account settings.
-        </p>
-      </div>
-
-      {isLoading && !formData.email ? (
-        <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
-          <ProfileSkeleton />
-        </section>
-      ) : (
-        <form
-          onSubmit={handleSubmit}
-          autoComplete="off"
-          data-form-type="other"
-          className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]"
-        >
+  return (
+    <form
+      onSubmit={handleSubmit}
+      autoComplete="off"
+      data-form-type="other"
+      className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]"
+    >
           <input type="text" name="username" autoComplete="username" tabIndex={-1} aria-hidden="true" className="hidden" />
-          <input type="password" name="password" autoComplete="current-password" tabIndex={-1} aria-hidden="true" className="hidden" />
 
           <aside className="space-y-4">
             <section className="overflow-hidden rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
@@ -443,7 +342,7 @@ const Profile = ({ embedded = false }) => {
                 <label className="absolute right-3 top-3 flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-white/90 px-3 text-xs font-black text-[#c72fb2] shadow-sm ring-1 ring-pink-100 transition hover:bg-white dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                   <FormIcon name="upload" className="h-4 w-4" />
                   Change Cover
-                  <input type="file" accept="image/*" onChange={handleCoverPhotoChange} className="sr-only" />
+                  <input type="file" accept={PROFILE_IMAGE_ACCEPT} onChange={handleCoverPhotoChange} className="sr-only" />
                 </label>
               </div>
               <div className="px-5 pb-5 text-center">
@@ -464,23 +363,20 @@ const Profile = ({ embedded = false }) => {
                   {formatRole(user?.role) || "User"}
                 </span>
                 <p className="mt-4 text-sm font-black text-[#10142d] dark:text-white">
-                  {formData.position || "System Administrator"}
-                </p>
-                <p className="mx-auto mt-2 max-w-[240px] text-xs font-semibold leading-5 text-slate-500">
-                  Managing the system and ensuring everything runs smoothly.
+                  {formData.position || formatRole(user?.role) || "Position not available"}
                 </p>
 
                 <div className="mt-4 space-y-3 border-y border-pink-50 py-4 text-left text-xs font-bold text-slate-600">
-                  <p className="flex min-w-0 items-center gap-3 break-all"><FormIcon name="mail" />{formData.email || "email@example.com"}</p>
-                  <p className="flex items-center gap-3"><FormIcon name="phone" />{formData.phone || "Phone number"}</p>
-                  <p className="flex items-center gap-3"><FormIcon name="location" />{formData.companyName || formData.country || "Manila, Philippines"}</p>
-                  <p className="flex items-center gap-3"><FormIcon name="calendar" />Joined {joinedDate}</p>
+                  <p className="flex min-w-0 items-center gap-3 break-all"><FormIcon name="mail" />{formData.email || "Email not available"}</p>
+                  <p className="flex items-center gap-3"><FormIcon name="phone" />{formData.phone || "Phone not available"}</p>
+                  <p className="flex items-center gap-3"><FormIcon name="location" />{formData.companyName || formData.country || "Location not available"}</p>
+                  <p className="flex items-center gap-3"><FormIcon name="calendar" />{joinedDate === "Not available" ? "Join date not available" : `Joined ${joinedDate}`}</p>
                 </div>
 
                 <label className="mt-4 flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c72fb2] text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:hover:!bg-[#c72fb2] dark:hover:text-white">
                   <FormIcon name="upload" className="h-4 w-4" />
                   Change Photo
-                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="sr-only" />
+                  <input type="file" accept={PROFILE_IMAGE_ACCEPT} onChange={handleAvatarChange} className="sr-only" />
                 </label>
                 {formData.avatar && (
                   <button
@@ -506,9 +402,9 @@ const Profile = ({ embedded = false }) => {
             <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-4 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
               <h2 className="mb-3 text-base font-black text-[#10142d] dark:text-white">Account Activity</h2>
               {[
-                ["Last profile update", "May 12, 2026 - 7:52 PM"],
-                ["Last login", "May 12, 2026 - 7:50 PM"],
-                ["Account created", `${joinedDate} - 10:44 AM`],
+                ["Last profile update", formatProfileDateTime(user?.updatedAt)],
+                ["Last active", formatProfileDateTime(user?.lastSeen)],
+                ["Account created", formatProfileDateTime(user?.createdAt)],
               ].map(([label, value]) => (
                 <div key={label} className="flex gap-3 border-b border-pink-50 py-3 last:border-b-0">
                   <span className="grid h-8 w-8 place-items-center rounded-xl bg-pink-50 text-[#c72fb2]">
@@ -565,6 +461,18 @@ const Profile = ({ embedded = false }) => {
                       className={iconInputClass}
                     />
                   </Field>
+                  {formData.email.trim().toLowerCase() !== String(user?.email || "").trim().toLowerCase() && (
+                    <Field label="Current Password to Change Email" icon="lock" required>
+                      <input
+                        type="password"
+                        name={fieldNames.currentPassword}
+                        autoComplete="current-password"
+                        value={formData.currentPassword}
+                        onChange={(event) => updateField("currentPassword", event.target.value)}
+                        className={iconInputClass}
+                      />
+                    </Field>
+                  )}
                   <Field label="Phone Number" icon="phone" required>
                     <input
                       type="text"
@@ -613,7 +521,7 @@ const Profile = ({ embedded = false }) => {
                   <FormIcon name="briefcase" /> Work Information
                 </h2>
                 <div className="grid gap-4 lg:grid-cols-3">
-                  <Field label="Employee ID" icon="id">
+                  <Field label={isClient ? "Client ID" : "Employee ID"} icon="id">
                     <input type="text" value={getEmployeeId(user)} readOnly className={`${readOnlyInputClass} pl-12`} />
                   </Field>
                   <Field label="Department" icon="briefcase">
@@ -639,90 +547,92 @@ const Profile = ({ embedded = false }) => {
                 </div>
               </section>
 
-              <section className="border-t border-pink-50 pt-5">
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h2 className="flex items-center gap-3 text-base font-black">
-                      <FormIcon name="person" /> Skills & Expertise
-                    </h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Manage your skills and expertise to showcase your strengths.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingSkill((isOpen) => !isOpen)}
-                    className="flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white"
-                    aria-expanded={isAddingSkill}
-                  >
-                    <span className="text-lg leading-none">+</span>
-                    Add Skill
-                  </button>
-                </div>
-
-                {isAddingSkill && (
-                  <div className="mb-5 grid gap-2 rounded-xl border border-pink-100 bg-pink-50/40 p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
-                    <select
-                      value={newSkillGroup}
-                      onChange={(event) => setNewSkillGroup(event.target.value)}
-                      className={inputClass}
-                      aria-label="Skill category"
-                    >
-                      {SKILL_GROUPS.map(({ key, label }) => (
-                        <option key={key} value={key}>{label}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      maxLength={80}
-                      value={newSkill}
-                      onChange={(event) => setNewSkill(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          handleAddSkill();
-                        }
-                      }}
-                      placeholder="Enter a skill"
-                      className={inputClass}
-                    />
+              {!isClient && (
+                <section className="border-t border-pink-50 pt-5">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h2 className="flex items-center gap-3 text-base font-black">
+                        <FormIcon name="person" /> Skills & Expertise
+                      </h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                        Manage your skills and expertise to showcase your strengths.
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      onClick={handleAddSkill}
-                      className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white"
+                      onClick={() => setIsAddingSkill((isOpen) => !isOpen)}
+                      className="flex h-9 items-center gap-2 rounded-lg border border-[#c72fb2] bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-[#141414] dark:hover:!bg-[#c72fb2] dark:hover:text-white"
+                      aria-expanded={isAddingSkill}
                     >
-                      Add
+                      <span className="text-lg leading-none">+</span>
+                      Add Skill
                     </button>
                   </div>
-                )}
 
-                {SKILL_GROUPS.map(({ key, label }) => (
-                  <div key={key} className="mb-5 last:mb-0">
-                    <h3 className="mb-3 text-sm font-black text-[black] dark:text-white">{label}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {skillGroups[key].length === 0 && (
-                        <span className="text-xs font-semibold text-slate-400">No skills added.</span>
-                      )}
-                      {skillGroups[key].map((skill) => (
-                        <span
-                          key={skill}
-                          className="inline-flex items-center gap-2 rounded-full border border-black-100 bg-black-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
-                        >
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSkill(key, skill)}
-                            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#c72fb2] transition hover:bg-pink-100 hover:text-[#10142d] dark:hover:bg-neutral-800 dark:hover:text-white"
-                            aria-label={`Remove ${skill}`}
-                          >
-                            x
-                          </button>
-                        </span>
-                      ))}
+                  {isAddingSkill && (
+                    <div className="mb-5 grid gap-2 rounded-xl border border-pink-100 bg-pink-50/40 p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
+                      <select
+                        value={newSkillGroup}
+                        onChange={(event) => setNewSkillGroup(event.target.value)}
+                        className={inputClass}
+                        aria-label="Skill category"
+                      >
+                        {SKILL_GROUPS.map(({ key, label }) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={newSkill}
+                        onChange={(event) => setNewSkill(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleAddSkill();
+                          }
+                        }}
+                        placeholder="Enter a skill"
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSkill}
+                        className="h-10 rounded-lg bg-[#c72fb2] px-5 text-xs font-black text-white"
+                      >
+                        Add
+                      </button>
                     </div>
-                  </div>
-                ))}
-              </section>
+                  )}
+
+                  {SKILL_GROUPS.map(({ key, label }) => (
+                    <div key={key} className="mb-5 last:mb-0">
+                      <h3 className="mb-3 text-sm font-black text-[black] dark:text-white">{label}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {skillGroups[key].length === 0 && (
+                          <span className="text-xs font-semibold text-slate-400">No skills added.</span>
+                        )}
+                        {skillGroups[key].map((skill) => (
+                          <span
+                            key={skill}
+                            className="inline-flex items-center gap-2 rounded-full border border-black-100 bg-black-50 px-3 py-1.5 text-xs font-black text-[#c72fb2]"
+                          >
+                            {skill}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSkill(key, skill)}
+                              className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#c72fb2] transition hover:bg-pink-100 hover:text-[#10142d] dark:hover:bg-neutral-800 dark:hover:text-white"
+                              aria-label={`Remove ${skill}`}
+                            >
+                              x
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
 
             </div>
 
@@ -744,6 +654,44 @@ const Profile = ({ embedded = false }) => {
             </div>
           </section>
         </form>
+  );
+};
+
+const Profile = ({ embedded = false }) => {
+  const navigate = useNavigate();
+  const { user, updateUser } = useAuth();
+  const { data: profile, isLoading } = useProfileQuery();
+  const { updateProfile: updateProfileMutation } = useProfileMutations();
+
+  const activeUser = profile || user;
+  const showSkeleton = isLoading && !activeUser?.email;
+
+  const content = (
+    <main className={embedded ? "w-full" : "w-full px-4 py-6 md:px-5 md:py-10"}>
+      <div className="mb-4">
+        <h1
+          className="page-title text-2xl leading-none text-neutral-950 dark:text-white md:text-3xl"
+          style={{ fontFamily: "var(--font-bruno)" }}
+        >
+          Profile
+        </h1>
+        <p className="mt-2 text-sm font-semibold text-slate-500">
+          Manage your personal information and account settings.
+        </p>
+      </div>
+
+      {showSkeleton ? (
+        <section className="rounded-2xl border-b-2 border-b-[#f7b7e6] bg-white p-5 shadow-[0_3px_4px_rgba(190,65,158,0.14),0_8px_24px_rgba(190,65,158,0.05)] ring-1 ring-pink-50">
+          <ProfileSkeleton />
+        </section>
+      ) : (
+        <ProfileForm
+          key={activeUser?._id || activeUser?.id || "profile-form"}
+          initialProfile={activeUser}
+          user={user}
+          updateUser={updateUser}
+          updateProfileMutation={updateProfileMutation}
+        />
       )}
     </main>
   );
@@ -794,7 +742,29 @@ const splitFullName = (value) => {
   };
 };
 
-const getEmployeeId = (user) => user?.employeeId || user?.employeeID || user?._id || user?.id || "EMP-000123";
+const getEmployeeId = (user) => user?.employeeId || user?.employeeID || user?._id || user?.id || "Not available";
+
+const formatProfileDate = (value) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatProfileDateTime = (value) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
 
 const getWorkStatus = (user) =>
   user?.workStatus || (user?.isActive === false ? "Inactive" : "Full-time");

@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { employeeAPI } from "../../../services/api.js";
+import { useEmployeeMutations } from "../../../hooks/index.js";
 import { isValidEmail } from "../../../utils/emailValidation.js";
 import {
   getPhoneValidationMessage,
   limitPhoneNumberLength,
 } from "../../../utils/phoneValidation.js";
-import CountrySelect from "../../../components/CountrySelect/CountrySelect";
+import CountrySelect from "../../../components/CountrySelect/CountrySelect.jsx";
 import {
   applyCountryDialCode,
   defaultCountry,
   getCountryDialCode,
 } from "../../../utils/countries.js";
+import { getPasswordValidationMessage } from "../../../utils/passwordValidation.js";
 
 const emptyForm = {
   firstName: "",
@@ -69,7 +70,8 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
   const isEditing = Boolean(employee?.id);
   const [formData, setFormData] = useState(() => createInitialForm(employee));
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { createEmployee, updateEmployee } = useEmployeeMutations();
+  const isSubmitting = createEmployee.isPending || updateEmployee.isPending;
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({
@@ -119,8 +121,15 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
       return;
     }
 
+    if (formData.password) {
+      const passwordValidationMessage = getPasswordValidationMessage(formData.password);
+      if (passwordValidationMessage) {
+        setErrorMessage(passwordValidationMessage);
+        return;
+      }
+    }
+
     try {
-      setIsSubmitting(true);
       setErrorMessage("");
 
       const payload = {
@@ -138,9 +147,9 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
       }
 
       if (isEditing) {
-        await employeeAPI.update(employee.id, payload);
+        await updateEmployee.mutateAsync({ id: employee.id, employee: payload });
       } else {
-        await employeeAPI.create(payload);
+        await createEmployee.mutateAsync(payload);
       }
 
       onEmployeeSaved?.();
@@ -149,8 +158,6 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
         error.response?.data?.message ||
           `Unable to ${isEditing ? "update" : "create"} employee.`
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -283,7 +290,6 @@ const Addemployee = ({ employee, onEmployeeSaved, onNavigate }) => {
                 value={formData.password}
                 onChange={(event) => updateField("password", event.target.value)}
                 placeholder={isEditing ? "Leave blank to keep..." : "Password..."}
-                style={{ WebkitTextSecurity: "disc" }}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100"
               />
             </div>

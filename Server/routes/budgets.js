@@ -4,8 +4,10 @@ import { authorize } from "../middleware/authorize.js";
 import { protect } from "../middleware/protectedjwt.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { getSafeSearchPattern } from "../utils/search.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const allowedTypes = ["income", "expense"];
 
 const normalizeBudgetPayload = (body) => {
@@ -38,9 +40,25 @@ router.get("/", protect, authorize("admin"), async (req, res) => {
     const category = getSafeSearchPattern(req.query.category);
     if (category) query.category = { $regex: category, $options: "i" };
     if (req.query.dateFrom || req.query.dateTo) {
-      query.date = {};
-      if (req.query.dateFrom) query.date.$gte = new Date(req.query.dateFrom);
-      if (req.query.dateTo) query.date.$lte = new Date(req.query.dateTo);
+      const dateFilter = {};
+      if (req.query.dateFrom) {
+        const fromDate = new Date(req.query.dateFrom);
+        if (!isNaN(fromDate.getTime())) {
+          dateFilter.$gte = fromDate;
+        }
+      }
+      if (req.query.dateTo) {
+        const toDate = new Date(req.query.dateTo);
+        if (!isNaN(toDate.getTime())) {
+          if (String(req.query.dateTo).trim().length <= 10) {
+            toDate.setHours(23, 59, 59, 999);
+          }
+          dateFilter.$lte = toDate;
+        }
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        query.date = dateFilter;
+      }
     }
 
     const [budgets, summary] = await Promise.all([

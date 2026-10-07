@@ -1,9 +1,9 @@
-const BREVO_EMAIL_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
+const RESEND_EMAIL_ENDPOINT = "https://api.resend.com/emails";
 const EMAIL_REQUEST_TIMEOUT_MS = 15_000;
 
-const getBrevoConfig = () => {
-  const apiKey = String(process.env.BREVO_API_KEY || "").trim();
-  const senderEmail = String(process.env.BREVO_SENDER_EMAIL || "").trim();
+const getResendConfig = () => {
+  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
+  const senderEmail = String(process.env.RESEND_SENDER_EMAIL || "").trim();
 
   if (!apiKey || !senderEmail) {
     const error = new Error("Email service is not configured");
@@ -11,34 +11,32 @@ const getBrevoConfig = () => {
     throw error;
   }
 
+  const senderName = String(process.env.RESEND_SENDER_NAME || "CLIENTRA Security").trim();
+
   return {
     apiKey,
-    sender: {
-      name: String(process.env.BREVO_SENDER_NAME || "CLIENTRA Security").trim(),
-      email: senderEmail,
-    },
+    from: `${senderName} <${senderEmail}>`,
   };
 };
 
 const sendEmail = async ({ to, subject, text, html }) => {
-  const { apiKey, sender } = getBrevoConfig();
+  const { apiKey, from } = getResendConfig();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), EMAIL_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(BREVO_EMAIL_ENDPOINT, {
+    const response = await fetch(RESEND_EMAIL_ENDPOINT, {
       method: "POST",
       headers: {
-        accept: "application/json",
-        "api-key": apiKey,
-        "content-type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        sender,
-        to: [{ email: to }],
+        from,
+        to: [to],
         subject,
-        textContent: text,
-        htmlContent: html,
+        text,
+        html,
       }),
       signal: controller.signal,
     });
@@ -46,16 +44,22 @@ const sendEmail = async ({ to, subject, text, html }) => {
     if (!response.ok) {
       const details = await response.json().catch(() => ({}));
       const providerMessage = String(details?.message || "").trim();
+      console.error(
+        `[email] Resend rejected the email (${response.status}):`,
+        providerMessage || response.statusText
+      );
       const error = new Error(
         providerMessage
-          ? `Brevo rejected the email: ${providerMessage}`
-          : `Brevo rejected the email with status ${response.status}`
+          ? `Resend rejected the email: ${providerMessage}`
+          : `Resend rejected the email with status ${response.status}`
       );
       error.status = 502;
       throw error;
     }
 
-    return response.json().catch(() => ({}));
+    const result = await response.json().catch(() => ({}));
+    console.log("[email] Resend accepted:", JSON.stringify(result), "| to:", to, "| subject:", subject);
+    return result;
   } catch (error) {
     if (error?.name === "AbortError") {
       const timeoutError = new Error("Email service timed out");

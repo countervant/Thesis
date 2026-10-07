@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 import {
   assertDistinctReviewFile,
+  canUserSubmitTaskOutput,
   createProtectedImageReview,
   getTaskFinalOutputForViewer,
   isPaymentProtectedTask,
@@ -44,6 +45,20 @@ test("output links accept only absolute HTTP and HTTPS URLs", () => {
   }
 });
 
+test("only administrators and assigned employees can submit project output", () => {
+  const task = {
+    assignedTo: "employee-1",
+    assignees: ["employee-1"],
+    subtasks: [{ assignedTo: "employee-2" }],
+  };
+
+  assert.equal(canUserSubmitTaskOutput(task, { role: "admin", _id: "admin-1" }), true);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "employee", _id: "employee-1" }), true);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "employee", _id: "employee-2" }), true);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "employee", _id: "employee-3" }), false);
+  assert.equal(canUserSubmitTaskOutput(task, { role: "client", _id: "employee-1" }), false);
+});
+
 test("allowed uploads use the declared safe MIME and a server-selected extension", () => {
   const parsed = parseOutputFile({
     fileName: "project-output.html",
@@ -71,6 +86,18 @@ test("active and unsupported upload MIME types are rejected", () => {
   );
   expectValidationError(
     () => parseOutputFile({ fileName: "blob.bin", dataUrl: asDataUrl("application/octet-stream", "data") }),
+    /file type is not supported/
+  );
+  expectValidationError(
+    () => parseOutputFile({ fileName: "video.mp4", dataUrl: asDataUrl("video/mp4", "fake-video-bytes") }),
+    /file type is not supported/
+  );
+  expectValidationError(
+    () => parseOutputFile({ fileName: "clip.mov", dataUrl: asDataUrl("video/quicktime", "fake-video-bytes") }),
+    /file type is not supported/
+  );
+  expectValidationError(
+    () => parseOutputFile({ fileName: "movie.webm", dataUrl: asDataUrl("video/webm", "fake-video-bytes") }),
     /file type is not supported/
   );
 });

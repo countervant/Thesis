@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import Skeleton from "../../components/Skeleton/Skeleton";
-import { getApiErrorMessage, calendarAPI, messageAPI, taskAPI } from "../../services/api.js";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Skeleton from "../../components/Skeleton/Skeleton.jsx";
+import { QUERY_KEYS } from "../../constants/queryKeys.js";
+import { useTasksQuery } from "../../hooks/index.js";
+import { getApiErrorMessage, messageAPI } from "../../services/api.js";
 
 const statusFromApi = {
   pending: "Pending",
@@ -27,7 +30,6 @@ const statStyles = {
   projects: "bg-[#f0e9ff] text-[#754de8] ring-[#754de8]/20",
   revisions: "bg-pink-50 text-[#e347a8] ring-[#e347a8]/20",
   messages: "bg-[#f0e9ff] text-[#754de8] ring-[#754de8]/20",
-  meetings: "bg-orange-50 text-orange-500 ring-orange-500/20",
 };
 
 const Card = ({ children, className = "" }) => (
@@ -126,17 +128,12 @@ const normalizeTask = (task) => {
     status,
     progress: getTaskProgress(subtasks),
     updatedAt: task?.updatedAt || task?.createdAt,
+    createdAt: task?.createdAt,
     amount,
     paid,
     pendingAmount: Math.max(0, amount - paid),
   };
 };
-
-const normalizeMeeting = (event) => ({
-  id: getEntityId(event),
-  title: event?.title || "Client meeting",
-  date: event?.date,
-});
 
 const getDisplayName = (profile) => {
   const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ");
@@ -172,8 +169,8 @@ const ClientDashboardSkeleton = () => (
       <Skeleton className="mt-3 h-4 w-96 max-w-full" />
     </header>
 
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, index) => (
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, index) => (
         <Card key={index} className="p-5">
           <div className="flex items-center gap-4">
             <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" />
@@ -270,82 +267,60 @@ const ClientDashboardSkeleton = () => (
 );
 
 const ClientDashboard = ({ onNavigate }) => {
-  const [tasks, setTasks] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [messagePreviews, setMessagePreviews] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    data: rawTasks = [],
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery({ view: "client" });
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: QUERY_KEYS.unreadMessages(),
+    queryFn: () => messageAPI.getUnreadCount(),
+  });
 
-    const loadDashboard = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const now = new Date();
-        const currentMonth = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
-        const [taskResult, unreadResult, meetingResult, threadResult] = await Promise.allSettled([
-          taskAPI.getAll({ limit: 100, view: "dashboard" }),
-          messageAPI.getUnreadCount(),
-          calendarAPI.getAll({ month: currentMonth }),
-          messageAPI.getThreads({ limit: 3 }),
-        ]);
+  const { data: rawThreads = [] } = useQuery({
+    queryKey: ["messages", "threads", JSON.stringify({ limit: 3 })],
+    queryFn: async () => {
+      const res = await messageAPI.getThreads({ limit: 3 });
+      return Array.isArray(res) ? res : [];
+    },
+  });
 
-        if (!isMounted) return;
+  const tasks = useMemo(() => {
+    const list = Array.isArray(rawTasks) ? rawTasks : [];
+    return list.map(normalizeTask);
+  }, [rawTasks]);
 
-        if (taskResult.status === "fulfilled") {
-          setTasks(taskResult.value.map(normalizeTask));
-        } else {
-          setErrorMessage(getApiErrorMessage(taskResult.reason, "Unable to load client dashboard."));
-        }
+  const messagePreviews = useMemo(() => {
+    const list = Array.isArray(rawThreads) ? rawThreads : [];
+    return list.map(normalizeMessagePreview);
+  }, [rawThreads]);
 
-        if (unreadResult.status === "fulfilled") {
-          setUnreadCount(unreadResult.value);
-        }
-
-        if (meetingResult.status === "fulfilled") {
-          setMeetings(meetingResult.value.map(normalizeMeeting));
-        }
-
-        if (threadResult.status === "fulfilled") {
-          setMessagePreviews(threadResult.value.map(normalizeMessagePreview));
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    loadDashboard();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const errorMessage = tasksError
+    ? getApiErrorMessage(tasksError, "Unable to load client dashboard.")
+    : "";
 
   const dashboardData = useMemo(() => {
-    const activeProjects = tasks.filter((task) => task.status !== "Completed");
-    const pendingRevisions = tasks.filter(
+    const sortedTasks = [...tasks].sort((first, second) => {
+      const firstTime = parseDate(first.createdAt) || parseDate(first.updatedAt) || 0;
+      const secondTime = parseDate(second.createdAt) || parseDate(second.updatedAt) || 0;
+      return secondTime - firstTime;
+    });
+    const activeProjects = sortedTasks.filter((task) => task.status !== "Completed");
+    const pendingRevisions = sortedTasks.filter(
       (task) => task.status === "Pending" || task.revisionRequests.length > 0
     );
-    const highPriority = tasks.filter((task) => task.priority === "high" && task.status !== "Completed");
-    const upcomingMeetings = meetings
-      .filter((meeting) => {
-        const date = parseDate(meeting.date);
-        return date && date >= new Date(new Date().toDateString());
-      })
-      .sort((first, second) => parseDate(first.date) - parseDate(second.date));
+    const highPriority = sortedTasks.filter((task) => task.priority === "high" && task.status !== "Completed");
 
     return {
       activeProjects,
-      completedProjects: tasks.filter((task) => task.status === "Completed"),
+      completedProjects: sortedTasks.filter((task) => task.status === "Completed"),
       highPriority,
       pendingRevisions,
-      projectOverview: tasks.slice(0, 3),
+      projectOverview: sortedTasks.slice(0, 3),
       recentRevisions: pendingRevisions.slice(0, 3),
-      upcomingMeetings,
     };
-  }, [meetings, tasks]);
+  }, [tasks]);
 
   const stats = [
     {
@@ -368,13 +343,6 @@ const ClientDashboard = ({ onNavigate }) => {
       detail: "From conversations",
       icon: "message",
       tone: "messages",
-    },
-    {
-      label: "Upcoming Meetings",
-      value: dashboardData.upcomingMeetings.length,
-      detail: "This week",
-      icon: "calendar",
-      tone: "meetings",
     },
   ];
 
@@ -406,7 +374,7 @@ const ClientDashboard = ({ onNavigate }) => {
         </p>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((item) => (
           <Card key={item.label} className="p-5">
             <div className="flex items-center gap-4">
@@ -417,7 +385,7 @@ const ClientDashboard = ({ onNavigate }) => {
                 <p className="text-sm font-black text-slate-600 dark:text-slate-300">{item.label}</p>
                 <p className="mt-1 text-4xl font-black text-[#10142d] dark:text-white">{item.value}</p>
                 <p className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                  <span className={`h-2 w-2 rounded-full ${item.tone === "meetings" ? "bg-orange-500" : item.tone === "revisions" ? "bg-pink-500" : "bg-emerald-500"}`} />
+                  <span className={`h-2 w-2 rounded-full ${item.tone === "revisions" ? "bg-pink-500" : "bg-emerald-500"}`} />
                   {item.detail}
                 </p>
               </div>

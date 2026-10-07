@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import check from "../../../assets/check.png";
 import pendingrequest from "../../../assets/pendingrequest.png";
 import reject from "../../../assets/reject.png";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
-import { SkeletonRows } from "../../../components/Skeleton/Skeleton";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
+import { SkeletonRows } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext";
-import { getApiErrorMessage, leaveRequestAPI } from "../../../services/api";
+import {
+  useLeaveRequestsQuery,
+  useLeaveRequestMutations,
+} from "../../../hooks/index.js";
+import { getApiErrorMessage } from "../../../services/api";
 
 const toneStyles = {
   green: "bg-emerald-50 text-emerald-600 ring-emerald-100",
@@ -14,9 +19,9 @@ const toneStyles = {
 };
 
 const statCardStyles = {
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
 };
 
 const statusStyles = {
@@ -148,6 +153,25 @@ const durationLabel = (days) => `${days || 0} ${Number(days) === 1 ? "day" : "da
 
 const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
 
+const getMonthDate = (monthFilter) => {
+  const now = new Date();
+  if (monthFilter === "last") {
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  }
+  if (monthFilter === "next") {
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
+const monthMatches = (request, monthDate) => {
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
+  const start = new Date(request.startDate);
+  const end = new Date(request.endDate);
+  return start < monthEnd && end >= monthStart;
+};
+
 const isCurrentApprovedLeave = (request) => {
   if (request?.status !== "Approved") return false;
 
@@ -274,41 +298,63 @@ const Calendar = ({ currentMonth, onNextMonth, onPreviousMonth, requests }) => {
 
 const EmpLeaverequest = () => {
   const { user } = useAuth();
-  const [requests, setRequests] = useState([]);
-  const [summary, setSummary] = useState({});
   const [statusFilter, setStatusFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [form, setForm] = useState(() => ({
     ...defaultForm,
     emergencyContact: user?.phone || "",
   }));
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [actionErrorMessage, setActionErrorMessage] = useState("");
   const [detailRequestId, setDetailRequestId] = useState("");
   const [commentText, setCommentText] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
+  const [requestToDelete, setRequestToDelete] = useState(null);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
 
-  const loadRequests = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
-      const response = await leaveRequestAPI.getAll({ limit: 100, month: "all" });
-      setRequests(response.leaveRequests.map(normalizeRequest));
-      setSummary(response.summary || {});
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to load leave requests."));
-      setRequests([]);
-    } finally {
-      setIsLoading(false);
+  const {
+    data: leaveData,
+    isLoading,
+    error: leaveError,
+  } = useLeaveRequestsQuery({ employeeOnly: true });
+
+  const {
+    createRequest,
+    updateStatus,
+    addComment,
+    deleteRequest,
+  } = useLeaveRequestMutations();
+
+  const isSubmitting = createRequest.isPending;
+  const isDeleting = deleteRequest.isPending;
+
+  const requests = useMemo(() => {
+    if (!leaveData) return [];
+    const list = Array.isArray(leaveData.leaveRequests)
+      ? leaveData.leaveRequests
+      : Array.isArray(leaveData)
+      ? leaveData
+      : [];
+    return list.map(normalizeRequest);
+  }, [leaveData]);
+
+  const summary = useMemo(() => {
+    if (leaveData?.summary && Object.keys(leaveData.summary).length > 0) {
+      return leaveData.summary;
     }
-  }, []);
+    return {
+      pending: requests.filter((r) => r.status === "Pending").length,
+      approved: requests.filter((r) => r.status === "Approved").length,
+      rejected: requests.filter((r) => r.status === "Rejected").length,
+    };
+  }, [leaveData, requests]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(loadRequests, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadRequests]);
+  const queryErrorMessage = leaveError
+    ? getApiErrorMessage(leaveError, "Unable to load leave requests.")
+    : "";
+  const errorMessage = actionErrorMessage || queryErrorMessage;
+  const setErrorMessage = setActionErrorMessage;
 
   const formDuration = calculateDuration(form.startDate, form.endDate);
 
@@ -322,19 +368,15 @@ const EmpLeaverequest = () => {
   );
 
   const filteredHistory = useMemo(
-    () => requests.filter((request) => !statusFilter || request.status === statusFilter),
-    [requests, statusFilter]
+    () =>
+      requests.filter((request) => {
+        const matchesStatus = !statusFilter || request.status === statusFilter;
+        const matchesMonth = monthFilter === "all" || monthMatches(request, getMonthDate(monthFilter));
+        return matchesStatus && matchesMonth;
+      }),
+    [requests, statusFilter, monthFilter]
   );
   const detailRequest = requests.find((request) => getEntityId(request) === detailRequestId) || null;
-
-  const updateRequestInState = (updatedRequest) => {
-    const normalizedRequest = normalizeRequest(updatedRequest);
-    const requestId = getEntityId(normalizedRequest);
-    setRequests((currentRequests) =>
-      currentRequests.map((item) => (getEntityId(item) === requestId ? normalizedRequest : item))
-    );
-    setDetailRequestId((currentId) => (currentId === requestId ? requestId : currentId));
-  };
 
   const updateField = (field, value) => {
     setForm((currentForm) => {
@@ -376,8 +418,7 @@ const EmpLeaverequest = () => {
     }
 
     try {
-      setIsSubmitting(true);
-      await leaveRequestAPI.create({
+      await createRequest.mutateAsync({
         leaveType: form.leaveType,
         startDate: form.startDate,
         endDate: form.endDate,
@@ -389,11 +430,8 @@ const EmpLeaverequest = () => {
         ...defaultForm,
         emergencyContact: user?.phone || "",
       });
-      await loadRequests();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit leave request."));
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -405,6 +443,13 @@ const EmpLeaverequest = () => {
     setCurrentMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1));
   };
 
+  const handleMonthFilterChange = (value) => {
+    setMonthFilter(value);
+    if (value !== "all") {
+      setCurrentMonth(getMonthDate(value));
+    }
+  };
+
   const handleAddComment = async (request) => {
     const requestId = getEntityId(request);
     const text = commentText.trim();
@@ -412,8 +457,7 @@ const EmpLeaverequest = () => {
 
     try {
       setErrorMessage("");
-      const updatedRequest = await leaveRequestAPI.comment(requestId, text);
-      updateRequestInState(updatedRequest);
+      await addComment.mutateAsync({ id: requestId, text });
       setCommentText("");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to add comment."));
@@ -428,14 +472,30 @@ const EmpLeaverequest = () => {
       setBusyRequestId(requestId);
       setMessage("");
       setErrorMessage("");
-      const updatedRequest = await leaveRequestAPI.updateStatus(requestId, "Returned");
-      updateRequestInState(updatedRequest);
+      await updateStatus.mutateAsync({ id: requestId, status: "Returned" });
       setMessage("You are marked as returned and can receive new project assignments.");
-      await loadRequests();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to mark this leave as returned."));
     } finally {
       setBusyRequestId("");
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!requestToDelete || isDeleting) return;
+
+    try {
+      setDeleteErrorMessage("");
+      const targetId = getEntityId(requestToDelete);
+      await deleteRequest.mutateAsync(targetId);
+
+      if (detailRequestId === targetId) {
+        setDetailRequestId("");
+      }
+      setRequestToDelete(null);
+      setMessage("Leave request deleted successfully.");
+    } catch (error) {
+      setDeleteErrorMessage(getApiErrorMessage(error, "Unable to delete leave request."));
     }
   };
 
@@ -564,19 +624,31 @@ const EmpLeaverequest = () => {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5">
           <h2 className="text-xl font-black">Leave History</h2>
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="">All Status</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending</option>
-            <option value="Returned">Returned</option>
-            <option value="Rejected">Rejected</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
+              value={monthFilter}
+              onChange={(event) => handleMonthFilterChange(event.target.value)}
+            >
+              <option value="all">All Months</option>
+              <option value="this">This Month</option>
+              <option value="next">Next Month</option>
+              <option value="last">Last Month</option>
+            </select>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="">All Status</option>
+              <option value="Approved">Approved</option>
+              <option value="Pending">Pending</option>
+              <option value="Returned">Returned</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto px-5 pb-5">
           <table className="w-full min-w-[1120px] text-left text-sm">
@@ -634,6 +706,19 @@ const EmpLeaverequest = () => {
                       >
                         <SmallIcon name="calendar" />
                       </button>
+                      {item.status === "Pending" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteErrorMessage("");
+                            setRequestToDelete(item);
+                          }}
+                          disabled={isDeleting || busyRequestId === getEntityId(item)}
+                          className="h-9 rounded-lg border border-rose-100 bg-rose-50 px-3 text-xs font-black text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -850,10 +935,41 @@ const EmpLeaverequest = () => {
                   {busyRequestId === getEntityId(detailRequest) ? "Updating..." : "Mark as Returned"}
                 </button>
               )}
+              {detailRequest.status === "Pending" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteErrorMessage("");
+                    setRequestToDelete(detailRequest);
+                  }}
+                  disabled={isDeleting || busyRequestId === getEntityId(detailRequest)}
+                  className="h-11 rounded-xl border border-rose-200 bg-rose-50 px-8 text-sm font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete Request
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        confirmLabel="Delete request"
+        confirmingLabel="Deleting..."
+        errorMessage={deleteErrorMessage}
+        icon="delete"
+        isConfirming={isDeleting}
+        isOpen={Boolean(requestToDelete)}
+        message={`Are you sure you want to cancel and delete leave request "${requestToDelete?.id || ""}"? This action cannot be undone.`}
+        onCancel={() => {
+          if (!isDeleting) {
+            setRequestToDelete(null);
+            setDeleteErrorMessage("");
+          }
+        }}
+        onConfirm={handleDeleteRequest}
+        title="Delete Leave Request"
+      />
     </div>
   );
 };

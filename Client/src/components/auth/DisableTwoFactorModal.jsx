@@ -17,7 +17,7 @@ const DisableTwoFactorModal = ({ open, onClose, onDisabled }) => {
   };
 
   return <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true">
-    <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-pink-100 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-6 dark:border-[#DA70D6]/60 dark:bg-[#141414]">
+    <section className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-pink-100 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-6 dark:border-[#e5e7eb]/20 dark:bg-[#141414]">
       <button type="button" onClick={onClose} className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button>
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-red-50 text-red-500"><ShieldAlert /></div>
       <h2 className="mt-4 text-center text-xl font-black text-[#10142d] dark:text-white">Disable Two-Factor Authentication?</h2>
@@ -29,7 +29,7 @@ const DisableTwoFactorModal = ({ open, onClose, onDisabled }) => {
         {error && <p className="mt-3 text-sm font-bold text-red-500">{error}</p>}
         <div className="mt-5 grid gap-3 min-[360px]:grid-cols-2">
           <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-200 text-sm font-black text-slate-600">Keep Enabled</button>
-          <button disabled={!password || loading} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Disable 2FA</button>
+          <button type="submit" disabled={!password || loading} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 text-sm font-black text-white disabled:opacity-50">{loading && <LoaderCircle className="h-4 w-4 animate-spin" />}Disable 2FA</button>
         </div>
       </form>
     </section>

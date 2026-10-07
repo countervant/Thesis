@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import done from "../../../assets/done.png";
-import notification from "../../../assets/notification.png";
-import pendingrequest from "../../../assets/pendingrequest.png";
-import progress from "../../../assets/progress.png";
-import taskIcon from "../../../assets/task.png";
-import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Kanban, List } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useTasksQuery,
+  useTaskDetailsQuery,
+  useTaskMutations,
+} from "../../../hooks/index.js";
+import { unwrapData } from "../../../utils/queryUtils.js";
+import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   getApiErrorMessage,
@@ -13,7 +17,9 @@ import {
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
 } from "../../../services/api.js";
-import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart";
+import ProjectGroupTable from "../../../components/ProjectGroupTable/ProjectGroupTable.jsx";
+import ProjectBoard from "../../../components/ProjectBoard/ProjectBoard.jsx";
+import { ProjectDetailsModal } from "../../../components/ProjectDetailsModal/ProjectDetailsModal.jsx";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -58,21 +64,6 @@ const getTaskProgress = (subtasks) => {
   return Math.round((completedCount / subtasks.length) * 100);
 };
 
-const toneStyles = {
-  blue: "bg-blue-50 text-blue-600 ring-blue-100 dark:!bg-[#1a1a1a] dark:text-blue-400 dark:ring-blue-500",
-  green: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:!bg-[#1a1a1a] dark:text-emerald-400 dark:ring-emerald-500",
-  orange: "bg-orange-50 text-orange-600 ring-orange-100 dark:!bg-[#1a1a1a] dark:text-orange-400 dark:ring-orange-500",
-  pink: "bg-pink-50 text-pink-600 ring-pink-100 dark:!bg-[#1a1a1a] dark:text-pink-400 dark:ring-[#c72fb2]",
-  rose: "bg-red-50 text-red-600 ring-red-100 dark:!bg-[#1a1a1a] dark:text-red-400 dark:ring-red-500",
-};
-
-const statCardStyles = {
-  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
-  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-};
 
 const priorityStyles = {
   High: "border border-pink-600 bg-transparent text-pink-600",
@@ -186,6 +177,13 @@ const getDateStatus = (dueDate) => {
   return "Upcoming";
 };
 
+const normalizeTasks = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.tasks)) return data.tasks;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 const normalizeTask = (task) => {
   const subtasks = normalizeSubtasks(task?.subtasks);
   const status = statusFromApi[task?.status] || "Pending";
@@ -215,6 +213,8 @@ const normalizeTask = (task) => {
     newsfeedPermissionAllowed: Boolean(task?.newsfeedPermission?.allowed),
     newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
+    createdAt: task?.createdAt,
+    updatedAt: task?.updatedAt,
   };
 };
 
@@ -450,84 +450,6 @@ const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitO
         </div>
       )}
     </article>
-  );
-};
-
-const ProjectDetailsModal = ({
-  currentUserId,
-  item,
-  onClose,
-  onSubmitOutput,
-  onToggleSubtask,
-  onViewCalendar,
-}) => {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      role="presentation"
-    >
-      <section
-        aria-labelledby="employee-project-details-title"
-        aria-modal="true"
-        className="max-h-[92dvh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
-        role="dialog"
-      >
-        <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800 sm:px-7">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">
-              Assigned Project
-            </p>
-            <h2 id="employee-project-details-title" className="mt-1 text-xl font-black text-[#10142d] dark:text-white">
-              Project Details
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:hover:bg-neutral-900"
-            aria-label="Close project details"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </header>
-
-        <div className="max-h-[calc(92dvh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
-          <TaskRow
-            currentUserId={currentUserId}
-            isExpanded
-            isOverlay
-            item={item}
-            onSubmitOutput={onSubmitOutput}
-            onToggleExpand={onClose}
-            onToggleSubtask={onToggleSubtask}
-            onViewCalendar={onViewCalendar}
-          />
-          <div className="mt-4">
-            <ProjectGanttChart item={item} />
-          </div>
-        </div>
-      </section>
-    </div>
   );
 };
 
@@ -852,43 +774,95 @@ const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
 
 const EmpTask = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const currentUserId = getEntityId(user);
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const tasksParams = useMemo(() => ({ view: "employee" }), []);
+
+  const {
+    data: rawTasks,
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery(
+    { view: "employee" },
+    {
+      refetchInterval: 10000,
+      refetchIntervalInBackground: true,
+    }
+  );
+
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+
+  const {
+    data: rawTaskDetails,
+    isLoading: isLoadingTaskDetails,
+    error: taskDetailsError,
+  } = useTaskDetailsQuery(selectedTaskId, {
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
+  });
+
+  const { updateTask, submitOutput, invalidateTaskData } = useTaskMutations();
+  const isSubmittingOutput = submitOutput.isPending;
+
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("Newest to Oldest");
+  const [viewMode, setViewMode] = useState("table");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [completionDraft, setCompletionDraft] = useState(null);
-  const [isSubmittingOutput, setIsSubmittingOutput] = useState(false);
   const [revisionDraft, setRevisionDraft] = useState(null);
   const [isStartingRevision, setIsStartingRevision] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState("");
-  const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
-  const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
   const pendingTaskUpdateIdsRef = useRef(new Set());
 
-  useEffect(() => {
-    let isMounted = true;
+  const tasks = useMemo(() => {
+    return normalizeTasks(rawTasks?.tasks || rawTasks || []).map(normalizeTask);
+  }, [rawTasks]);
 
-    const loadTasks = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
-        if (isMounted) setTasks(data.map(normalizeTask));
-      } catch (error) {
-        if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));
-      } finally {
-        if (isMounted) setIsLoading(false);
+  const selectedTaskDetails = useMemo(() => {
+    if (rawTaskDetails) return normalizeTask(rawTaskDetails);
+    if (selectedTaskId) {
+      return tasks.find((t) => t.id === selectedTaskId) || null;
+    }
+    return null;
+  }, [rawTaskDetails, selectedTaskId, tasks]);
+
+  const errorMessage =
+    localErrorMessage ||
+    (tasksError ? getApiErrorMessage(tasksError, "Unable to load tasks.") : "") ||
+    (taskDetailsError
+      ? getApiErrorMessage(taskDetailsError, "Unable to load project details.")
+      : "");
+  const setErrorMessage = setLocalErrorMessage;
+
+  const updateTaskInCache = useCallback(
+    (updatedTask) => {
+      const normalized = normalizeTask(updatedTask);
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((item) =>
+            getEntityId(item) === normalized.id ? normalized : item
+          );
+        }
+        if (Array.isArray(old?.tasks)) {
+          return {
+            ...old,
+            tasks: old.tasks.map((item) =>
+              getEntityId(item) === normalized.id ? normalized : item
+            ),
+          };
+        }
+        return old;
+      });
+      if (selectedTaskId === normalized.id) {
+        queryClient.setQueryData(QUERY_KEYS.taskDetails(normalized.id), normalized);
       }
-    };
-
-    loadTasks();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+      invalidateTaskData(normalized.id);
+      return normalized;
+    },
+    [invalidateTaskData, queryClient, selectedTaskId, tasksParams]
+  );
 
   useEffect(() => {
     const openNotificationTarget = () => {
@@ -916,34 +890,6 @@ const EmpTask = () => {
     return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
   }, [isLoading, tasks]);
 
-  useEffect(() => {
-    if (!selectedTaskId) return undefined;
-
-    let isCurrent = true;
-    const loadTaskDetails = async () => {
-      setSelectedTaskDetails(null);
-      setIsLoadingTaskDetails(true);
-      setErrorMessage("");
-
-      try {
-        const task = await taskAPI.getById(selectedTaskId, { refresh: true });
-        if (isCurrent) setSelectedTaskDetails(normalizeTask(task));
-      } catch (error) {
-        if (!isCurrent) return;
-        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
-        setSelectedTaskId("");
-      } finally {
-        if (isCurrent) setIsLoadingTaskDetails(false);
-      }
-    };
-
-    loadTaskDetails();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedTaskId]);
-
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -964,37 +910,23 @@ const EmpTask = () => {
         return matchesGroup && matchesSearch;
       })
       .sort((firstTask, secondTask) => {
-        return (parseDate(firstTask.dueDate) || new Date(8640000000000000)) - (parseDate(secondTask.dueDate) || new Date(8640000000000000));
+        if (sortBy === "Oldest to Newest" || sortBy === "Oldest") {
+          const firstTime = new Date(firstTask.createdAt || firstTask.startDate || 0).getTime();
+          const secondTime = new Date(secondTask.createdAt || secondTask.startDate || 0).getTime();
+          return firstTime - secondTime;
+        }
+        if (sortBy === "Due Date") {
+          return (parseDate(firstTask.dueDate) || new Date(8640000000000000)) - (parseDate(secondTask.dueDate) || new Date(8640000000000000));
+        }
+        const firstTime = new Date(firstTask.createdAt || firstTask.startDate || 0).getTime();
+        const secondTime = new Date(secondTask.createdAt || secondTask.startDate || 0).getTime();
+        return secondTime - firstTime;
       });
-  }, [searchQuery, tasks, visibleGroup]);
+  }, [searchQuery, sortBy, tasks, visibleGroup]);
 
-  const taskStats = [
-    { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
-    { label: "Due Today", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Today" && task.status !== "Done").length, icon: pendingrequest, tone: "orange" },
-    { label: "In Progress", value: tasks.filter((task) => task.status === "In progress").length, icon: progress, tone: "blue" },
-    { label: "Completed", value: tasks.filter((task) => task.status === "Done").length, icon: done, tone: "green" },
-    { label: "Overdue", value: tasks.filter((task) => getDateStatus(task.dueDate) === "Overdue" && task.status !== "Done").length, icon: notification, tone: "rose" },
-  ];
   const selectedTask = selectedTaskDetails;
 
-  const renderTaskRows = (items) => {
-    if (items.length === 0) {
-      return <p className="px-4 py-5 text-center text-sm font-bold text-slate-500">No projects found.</p>;
-    }
 
-    return items.map((item) => (
-      <TaskRow
-        currentUserId={currentUserId}
-        isExpanded={false}
-        key={item.id}
-        item={item}
-        onSubmitOutput={handleSubmitOutput}
-        onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
-        onToggleSubtask={handleToggleSubtask}
-        onViewCalendar={handleViewCalendar}
-      />
-    ));
-  };
 
   const updateTaskSubtasks = async (task, nextSubtasks) => {
     if (pendingTaskUpdateIdsRef.current.has(task.id)) return;
@@ -1003,16 +935,15 @@ const EmpTask = () => {
     try {
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = await taskAPI.update(task.id, {
-        title: task.title,
-        subtasks: nextSubtasks,
+      const result = await updateTask.mutateAsync({
+        id: task.id,
+        task: {
+          title: task.title,
+          subtasks: nextSubtasks,
+        },
       });
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === task.id ? normalizeTask(updatedTask) : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      const updatedTask = unwrapData(result);
+      updateTaskInCache(updatedTask);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to update task."));
     } finally {
@@ -1103,12 +1034,7 @@ const EmpTask = () => {
       setErrorMessage("");
       setNoticeMessage("");
       const updatedTask = await taskAPI.startRevision(revisionDraft.task.id);
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === revisionDraft.task.id ? normalizeTask(updatedTask) : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === revisionDraft.task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      updateTaskInCache(updatedTask);
       setRevisionDraft(null);
       setNoticeMessage(`${revisionDraft.task.title} revision is now in progress.`);
     } catch (error) {
@@ -1143,20 +1069,18 @@ const EmpTask = () => {
     }
 
     try {
-      setIsSubmittingOutput(true);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = await taskAPI.submitOutput(draft.task.id, {
-        ...output,
-        subtasks: draft.nextSubtasks,
-        finalize: draft.finalize,
+      const result = await submitOutput.mutateAsync({
+        id: draft.task.id,
+        output: {
+          ...output,
+          subtasks: draft.nextSubtasks,
+          finalize: draft.finalize,
+        },
       });
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === draft.task.id ? normalizeTask(updatedTask) : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      const updatedTask = unwrapData(result);
+      updateTaskInCache(updatedTask);
       setCompletionDraft(null);
       setNoticeMessage(
         draft.finalize
@@ -1165,8 +1089,6 @@ const EmpTask = () => {
       );
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
-    } finally {
-      setIsSubmittingOutput(false);
     }
   };
 
@@ -1197,25 +1119,10 @@ const EmpTask = () => {
         </p>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-        {taskStats.map((item) => (
-          <Card key={item.label} className={`p-5 !shadow-sm dark:!shadow-none ${statCardStyles[item.tone]}`}>
-            <div className="flex items-center gap-4">
-              <span className={`grid h-16 w-16 place-items-center rounded-2xl ${toneStyles[item.tone]}`}>
-                <ImageIcon src={item.icon} className="h-9 w-9" />
-              </span>
-              <div>
-                <p className="text-4xl font-black text-[#10142d]">{item.value}</p>
-                <p className="mt-1 text-sm font-black text-slate-600">{item.label}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
 
       <Card className="p-5">
-        <div>
-          <label className="relative block">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="relative block flex-1">
             <span className="sr-only">Search projects</span>
             <SmallIcon name="search" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
@@ -1226,6 +1133,46 @@ const EmpTask = () => {
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100"
             />
           </label>
+          <label className="relative block sm:w-auto">
+            <span className="sr-only">Sort projects</span>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+            >
+              <option value="Newest to Oldest">Newest to Oldest</option>
+              <option value="Oldest to Newest">Oldest to Newest</option>
+              <option value="Due Date">Due Date</option>
+            </select>
+          </label>
+          <div className="flex h-12 items-center rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-neutral-800 dark:bg-neutral-900">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-black transition ${
+                viewMode === "table"
+                  ? "bg-white text-[#10142d] shadow-xs dark:bg-neutral-800 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+              }`}
+              title="Table View"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("board")}
+              className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-black transition ${
+                viewMode === "board"
+                  ? "bg-white text-[#10142d] shadow-xs dark:bg-neutral-800 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+              }`}
+              title="Board View"
+            >
+              <Kanban className="h-4 w-4" />
+              <span className="hidden sm:inline">Board</span>
+            </button>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
@@ -1244,11 +1191,19 @@ const EmpTask = () => {
       {isLoading && <TaskListSkeleton rows={5} />}
 
       {!isLoading && (
-        <Card className="overflow-hidden p-0">
-          <div className="divide-y divide-pink-50">
-            {renderTaskRows(visibleTasks)}
-          </div>
-        </Card>
+        viewMode === "table" ? (
+          <ProjectGroupTable
+            tasks={visibleTasks}
+            showAssignee={false}
+            onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+          />
+        ) : (
+          <ProjectBoard
+            tasks={visibleTasks}
+            showAssignee={false}
+            onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+          />
+        )
       )}
       {selectedTaskId && isLoadingTaskDetails && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/65 p-4 backdrop-blur-[2px]">

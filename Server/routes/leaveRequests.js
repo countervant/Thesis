@@ -1,12 +1,16 @@
 import express from "express";
+import mongoose from "mongoose";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import LeaveRequest from "../models/leaveRequestModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
+import { authorize } from "../middleware/authorize.js";
 import { getPagination, pagedResponse } from "../utils/pagination.js";
 import { withAvatarUrl } from "../utils/avatar.js";
 import { getManilaDayRange } from "../utils/leaveAvailability.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 
 const allowedStatuses = ["Pending", "Approved", "Rejected", "Returned"];
 const allowedLeaveTypes = ["Vacation Leave", "Sick Leave", "Emergency Leave", "Others"];
@@ -54,7 +58,12 @@ const getMonthRange = (value) => {
   if (!value || value === "all") return null;
 
   const now = new Date();
-  const monthOffset = value === "last" ? -1 : 0;
+  let monthOffset = 0;
+  if (value === "last") monthOffset = -1;
+  else if (value === "next") monthOffset = 1;
+  else if (value === "this") monthOffset = 0;
+  else return null;
+
   const start = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const end = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 1);
 
@@ -76,7 +85,7 @@ const buildRequestQuery = (req) => {
     query.employeeRole = req.query.role;
   }
 
-  const monthRange = getMonthRange(req.query.month || "this");
+  const monthRange = getMonthRange(req.query.month);
   if (monthRange) {
     query.startDate = { $lt: monthRange.end };
     query.endDate = { $gte: monthRange.start };
@@ -94,14 +103,44 @@ const createRequestCode = async () => {
   return `LR-${year}-${String(count + 1).padStart(4, "0")}`;
 };
 
+const createLeaveRequest = async (payload) => {
+  const maxAttempts = 5;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await LeaveRequest.create({
+        ...payload,
+        requestCode: await createRequestCode(),
+      });
+    } catch (error) {
+      const isRequestCodeCollision =
+        error.code === 11000 &&
+        (error.keyPattern?.requestCode || error.keyValue?.requestCode);
+
+      if (!isRequestCodeCollision || attempt === maxAttempts) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Unable to allocate a leave request code");
+};
+
 const normalizeRequestPayload = async (body, currentUser) => {
   const employeeId = currentUser.role === "admin" && body.employee ? body.employee : currentUser._id;
+  if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+    return { error: "Employee not found" };
+  }
   const employee = await User.findById(employeeId)
     .select("firstName lastName email companyName position role phone")
     .lean();
 
   if (!employee) {
     return { error: "Employee not found" };
+  }
+
+  if (employee.role !== "employee") {
+    return { error: "Leave requests can only be created for employees" };
   }
 
   const startDate = body.startDate ? new Date(body.startDate) : null;
@@ -117,8 +156,11 @@ const normalizeRequestPayload = async (body, currentUser) => {
     startDate,
     endDate,
     durationDays: startDate && endDate ? getDurationDays(startDate, endDate) : 0,
-    reason: body.reason?.trim() || "",
-    emergencyContact: body.emergencyContact?.trim() || employee.phone || "",
+    reason: typeof body.reason === "string" ? body.reason.trim() : "",
+    emergencyContact:
+      typeof body.emergencyContact === "string"
+        ? body.emergencyContact.trim()
+        : employee.phone || "",
   };
 };
 
@@ -168,7 +210,7 @@ router.get("/", protect, async (req, res) => {
             onLeaveToday: [
               {
                 $match: {
-                  ...summaryQuery,
+                  ...baseQuery,
                   status: "Approved",
                   startDate: { $lt: todayRange.end },
                   endDate: { $gte: todayRange.start },
@@ -179,7 +221,7 @@ router.get("/", protect, async (req, res) => {
             approvedThisMonth: [
               {
                 $match: {
-                  ...summaryQuery,
+                  ...baseQuery,
                   status: { $in: ["Approved", "Returned"] },
                   reviewedAt: {
                     $gte: currentMonthStart,
@@ -235,7 +277,7 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
-router.post("/", protect, async (req, res) => {
+router.post("/", protect, authorize("admin", "employee"), async (req, res) => {
   try {
     const payload = await normalizeRequestPayload(req.body, req.user);
     const validationMessage = validateRequestPayload(payload);
@@ -244,10 +286,7 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: validationMessage });
     }
 
-    const leaveRequest = await LeaveRequest.create({
-      ...payload,
-      requestCode: await createRequestCode(),
-    });
+    const leaveRequest = await createLeaveRequest(payload);
 
     const createdRequest = await LeaveRequest.findById(leaveRequest._id)
       .populate(leaveRequestPopulate)
@@ -255,6 +294,9 @@ router.post("/", protect, async (req, res) => {
 
     res.status(201).json(withLeaveRequestAvatarUrls(createdRequest));
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Create leave request error:", error);
     res.status(500).json({ message: "Unable to create leave request" });
   }
@@ -263,7 +305,10 @@ router.post("/", protect, async (req, res) => {
 router.patch("/:id/status", protect, async (req, res) => {
   try {
     const status = String(req.body.status || "");
-    const comment = String(req.body.comment || "").trim();
+    if (req.body.comment !== undefined && typeof req.body.comment !== "string") {
+      return res.status(400).json({ message: "Comment must be text" });
+    }
+    const comment = (req.body.comment || "").trim();
 
     if (!["Approved", "Rejected", "Returned"].includes(status)) {
       return res.status(400).json({ message: "Status must be Approved, Rejected, or Returned" });
@@ -330,6 +375,9 @@ router.patch("/:id/status", protect, async (req, res) => {
 
     res.status(200).json(withLeaveRequestAvatarUrls(updatedRequest));
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Update leave request status error:", error);
     res.status(500).json({ message: "Unable to update leave request status" });
   }
@@ -337,7 +385,10 @@ router.patch("/:id/status", protect, async (req, res) => {
 
 router.post("/:id/comments", protect, async (req, res) => {
   try {
-    const text = String(req.body.text || "").trim();
+    if (typeof req.body.text !== "string") {
+      return res.status(400).json({ message: "Comment must be text" });
+    }
+    const text = req.body.text.trim();
 
     if (!text) {
       return res.status(400).json({ message: "Comment is required" });
@@ -366,8 +417,39 @@ router.post("/:id/comments", protect, async (req, res) => {
 
     res.status(201).json(withLeaveRequestAvatarUrls(updatedRequest));
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Add leave request comment error:", error);
     res.status(500).json({ message: "Unable to add leave request comment" });
+  }
+});
+
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const leaveRequest = await LeaveRequest.findById(req.params.id);
+
+    if (!leaveRequest) {
+      return res.status(404).json({ message: "Leave request not found" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner = String(leaveRequest.employee) === String(req.user._id);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ message: "You cannot delete this leave request" });
+    }
+
+    if (!isAdmin && leaveRequest.status !== "Pending") {
+      return res.status(400).json({ message: "You can only delete pending leave requests" });
+    }
+
+    await LeaveRequest.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ message: "Leave request deleted successfully", id: req.params.id });
+  } catch (error) {
+    console.error("Delete leave request error:", error);
+    res.status(500).json({ message: "Unable to delete leave request" });
   }
 });
 

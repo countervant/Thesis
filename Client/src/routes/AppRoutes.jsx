@@ -7,11 +7,12 @@ import {
   Outlet,
   Navigate,
   Link,
+  useLocation,
   useRouteError,
 } from "react-router-dom";
 
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
-import AppLoadingScreen from "../components/AppLoadingScreen/AppLoadingScreen";
+import AppLoadingScreen from "../components/AppLoadingScreen/AppLoadingScreen.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 const Login = lazy(() => import("../pages/auth/Login.jsx"));
@@ -42,7 +43,16 @@ const AuthLayout = () => {
 
 const RoleDashboardRedirect = () => {
   const { user } = useAuth();
-  return <Navigate to={dashboardPathByRole[user?.role] || "/client/dashboard"} replace />;
+  const location = useLocation();
+  const search = location.search || "";
+  const basePath = dashboardPathByRole[user?.role] || "/client/dashboard";
+  return <Navigate to={`${basePath}${search}`} replace />;
+};
+
+const ClientProjectsRedirect = () => {
+  const location = useLocation();
+  const search = location.search ? location.search.replace(/^\?/, "&") : "";
+  return <Navigate to={`/client/dashboard?page=projects${search}`} replace />;
 };
 
 const AuthPageRoute = ({ children }) => {
@@ -94,8 +104,7 @@ const RouteErrorBoundary = () => {
   );
 };
 
-const AppRoutes = () => {
-  const router = createBrowserRouter(
+const router = createBrowserRouter(
     createRoutesFromElements(
       <Route element={<AuthLayout />} errorElement={<RouteErrorBoundary />}>
         <Route
@@ -144,6 +153,22 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/tasks"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Navigate to="/admin/dashboard?page=tasks" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tasks"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Navigate to="/admin/dashboard?page=tasks" replace />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/profile"
@@ -171,6 +196,14 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/client/projects"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <ClientProjectsRedirect />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Admin routes */}
         <Route
@@ -195,6 +228,7 @@ const AppRoutes = () => {
     )
   );
 
+const AppRoutes = () => {
   return (
     <Suspense fallback={<AppLoadingScreen />}>
       <RouterProvider router={router} />

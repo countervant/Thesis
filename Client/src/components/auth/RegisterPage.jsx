@@ -17,6 +17,7 @@ import {
   getCountryDialCode,
 } from "../../utils/countries.js";
 import { getAuthErrorMessage } from "../../utils/authErrors.js";
+import { getPasswordValidationMessage } from "../../utils/passwordValidation.js";
 
 const fieldNames = {
   firstName: `register_given_${Date.now()}`,
@@ -170,13 +171,9 @@ const RegisterPage = () => {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-      setError("Password must include uppercase, lowercase, and number characters");
+    const passwordValidationMessage = getPasswordValidationMessage(password);
+    if (passwordValidationMessage) {
+      setError(passwordValidationMessage);
       return;
     }
 
@@ -448,7 +445,7 @@ const RegisterPage = () => {
           <div className={mobileFieldWrap}>
             <div className={mobileInputBox}>
             <input
-              type="text"
+              type={showPassword ? "text" : "password"}
               name={fieldNames.password}
               placeholder="Enter your password"
               value={password}
@@ -459,7 +456,6 @@ const RegisterPage = () => {
               {...antiAutofillProps}
               readOnly
               onFocus={handlePreventAutofill}
-              style={showPassword ? undefined : { WebkitTextSecurity: "disc" }}
               className={mobileInput}
               required
             />
@@ -481,7 +477,7 @@ const RegisterPage = () => {
           <div className={mobileFieldWrap}>
             <div className={mobileInputBox}>
             <input
-              type="text"
+              type={showConfirmPassword ? "text" : "password"}
               name={fieldNames.confirmPassword}
               placeholder="Confirm your password"
               value={confirmPassword}
@@ -492,7 +488,6 @@ const RegisterPage = () => {
               {...antiAutofillProps}
               readOnly
               onFocus={handlePreventAutofill}
-              style={showConfirmPassword ? undefined : { WebkitTextSecurity: "disc" }}
               className={mobileInput}
               required
             />

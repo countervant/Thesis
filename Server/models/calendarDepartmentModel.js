@@ -6,11 +6,13 @@ const calendarDepartmentSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 120,
     },
     color: {
       type: String,
       default: "bg-violet-600",
       trim: true,
+      maxlength: 40,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

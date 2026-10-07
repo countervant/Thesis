@@ -1,10 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import done from "../../../assets/done.png";
-import notification from "../../../assets/notification.png";
-import pendingrequest from "../../../assets/pendingrequest.png";
-import progress from "../../../assets/progress.png";
-import taskIcon from "../../../assets/task.png";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   getApiErrorMessage,
@@ -13,9 +9,19 @@ import {
   PROJECT_OUTPUT_FILE_ACCEPT,
   taskAPI,
 } from "../../../services/api.js";
-import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog";
-import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton";
-import ProjectGanttChart from "../../../components/ProjectGanttChart/ProjectGanttChart";
+import { Kanban, List, Sparkles } from "lucide-react";
+import ConfirmDialog from "../../../components/ConfirmDialog/ConfirmDialog.jsx";
+import { TaskListSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
+import ProjectGroupTable from "../../../components/ProjectGroupTable/ProjectGroupTable.jsx";
+import ProjectBoard from "../../../components/ProjectBoard/ProjectBoard.jsx";
+import { ProjectDetailsModal } from "../../../components/ProjectDetailsModal/ProjectDetailsModal.jsx";
+import TaskAllocationModal from "../../../components/TaskAllocationModal/TaskAllocationModal.jsx";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useTasksQuery,
+  useTaskDetailsQuery,
+  useTaskMutations,
+} from "../../../hooks/useTasksQuery.js";
 
 const notificationTargetKey = "clientraNotificationTarget";
 const statusFromApi = {
@@ -25,7 +31,14 @@ const statusFromApi = {
   review: "In review",
 };
 
-const formatInputDate = (date) => date.toISOString().slice(0, 10);
+const formatInputDate = (date) => {
+  const target = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(target.getTime())) return "";
+  const year = target.getFullYear();
+  const month = String(target.getMonth() + 1).padStart(2, "0");
+  const day = String(target.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const toInputDate = (date) => {
   if (!date) return formatInputDate(new Date());
@@ -49,6 +62,19 @@ const getEntityId = (entity) => {
   return entity._id || entity.id || "";
 };
 
+const matchesUser = (assignee, userId, userEmail) => {
+  if (!assignee) return false;
+  if (typeof assignee === "string") {
+    if (userId && assignee === userId) return true;
+    if (userEmail && assignee.toLowerCase() === userEmail.toLowerCase()) return true;
+    return false;
+  }
+  const id = getEntityId(assignee);
+  if (userId && id && String(id) === String(userId)) return true;
+  if (userEmail && assignee.email && String(assignee.email).toLowerCase() === userEmail.toLowerCase()) return true;
+  return false;
+};
+
 const getPersonName = (person) => {
   if (!person) return "Unassigned";
   if (typeof person === "string") return "Assigned user";
@@ -60,7 +86,7 @@ const getPersonName = (person) => {
   );
 };
 
-const getAssignedEmployees = (task) => {
+const getAssignedEmployees = (task, adminId = "") => {
   const employees = [...(task?.assignees || []), task?.assignedTo].filter(Boolean);
   const uniqueEmployees = new Map();
 
@@ -69,9 +95,11 @@ const getAssignedEmployees = (task) => {
     if (employeeId && !uniqueEmployees.has(employeeId)) uniqueEmployees.set(employeeId, employee);
   });
 
-  return [...uniqueEmployees.values()].filter(
-    (employee) => typeof employee === "string" || !employee?.role || employee.role === "employee"
-  );
+  return [...uniqueEmployees.values()].filter((employee) => {
+    const id = getEntityId(employee);
+    if (adminId && id === adminId) return false;
+    return typeof employee === "string" || !employee?.role || employee.role === "employee";
+  });
 };
 
 const isClientReviewSubtask = (subtask) =>
@@ -113,32 +141,6 @@ const formatReadableDate = (date) => {
   });
 };
 
-const formatSubmittedDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const getSafeOutputLink = (value) => {
-  const rawValue = String(value || "").trim();
-  if (!rawValue) return "";
-
-  try {
-    const url = new URL(/^https?:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`);
-    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
-  } catch {
-    return "";
-  }
-};
-
 const getStatusTone = (status) => {
   if (status === "Done") return "bg-[#eafbed] text-[#28b84c]";
   if (status === "Pending") return "bg-[#ffeaf5] text-[#e347a8]";
@@ -146,21 +148,6 @@ const getStatusTone = (status) => {
   return "bg-[#f0e9ff] text-[#754de8]";
 };
 
-const toneStyles = {
-  blue: "bg-blue-50 text-blue-600 ring-blue-100 dark:!bg-[#1a1a1a] dark:text-blue-400 dark:ring-blue-500",
-  green: "bg-emerald-50 text-emerald-600 ring-emerald-100 dark:!bg-[#1a1a1a] dark:text-emerald-400 dark:ring-emerald-500",
-  orange: "bg-orange-50 text-orange-600 ring-orange-100 dark:!bg-[#1a1a1a] dark:text-orange-400 dark:ring-orange-500",
-  pink: "bg-pink-50 text-pink-600 ring-pink-100 dark:!bg-[#1a1a1a] dark:text-pink-400 dark:ring-[#c72fb2]",
-  rose: "bg-red-50 text-red-600 ring-red-100 dark:!bg-[#1a1a1a] dark:text-red-400 dark:ring-red-500",
-};
-
-const statCardStyles = {
-  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
-  rose: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-};
 
 const priorityStyles = {
   high: "border border-pink-600 bg-transparent text-pink-600",
@@ -246,6 +233,8 @@ const normalizeTask = (task) => {
     newsfeedPermissionGrantedAt: task?.newsfeedPermission?.grantedAt,
     feedback: task?.feedback || null,
     employeePayments: Array.isArray(task?.employeePayments) ? task.employeePayments : [],
+    createdAt: task?.createdAt,
+    updatedAt: task?.updatedAt,
   };
 };
 
@@ -498,6 +487,8 @@ const EmployeePaymentButton = ({ isPayingEmployee, item, onPayEmployee }) => {
   if (!onPayEmployee) return null;
 
   const assignedEmployees = getAssignedEmployees(item);
+  if (assignedEmployees.length === 0) return null;
+
   const paidEmployeeIds = new Set(
     (item.employeePayments || []).map((payment) => getEntityId(payment.employee))
   );
@@ -1068,166 +1059,6 @@ const EmployeePaymentModal = ({ isSubmitting, onClose, onSubmit, task }) => {
   );
 };
 
-const ProjectDetailsModal = ({
-  canAccessTasks,
-  isApprovingCustomClient,
-  isDownloadingOutput,
-  isMarkingPaid,
-  isPayingEmployee,
-  item,
-  onClose,
-  onDelete,
-  onDownloadOutput,
-  onEdit,
-  onMarkPaid,
-  onPayEmployee,
-  onApproveCustomClient,
-  onSubmitOutput,
-  onToggleTask,
-}) => {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-[2px] sm:p-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      role="presentation"
-    >
-      <section
-        aria-labelledby="admin-project-details-title"
-        aria-modal="true"
-        className="max-h-[92dvh] w-full max-w-6xl overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
-        role="dialog"
-      >
-        <header className="flex items-center justify-between gap-4 border-b border-pink-100 px-5 py-4 dark:border-neutral-800 sm:px-7">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c72fb2]">
-              Project Management
-            </p>
-            <h2 id="admin-project-details-title" className="mt-1 text-xl font-black text-[#10142d] dark:text-white">
-              Project Details
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600 dark:border-neutral-700 dark:hover:bg-neutral-900"
-            aria-label="Close project details"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </header>
-
-        <div className="max-h-[calc(92dvh-82px)] overflow-y-auto px-2 py-2 sm:px-4 sm:py-4">
-          <TaskRow
-            canAccessSubtasks={canAccessTasks}
-            isExpanded
-            isFocused={false}
-            isMarkingPaid={isMarkingPaid}
-            isPayingEmployee={isPayingEmployee}
-            isOverlay
-            item={item}
-            onDelete={(task) => {
-              onClose();
-              onDelete(task);
-            }}
-            onEdit={(task) => {
-              onClose();
-              onEdit(task);
-            }}
-            onMarkPaid={onMarkPaid}
-            onPayEmployee={onPayEmployee}
-            onSubmitOutput={onSubmitOutput}
-            onToggleExpand={onClose}
-            onToggleSubtask={onToggleTask}
-          />
-          {item.finalOutput?.submittedAt && (
-            <section className="mt-4 rounded-2xl border border-pink-100 bg-pink-50/40 p-4 dark:border-pink-900/30 dark:bg-pink-950/10 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#c72fb2]">
-                    Submitted Output
-                  </p>
-                  <h3 className="mt-1 text-base font-black text-[#10142d] dark:text-white">
-                    {item.finalOutput.fileName || (item.finalOutput.link ? "Project output link" : "Employee submission")}
-                  </h3>
-                  <p className="mt-1 text-xs font-bold text-slate-500">
-                    Submitted by {getPersonName(item.finalOutput.submittedBy || item.assignedTo)}
-                    {formatSubmittedDate(item.finalOutput.submittedAt)
-                      ? ` • ${formatSubmittedDate(item.finalOutput.submittedAt)}`
-                      : ""}
-                  </p>
-                  {item.finalOutput.message && (
-                    <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-600 dark:text-neutral-300">
-                      {item.finalOutput.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {item.finalOutput.fileName && (
-                    <button
-                      type="button"
-                      disabled={isDownloadingOutput}
-                      onClick={() => onDownloadOutput(item)}
-                      className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#c72fb2] px-4 text-xs font-black text-white transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <SmallIcon name="download" />
-                      {isDownloadingOutput ? "Downloading..." : "Download File"}
-                    </button>
-                  )}
-                  {getSafeOutputLink(item.finalOutput.link) && (
-                    <a
-                      href={getSafeOutputLink(item.finalOutput.link)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#c72fb2]/40 bg-white px-4 text-xs font-black text-[#c72fb2] transition hover:bg-pink-50 dark:bg-neutral-950"
-                    >
-                      Open Link
-                      <SmallIcon name="external" />
-                    </a>
-                  )}
-                  {item.apiStatus === "review" && !getEntityId(item.requestedBy) && (
-                    <button
-                      type="button"
-                      disabled={isApprovingCustomClient}
-                      onClick={() => onApproveCustomClient(item)}
-                      className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <SmallIcon name="check" />
-                      {isApprovingCustomClient ? "Recording..." : "Record Offline Approval"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
-          <div className="mt-4">
-            <ProjectGanttChart item={item} />
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
 const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, onSubmit }) => {
   const [message, setMessage] = useState(
     completion.finalize
@@ -1328,7 +1159,7 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
           </p>
           <p className="mt-1 text-[11px] font-bold text-slate-600">
             {needsPaymentProtection
-              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a rasterized, watermarked or redacted image preview.`
+              ? `${Number(task.amount || 0) > 0 ? `Pending balance: ₱${pendingAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}. ` : "Payment has not been confirmed. "}Image outputs receive a server-generated watermark. For other file types, upload a watermarked or redacted image preview.`
               : "This project is fully paid, so the client will receive the original output without a watermark."}
           </p>
         </div>
@@ -1474,57 +1305,96 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
 const Tasks = ({
   onEditTask,
   onNavigate,
-  refreshKey = 0,
 }) => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
+  const queryClient = useQueryClient();
+  const tasksParams = useMemo(() => ({ limit: 100, view: "projects" }), []);
+  const {
+    data: rawTasks = [],
+    isLoading,
+    error: tasksError,
+  } = useTasksQuery(tasksParams, {
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
+  });
+
+  const tasks = useMemo(
+    () => normalizeTasks(rawTasks).map(normalizeTask),
+    [rawTasks]
+  );
+
+  const { invalidateTaskData } = useTaskMutations();
+
   const [isApprovingCustomClientId, setIsApprovingCustomClientId] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
   const [isMarkingPaidId, setIsMarkingPaidId] = useState("");
   const [isPayingEmployeeId, setIsPayingEmployeeId] = useState("");
   const [employeePaymentTask, setEmployeePaymentTask] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("Newest to Oldest");
+  const [viewMode, setViewMode] = useState("table");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [visibleGroup, setVisibleGroup] = useState("All");
   const [confirmAction, setConfirmAction] = useState(null);
   const [completionDraft, setCompletionDraft] = useState(null);
   const [isSubmittingOutput, setIsSubmittingOutput] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState("");
-  const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
-  const [isLoadingTaskDetails, setIsLoadingTaskDetails] = useState(false);
+  const [isTaskAllocationOpen, setIsTaskAllocationOpen] = useState(false);
   const pendingTaskUpdateIdsRef = useRef(new Set());
   const currentUserId = getEntityId(user);
 
-  useEffect(() => {
-    let isMounted = true;
+  const {
+    data: rawTaskDetails,
+    isLoading: isLoadingTaskDetails,
+    error: taskDetailsError,
+  } = useTaskDetailsQuery(selectedTaskId);
 
-    const loadTasks = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, refresh: true, view: "projects" });
-        if (isMounted) {
-          setTasks(normalizeTasks(data).map(normalizeTask));
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load tasks."));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+  const errorMessage =
+    localErrorMessage ||
+    (tasksError ? getApiErrorMessage(tasksError, "Unable to load tasks.") : "") ||
+    (taskDetailsError
+      ? getApiErrorMessage(taskDetailsError, "Unable to load project details.")
+      : "");
+  const setErrorMessage = setLocalErrorMessage;
+
+  const selectedTaskDetails = useMemo(() => {
+    if (rawTaskDetails) return normalizeTask(rawTaskDetails);
+    if (selectedTaskId) {
+      return tasks.find((t) => t.id === selectedTaskId) || null;
+    }
+    return null;
+  }, [rawTaskDetails, selectedTaskId, tasks]);
+
+  const updateTaskInCache = useCallback(
+    (updatedTask) => {
+      const normalized = normalizeTask(updatedTask);
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.map((item) =>
+          getEntityId(item) === normalized.id ? normalized : item
+        );
+      });
+      if (selectedTaskId === normalized.id) {
+        queryClient.setQueryData(QUERY_KEYS.taskDetails(normalized.id), normalized);
       }
-    };
+      invalidateTaskData(normalized.id);
+      return normalized;
+    },
+    [invalidateTaskData, queryClient, selectedTaskId, tasksParams]
+  );
 
-    loadTasks();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey]);
+  const removeTaskFromCache = useCallback(
+    (taskId) => {
+      queryClient.setQueryData(QUERY_KEYS.tasks(tasksParams), (old) => {
+        const list = Array.isArray(old) ? old : [];
+        return list.filter((item) => getEntityId(item) !== taskId);
+      });
+      invalidateTaskData(taskId);
+    },
+    [invalidateTaskData, queryClient, tasksParams]
+  );
 
   useEffect(() => {
     const focusTarget = () => {
@@ -1536,6 +1406,7 @@ const Tasks = ({
         if (target?.page !== "tasks" || !target?.taskId) return;
 
         setVisibleGroup("All");
+        setAssignmentFilter("all");
         setSelectedTaskId(String(target.taskId));
         sessionStorage.removeItem(notificationTargetKey);
       } catch {
@@ -1551,38 +1422,64 @@ const Tasks = ({
     return () => window.removeEventListener("clientra:notification-target", focusTarget);
   }, [isLoading]);
 
-  useEffect(() => {
-    if (!selectedTaskId) return undefined;
+  const isAssignedToMe = useCallback(
+    (task) => {
+      if (!currentUserId && !user?.email) return false;
+      const allAssignees = [...(task?.assignees || []), task?.assignedTo].filter(Boolean);
+      const isDirectlyAssigned = allAssignees.some((assignee) =>
+        matchesUser(assignee, currentUserId, user?.email)
+      );
+      if (isDirectlyAssigned) return true;
+      return (task?.subtasks || []).some((subtask) =>
+        matchesUser(subtask?.assignedTo, currentUserId, user?.email)
+      );
+    },
+    [currentUserId, user?.email]
+  );
 
-    let isCurrent = true;
-    const loadTaskDetails = async () => {
-      setSelectedTaskDetails(null);
-      setIsLoadingTaskDetails(true);
-      setErrorMessage("");
+  const isMyProject = useCallback(
+    (task) => isAssignedToMe(task),
+    [isAssignedToMe]
+  );
 
-      try {
-        const task = await taskAPI.getById(selectedTaskId, { refresh: true });
-        if (isCurrent) setSelectedTaskDetails(normalizeTask(task));
-      } catch (error) {
-        if (!isCurrent) return;
-        setErrorMessage(getApiErrorMessage(error, "Unable to load project details."));
-        setSelectedTaskId("");
-      } finally {
-        if (isCurrent) setIsLoadingTaskDetails(false);
-      }
-    };
+  const isUnassignedProject = useCallback((task) => {
+    const projectAssignees = [...(task?.assignees || []), task?.assignedTo].filter(Boolean);
+    const subtaskAssignees = (task?.subtasks || [])
+      .map((s) => s?.assignedTo)
+      .filter(Boolean);
+    return projectAssignees.length === 0 && subtaskAssignees.length === 0;
+  }, []);
 
-    loadTaskDetails();
+  const isEmployeeAssignedProject = useCallback(
+    (task) => !isAssignedToMe(task) && !isUnassignedProject(task),
+    [isAssignedToMe, isUnassignedProject]
+  );
 
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedTaskId]);
+  const assignmentFilteredTasks = useMemo(() => {
+    if (assignmentFilter === "my-projects") {
+      return tasks.filter(isMyProject);
+    }
+    if (assignmentFilter === "employee-assigned") {
+      return tasks.filter(isEmployeeAssignedProject);
+    }
+    if (assignmentFilter === "unassigned") {
+      return tasks.filter(isUnassignedProject);
+    }
+    return tasks;
+  }, [assignmentFilter, isEmployeeAssignedProject, isMyProject, isUnassignedProject, tasks]);
+
+  const unassignedTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const isUnassigned = isUnassignedProject(task);
+      const isNotDone = String(task.status || "").toLowerCase() !== "done";
+      return isUnassigned && isNotDone;
+    });
+  }, [isUnassignedProject, tasks]);
 
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
-    const filteredTasks = tasks.filter((task) => {
+    const filteredTasks = assignmentFilteredTasks.filter((task) => {
       const dateStatus = getDateStatus(task.dueDate);
       const matchesGroup =
         visibleGroup === "All" ||
@@ -1600,82 +1497,32 @@ const Tasks = ({
     });
 
     return filteredTasks.sort((firstTask, secondTask) => {
-      const firstDate = toInputDate(firstTask.dueDate);
-      const secondDate = toInputDate(secondTask.dueDate);
-      return firstDate.localeCompare(secondDate);
+      if (sortBy === "Oldest to Newest" || sortBy === "Oldest") {
+        const firstTime = new Date(firstTask.createdAt || firstTask.updatedAt || 0).getTime();
+        const secondTime = new Date(secondTask.createdAt || secondTask.updatedAt || 0).getTime();
+        return firstTime - secondTime;
+      }
+      if (sortBy === "Due Date") {
+        const firstDate = toInputDate(firstTask.dueDate);
+        const secondDate = toInputDate(secondTask.dueDate);
+        return firstDate.localeCompare(secondDate);
+      }
+      const firstTime = new Date(firstTask.createdAt || firstTask.updatedAt || 0).getTime();
+      const secondTime = new Date(secondTask.createdAt || secondTask.updatedAt || 0).getTime();
+      return secondTime - firstTime;
     });
-  }, [searchQuery, tasks, visibleGroup]);
+  }, [assignmentFilteredTasks, searchQuery, sortBy, visibleGroup]);
 
   const isOwnedByCurrentUser = (task) => {
-    if (!currentUserId) return false;
+    if (!currentUserId && !user?.email) return false;
     if (user?.role === "client") {
       return getEntityId(task.createdBy) === currentUserId;
     }
-    return task.assignees.some((assignee) => getEntityId(assignee) === currentUserId);
+    return isAssignedToMe(task);
   };
-  const taskStats = useMemo(() => {
-    let dueToday = 0;
-    let inProgress = 0;
-    let completed = 0;
-    let overdue = 0;
-
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      const isDone = task.status === "Done";
-      if (isDone) {
-        completed++;
-      } else {
-        if (task.status === "In progress") inProgress++;
-        const dateStatus = getDateStatus(task.dueDate);
-        if (dateStatus === "Today") dueToday++;
-        else if (dateStatus === "Overdue") overdue++;
-      }
-    }
-
-    return [
-      { label: "Total Projects", value: tasks.length, icon: taskIcon, tone: "pink" },
-      { label: "Due Today", value: dueToday, icon: pendingrequest, tone: "orange" },
-      { label: "In Progress", value: inProgress, icon: progress, tone: "blue" },
-      { label: "Completed", value: completed, icon: done, tone: "green" },
-      { label: "Overdue", value: overdue, icon: notification, tone: "rose" },
-    ];
-  }, [tasks]);
   const selectedTask = selectedTaskDetails;
 
-  const renderTaskRows = (items, accentClass = "bg-pink-500") => {
-    if (items.length === 0) {
-      return (
-        <div className="grid min-h-24 place-items-center rounded-xl bg-white px-4 py-5 text-center md:rounded-none">
-          <div>
-            <span className="mx-auto grid h-9 w-9 place-items-center rounded-xl bg-pink-50 text-pink-400">
-              <SmallIcon name="list" className="h-5 w-5" />
-            </span>
-            <p className="mt-2 text-xs font-bold text-slate-500 md:text-sm">No projects found.</p>
-          </div>
-        </div>
-      );
-    }
 
-    return items.map((task) => (
-      <TaskRow
-        key={task.id}
-        accentClass={accentClass}
-        canAccessSubtasks={isOwnedByCurrentUser(task)}
-        isExpanded={false}
-        isFocused={false}
-        isMarkingPaid={isMarkingPaidId === task.id}
-        isPayingEmployee={isPayingEmployeeId === task.id}
-        item={task}
-        onDelete={requestDeleteTask}
-        onEdit={handleEditTask}
-        onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
-        onPayEmployee={user?.role === "admin" ? setEmployeePaymentTask : undefined}
-        onSubmitOutput={handleSubmitOutput}
-        onToggleExpand={(taskId) => setSelectedTaskId(String(taskId))}
-        onToggleSubtask={handleToggleSubtask}
-      />
-    ));
-  };
 
   const handleAddTask = () => {
     onNavigate?.("add-task");
@@ -1710,18 +1557,99 @@ const Tasks = ({
         subtasks: nextSubtasks,
       });
 
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? normalizeTask(updatedTask) : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      updateTaskInCache(updatedTask);
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to update task.");
     } finally {
       pendingTaskUpdateIdsRef.current.delete(task.id);
+    }
+  };
+
+  const handleUpdateAssignees = async (task, nextAssigneeIds) => {
+    try {
+      setErrorMessage("");
+      const updatedSubtasks = (task.subtasks || []).map((subtask) => {
+        const subtaskAssigneeId = getEntityId(subtask.assignedTo);
+        return subtaskAssigneeId && !nextAssigneeIds.includes(subtaskAssigneeId)
+          ? { ...subtask, assignedTo: null }
+          : subtask;
+      });
+
+      const updatedTask = await taskAPI.update(task.id, {
+        title: task.title,
+        description: task.description,
+        startDate: toInputDate(task.startDate),
+        dueDate: toInputDate(task.dueDate),
+        priority: task.priority,
+        assignedTo: nextAssigneeIds[0] || null,
+        assignees: nextAssigneeIds,
+        subtasks: updatedSubtasks,
+      });
+
+      return updateTaskInCache(updatedTask);
+    } catch (error) {
+      const msg = getApiErrorMessage(error, "Unable to update assignee.");
+      setErrorMessage(msg);
+      throw error;
+    }
+  };
+
+  const handleUpdateDueDate = async (task, newDueDate) => {
+    try {
+      setErrorMessage("");
+      const formattedDueDate = toInputDate(newDueDate);
+      const startDateInput = toInputDate(task.startDate);
+      const finalStartDate =
+        startDateInput && startDateInput > formattedDueDate
+          ? formattedDueDate
+          : startDateInput;
+
+      const updatedTask = await taskAPI.update(task.id, {
+        title: task.title,
+        description: task.description,
+        startDate: finalStartDate,
+        dueDate: formattedDueDate,
+        priority: task.priority,
+        assignedTo: getEntityId(task.assignedTo) || null,
+        assignees: (task.assignees || []).map(getEntityId).filter(Boolean),
+        subtasks: task.subtasks,
+      });
+
+      return updateTaskInCache(updatedTask);
+    } catch (error) {
+      const msg = getApiErrorMessage(error, "Unable to update due date.");
+      setErrorMessage(msg);
+      throw error;
+    }
+  };
+
+  const handleUpdateStatus = async (task, targetStatus) => {
+    try {
+      setErrorMessage("");
+      let nextSubtasks = [...(task.subtasks || [])];
+      if (targetStatus === "done") {
+        nextSubtasks = nextSubtasks.map((s) => ({ ...s, completed: true }));
+      } else if (targetStatus === "pending") {
+        nextSubtasks = nextSubtasks.map((s) => ({ ...s, completed: false }));
+      }
+
+      const updatedTask = await taskAPI.update(task.id, {
+        title: task.title,
+        description: task.description,
+        startDate: toInputDate(task.startDate),
+        dueDate: toInputDate(task.dueDate),
+        priority: task.priority,
+        status: targetStatus,
+        assignedTo: getEntityId(task.assignedTo) || null,
+        assignees: (task.assignees || []).map(getEntityId).filter(Boolean),
+        subtasks: nextSubtasks,
+      });
+
+      return updateTaskInCache(updatedTask);
+    } catch (error) {
+      const msg = getApiErrorMessage(error, "Unable to update project status.");
+      setErrorMessage(msg);
+      throw error;
     }
   };
 
@@ -1815,14 +1743,7 @@ const Tasks = ({
         subtasks: draft.nextSubtasks,
         finalize: draft.finalize,
       });
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === draft.task.id ? normalizeTask(updatedTask) : currentTask
-      );
+      updateTaskInCache(updatedTask);
       setCompletionDraft(null);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to submit completed task."));
@@ -1850,15 +1771,8 @@ const Tasks = ({
       setIsApprovingCustomClientId(task.id);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = normalizeTask(await taskAPI.approve(task.id));
-      setTasks((currentTasks) =>
-        currentTasks.map((currentTask) =>
-          currentTask.id === task.id ? updatedTask : currentTask
-        )
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? updatedTask : currentTask
-      );
+      const rawApproved = await taskAPI.approve(task.id);
+      updateTaskInCache(rawApproved);
       setNoticeMessage(`Offline approval was recorded for ${getClientName(task)}.`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to record the custom client's approval."));
@@ -1881,9 +1795,7 @@ const Tasks = ({
     try {
       setErrorMessage("");
       await taskAPI.delete(task.id);
-      setTasks((currentTasks) =>
-        currentTasks.filter((currentTask) => currentTask.id !== task.id)
-      );
+      removeTaskFromCache(task.id);
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Unable to delete task.");
     }
@@ -1896,13 +1808,8 @@ const Tasks = ({
       setIsMarkingPaidId(task.id);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = normalizeTask(await taskAPI.markPaid(task.id));
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === task.id ? updatedTask : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? updatedTask : currentTask
-      );
+      const rawPaid = await taskAPI.markPaid(task.id);
+      updateTaskInCache(rawPaid);
       setNoticeMessage(
         `${task.title} was marked as paid and added to Budget Management income.`
       );
@@ -1935,13 +1842,8 @@ const Tasks = ({
       setIsPayingEmployeeId(task.id);
       setErrorMessage("");
       setNoticeMessage("");
-      const updatedTask = normalizeTask(await taskAPI.payEmployee(task.id, { amount, employeeId }));
-      setTasks((currentTasks) =>
-        currentTasks.map((item) => (item.id === task.id ? updatedTask : item))
-      );
-      setSelectedTaskDetails((currentTask) =>
-        currentTask?.id === task.id ? updatedTask : currentTask
-      );
+      const rawPaid = await taskAPI.payEmployee(task.id, { amount, employeeId });
+      const updatedTask = updateTaskInCache(rawPaid);
       setEmployeePaymentTask(null);
       setNoticeMessage(
         `${getPersonName(updatedTask.employeePayments.find((payment) => getEntityId(payment.employee) === employeeId)?.employee)} was paid ${formatProjectAmount(amount)}. The payment was added to Budget Management expenses.`
@@ -1956,9 +1858,9 @@ const Tasks = ({
   const requestDeleteTask = (task) => {
     setConfirmAction({
       icon: "delete",
-      title: "Delete",
-      message: `Delete task "${task.title}"?`,
-      confirmLabel: "Yes , delete",
+      title: "Delete Project",
+      message: `Permanently delete project "${task.title}" and its stored output files? This cannot be undone.`,
+      confirmLabel: "Delete permanently",
       onConfirm: () => handleDeleteTask(task),
     });
   };
@@ -1987,7 +1889,19 @@ const Tasks = ({
               </p>
             </div>
 
-            <div className="flex items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsTaskAllocationOpen(true)}
+                className="flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-pink-200 bg-pink-50/70 px-3.5 text-xs font-black text-pink-700 transition hover:bg-pink-100 dark:border-pink-900/50 dark:bg-pink-950/30 dark:text-pink-300 dark:hover:bg-pink-950/50 md:px-4 md:text-sm cursor-pointer"
+                title="Auto Assign"
+              >
+                <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-pink-500" />
+                <span>
+                  Auto Assign
+                  {unassignedTasks.length > 0 && ` (${unassignedTasks.length})`}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={handleAddTask}
@@ -1999,45 +1913,93 @@ const Tasks = ({
             </div>
           </header>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-5 xl:grid-cols-5">
-            {taskStats.map((item, index) => (
-              <Card key={item.label} className={`min-w-0 p-2 !shadow-sm dark:!shadow-none md:p-5 ${index === taskStats.length - 1 ? "col-span-2 sm:col-span-1" : ""} ${statCardStyles[item.tone]}`}>
-                <div className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:gap-4 md:text-left">
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg md:h-16 md:w-16 md:rounded-2xl ${toneStyles[item.tone]}`}>
-                    <ImageIcon src={item.icon} className="h-5 w-5 md:h-9 md:w-9" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-base font-black leading-none text-[#10142d] md:text-4xl">{item.value}</p>
-                    <p className="mt-1 truncate text-[11px] font-black text-slate-600 md:text-sm">{item.label}</p>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
 
           <Card className="p-3 md:p-5">
-            <label className="relative block">
-              <span className="sr-only">Search projects</span>
-              <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search projects..."
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
-              />
-            </label>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["All", "Due Today", "Upcoming", "Overdue", "Completed"].map((group) => (
-                <button
-                  key={group}
-                  type="button"
-                  onClick={() => setVisibleGroup(group)}
-                  className={`rounded-full px-4 py-2 text-xs font-black transition ${visibleGroup === group ? "bg-pink-100 text-pink-700" : "border border-pink-100 bg-white text-slate-600 hover:bg-pink-50"}`}
-                >
-                  {group}
-                </button>
-              ))}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <label className="relative block flex-1">
+                <span className="sr-only">Search projects</span>
+                <SmallIcon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 md:left-4 md:h-5 md:w-5" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search projects..."
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-xs font-bold outline-none placeholder:text-slate-400 focus:border-pink-200 focus:ring-2 focus:ring-pink-100 md:h-12 md:pl-12 md:pr-4 md:text-sm"
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center gap-2.5 sm:flex-nowrap md:gap-3">
+                <label className="relative block w-full sm:w-auto">
+                  <span className="sr-only">Filter by assignment</span>
+                  <select
+                    value={assignmentFilter}
+                    onChange={(event) => setAssignmentFilter(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto md:h-12 md:px-4 md:text-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                  >
+                    <option value="all">All Assignments</option>
+                    <option value="my-projects">My Projects</option>
+                    <option value="employee-assigned">Employee Assigned</option>
+                    <option value="unassigned">Unassigned</option>
+                  </select>
+                </label>
+
+                <label className="relative block w-full sm:w-auto">
+                  <span className="sr-only">Filter by status</span>
+                  <select
+                    value={visibleGroup}
+                    onChange={(event) => setVisibleGroup(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto md:h-12 md:px-4 md:text-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Due Today">Due Today</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </label>
+
+                <label className="relative block w-full sm:w-auto">
+                  <span className="sr-only">Sort projects</span>
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-black text-[#10142d] outline-none transition focus:border-pink-200 focus:ring-2 focus:ring-pink-100 sm:w-auto md:h-12 md:px-4 md:text-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                  >
+                    <option value="Newest to Oldest">Newest to Oldest</option>
+                    <option value="Oldest to Newest">Oldest to Newest</option>
+                    <option value="Due Date">Due Date</option>
+                  </select>
+                </label>
+
+                <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 p-1 md:h-12 dark:border-neutral-800 dark:bg-neutral-900">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("table")}
+                    className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-black transition ${
+                      viewMode === "table"
+                        ? "bg-white text-[#10142d] shadow-xs dark:bg-neutral-800 dark:text-white"
+                        : "text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+                    }`}
+                    title="Table View"
+                  >
+                    <List className="h-4 w-4" />
+                    <span className="hidden sm:inline">Table</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("board")}
+                    className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-black transition ${
+                      viewMode === "board"
+                        ? "bg-white text-[#10142d] shadow-xs dark:bg-neutral-800 dark:text-white"
+                        : "text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+                    }`}
+                    title="Board View"
+                  >
+                    <Kanban className="h-4 w-4" />
+                    <span className="hidden sm:inline">Board</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </Card>
 
@@ -2058,11 +2020,23 @@ const Tasks = ({
             )}
 
             {!isLoading && (
-              <Card className="overflow-hidden p-0">
-                <div className="space-y-3 p-3 md:space-y-0 md:p-0">
-                  {renderTaskRows(visibleTasks)}
-                </div>
-              </Card>
+              viewMode === "table" ? (
+                <ProjectGroupTable
+                  tasks={visibleTasks}
+                  showAssignee={true}
+                  onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+                  onUpdateAssignees={handleUpdateAssignees}
+                  onUpdateDueDate={handleUpdateDueDate}
+                  onUpdateStatus={handleUpdateStatus}
+                />
+              ) : (
+                <ProjectBoard
+                  tasks={visibleTasks}
+                  showAssignee={true}
+                  onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+                  onUpdateStatus={handleUpdateStatus}
+                />
+              )
             )}
 
           </section>
@@ -2077,6 +2051,7 @@ const Tasks = ({
           {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
             <ProjectDetailsModal
               canAccessTasks={isOwnedByCurrentUser(selectedTask)}
+              currentUserId={currentUserId}
               isApprovingCustomClient={isApprovingCustomClientId === selectedTask.id}
               isDownloadingOutput={isDownloadingOutputId === selectedTask.id}
               isMarkingPaid={isMarkingPaidId === selectedTask.id}
@@ -2087,7 +2062,13 @@ const Tasks = ({
               onDownloadOutput={handleDownloadOutput}
               onEdit={handleEditTask}
               onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
-              onPayEmployee={user?.role === "admin" ? setEmployeePaymentTask : undefined}
+              onPayEmployee={
+                user?.role === "admin" &&
+                !isAssignedToMe(selectedTask) &&
+                getAssignedEmployees(selectedTask, currentUserId).length > 0
+                  ? setEmployeePaymentTask
+                  : undefined
+              }
               onApproveCustomClient={requestCustomClientApproval}
               onSubmitOutput={handleSubmitOutput}
               onToggleTask={handleToggleSubtask}
@@ -2124,6 +2105,17 @@ const Tasks = ({
               }}
               onSubmit={handlePayEmployee}
               task={employeePaymentTask}
+            />
+          )}
+          {isTaskAllocationOpen && (
+            <TaskAllocationModal
+              isOpen={isTaskAllocationOpen}
+              initialTasks={unassignedTasks}
+              onClose={() => setIsTaskAllocationOpen(false)}
+              onAllocationCommitted={() => {
+                invalidateTaskData();
+                setNoticeMessage("Tasks successfully assigned!");
+              }}
             />
           )}
         </div>

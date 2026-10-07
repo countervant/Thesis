@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useOnlineTeamQuery } from "../../../hooks/index.js";
 import progress from "../../../assets/progress.png";
 import pending from "../../../assets/pending.png";
 import review from "../../../assets/Review.png";
@@ -13,14 +15,14 @@ import {
   newsfeedAPI,
   taskAPI,
 } from "../../../services/api.js";
-import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar";
-import { DashboardSkeleton } from "../../../components/Skeleton/Skeleton";
+import InitialsAvatar from "../../../components/InitialsAvatar/InitialsAvatar.jsx";
+import { DashboardSkeleton } from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
 
 const statItems = [
   { key: "in_progress", label: "In Progress", icon: "progress" },
-  { key: "pending", label: "Pending", icon: "pending" },
   { key: "review", label: "In Review", icon: "review" },
+  { key: "pending", label: "Revision", icon: "pending" },
   { key: "done", label: "Done", icon: "done" },
 ];
 
@@ -29,77 +31,30 @@ const timelineDayCount = 21;
 const monthlyOverviewVisibleRows = 10;
 const compactListVisibleRows = 5;
 const modalListVisibleRows = 10;
-const timelineTasks = [
-  {
-    name: "Start",
-    priority: "medium",
-    progress: 100,
-    marker: "dot",
-    segments: [
-      { start: 0.6, width: 1.1, color: "#7da4e6" },
-    ],
-  },
-  {
-    name: "Design",
-    priority: "high",
-    progress: 0,
-    marker: "dot",
-    segments: [
-      { start: 1.5, width: 3.2, color: "#8a97ee", striped: true },
-    ],
-  },
-  {
-    name: "Review",
-    priority: "low",
-    progress: 100,
-    marker: "diamond",
-    segments: [
-      { start: 4.3, width: 0.7, color: "#8d73dc", diamond: true },
-    ],
-  },
-  {
-    name: "User tests",
-    priority: "medium",
-    progress: 50,
-    marker: "dot",
-    segments: [
-      { start: 5.0, width: 1.2, color: "#bd75e8", striped: true },
-    ],
-  },
-  {
-    name: "Programm...",
-    priority: "high",
-    progress: 0,
-    marker: "dot",
-    segments: [
-      { start: 6.3, width: 3.0, color: "#d46cdf", striped: true },
-    ],
-  },
-];
 
 const expenseColors = ["#fb4778", "#7c5cff", "#b65cf6", "#ff8a1f"];
 const dashboardCardShadow =
-  "border-b-2 border-b-[#86003C]/55 shadow-sm ring-1 ring-[#86003C]/20 dark:!border-b-[#86003C] dark:!ring-[#86003C]/45";
+  "border-b-2 border-b-[#86003C]/55 shadow-sm ring-1 ring-[#86003C]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20";
 const statStyles = {
   in_progress: {
     tile: "bg-[#f0e9ff]",
     text: "text-[#754de8]",
-    card: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
+    card: "!border-[#754de8]/45 !border-b-[#754de8] !ring-[#754de8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
   },
   pending: {
     tile: "bg-[#ffeaf5]",
     text: "text-[#e347a8]",
-    card: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+    card: "!border-[#e347a8]/45 !border-b-[#e347a8] !ring-[#e347a8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
   },
   review: {
     tile: "bg-[#fff0e5]",
     text: "text-[#ff8317]",
-    card: "!border-[#ff8317]/45 !border-b-[#ff8317] !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
+    card: "!border-[#ff8317]/45 !border-b-[#ff8317] !ring-[#ff8317]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
   },
   done: {
     tile: "bg-[#eafbed]",
     text: "text-[#28b84c]",
-    card: "!border-[#28b84c]/45 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
+    card: "!border-[#28b84c]/45 !border-b-[#28b84c] !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
   },
 };
 
@@ -113,7 +68,7 @@ const parseCalendarDate = (value) => {
   }
 
   if (typeof value === "string") {
-    const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (isoDate) {
       return new Date(
         Number(isoDate[1]),
@@ -188,12 +143,14 @@ const getCurrentMonthKey = () => getMonthKey(new Date());
 
 const getNextMonthKey = () => {
   const date = new Date();
+  date.setDate(1);
   date.setMonth(date.getMonth() + 1);
   return getMonthKey(date);
 };
 
 const getLastMonthKey = () => {
   const date = new Date();
+  date.setDate(1);
   date.setMonth(date.getMonth() - 1);
   return getMonthKey(date);
 };
@@ -210,7 +167,7 @@ const formatMonthLabel = (monthKey) => {
   });
 };
 
-const getUserId = (value) => value?._id || value?.id || value || "";
+const getUserId = (value) => String(value?._id || value?.id || value || "").trim();
 
 const getUserName = (value) => {
   const firstName = value?.firstName || "";
@@ -362,8 +319,8 @@ const Icon = ({ name, className = "h-8 w-8" }) => {
   return <img src={done} alt="" className={className} aria-hidden="true" />;
 };
 
-const Avatar = ({ name }) => (
-  <InitialsAvatar className="h-8 w-8" name={name} textClassName="text-xs" />
+const Avatar = ({ name, user }) => (
+  <InitialsAvatar className="h-8 w-8" name={name} user={user} textClassName="text-xs" />
 );
 
 const StatCard = ({ item }) => {
@@ -462,16 +419,21 @@ const MonthlyChart = ({ tasks }) => {
     };
   });
 
-  const visibleTasks = chartTasks.length > 0 ? chartTasks : timelineTasks;
+  const visibleTasks = chartTasks;
 
   return (
   <section className={`overflow-hidden rounded-xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 md:py-5 ${dashboardCardShadow}`}>
     <div className="mb-3 flex items-center justify-between gap-4 md:mb-4">
       <h2 className="text-sm font-extrabold text-[#10172a] md:text-base dark:text-white">Monthly Overview</h2>
-      <span className="box-border inline-flex h-8 shrink-0 items-center rounded-full border-2 border-slate-200 bg-transparent px-3 text-[10px] font-black leading-none text-[#10172a] md:h-10 md:rounded-2xl md:px-4 md:text-sm dark:border-[#e347a8] dark:text-white">
+      <span className="box-border inline-flex h-8 shrink-0 items-center rounded-full border-2 border-slate-200 bg-transparent px-3 text-[10px] font-black leading-none text-[#10172a] md:h-10 md:rounded-2xl md:px-4 md:text-sm dark:border-[#e5e7eb]/20 dark:text-white">
         This Month
       </span>
     </div>
+    {visibleTasks.length === 0 ? (
+      <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:bg-neutral-900 dark:text-neutral-400">
+        No projects with scheduled start and due dates yet.
+      </p>
+    ) : (
     <div
       className={`grid grid-cols-[86px_1fr] overflow-x-auto md:grid-cols-[178px_1fr] ${shouldScrollRows ? "overflow-y-auto pr-2" : ""}`}
       style={shouldScrollRows ? { maxHeight: `${32 + chartRowsMaxHeight}px` } : undefined}
@@ -563,6 +525,7 @@ const MonthlyChart = ({ tasks }) => {
         </div>
       </div>
     </div>
+    )}
   </section>
   );
 };
@@ -637,7 +600,7 @@ const ExpenseChart = ({ budgetEntries }) => {
           <select
             value={activeMonth}
             onChange={(event) => setSelectedMonth(event.target.value)}
-            className="box-border h-8 appearance-none rounded-full border-2 border-slate-200 bg-white py-0 pl-3 pr-8 text-[10px] font-bold text-[#10172a] outline-none transition focus:border-[#e347a8] md:h-9 md:pr-9 md:text-xs dark:border-[#e347a8] dark:text-white"
+            className="box-border h-8 appearance-none rounded-full border-2 border-slate-200 bg-white py-0 pl-3 pr-8 text-[10px] font-bold text-[#10172a] outline-none transition focus:border-[#e347a8] md:h-9 md:pr-9 md:text-xs dark:border-[#e5e7eb]/20 dark:text-white"
           >
             {monthOptions.map((month) => (
               <option key={month} value={month}>
@@ -711,7 +674,7 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
     <table className="w-full min-w-[520px] text-left text-xs text-[#10172a] dark:text-white">
       <thead className="border-b border-slate-100 text-slate-500 dark:text-white">
         <tr>
-          <th className="px-5 py-2.5 font-extrabold">Employee</th>
+          <th className="px-5 py-2.5 font-extrabold">Name</th>
           <th className="px-3 py-2.5 font-extrabold">Job</th>
           <th className="px-3 py-2.5 font-extrabold">Client</th>
           <th className="px-3 py-2.5 font-extrabold">{tone === "pink" ? "Status" : "Date"}</th>
@@ -834,18 +797,6 @@ const EmployeeTable = ({ title, employees, tone = "violet" }) => {
     </>
   );
 };
-
-const PlaceholderPanel = ({ title, children }) => (
-  <section className={`rounded-lg border border-pink-100 bg-white px-8 py-10 ${dashboardCardShadow}`}>
-    <h1
-      className="text-2xl uppercase text-neutral-950 dark:text-white"
-      style={{ fontFamily: "var(--font-bruno)" }}
-    >
-      {title}
-    </h1>
-    <p className="mt-3 text-sm font-medium text-neutral-600 dark:text-white">{children}</p>
-  </section>
-);
 
 const FloatingListPanel = ({ children, onClose, title }) => (
   <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 p-3 backdrop-blur-sm sm:p-5">
@@ -1124,28 +1075,28 @@ const UpcomingEvents = ({ events }) => {
   );
 };
 
+const MemberRow = ({ member, index }) => (
+  <div key={member._id || member.id || `${member.email}-${index}`} className="flex w-full min-w-0 items-center gap-3 overflow-hidden py-2.5 first:pt-0 last:pb-0">
+    <span className="relative shrink-0">
+      <Avatar name={getUserName(member)} user={member} />
+      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
+        {getUserName(member)}
+      </span>
+      <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
+        {member.role || "Team member"}
+      </span>
+    </span>
+  </div>
+);
+
 const OnlineTeam = ({ members }) => {
   const [isViewingAll, setIsViewingAll] = useState(false);
   const canViewAll = members.length > compactListVisibleRows;
   const listMaxHeight = compactListVisibleRows * 54;
   const modalListMaxHeight = modalListVisibleRows * 54;
-
-  const MemberRow = ({ member, index }) => (
-    <div key={member._id || member.id || `${member.email}-${index}`} className="flex w-full min-w-0 items-center gap-3 overflow-hidden py-2.5 first:pt-0 last:pb-0">
-      <span className="relative shrink-0">
-        <Avatar name={getUserName(member)} />
-        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-black text-[#10172a] dark:text-white">
-          {getUserName(member)}
-        </span>
-        <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500 dark:text-white">
-          {member.role || "Team member"}
-        </span>
-      </span>
-    </div>
-  );
 
   return (
     <section className={`min-w-0 overflow-hidden rounded-3xl border border-pink-100 bg-white px-4 py-4 md:rounded-2xl md:px-5 ${dashboardCardShadow}`}>
@@ -1197,21 +1148,65 @@ const OnlineTeam = ({ members }) => {
   );
 };
 
-const AdminDashboard = ({ activePage = "dashboard" }) => {
+const ADMIN_HOME_QUERY_KEY = ["admin-dashboard"];
+const EMPTY_LIST = [];
+const toList = (value) => (Array.isArray(value) ? value : []);
+
+const loadHomeData = async () => {
+  const results = await Promise.allSettled([
+    taskAPI.getAll({ limit: 100, view: "dashboard" }),
+    employeeAPI.getAll({ limit: 100 }),
+    clientAPI.getAll({ limit: 100 }),
+    budgetAPI.getAll({ limit: 100 }),
+    newsfeedAPI.getActivity({ limit: 20 }),
+    authAPI.getOnlineTeam(),
+    calendarAPI.getAll({ month: getCurrentMonthKey() }),
+    calendarAPI.getAll({ month: getNextMonthKey() }),
+  ]);
+
+  const valueAt = (index) => toList(results[index]?.status === "fulfilled" ? results[index].value : []);
+  const tasks = valueAt(0);
+  const failedCount = results.filter((result) => result.status === "rejected").length;
+
+  return {
+    tasks,
+    employees: valueAt(1),
+    clients: valueAt(2),
+    budgetEntries: valueAt(3),
+    newsfeedActivities: valueAt(4),
+    onlineTeam: valueAt(5),
+    calendarEvents: [...valueAt(6), ...valueAt(7)],
+    taskStatusCounts: tasks.reduce((counts, task) => {
+      const status = task?.status;
+      if (status) counts[status] = (counts[status] || 0) + 1;
+      return counts;
+    }, {}),
+    loadError: failedCount
+      ? `${failedCount} dashboard request${failedCount === 1 ? "" : "s"} could not be loaded. Available data is shown; refresh to retry.`
+      : "",
+  };
+};
+
+const AdminDashboard = () => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [budgetEntries, setBudgetEntries] = useState([]);
-  const [calendarEvents, setCalendarEvents] = useState([]);
-  const [newsfeedActivities, setNewsfeedActivities] = useState([]);
-  const [onlineTeam, setOnlineTeam] = useState([]);
-  const [taskStatusCounts, setTaskStatusCounts] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const activeTopTab = ["dashboard", "newsfeed", "messages"].includes(activePage)
-    ? activePage
-    : "dashboard";
+  const { data: homeData, isLoading, error: homeError } = useQuery({
+    queryKey: ADMIN_HOME_QUERY_KEY,
+    queryFn: loadHomeData,
+  });
+  const { data: polledOnlineTeam } = useOnlineTeamQuery();
+  const {
+    tasks = EMPTY_LIST,
+    employees = EMPTY_LIST,
+    clients = EMPTY_LIST,
+    budgetEntries = EMPTY_LIST,
+    calendarEvents = EMPTY_LIST,
+    newsfeedActivities = EMPTY_LIST,
+    taskStatusCounts = {},
+  } = homeData ?? {};
+  const onlineTeam = polledOnlineTeam ?? homeData?.onlineTeam ?? EMPTY_LIST;
+  const loadError = homeError
+    ? getApiErrorMessage(homeError, "Unable to load dashboard data.")
+    : homeData?.loadError ?? "";
 
   const stats = statItems.map((item) => ({
     ...item,
@@ -1220,12 +1215,72 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
 
   const { notWorkingEmployees, workingEmployees } = useMemo(() => {
     const activeTaskByAssignee = new Map();
+
+    const getTaskRank = (task) => {
+      if (task.status === "in_progress") return 1;
+      if (task.status === "review") return 2;
+      if (task.status === "pending") return 3;
+      return 4;
+    };
+
+    const isBetterTask = (newTask, currentTask) => {
+      if (!currentTask) return true;
+      const newRank = getTaskRank(newTask);
+      const currentRank = getTaskRank(currentTask);
+      if (newRank !== currentRank) return newRank < currentRank;
+
+      const newDueDate = new Date(newTask.dueDate || 8640000000000000).getTime();
+      const currentDueDate = new Date(currentTask.dueDate || 8640000000000000).getTime();
+      return newDueDate < currentDueDate;
+    };
+
     tasks.forEach((task) => {
-      if (task.status !== "in_progress" && task.status !== "review") return;
-      const assigneeId = getUserId(task.assignedTo);
-      if (assigneeId && !activeTaskByAssignee.has(assigneeId)) {
-        activeTaskByAssignee.set(assigneeId, task);
+      if (task.archived || task.status === "done") return;
+
+      const candidates = [];
+      if (task.assignedTo) {
+        candidates.push({
+          id: getUserId(task.assignedTo),
+          user: typeof task.assignedTo === "object" ? task.assignedTo : null,
+        });
       }
+      if (Array.isArray(task.assignees)) {
+        task.assignees.forEach((assignee) => {
+          if (assignee) {
+            candidates.push({
+              id: getUserId(assignee),
+              user: typeof assignee === "object" ? assignee : null,
+            });
+          }
+        });
+      }
+      if (Array.isArray(task.subtasks)) {
+        task.subtasks.forEach((subtask) => {
+          if (subtask?.assignedTo) {
+            candidates.push({
+              id: getUserId(subtask.assignedTo),
+              user: typeof subtask.assignedTo === "object" ? subtask.assignedTo : null,
+            });
+          }
+        });
+      }
+
+      candidates.forEach(({ id: assigneeId, user: candidateUser }) => {
+        if (!assigneeId) return;
+        const currentEntry = activeTaskByAssignee.get(assigneeId);
+        if (isBetterTask(task, currentEntry?.task)) {
+          activeTaskByAssignee.set(assigneeId, {
+            task,
+            user: candidateUser || currentEntry?.user || null,
+          });
+        }
+      });
+    });
+
+    const employeeById = new Map();
+    employees.forEach((emp) => {
+      const id = getUserId(emp);
+      if (id) employeeById.set(id, emp);
     });
 
     const clientByEmployee = new Map();
@@ -1237,137 +1292,56 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
     });
 
     const working = [];
+    const workingAssigneeIds = new Set();
+
+    activeTaskByAssignee.forEach(({ task, user: taskUser }, assigneeId) => {
+      workingAssigneeIds.add(assigneeId);
+      const employee =
+        employeeById.get(assigneeId) ||
+        taskUser ||
+        (getUserId(user) === assigneeId ? user : null);
+
+      const clientName =
+        task.requestedByName ||
+        task.requestedBy?.companyName ||
+        (task.requestedBy?.firstName
+          ? `${task.requestedBy.firstName} ${task.requestedBy.lastName || ""}`.trim()
+          : "") ||
+        clientByEmployee.get(assigneeId)?.companyName ||
+        task.title ||
+        "No client";
+
+      working.push({
+        id: assigneeId,
+        name: getUserName(employee || taskUser),
+        job: employee?.position || taskUser?.position || (employee?.role === "admin" || taskUser?.role === "admin" ? "Admin" : "Employee"),
+        client: clientName,
+        date: formatDate(task.dueDate),
+      });
+    });
+
     const available = [];
     employees.forEach((employee) => {
       const employeeId = getUserId(employee);
-      const task = activeTaskByAssignee.get(employeeId);
-      if (!task) {
+      if (!workingAssigneeIds.has(employeeId)) {
         available.push({
+          id: employeeId,
           name: getUserName(employee),
           job: employee.position || "Employee",
           client: "No active task",
           date: "Available",
         });
-        return;
       }
-
-      working.push({
-        name: getUserName(employee),
-        job: employee.position || "Employee",
-        client: clientByEmployee.get(employeeId)?.companyName || task.title || "No client",
-        date: formatDate(task.dueDate),
-      });
     });
 
+    working.sort((a, b) => a.name.localeCompare(b.name));
+    available.sort((a, b) => a.name.localeCompare(b.name));
+
     return { notWorkingEmployees: available, workingEmployees: working };
-  }, [clients, employees, tasks]);
+  }, [clients, employees, tasks, user]);
 
-  useEffect(() => {
-    let isMounted = true;
 
-    const loadHomeData = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError("");
-        const results = await Promise.allSettled([
-          taskAPI.getAll({ limit: 100, view: "dashboard" }),
-          employeeAPI.getAll({ limit: 100 }),
-          clientAPI.getAll({ limit: 100 }),
-          budgetAPI.getAll({ limit: 100 }),
-          newsfeedAPI.getActivity({ limit: 20 }),
-          authAPI.getOnlineTeam(),
-          calendarAPI.getAll({ month: getCurrentMonthKey() }),
-          calendarAPI.getAll({ month: getNextMonthKey() }),
-        ]);
-
-        const valueAt = (index, fallback) => results[index]?.status === "fulfilled" ? results[index].value : fallback;
-        const allTasks = valueAt(0, []);
-        const allEmployees = valueAt(1, []);
-        const allClients = valueAt(2, []);
-        const allBudgetEntries = valueAt(3, []);
-        const newsfeedActivity = valueAt(4, []);
-        const onlineMembers = valueAt(5, []);
-        const currentMonthEvents = valueAt(6, []);
-        const nextMonthEvents = valueAt(7, []);
-        const failedRequests = results.filter((result) => result.status === "rejected");
-
-        if (!isMounted) {
-          return;
-        }
-
-        setTasks(Array.isArray(allTasks) ? allTasks : []);
-        setEmployees(Array.isArray(allEmployees) ? allEmployees : []);
-        setClients(Array.isArray(allClients) ? allClients : []);
-        setBudgetEntries(Array.isArray(allBudgetEntries) ? allBudgetEntries : []);
-        setCalendarEvents([
-          ...(Array.isArray(currentMonthEvents) ? currentMonthEvents : []),
-          ...(Array.isArray(nextMonthEvents) ? nextMonthEvents : []),
-        ]);
-        setNewsfeedActivities(Array.isArray(newsfeedActivity) ? newsfeedActivity : []);
-        setOnlineTeam(Array.isArray(onlineMembers) ? onlineMembers : []);
-        setTaskStatusCounts(
-          (Array.isArray(allTasks) ? allTasks : []).reduce((counts, task) => {
-            const status = task?.status;
-            if (status) counts[status] = (counts[status] || 0) + 1;
-            return counts;
-          }, {}),
-        );
-        setLoadError(
-          failedRequests.length
-            ? `${failedRequests.length} dashboard request${failedRequests.length === 1 ? "" : "s"} could not be loaded. Available data is shown; refresh to retry.`
-            : "",
-        );
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setLoadError(getApiErrorMessage(error, "Unable to load dashboard data."));
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadHomeData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    let onlineTeamRequest = null;
-
-    const refreshOnlineTeam = async () => {
-      if (onlineTeamRequest) return onlineTeamRequest;
-
-      try {
-        onlineTeamRequest = authAPI.getOnlineTeam();
-        const members = await onlineTeamRequest;
-        if (isMounted) setOnlineTeam(Array.isArray(members) ? members : []);
-      } catch {
-        // Keep the last successful presence list until the next refresh.
-      } finally {
-        onlineTeamRequest = null;
-      }
-    };
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshOnlineTeam();
-    };
-    const intervalId = window.setInterval(refreshWhenVisible, 30000);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, []);
-
-  if (activeTopTab === "dashboard" && isLoading) {
+  if (isLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -1379,8 +1353,6 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
             </div>
           )}
 
-          {activeTopTab === "dashboard" && (
-            <>
               <header className="pb-1">
                 <p className="text-sm font-black text-[#10172a] dark:text-white">
            
@@ -1422,20 +1394,6 @@ const AdminDashboard = ({ activePage = "dashboard" }) => {
                   tasks={tasks}
                 />
               </div>
-            </>
-          )}
-
-          {activeTopTab === "newsfeed" && (
-            <PlaceholderPanel title="Newsfeed">
-              Latest task, client, and employee updates are connected to the database.
-            </PlaceholderPanel>
-          )}
-
-          {activeTopTab === "messages" && (
-            <PlaceholderPanel title="Messages">
-              Message threads will stay on this connected Home tab once the messages API is added.
-            </PlaceholderPanel>
-          )}
         </div>
   );
 };

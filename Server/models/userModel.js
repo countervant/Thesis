@@ -14,24 +14,28 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 100,
     },
 
     middleInitial: {
       type: String,
       default: "",
       trim: true,
+      maxlength: 10,
     },
 
     lastName: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 100,
     },
 
     companyName: {
       type: String,
       default: "",
       trim: true,
+      maxlength: 160,
     },
 
     email: {
@@ -40,12 +44,14 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
+      maxlength: 254,
     },
 
     password: {
       type: String,
       required: true,
       minlength: 8,
+      maxlength: 72,
     },
 
     passwordChangedAt: {
@@ -66,18 +72,21 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       default: "",
+      maxlength: 40,
     },
 
     country: {
       type: String,
       default: "Philippines",
       trim: true,
+      maxlength: 100,
     },
 
     position: {
       type: String,
       default: "",
       trim: true,
+      maxlength: 160,
     },
 
     birthday: {
@@ -134,18 +143,22 @@ const userSchema = new mongoose.Schema(
 
     resetPasswordToken: {
       type: String,
+      select: false,
     },
 
     resetPasswordExpires: {
       type: Date,
+      select: false,
     },
 
     resetPasswordOTP: {
       type: String,
+      select: false,
     },
 
     resetPasswordOTPExpires: {
       type: Date,
+      select: false,
     },
 
     resetPasswordAttempts: {

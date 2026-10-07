@@ -6,6 +6,8 @@ export const MAX_AVATAR_CACHE_ENTRIES = 100;
 const MAX_AVATAR_CACHE_BYTES = 24 * 1024 * 1024;
 const MAX_AVATAR_UPLOAD_BYTES = 6 * 1024 * 1024;
 export const MAX_STORED_AVATAR_BYTES = 512 * 1024;
+const MAX_COVER_UPLOAD_BYTES = 6 * 1024 * 1024;
+export const MAX_STORED_COVER_BYTES = 1024 * 1024;
 let avatarCacheBytes = 0;
 
 const getAvatarSecret = () => process.env.JWT_SECRET || "";
@@ -89,12 +91,17 @@ export const withAvatarUrl = (user) => {
 
   const userId = getEntityId(user);
   const version = getAvatarVersion(user);
-  if (Object.prototype.hasOwnProperty.call(user, "avatar")) {
+  const hasAvatarProp = Object.prototype.hasOwnProperty.call(user, "avatar");
+  if (hasAvatarProp) {
     setCachedAvatar(userId, version, user.avatar);
+    if (!user.avatar) {
+      const profile = { ...user };
+      delete profile.avatar;
+      return { ...profile, avatar: "" };
+    }
   }
 
   const profile = { ...user };
-  delete profile.updatedAt;
   delete profile.avatar;
   return { ...profile, avatar: getAvatarUrl(user) };
 };
@@ -120,39 +127,82 @@ export const parseAvatarDataUrl = (value) => {
 };
 
 export const optimizeAvatarDataUrl = async (value) => {
+  return optimizeProfileImageDataUrl(value, {
+    label: "Avatar",
+    maxUploadBytes: MAX_AVATAR_UPLOAD_BYTES,
+    maxStoredBytes: MAX_STORED_AVATAR_BYTES,
+    width: 512,
+    height: 512,
+    fit: "cover",
+  });
+};
+
+export const optimizeCoverPhotoDataUrl = async (value) =>
+  optimizeProfileImageDataUrl(value, {
+    label: "Cover photo",
+    maxUploadBytes: MAX_COVER_UPLOAD_BYTES,
+    maxStoredBytes: MAX_STORED_COVER_BYTES,
+    width: 1920,
+    height: 720,
+    fit: "inside",
+  });
+
+const createImageError = (message, status = 400) => {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+};
+
+const optimizeProfileImageDataUrl = async (
+  value,
+  { label, maxUploadBytes, maxStoredBytes, width, height, fit }
+) => {
   if (value === "") return "";
 
-  const avatar = parseAvatarDataUrl(value);
-  if (!avatar) {
-    const error = new Error("Avatar must be a PNG, JPEG, WebP, or GIF image");
-    error.status = 400;
-    throw error;
+  const image = parseAvatarDataUrl(value);
+  if (!image) {
+    throw createImageError(`${label} must be a PNG, JPEG, WebP, or GIF image`);
   }
 
-  if (avatar.buffer.length > MAX_AVATAR_UPLOAD_BYTES) {
-    const error = new Error("Avatar image must be 6MB or smaller");
-    error.status = 413;
-    throw error;
+  if (!image.buffer.length) {
+    throw createImageError(`${label} image is empty`);
   }
 
-  let optimized = await sharp(avatar.buffer, {
-    failOn: "error",
-    limitInputPixels: 40_000_000,
-  })
-    .rotate()
-    .resize(512, 512, {
-      fit: "cover",
-      position: "centre",
-      withoutEnlargement: true,
+  if (image.buffer.length > maxUploadBytes) {
+    throw createImageError(`${label} image must be 6MB or smaller`, 413);
+  }
+
+  try {
+    let optimized = await sharp(image.buffer, {
+      failOn: "error",
+      limitInputPixels: 40_000_000,
     })
-    .webp({ quality: 82, effort: 4 })
-    .toBuffer();
-
-  if (optimized.length > MAX_STORED_AVATAR_BYTES) {
-    optimized = await sharp(optimized)
-      .webp({ quality: 68, effort: 5 })
+      .rotate()
+      .resize(width, height, {
+        fit,
+        position: "centre",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 82, effort: 4 })
       .toBuffer();
-  }
 
-  return `data:image/webp;base64,${optimized.toString("base64")}`;
+    if (optimized.length > maxStoredBytes) {
+      optimized = await sharp(optimized)
+        .resize(Math.round(width * 0.8), Math.round(height * 0.8), {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({ quality: 62, effort: 5 })
+        .toBuffer();
+    }
+
+    if (optimized.length > maxStoredBytes) {
+      throw createImageError(`${label} could not be reduced to a safe storage size`, 413);
+    }
+
+    return `data:image/webp;base64,${optimized.toString("base64")}`;
+  } catch (error) {
+    if (error.status) throw error;
+    throw createImageError(`${label} is not a valid image`);
+  }
 };

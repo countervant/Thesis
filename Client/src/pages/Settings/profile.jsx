@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar";
+import { useMemo, useState } from "react";
+import InitialsAvatar from "../../components/InitialsAvatar/InitialsAvatar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { authAPI, getApiErrorMessage } from "../../services/api.js";
+import { useProfileMutations, useProfileQuery } from "../../hooks/index.js";
+import { getApiErrorMessage } from "../../services/api.js";
 
-const defaultSkills = {
-  "Technical Skills": ["React", "Laravel", "JavaScript", "TypeScript", "PHP", "MySQL", "Git", "UI/UX Design"],
-  "Soft Skills": ["Leadership", "Communication", "Problem Solving", "Time Management", "Teamwork", "Adaptability"],
-  "Other Expertise": ["System Administration", "Database Management", "Cybersecurity Basics", "Agile Methodology"],
+const DEFAULT_SKILLS = {
+  "Technical Skills": [],
+  "Soft Skills": [],
+  "Other Expertise": [],
 };
 const todayInputValue = new Date().toISOString().slice(0, 10);
+const PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const PROFILE_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
 const getStorageKey = (user) => `clientraProfileSettings:${user?._id || user?.id || user?.email || "guest"}`;
 
@@ -80,12 +83,13 @@ const iconInputClass = `${inputClass} pl-10`;
 
 const ProfileSettings = ({ user }) => {
   const { updateUser } = useAuth();
-  const userId = user?._id || user?.id;
+  const isClient = String(user?.role || "").toLowerCase() === "client";
   const localSettings = useMemo(() => loadLocalSettings(user), [user]);
   const initialData = useMemo(
     () => ({
       fullName: getFullName(user),
       email: user?.email || "",
+      currentPassword: "",
       phone: user?.phone || "",
       address: user?.country || "",
       birthday: formatBirthday(user?.birthday),
@@ -104,13 +108,12 @@ const ProfileSettings = ({ user }) => {
         "Soft Skills": user.skillGroups.soft || [],
         "Other Expertise": user.skillGroups.other || [],
       }
-    : localSettings.skills || defaultSkills);
+    : localSettings.skills || DEFAULT_SKILLS);
   const [newSkill, setNewSkill] = useState("");
   const [newSkillGroup, setNewSkillGroup] = useState("Technical Skills");
   const [showSkillForm, setShowSkillForm] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [hasLoadedAvatar, setHasLoadedAvatar] = useState(() =>
     Object.prototype.hasOwnProperty.call(user || {}, "avatar")
   );
@@ -120,36 +123,23 @@ const ProfileSettings = ({ user }) => {
   );
   const [hasChangedCoverPhoto, setHasChangedCoverPhoto] = useState(false);
 
-  useEffect(() => {
-    if (!userId) return undefined;
+  const { data: profile } = useProfileQuery();
+  const { updateProfile } = useProfileMutations();
+  const isSaving = updateProfile.isPending;
 
-    let isActive = true;
-
-    authAPI
-      .getPublicProfile(userId, { refresh: true })
-      .then((profile) => {
-        if (!isActive) return;
-
-        setFormData((currentData) => ({
-          ...currentData,
-          avatar: currentData.avatar || profile?.avatar || "",
-          coverPhoto: currentData.coverPhoto || profile?.coverPhoto || "",
-        }));
-        setHasLoadedAvatar(true);
-        setHasLoadedCoverPhoto(true);
-      })
-      .catch(() => {
-        if (isActive) {
-          setError(
-            "Current profile photos could not be loaded. They will be preserved unless you choose new ones."
-          );
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [userId]);
+  const [syncedProfileId, setSyncedProfileId] = useState("");
+  const activeProfileId = profile?._id || profile?.id;
+  if (activeProfileId && syncedProfileId !== activeProfileId) {
+    setSyncedProfileId(activeProfileId);
+    if (!hasChangedAvatar && profile?.avatar) {
+      setFormData((current) => ({ ...current, avatar: profile.avatar }));
+      setHasLoadedAvatar(true);
+    }
+    if (!hasChangedCoverPhoto && profile?.coverPhoto) {
+      setFormData((current) => ({ ...current, coverPhoto: profile.coverPhoto }));
+      setHasLoadedCoverPhoto(true);
+    }
+  }
 
   const updateField = (field, value) => {
     if (field === "avatar") setHasChangedAvatar(true);
@@ -181,8 +171,12 @@ const ProfileSettings = ({ user }) => {
 
   const loadImage = (field, file) => {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Please choose an image smaller than 10 MB.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setError("Please choose a PNG, JPEG, WebP, or GIF image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Please choose an image that is 5 MB or smaller.");
       return;
     }
 
@@ -201,7 +195,13 @@ const ProfileSettings = ({ user }) => {
       return;
     }
 
-    setIsSaving(true);
+    const isChangingEmail = formData.email.trim().toLowerCase() !==
+      String(user?.email || "").trim().toLowerCase();
+    if (isChangingEmail && !formData.currentPassword) {
+      setError("Enter your current password to change your email address.");
+      return;
+    }
+
     setMessage("");
     setError("");
     try {
@@ -213,14 +213,17 @@ const ProfileSettings = ({ user }) => {
         country: formData.address.trim(),
         birthday: formData.birthday,
         gender: formData.gender,
-        skillGroups: {
-          technical: skillGroups["Technical Skills"],
-          soft: skillGroups["Soft Skills"],
-          other: skillGroups["Other Expertise"],
-        },
         companyName: formData.companyName.trim(),
         position: formData.role.trim(),
       };
+
+      if (!isClient) {
+        payload.skillGroups = {
+          technical: skillGroups["Technical Skills"],
+          soft: skillGroups["Soft Skills"],
+          other: skillGroups["Other Expertise"],
+        };
+      }
 
       if (hasLoadedAvatar || hasChangedAvatar) {
         payload.avatar = formData.avatar;
@@ -228,12 +231,22 @@ const ProfileSettings = ({ user }) => {
       if (hasLoadedCoverPhoto || hasChangedCoverPhoto) {
         payload.coverPhoto = formData.coverPhoto;
       }
+      if (isChangingEmail) {
+        payload.currentPassword = formData.currentPassword;
+      }
 
-      const updatedUser = await authAPI.updateMe(payload);
-      localStorage.setItem(getStorageKey(user), JSON.stringify({ gender: formData.gender, skills: skillGroups }));
+      const updatedUser = await updateProfile.mutateAsync(payload);
+      localStorage.setItem(
+        getStorageKey(user),
+        JSON.stringify({
+          gender: formData.gender,
+          ...(!isClient ? { skills: skillGroups } : {}),
+        })
+      );
       updateUser(updatedUser);
       setFormData((currentData) => ({
         ...currentData,
+        currentPassword: "",
         avatar: updatedUser.avatar || "",
         coverPhoto: updatedUser.coverPhoto || "",
       }));
@@ -244,8 +257,6 @@ const ProfileSettings = ({ user }) => {
       setMessage("Profile settings saved.");
     } catch (saveError) {
       setError(getApiErrorMessage(saveError, "Unable to save profile settings."));
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -259,7 +270,7 @@ const ProfileSettings = ({ user }) => {
               Change Cover
               <input
                 type="file"
-                accept="image/*"
+                accept={PROFILE_IMAGE_ACCEPT}
                 className="sr-only"
                 onChange={(event) => {
                   loadImage("coverPhoto", event.target.files?.[0]);
@@ -278,13 +289,10 @@ const ProfileSettings = ({ user }) => {
             </div>
             <h2 className="mt-3 text-base font-black text-[#10142d] dark:text-white">{formData.fullName || "Profile Name"}</h2>
             <span className="mt-2 inline-flex rounded-full bg-pink-50 px-3 py-1 text-xs font-black uppercase text-[#c72fb2]">
-              {user?.role || "Admin"}
+              {user?.role || "User"}
             </span>
             <p className="mt-3 text-sm font-black text-[#10142d] dark:text-white">
-              {formData.role || "System Administrator"}
-            </p>
-            <p className="mx-auto mt-2 max-w-[220px] text-xs font-semibold leading-5 text-slate-500">
-              Managing the system and ensuring everything runs smoothly.
+              {formData.role || user?.role || "Position not available"}
             </p>
             <div className="mt-4 space-y-3 border-y border-pink-50 py-3.5 text-left text-xs font-bold text-slate-600">
               <p className="flex items-center gap-3"><Icon name="mail" />{formData.email}</p>
@@ -298,7 +306,7 @@ const ProfileSettings = ({ user }) => {
                 Change Photo
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={PROFILE_IMAGE_ACCEPT}
                   className="sr-only"
                   onChange={(event) => {
                     loadImage("avatar", event.target.files?.[0]);
@@ -328,6 +336,18 @@ const ProfileSettings = ({ user }) => {
             <Field label="Email Address" icon="mail" required>
               <input type="email" required value={formData.email} onChange={(event) => updateField("email", event.target.value)} className={iconInputClass} />
             </Field>
+            {formData.email.trim().toLowerCase() !== String(user?.email || "").trim().toLowerCase() && (
+              <Field label="Current Password to Change Email" required>
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={formData.currentPassword}
+                  onChange={(event) => updateField("currentPassword", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            )}
             <Field label="Phone Number" icon="phone" required>
               <input type="tel" required value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} className={iconInputClass} />
             </Field>
@@ -352,7 +372,7 @@ const ProfileSettings = ({ user }) => {
             <Icon name="briefcase" className="h-5 w-5" /> Work Information
           </h2>
           <div className="grid gap-3.5 xl:grid-cols-3">
-            <Field label="Employee ID" icon="id">
+            <Field label={isClient ? "Client ID" : "Employee ID"} icon="id">
               <input type="text" value={getEmployeeId(user)} readOnly className={`${iconInputClass} bg-slate-50`} />
             </Field>
             <Field label="Company" icon="briefcase">
@@ -367,42 +387,44 @@ const ProfileSettings = ({ user }) => {
           </div>
         </section>
 
-        <section className="mt-4 border-t border-pink-50 pt-4">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-3 text-base font-black text-[#10142d] dark:text-white">
-                <Icon name="person" className="h-5 w-5" /> Skills & Expertise
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Manage your skills and expertise to showcase your strengths.
-              </p>
-            </div>
-            <button type="button" onClick={() => setShowSkillForm((visible) => !visible)} className="h-9 rounded-lg border border-pink-500 px-4 text-xs font-black text-pink-600 transition hover:bg-pink-50 dark:hover:bg-pink-500 dark:hover:text-white">
-              + Add Skill
-            </button>
-          </div>
-          {showSkillForm && (
-            <div className="mb-4 grid gap-2 rounded-xl bg-pink-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-              <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-0 w-full`} />
-              <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-full sm:w-auto`}>
-                {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
-              </select>
-              <button type="button" onClick={addSkill} className="h-10 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Add</button>
-            </div>
-          )}
-          {Object.entries(skillGroups).map(([group, items]) => (
-            <div key={group} className="mb-4 last:mb-0">
-              <h3 className="mb-3 text-sm font-black text-[#10142d] dark:text-white">{group}</h3>
-              <div className="flex flex-wrap gap-2">
-                {items.map((skill) => (
-                  <button type="button" onClick={() => removeSkill(group, skill)} key={skill} aria-label={`Remove ${skill}`} className="rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-pink-600 transition hover:border-pink-300 hover:bg-pink-100">
-                    {skill} <span className="ml-1">×</span>
-                  </button>
-                ))}
+        {!isClient && (
+          <section className="mt-4 border-t border-pink-50 pt-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-3 text-base font-black text-[#10142d] dark:text-white">
+                  <Icon name="person" className="h-5 w-5" /> Skills & Expertise
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Manage your skills and expertise to showcase your strengths.
+                </p>
               </div>
+              <button type="button" onClick={() => setShowSkillForm((visible) => !visible)} className="h-9 rounded-lg border border-pink-500 px-4 text-xs font-black text-pink-600 transition hover:bg-pink-50 dark:hover:bg-pink-500 dark:hover:text-white">
+                + Add Skill
+              </button>
             </div>
-          ))}
-        </section>
+            {showSkillForm && (
+              <div className="mb-4 grid gap-2 rounded-xl bg-pink-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <input type="text" value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSkill(); } }} placeholder="Enter a skill" className={`${inputClass} min-w-0 w-full`} />
+                <select value={newSkillGroup} onChange={(event) => setNewSkillGroup(event.target.value)} className={`${inputClass} w-full sm:w-auto`}>
+                  {Object.keys(skillGroups).map((group) => <option key={group}>{group}</option>)}
+                </select>
+                <button type="button" onClick={addSkill} className="h-10 rounded-lg bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-4 text-xs font-black text-white shadow-[0_8px_18px_rgba(219,74,181,0.28)] transition hover:brightness-105">Add</button>
+              </div>
+            )}
+            {Object.entries(skillGroups).map(([group, items]) => (
+              <div key={group} className="mb-4 last:mb-0">
+                <h3 className="mb-3 text-sm font-black text-[#10142d] dark:text-white">{group}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((skill) => (
+                    <button type="button" onClick={() => removeSkill(group, skill)} key={skill} aria-label={`Remove ${skill}`} className="rounded-full border border-pink-100 bg-pink-50 px-3 py-1.5 text-xs font-black text-pink-600 transition hover:border-pink-300 hover:bg-pink-100">
+                      {skill} <span className="ml-1">×</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
         <span className="sr-only" aria-live="polite">{isSaving ? "Saving profile settings" : message}</span>
       </form>
     </div>

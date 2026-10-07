@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { authAPI, clientAPI, taskAPI } from "../../../services/api.js";
+import { useAssigneesQuery, useClientsQuery, useTaskMutations } from "../../../hooks/index.js";
 
 const priorityOptions = [
   { label: "Low", value: "low" },
@@ -126,8 +126,6 @@ const formatInputDate = (date) => {
 
 const todayInputDate = () => formatInputDate(new Date());
 
-const isPastInputDate = (date) => Boolean(date) && date < todayInputDate();
-
 const toInputDate = (date) => {
   if (!date) return todayInputDate();
   const dateValue = String(date);
@@ -192,6 +190,7 @@ const normalizeClients = (data) => {
 
 const formatClientName = (client) => {
   if (!client) return "";
+  if (typeof client === "string") return client.trim();
 
   const personName =
     client.contactPerson ||
@@ -199,28 +198,32 @@ const formatClientName = (client) => {
   const companyName = client.companyName || "";
 
   if (companyName && personName) return `${companyName} - ${personName}`;
-  return companyName || personName || client.email || "Unnamed client";
+  return companyName || personName || client.email || "";
 };
 
-const isRegisteredClientUser = (client) => client?.source === "user" || client?.role === "client";
+const isRegisteredClientUser = (client) =>
+  client?.source === "user" || client?.role === "client" || Boolean(client?.hasLoginAccount);
 
 const FieldLabel = ({ children }) => (
   <label className="text-sm font-medium text-neutral-800 dark:text-neutral-300">{children}</label>
 );
 
-const createInitialForm = (task, user, isAdmin) => {
+const createInitialForm = (task, user, isAdmin, initialClient = null) => {
+  const targetClient = task?.requestedBy || initialClient;
+  const targetClientId = getEntityId(targetClient);
+
   if (task) {
     return {
       title: task.title || "",
       description: task.description || "",
       startDate: toInputDate(task.startDate || task.createdAt || task.dueDate),
-      dueDate: toInputDate(task.dueDate),
+      dueDate: toInputDate(task.dueDate || task.targetDeadline),
       amount: task.amount ?? task.budget ?? "",
-      downPaymentType: task.downPayment?.mode || "none",
-      downPaymentValue: task.downPayment?.value ?? "",
+      downPaymentType: task.downPayment?.mode || task.downPaymentType || "none",
+      downPaymentValue: task.downPayment?.value ?? task.downPaymentValue ?? "",
       priority: task.priority || "medium",
       requestedBy:
-        getEntityId(task.requestedBy) ||
+        targetClientId ||
         (task.createdBy?.role === "client" ? getEntityId(task.createdBy) : ""),
       assignees: (task.assignees?.length ? task.assignees : [task.assignedTo])
         .map(getEntityId)
@@ -238,124 +241,90 @@ const createInitialForm = (task, user, isAdmin) => {
     downPaymentType: "none",
     downPaymentValue: "",
     priority: "medium",
-    requestedBy: isAdmin ? "" : getEntityId(user),
+    requestedBy: isAdmin ? targetClientId : getEntityId(user),
     assignees: isAdmin ? [] : [getEntityId(user)].filter(Boolean),
     subtasks: [createSubmitOutputSubtask()],
   };
 };
 
-const Addtask = ({ onNavigate, onTaskCreated, task }) => {
+const Addtask = ({ initialClient = null, onNavigate, onTaskCreated, task }) => {
   const { user } = useAuth();
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const isEditing = Boolean(task?.id);
-  const [formData, setFormData] = useState(() => createInitialForm(task, user, isAdmin));
-  const [assignees, setAssignees] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [clientSearch, setClientSearch] = useState("");
-  const [clientRequestType, setClientRequestType] = useState(
-    task?.requestedByName && !getEntityId(task?.requestedBy) ? "custom" : "existing"
-  );
-  const [customClientName, setCustomClientName] = useState(
-    task?.requestedByName && !getEntityId(task?.requestedBy) ? task.requestedByName : ""
-  );
+  const targetClient = useMemo(() => {
+    if (initialClient && typeof initialClient === "object") return initialClient;
+    if (task?.requestedBy && typeof task.requestedBy === "object") return task.requestedBy;
+    return null;
+  }, [initialClient, task?.requestedBy]);
+
+  const [formData, setFormData] = useState(() => createInitialForm(task, user, isAdmin, initialClient));
+  const [clientSearch, setClientSearch] = useState(() => {
+    if (targetClient) {
+      return formatClientName(targetClient);
+    }
+    if (task?.requestedByName) {
+      return task.requestedByName;
+    }
+    return "";
+  });
+  const [clientRequestType, setClientRequestType] = useState(() => {
+    if (targetClient || formData.requestedBy) return "existing";
+    if (task?.requestedByName && !getEntityId(task?.requestedBy)) return "custom";
+    return "existing";
+  });
+  const [customClientName, setCustomClientName] = useState(() => {
+    if (task?.requestedByName && !getEntityId(task?.requestedBy) && !targetClient) {
+      return task.requestedByName;
+    }
+    return "";
+  });
   const [isClientPickerOpen, setIsClientPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: rawAssignees = [] } = useAssigneesQuery();
+  const { data: rawClients = [] } = useClientsQuery(
+    { limit: 100 },
+    { enabled: Boolean(isAdmin) }
+  );
+  const { createTask, updateTask } = useTaskMutations();
+  const isSubmitting = createTask.isPending || updateTask.isPending;
 
-    const loadAssignees = async () => {
-      try {
-        const data = await authAPI.getAssignees();
-        const loadedAssignees = normalizeAssignees(data);
-        const availableAssignees = isAdmin
-          ? loadedAssignees.filter(
-              (assignee) =>
-                assignee?.role === "employee" ||
-                (assignee?.role === "admin" && assignee?.isSelf)
-            )
-          : loadedAssignees;
+  const assignees = useMemo(() => {
+    const loadedAssignees = normalizeAssignees(rawAssignees);
+    return isAdmin
+      ? loadedAssignees.filter(
+          (assignee) =>
+            assignee?.role === "employee" ||
+            (assignee?.role === "admin" && assignee?.isSelf)
+        )
+      : loadedAssignees;
+  }, [isAdmin, rawAssignees]);
 
-        if (isMounted) {
-          setAssignees(availableAssignees);
-
-          setFormData((currentData) => {
-            const existingAssigneeIds = (task?.assignees?.length
-              ? task.assignees
-              : [task?.assignedTo]
-            ).map(getEntityId).filter(Boolean);
-
-            return {
-              ...currentData,
-              assignees:
-                currentData.assignees.length > 0
-                  ? currentData.assignees
-                  : existingAssigneeIds.length > 0
-                    ? existingAssigneeIds
-                    : [getEntityId(availableAssignees[0])].filter(Boolean),
-            };
-          });
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load assignees."
-          );
-        }
+  const clients = useMemo(() => {
+    const list = normalizeClients(rawClients);
+    if (targetClient) {
+      const targetId = getEntityId(targetClient);
+      if (targetId && !list.some((client) => getEntityId(client) === targetId)) {
+        return [targetClient, ...list];
       }
-    };
-
-    loadAssignees();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAdmin, task?.assignedTo, task?.assignees, user]);
-
-  useEffect(() => {
-    if (!isAdmin) {
-      return;
     }
+    return list;
+  }, [rawClients, targetClient]);
 
-    let isMounted = true;
-
-    const loadClients = async () => {
-      try {
-        const data = await clientAPI.getAll({ limit: 100 });
-        const loadedClients = normalizeClients(data);
-
-        if (isMounted) {
-          setClients(loadedClients);
-
-          const requestedClient = loadedClients.find(
-            (client) => getEntityId(client) === getEntityId(task?.requestedBy)
-          );
-          if (requestedClient) setClientSearch(formatClientName(requestedClient));
-
-          setFormData((currentData) => ({
-            ...currentData,
-            requestedBy:
-              currentData.requestedBy ||
-              getEntityId(task?.requestedBy) ||
-              "",
-          }));
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(
-            error.response?.data?.message || "Unable to load clients."
-          );
-        }
+  const [hasInitializedClientSearch, setHasInitializedClientSearch] = useState(false);
+  if (!hasInitializedClientSearch && !clientSearch && isAdmin && (task?.requestedBy || initialClient) && clients.length > 0) {
+    const targetId = getEntityId(task?.requestedBy) || getEntityId(initialClient);
+    const requestedClient = clients.find(
+      (client) => getEntityId(client) === targetId
+    );
+    if (requestedClient) {
+      setHasInitializedClientSearch(true);
+      setClientSearch(formatClientName(requestedClient));
+      if (!formData.requestedBy) {
+        setFormData((current) => ({ ...current, requestedBy: getEntityId(requestedClient) }));
       }
-    };
-
-    loadClients();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAdmin, task?.requestedBy]);
+    }
+  }
 
   const updateField = (field, value) => {
     setFormData((currentData) => ({
@@ -480,20 +449,12 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       return;
     }
 
-    if ((!isEditing && isPastInputDate(formData.startDate)) || isPastInputDate(formData.dueDate)) {
-      setErrorMessage("Past dates cannot be selected.");
-      return;
-    }
-
     if (new Date(formData.startDate) > new Date(formData.dueDate)) {
       setErrorMessage("Start date cannot be after due date.");
       return;
     }
 
-    if (formData.assignees.length === 0) {
-      setErrorMessage("Please choose at least one employee for this project.");
-      return;
-    }
+
 
     const unavailableAssignee = safeAssignees.find((assignee) => {
       const assigneeId = getEntityId(assignee);
@@ -566,7 +527,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
     const subtasks = ensureSubmitOutputSubtask(normalizedFormSubtasks);
 
     try {
-      setIsSubmitting(true);
       setErrorMessage("");
 
       const payload = {
@@ -587,7 +547,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           : {}),
         priority: formData.priority,
         status: statusToApi[task?.status] || task?.status || "in_progress",
-        assignedTo: formData.assignees[0],
+        assignedTo: formData.assignees[0] || null,
         assignees: formData.assignees,
         requestedBy:
           !isAdmin ||
@@ -603,9 +563,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
       };
 
       if (isEditing) {
-        await taskAPI.update(task.id, payload);
+        await updateTask.mutateAsync({ id: task.id, task: payload });
       } else {
-        await taskAPI.create(payload);
+        await createTask.mutateAsync(payload);
       }
 
       onTaskCreated?.();
@@ -614,8 +574,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
         error.response?.data?.message ||
           `Unable to ${isEditing ? "update" : "create"} project.`
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -627,7 +585,7 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
   );
   const isUnavailableForNewAssignment = (assignee) =>
     Boolean(assignee?.isOnLeave) && !originalAssigneeIds.has(getEntityId(assignee));
-  const safeClients = normalizeClients(clients);
+  const safeClients = clients;
   const currentClient = safeClients.find(
     (client) => getEntityId(client) === formData.requestedBy
   );
@@ -785,7 +743,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               <input
                 type="date"
                 disabled={isEditing}
-                min={todayInputDate()}
                 value={formData.startDate}
                 onChange={(event) => updateField("startDate", event.target.value)}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:border-neutral-700 dark:text-neutral-300 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-500 dark:focus:ring-pink-950"
@@ -796,7 +753,6 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
               <FieldLabel>Due Date</FieldLabel>
               <input
                 type="date"
-                min={formData.startDate || todayInputDate()}
                 value={formData.dueDate}
                 onChange={(event) => updateField("dueDate", event.target.value)}
                 className="h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-4 text-xs font-medium text-neutral-500 outline-none transition focus:border-[#d94ab4] focus:ring-2 focus:ring-pink-100 dark:border-neutral-700 dark:text-neutral-300 dark:focus:ring-pink-950"
@@ -1022,9 +978,9 @@ const Addtask = ({ onNavigate, onTaskCreated, task }) => {
           )}
 
           <div className="mt-5 space-y-1">
-            <FieldLabel>Assign Project to:</FieldLabel>
+            <FieldLabel>Assign Project to (Optional):</FieldLabel>
             <p className="text-[11px] font-medium text-neutral-400">
-              Select everyone who will collaborate, then assign individual tasks above.
+              Select everyone who will collaborate, or leave unassigned to add team members later.
             </p>
             <div className="mt-2 grid max-h-40 gap-2 overflow-y-auto rounded-lg border border-neutral-300 bg-white/40 p-3 dark:border-neutral-700 dark:bg-neutral-950 sm:grid-cols-2">
               {safeAssignees.map((assignee) => {

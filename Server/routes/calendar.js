@@ -1,11 +1,14 @@
 import express from "express";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 import mongoose from "mongoose";
 import CalendarDepartment from "../models/calendarDepartmentModel.js";
 import CalendarEvent from "../models/calendarEventModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/protectedjwt.js";
+import { authorize } from "../middleware/authorize.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 
 const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const startOfToday = () => {
@@ -138,7 +141,7 @@ router.get("/departments", protect, async (req, res) => {
   }
 });
 
-router.post("/departments", protect, async (req, res) => {
+router.post("/departments", protect, authorize("admin"), async (req, res) => {
   try {
     const name = String(req.body.name || "").trim();
 
@@ -160,6 +163,9 @@ router.post("/departments", protect, async (req, res) => {
 
     res.status(201).json(department);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Create calendar department error:", error);
     res.status(500).json({ message: "Unable to create calendar department" });
   }
@@ -169,13 +175,22 @@ router.get("/", protect, async (req, res) => {
   try {
     const query = { ...eventQueryForUser(req.user) };
     const month = String(req.query.month || "").trim();
+    const now = new Date();
+
+    let birthdayYear = now.getFullYear();
+    let birthdayMonthIndex = now.getMonth();
 
     if (month) {
-      const [year, monthIndex] = month.split("-").map(Number);
-      if (year && monthIndex) {
-        const from = new Date(year, monthIndex - 1, 1);
-        const to = new Date(year, monthIndex, 1);
-        query.date = { $gte: from, $lt: to };
+      const parts = month.split("-").map(Number);
+      if (parts.length === 2 && Number.isInteger(parts[0]) && Number.isInteger(parts[1])) {
+        const [year, monthIndex] = parts;
+        if (monthIndex >= 1 && monthIndex <= 12) {
+          const from = new Date(year, monthIndex - 1, 1);
+          const to = new Date(year, monthIndex, 1);
+          query.date = { $gte: from, $lt: to };
+          birthdayYear = year;
+          birthdayMonthIndex = monthIndex - 1;
+        }
       }
     }
 
@@ -192,10 +207,6 @@ router.get("/", protect, async (req, res) => {
       ];
     }
 
-    const now = new Date();
-    const [requestedYear, requestedMonth] = month.split("-").map(Number);
-    const birthdayYear = requestedYear || now.getFullYear();
-    const birthdayMonthIndex = requestedMonth ? requestedMonth - 1 : now.getMonth();
     const [events, birthdayEvents] = await Promise.all([
       CalendarEvent.find(query)
         .sort({ date: 1, startTime: 1, createdAt: 1 })
@@ -237,6 +248,9 @@ router.post("/", protect, async (req, res) => {
 
     res.status(201).json(event);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Create calendar event error:", error);
     res.status(500).json({ message: "Unable to create calendar event" });
   }
@@ -277,6 +291,9 @@ router.put("/:id", protect, async (req, res) => {
     await event.save();
     res.status(200).json(event);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
+    }
     console.error("Update calendar event error:", error);
     res.status(500).json({ message: "Unable to update calendar event" });
   }

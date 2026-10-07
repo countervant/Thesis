@@ -134,7 +134,7 @@ const TwoFactorVerification = () => {
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f8f9fd] px-4 py-10 dark:bg-[#111]">
       <div className="absolute -left-28 top-10 h-72 w-72 rounded-full bg-pink-200/40 blur-3xl" />
       <div className="absolute -right-28 bottom-8 h-80 w-80 rounded-full bg-violet-200/40 blur-3xl" />
-      <section className="relative w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 text-center shadow-[0_24px_70px_rgba(65,36,86,0.12)] sm:p-10 dark:border-[#DA70D6]/60 dark:bg-[#141414]">
+      <section className="relative w-full max-w-lg rounded-2xl border border-pink-100 bg-white p-6 text-center shadow-[0_24px_70px_rgba(65,36,86,0.12)] sm:p-10 dark:border-[#e5e7eb]/20 dark:bg-[#141414]">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-linear-to-br from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-200/70">
           {status === "success" ? <CheckCircle2 className="h-8 w-8" /> : <ShieldCheck className="h-8 w-8" />}
         </div>

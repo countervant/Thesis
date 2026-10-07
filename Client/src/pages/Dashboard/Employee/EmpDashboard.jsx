@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import done from "../../../assets/done.png";
 import pendingRequest from "../../../assets/pendingrequest.png";
 import pending from "../../../assets/pending.png";
 import task from "../../../assets/task.png";
-import Skeleton from "../../../components/Skeleton/Skeleton";
+import Skeleton from "../../../components/Skeleton/Skeleton.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
-import { getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import {
+  useTasksQuery,
+  useCalendarQuery,
+  useLeaveRequestsQuery,
+  useOnlineTeamQuery,
+} from "../../../hooks/index.js";
+import { getApiErrorMessage } from "../../../services/api.js";
 
 const statusFromApi = {
   done: "Done",
@@ -22,10 +28,10 @@ const toneStyles = {
 };
 
 const statCardStyles = {
-  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#754de8] dark:!border-b-[#754de8] dark:!ring-[#754de8]/45",
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  blue: "!border-[#754de8]/45 border-b-2 !border-b-[#754de8] ring-1 !ring-[#754de8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
 };
 
 const priorityStyles = {
@@ -257,31 +263,42 @@ const normalizeTask = (item) => {
 const EmpDashboard = () => {
   const { user } = useAuth();
   const firstName = getDisplayName(user).split(" ")[0];
-  const [tasks, setTasks] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
-  useEffect(() => {
-    let isMounted = true;
+  const {
+    data: rawTasks = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery({ view: "employee" }, {
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
+  });
 
-    const loadTasks = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-        const data = await taskAPI.getAll({ limit: 100, view: "dashboard" });
-        if (isMounted) setTasks(data.map(normalizeTask));
-      } catch (error) {
-        if (isMounted) setErrorMessage(getApiErrorMessage(error, "Unable to load dashboard."));
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
+  const {
+    isLoading: isCalendarLoading,
+    error: calendarError,
+  } = useCalendarQuery({ month: currentMonthKey });
 
-    loadTasks();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const {
+    isLoading: isLeaveLoading,
+    error: leaveError,
+  } = useLeaveRequestsQuery({ employeeOnly: true });
+
+  const {
+    isLoading: isTeamLoading,
+  } = useOnlineTeamQuery();
+
+  const tasks = useMemo(() => {
+    if (!Array.isArray(rawTasks)) return [];
+    return rawTasks.map(normalizeTask);
+  }, [rawTasks]);
+
+  const queryError = tasksError || calendarError || leaveError;
+  const errorMessage = queryError
+    ? getApiErrorMessage(queryError, "Unable to load dashboard.")
+    : "";
+  const isLoading = isTasksLoading || isCalendarLoading || isLeaveLoading || isTeamLoading;
 
   const dashboardData = useMemo(() => {
     const sortedTasks = [...tasks].sort(

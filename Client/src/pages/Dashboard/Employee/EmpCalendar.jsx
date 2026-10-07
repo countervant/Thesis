@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { calendarAPI, getApiErrorMessage, taskAPI } from "../../../services/api.js";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../../../constants/queryKeys.js";
+import {
+  useCalendarQuery,
+  useCalendarMutations,
+  useTasksQuery,
+} from "../../../hooks/index.js";
+import { unwrapData } from "../../../utils/queryUtils.js";
+import { getApiErrorMessage } from "../../../services/api.js";
 
 const calendars = [
   ["My Schedule", "accent-pink-600"],
@@ -19,11 +27,11 @@ const toneStyles = {
 };
 
 const statCardStyles = {
-  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#28b84c] dark:!border-b-[#28b84c] dark:!ring-[#28b84c]/45",
-  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#ff8317] dark:!border-b-[#ff8317] dark:!ring-[#ff8317]/45",
-  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
-  red: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#dc2626] dark:!border-b-[#dc2626] dark:!ring-[#dc2626]/45",
-  violet: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e347a8] dark:!border-b-[#e347a8] dark:!ring-[#e347a8]/45",
+  green: "!border-[#28b84c]/45 border-b-2 !border-b-[#28b84c] ring-1 !ring-[#28b84c]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  orange: "!border-[#ff8317]/45 border-b-2 !border-b-[#ff8317] ring-1 !ring-[#ff8317]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  pink: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  red: "!border-[#dc2626]/45 border-b-2 !border-b-[#dc2626] ring-1 !ring-[#dc2626]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
+  violet: "!border-[#e347a8]/45 border-b-2 !border-b-[#e347a8] ring-1 !ring-[#e347a8]/20 dark:!border-[#e5e7eb]/20 dark:!border-b-[#e5e7eb]/20 dark:!ring-[#e5e7eb]/20",
 };
 
 const typeStyles = {
@@ -178,32 +186,6 @@ const normalizeTaskEvent = (task) => {
   };
 };
 
-const loadCalendarSources = async (currentMonth) => {
-  const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
-  const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
-  const [calendarResult, taskResult] = await Promise.allSettled([
-    calendarAPI.getAll({ month: monthKey(currentMonth) }),
-    taskAPI.getAll({ dueFrom: monthStart, dueTo: monthEnd, limit: 100, view: "calendar" }),
-  ]);
-  const calendarEvents = calendarResult.status === "fulfilled" ? calendarResult.value : [];
-  const tasks = taskResult.status === "fulfilled" ? taskResult.value : [];
-
-  const unavailableSources = [
-    calendarResult.status === "rejected" ? "calendar events" : "",
-    taskResult.status === "rejected" ? "task deadlines" : "",
-  ].filter(Boolean);
-
-  return {
-    events: [
-      ...calendarEvents.map(normalizeEvent),
-      ...tasks.filter((task) => task.dueDate).map(normalizeTaskEvent),
-    ],
-    warning: unavailableSources.length
-      ? `Some calendar data could not be loaded (${unavailableSources.join(" and ")}). Refresh to retry.`
-      : "",
-  };
-};
-
 const emptyPersonalForm = (date) => ({
   id: "",
   title: "",
@@ -242,6 +224,7 @@ const eventMatchesCalendar = (event, calendarName) => {
 };
 
 const EmpCalendar = () => {
+  const queryClient = useQueryClient();
   const today = new Date();
   const todayKey = toDateKey(today);
   const [currentMonth, setCurrentMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -249,43 +232,38 @@ const EmpCalendar = () => {
   const [activeView, setActiveView] = useState("Month");
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [visibleCalendars, setVisibleCalendars] = useState(() => Object.fromEntries(calendars.map(([item]) => [item, true])));
-  const [events, setEvents] = useState([]);
   const [eventForm, setEventForm] = useState(null);
   const [showDayEventsPanel, setShowDayEventsPanel] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [actionErrorMessage, setActionErrorMessage] = useState("");
 
-  useEffect(() => {
-    let isActive = true;
+  const activeMonthKey = monthKey(currentMonth);
+  const monthStart = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+  const monthEnd = toDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
 
-    const loadCalendarData = async () => {
-      setIsLoading(true);
+  const {
+    data: rawCalendarEvents = [],
+    isLoading: isCalendarLoading,
+    error: calendarError,
+  } = useCalendarQuery({ month: activeMonthKey });
 
-      try {
-        const { events: calendarEvents, warning } = await loadCalendarSources(currentMonth);
+  const {
+    data: rawTasks = [],
+    isLoading: isTasksLoading,
+    error: tasksError,
+  } = useTasksQuery({ dueFrom: monthStart, dueTo: monthEnd, limit: 100, view: "calendar" });
 
-        if (isActive) {
-          setEvents(calendarEvents);
-          setErrorMessage(warning);
-        }
-      } catch (error) {
-        if (isActive) {
-          setErrorMessage(getApiErrorMessage(error, "Unable to load your calendar."));
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
+  const { createEvent, updateEvent: updateEventMutation } = useCalendarMutations();
+  const isSaving = createEvent.isPending || updateEventMutation.isPending;
 
-    void loadCalendarData();
+  const events = useMemo(() => {
+    const calendarEvents = Array.isArray(rawCalendarEvents) ? rawCalendarEvents : [];
+    const tasks = Array.isArray(rawTasks) ? rawTasks : [];
 
-    return () => {
-      isActive = false;
-    };
-  }, [currentMonth]);
+    return [
+      ...calendarEvents.map(normalizeEvent),
+      ...tasks.filter((task) => task?.dueDate).map(normalizeTaskEvent),
+    ];
+  }, [rawCalendarEvents, rawTasks]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) =>
@@ -349,25 +327,48 @@ const EmpCalendar = () => {
     };
 
     try {
-      setIsSaving(true);
-      setErrorMessage("");
-      const savedEvent = eventForm.id
-        ? await calendarAPI.update(eventForm.id, payload)
-        : await calendarAPI.create(payload);
-      const normalizedEvent = normalizeEvent(savedEvent);
-      const belongsToCurrentMonth = sameMonth(new Date(normalizedEvent.date), currentMonth);
+      setActionErrorMessage("");
+      const savedResult = eventForm.id
+        ? await updateEventMutation.mutateAsync({ id: eventForm.id, event: payload })
+        : await createEvent.mutateAsync(payload);
+      const savedEvent = unwrapData(savedResult);
 
-      setEvents((currentEvents) => [
-        ...currentEvents.filter((currentEvent) => currentEvent.id !== normalizedEvent.id),
-        ...(belongsToCurrentMonth ? [normalizedEvent] : []),
-      ]);
+      if (savedEvent) {
+        queryClient.setQueryData(
+          QUERY_KEYS.calendar({ month: activeMonthKey }),
+          (old) => {
+            const oldList = Array.isArray(old) ? old : [];
+            const savedId = savedEvent._id || savedEvent.id;
+            const exists = oldList.some((item) => (item._id || item.id) === savedId);
+            if (exists) {
+              return oldList.map((item) =>
+                (item._id || item.id) === savedId ? savedEvent : item
+              );
+            }
+            if (sameMonth(new Date(savedEvent.date), currentMonth)) {
+              return [...oldList, savedEvent];
+            }
+            return oldList;
+          }
+        );
+      }
       setEventForm(null);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to save this event."));
-    } finally {
-      setIsSaving(false);
+      setActionErrorMessage(getApiErrorMessage(error, "Unable to save this event."));
     }
   };
+
+  const unavailableSources = [
+    calendarError ? "calendar events" : "",
+    tasksError ? "task deadlines" : "",
+  ].filter(Boolean);
+
+  const queryWarning = unavailableSources.length
+    ? `Some calendar data could not be loaded (${unavailableSources.join(" and ")}). Refresh to retry.`
+    : "";
+
+  const errorMessage = [queryWarning, actionErrorMessage].filter(Boolean).join(" ");
+  const isLoading = isCalendarLoading || isTasksLoading;
 
   const selectMonth = (month) => {
     const nextMonth = new Date(month.getFullYear(), month.getMonth(), 1);

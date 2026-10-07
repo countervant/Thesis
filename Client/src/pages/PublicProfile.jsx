@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
-import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar";
-import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton/Skeleton";
+import { useQueryClient } from "@tanstack/react-query";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog.jsx";
+import InitialsAvatar from "../components/InitialsAvatar/InitialsAvatar.jsx";
+import { FeedSkeleton, ProfileSkeleton } from "../components/Skeleton/Skeleton.jsx";
 import companyIcon from "../assets/company.png";
 import defaultCoverPhoto from "../assets/defaultcoverphoto.webp";
 import emailIcon from "../assets/email.png";
@@ -10,8 +11,14 @@ import heartIcon from "../assets/heart.png";
 import phoneIcon from "../assets/phonenumber.png";
 import redHeartIcon from "../assets/redheart.png";
 import { useAuth } from "../context/AuthContext.jsx";
-import { authAPI, newsfeedAPI } from "../services/api.js";
+import { newsfeedAPI, getApiErrorMessage } from "../services/api.js";
 import { getCountryFlag } from "../utils/countries.js";
+import { QUERY_KEYS } from "../constants/queryKeys.js";
+import {
+  usePublicProfileQuery,
+  useNewsfeedQuery,
+  useNewsfeedMutations,
+} from "../hooks/index.js";
 import MainBars from "./MainBars.jsx";
 
 const PROFILE_POST_PAGE_SIZE = 10;
@@ -134,18 +141,6 @@ const mergePostPage = (currentPosts, incomingPosts) => {
   return mergedPosts;
 };
 
-const mergeRefreshedFirstPage = (currentPosts, incomingPosts) => {
-  const mergedPosts = mergePostPage(currentPosts, incomingPosts);
-  const incomingIds = incomingPosts.map(getEntityId).filter(Boolean);
-  const incomingIdSet = new Set(incomingIds);
-  const postsById = new Map(mergedPosts.map((post) => [post.id, post]));
-
-  return [
-    ...incomingIds.map((postId) => postsById.get(postId)).filter(Boolean),
-    ...mergedPosts.filter((post) => !incomingIdSet.has(post.id)),
-  ];
-};
-
 const collectUsers = (posts) => {
   const users = new Map();
   const addUser = (candidate) => {
@@ -162,18 +157,6 @@ const collectUsers = (posts) => {
   });
 
   return users;
-};
-
-const toggleUserHeart = (hearts, user) => {
-  const userId = getEntityId(user);
-  const safeHearts = Array.isArray(hearts) ? hearts : [];
-  const hasHearted = safeHearts.some((heart) => getEntityId(heart) === userId);
-
-  if (hasHearted) {
-    return safeHearts.filter((heart) => getEntityId(heart) !== userId);
-  }
-
-  return [...safeHearts, user];
 };
 
 const Avatar = ({ user, size = "h-24 w-24" }) => (
@@ -444,134 +427,117 @@ const PublicProfile = () => {
   const navigate = useNavigate();
   const { userId = "" } = useParams();
   const { logout, user } = useAuth();
-  const [posts, setPosts] = useState([]);
-  const [directProfileUser, setDirectProfileUser] = useState(null);
+  const queryClient = useQueryClient();
+
   const [commentDrafts, setCommentDrafts] = useState({});
   const [replyDrafts, setReplyDrafts] = useState({});
   const [visibleComments, setVisibleComments] = useState({});
   const [visibleReplies, setVisibleReplies] = useState({});
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [localErrorMessage, setLocalErrorMessage] = useState("");
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState(null);
   const [activeProfileTab, setActiveProfileTab] = useState("Newsfeed");
-  const [currentPostPage, setCurrentPostPage] = useState(1);
-  const [totalPostPages, setTotalPostPages] = useState(1);
-  const [totalPostCount, setTotalPostCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingMorePosts, setIsLoadingMorePosts] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState("");
-  const optimisticCommentId = useRef(0);
-  const profileRequestGeneration = useRef(0);
 
-  const loadProfilePosts = useCallback(async ({ showLoading = true } = {}) => {
-    const requestGeneration = profileRequestGeneration.current + 1;
-    profileRequestGeneration.current = requestGeneration;
-    const isCurrentRequest = () =>
-      profileRequestGeneration.current === requestGeneration;
-    let profileData = null;
+  const {
+    data: directProfileUser,
+    isLoading: isProfileLoading,
+    error: profileError,
+  } = usePublicProfileQuery(userId, { enabled: Boolean(userId) });
 
-    try {
-      if (showLoading) {
-        setIsLoading(true);
-        setPosts([]);
-        setDirectProfileUser(null);
-        setCurrentPostPage(1);
-        setTotalPostPages(1);
-        setTotalPostCount(0);
-      }
-      setIsLoadingMorePosts(false);
-      setLoadMoreError("");
-      setErrorMessage("");
+  const canViewActivity = directProfileUser?.canViewActivity !== false;
 
-      if (!userId) {
-        throw new Error("Profile not found");
-      }
+  const feedParams = useMemo(
+    () => ({
+      author: userId,
+      limit: PROFILE_POST_PAGE_SIZE,
+    }),
+    [userId]
+  );
 
-      profileData = await authAPI.getPublicProfile(userId, { refresh: true });
-      if (!isCurrentRequest()) return;
+  const {
+    data: feedData,
+    isLoading: isFeedLoading,
+    error: feedError,
+  } = useNewsfeedQuery(feedParams, {
+    enabled: Boolean(userId && canViewActivity),
+  });
 
-      setDirectProfileUser(profileData);
+  const {
+    toggleHeart: toggleHeartMutation,
+    addComment: addCommentMutation,
+    deleteComment: deleteCommentMutation,
+    toggleCommentHeart: toggleCommentHeartMutation,
+    replyComment: replyCommentMutation,
+  } = useNewsfeedMutations();
 
-      if (profileData?.canViewActivity === false) {
-        setPosts([]);
-        setCurrentPostPage(1);
-        setTotalPostPages(1);
-        setTotalPostCount(0);
-        return;
-      }
+  const posts = useMemo(() => {
+    if (!canViewActivity) return [];
+    const list = Array.isArray(feedData?.posts) ? feedData.posts : [];
+    return list.map(normalizePost);
+  }, [canViewActivity, feedData]);
 
-      const pageData = await newsfeedAPI.getPage({
-        author: userId,
-        page: 1,
-        limit: PROFILE_POST_PAGE_SIZE,
-        refresh: true,
+  const totalPostPages = feedData?.totalPages || 1;
+  const totalPostCount = feedData?.total ?? posts.length;
+  const hasMorePosts = currentPage < totalPostPages;
+
+  const isLoading =
+    isProfileLoading || (canViewActivity && isFeedLoading && posts.length === 0);
+
+  const errorMessage =
+    localErrorMessage ||
+    (profileError
+      ? getApiErrorMessage(profileError, "Unable to load profile.")
+      : "") ||
+    (feedError
+      ? getApiErrorMessage(feedError, "Profile activity could not be loaded.")
+      : "");
+  const setErrorMessage = useCallback((msg) => setLocalErrorMessage(msg), []);
+
+  const updateFeedCache = useCallback(
+    (updater) => {
+      queryClient.setQueryData(QUERY_KEYS.newsfeed(feedParams), (old) => {
+        const current =
+          old && Array.isArray(old.posts)
+            ? old
+            : { posts: [], page: 1, totalPages: 1, total: 0 };
+        return updater(current);
       });
-      if (!isCurrentRequest()) return;
+    },
+    [feedParams, queryClient]
+  );
 
-      setPosts((currentPosts) =>
-        showLoading
-          ? mergePostPage([], pageData.posts)
-          : mergeRefreshedFirstPage(currentPosts, pageData.posts)
-      );
-      setCurrentPostPage((currentPage) =>
-        showLoading
-          ? pageData.page
-          : Math.min(Math.max(currentPage, pageData.page), pageData.totalPages)
-      );
-      setTotalPostPages(pageData.totalPages);
-      setTotalPostCount(pageData.total);
-    } catch (error) {
-      if (!isCurrentRequest()) return;
-
-      if (!profileData) {
-        setPosts([]);
-        setDirectProfileUser(null);
-        setCurrentPostPage(1);
-        setTotalPostPages(1);
-        setTotalPostCount(0);
-        setErrorMessage(error.response?.data?.message || error.message || "Unable to load profile.");
-      } else {
-        setErrorMessage(
-          error.response?.data?.message ||
-            "Profile activity could not be loaded. Refresh to retry."
-        );
-      }
-    } finally {
-      if (isCurrentRequest()) setIsLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(loadProfilePosts, 0);
-    return () => {
-      window.clearTimeout(timer);
-      profileRequestGeneration.current += 1;
-    };
-  }, [loadProfilePosts]);
-
-  useEffect(() => {
-    const handleNewsfeedUpdate = () => {
-      loadProfilePosts({ showLoading: false });
-    };
-
-    window.addEventListener("clientra:newsfeed-updated", handleNewsfeedUpdate);
-    return () => window.removeEventListener("clientra:newsfeed-updated", handleNewsfeedUpdate);
-  }, [loadProfilePosts]);
+  const replacePost = useCallback(
+    (updatedPost) => {
+      const normalizedPost = normalizePost(updatedPost);
+      updateFeedCache((old) => ({
+        ...old,
+        posts: old.posts.map((post) =>
+          post.id === normalizedPost.id
+            ? mergePostPreservingMedia(normalizePost(post), normalizedPost)
+            : post
+        ),
+      }));
+    },
+    [updateFeedCache]
+  );
 
   useEffect(() => {
     const postsMissingMedia = posts.filter(
       (post) => post.media?.type && !post.media?.url
     );
 
-    if (postsMissingMedia.length === 0) return undefined;
+    if (postsMissingMedia.length === 0) return;
 
-    let isMounted = true;
+    let isActive = true;
 
     const loadMissingMedia = async () => {
       const result = await newsfeedAPI.getMediaBatch(
         postsMissingMedia.map((post) => post.id)
       );
-      if (!isMounted) return;
+      if (!isActive) return;
 
       const mediaByPostId = new Map(
         Object.entries(result.mediaById).map(([postId, media]) => [
@@ -585,13 +551,14 @@ const PublicProfile = () => {
       );
 
       if (mediaByPostId.size > 0) {
-        setPosts((currentPosts) =>
-          currentPosts.map((currentPost) =>
+        updateFeedCache((old) => ({
+          ...old,
+          posts: old.posts.map((currentPost) =>
             mediaByPostId.has(currentPost.id)
               ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
               : currentPost
-          )
-        );
+          ),
+        }));
       }
 
       if (result.failedBatchCount > 0) {
@@ -600,22 +567,22 @@ const PublicProfile = () => {
     };
 
     loadMissingMedia().catch(() => {
-      if (isMounted) {
-        setErrorMessage("Profile media could not be loaded. Refresh to retry.");
-      }
+      if (!isActive) return;
+      setErrorMessage("Profile media could not be loaded. Refresh to retry.");
     });
 
     return () => {
-      isMounted = false;
+      isActive = false;
     };
-  }, [posts]);
+  }, [posts, setErrorMessage, updateFeedCache]);
 
   const { profileUser, userPosts } = useMemo(() => {
     const users = collectUsers(posts);
     const foundUser = users.get(userId) || null;
-    const authoredPosts = directProfileUser?.canViewActivity === false
-      ? []
-      : posts.filter((post) => getEntityId(post.author) === userId);
+    const authoredPosts =
+      directProfileUser?.canViewActivity === false
+        ? []
+        : posts.filter((post) => getEntityId(post.author) === userId);
     const postProfileUser = foundUser || authoredPosts[0]?.author || null;
 
     return {
@@ -626,45 +593,42 @@ const PublicProfile = () => {
       userPosts: authoredPosts,
     };
   }, [directProfileUser, posts, userId]);
+
   const totalLikes = userPosts.reduce((total, post) => total + post.hearts.length, 0);
   const totalComments = userPosts.reduce((total, post) => total + post.comments.length, 0);
   const activeProjects = Math.max(
     0,
     new Set(userPosts.map((post) => post.media?.name || post.content?.slice(0, 18)).filter(Boolean)).size
   );
-  const hasMorePosts = currentPostPage < totalPostPages;
 
   const handleLoadMorePosts = async () => {
     if (!userId || !hasMorePosts || isLoadingMorePosts) return;
 
-    const requestGeneration = profileRequestGeneration.current;
-    const nextPage = currentPostPage + 1;
-
     try {
       setIsLoadingMorePosts(true);
       setLoadMoreError("");
+      const nextPage = currentPage + 1;
       const pageData = await newsfeedAPI.getPage({
         author: userId,
         page: nextPage,
         limit: PROFILE_POST_PAGE_SIZE,
         refresh: true,
       });
-      if (profileRequestGeneration.current !== requestGeneration) return;
 
-      setPosts((currentPosts) => mergePostPage(currentPosts, pageData.posts));
-      setCurrentPostPage(pageData.page);
-      setTotalPostPages(pageData.totalPages);
-      setTotalPostCount(pageData.total);
+      updateFeedCache((old) => ({
+        ...old,
+        posts: mergePostPage(old.posts, pageData.posts),
+        page: pageData.page,
+        totalPages: pageData.totalPages,
+        total: pageData.total,
+      }));
+      setCurrentPage(pageData.page);
     } catch (error) {
-      if (profileRequestGeneration.current === requestGeneration) {
-        setLoadMoreError(
-          error.response?.data?.message || "More profile posts could not be loaded. Try again."
-        );
-      }
+      setLoadMoreError(
+        getApiErrorMessage(error, "More profile posts could not be loaded. Try again.")
+      );
     } finally {
-      if (profileRequestGeneration.current === requestGeneration) {
-        setIsLoadingMorePosts(false);
-      }
+      setIsLoadingMorePosts(false);
     }
   };
 
@@ -673,17 +637,6 @@ const PublicProfile = () => {
       ...currentVisibility,
       [postId]: !currentVisibility[postId],
     }));
-  };
-
-  const replacePost = (updatedPost) => {
-    const normalizedPost = normalizePost(updatedPost);
-    setPosts((currentPosts) =>
-      currentPosts.map((post) =>
-        post.id === normalizedPost.id
-          ? mergePostPreservingMedia(post, normalizedPost)
-          : post
-      )
-    );
   };
 
   const handleCommentChange = (postId, value) => {
@@ -708,69 +661,22 @@ const PublicProfile = () => {
   };
 
   const handleToggleHeart = async (postId) => {
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? { ...post, hearts: toggleUserHeart(post.hearts, user) }
-            : post
-        );
-      });
-      newsfeedAPI.updateCachedPost(postId, (post) => ({
-        ...post,
-        hearts: toggleUserHeart(post.hearts, user),
-      }));
-
-      const updatedPost = await newsfeedAPI.toggleHeart(postId);
+      const updatedPost = await toggleHeartMutation.mutateAsync(postId);
       replacePost(updatedPost);
     } catch (error) {
-      setPosts(previousPosts);
-      newsfeedAPI.clearCachedPosts();
-      setErrorMessage(error.response?.data?.message || "Unable to update heart.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to update heart."));
     }
   };
 
   const handleToggleCommentHeart = async (postId, commentId) => {
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                comments: post.comments.map((comment) =>
-                  (comment.id || comment._id) === commentId
-                    ? { ...comment, hearts: toggleUserHeart(comment.hearts, user) }
-                    : comment
-                ),
-              }
-            : post
-        );
-      });
-      newsfeedAPI.updateCachedPost(postId, (post) => ({
-        ...post,
-        comments: Array.isArray(post.comments)
-          ? post.comments.map((comment) =>
-              (comment.id || comment._id) === commentId
-                ? { ...comment, hearts: toggleUserHeart(comment.hearts, user) }
-                : comment
-            )
-          : [],
-      }));
-
-      const updatedPost = await newsfeedAPI.toggleCommentHeart(postId, commentId);
+      const updatedPost = await toggleCommentHeartMutation.mutateAsync({ postId, commentId });
       replacePost(updatedPost);
     } catch (error) {
-      setPosts(previousPosts);
-      newsfeedAPI.clearCachedPosts();
-      setErrorMessage(error.response?.data?.message || "Unable to update comment heart.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to update comment heart."));
     }
   };
 
@@ -783,59 +689,27 @@ const PublicProfile = () => {
       return;
     }
 
-    optimisticCommentId.current += 1;
-    const optimisticComment = normalizeComment({
-      id: `temp-comment-${optimisticCommentId.current}`,
-      text,
-      user,
-      hearts: [],
-      replies: [],
-      createdAt: new Date().toISOString(),
-    });
-    let previousPosts = [];
-
     try {
       setErrorMessage("");
-      setPosts((currentPosts) => {
-        previousPosts = currentPosts;
-        return currentPosts.map((post) =>
-          post.id === postId
-            ? { ...post, comments: [...post.comments, optimisticComment] }
-            : post
-        );
-      });
-      newsfeedAPI.updateCachedPost(postId, (post) => ({
-        ...post,
-        comments: [...(post.comments || []), optimisticComment],
-      }));
+      const updatedPost = await addCommentMutation.mutateAsync({ postId, text });
+      replacePost(updatedPost);
       handleCommentChange(postId, "");
       setVisibleComments((currentVisibility) => ({
         ...currentVisibility,
         [postId]: true,
       }));
-
-      const updatedPost = await newsfeedAPI.comment(postId, text);
-      replacePost(updatedPost);
     } catch (error) {
-      setPosts(previousPosts);
-      newsfeedAPI.updateCachedPost(postId, (post) => ({
-        ...post,
-        comments: (post.comments || []).filter(
-          (comment) => (comment.id || comment._id) !== optimisticComment.id
-        ),
-      }));
-      handleCommentChange(postId, text);
-      setErrorMessage(error.response?.data?.message || "Unable to add comment.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to add comment."));
     }
   };
 
   const handleDeleteComment = async (postId, commentId) => {
     try {
       setErrorMessage("");
-      const updatedPost = await newsfeedAPI.deleteComment(postId, commentId);
+      const updatedPost = await deleteCommentMutation.mutateAsync({ postId, commentId });
       replacePost(updatedPost);
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to delete comment.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to delete comment."));
     }
   };
 
@@ -850,7 +724,7 @@ const PublicProfile = () => {
 
     try {
       setErrorMessage("");
-      const updatedPost = await newsfeedAPI.reply(postId, commentId, text);
+      const updatedPost = await replyCommentMutation.mutateAsync({ postId, commentId, text });
       replacePost(updatedPost);
       handleReplyChange(commentId, "");
       setVisibleComments((currentVisibility) => ({
@@ -862,7 +736,7 @@ const PublicProfile = () => {
         [commentId]: true,
       }));
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Unable to add reply.");
+      setErrorMessage(getApiErrorMessage(error, "Unable to add reply."));
     }
   };
 
@@ -1146,7 +1020,7 @@ const PublicProfile = () => {
                         Work Information
                       </h2>
                       {[
-                        ["Employee ID", getEntityId(profileUser).slice(-8).toUpperCase() || "Not available"],
+                        [profileUser.role === "client" ? "Client ID" : "Employee ID", getEntityId(profileUser).slice(-8).toUpperCase() || "Not available"],
                         ["Department", profileUser.companyName || "Not provided"],
                         ["Position", profileUser.position || "Not provided"],
                         ["Join Date", formatJoinedDate(profileUser.createdAt)],
@@ -1165,21 +1039,23 @@ const PublicProfile = () => {
                       ))}
                     </section>
 
-                    <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-                      <h2 className="mb-4 text-sm font-black text-[#10142d]">
-                        Skills & Expertise
-                      </h2>
-                      <div className="flex flex-wrap gap-2.5">
-                        {Object.values(profileUser.skillGroups || {}).flat().map((skill) => (
-                          <span key={skill} className="rounded-full bg-pink-50 px-4 py-2 text-[11px] font-black text-[#c72fb2]">
-                            {skill}
-                          </span>
-                        ))}
-                        {Object.values(profileUser.skillGroups || {}).flat().length === 0 && (
-                          <span className="text-xs font-semibold text-slate-500">No skills added yet.</span>
-                        )}
-                      </div>
-                    </section>
+                    {profileUser.role !== "client" && (
+                      <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
+                        <h2 className="mb-4 text-sm font-black text-[#10142d]">
+                          Skills & Expertise
+                        </h2>
+                        <div className="flex flex-wrap gap-2.5">
+                          {Object.values(profileUser.skillGroups || {}).flat().map((skill) => (
+                            <span key={skill} className="rounded-full bg-pink-50 px-4 py-2 text-[11px] font-black text-[#c72fb2]">
+                              {skill}
+                            </span>
+                          ))}
+                          {Object.values(profileUser.skillGroups || {}).flat().length === 0 && (
+                            <span className="text-xs font-semibold text-slate-500">No skills added yet.</span>
+                          )}
+                        </div>
+                      </section>
+                    )}
 
                     <section className="rounded-2xl border border-pink-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
                       <h2 className="mb-4 text-sm font-black text-[#10142d]">

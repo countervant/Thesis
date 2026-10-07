@@ -202,7 +202,7 @@ const validateCode = async (user, code, purpose) => {
         ],
       },
       { $inc: { twoFactorAttempts: 1 } },
-      { new: true }
+      { returnDocument: "after" }
     ).select("+twoFactorAttempts +twoFactorCodeHash");
     if (!failedAttempt) {
       return { status: 400, message: "This verification code is no longer valid." };
@@ -280,7 +280,7 @@ const validateBackupCode = async (user, backupCode) => {
         ],
       },
       { $inc: { twoFactorAttempts: 1 } },
-      { new: true }
+      { returnDocument: "after" }
     ).select("+twoFactorAttempts");
     user.twoFactorAttempts = failedAttempt?.twoFactorAttempts || OTP_MAX_ATTEMPTS;
     logSecurityEvent("2fa_backup_code_rejected", user._id, `attempt=${user.twoFactorAttempts}`);
@@ -379,6 +379,7 @@ export const resendLoginTwoFactor = async (req, res) => {
     const delivery = await sendOtp(user, "login", true);
     return res.json({ message: "A new code was sent.", ...delivery });
   } catch (error) {
+    console.error("Resend 2FA error:", error);
     if (error.retryAfter) res.set("Retry-After", String(error.retryAfter));
     const expired = error?.name === "TokenExpiredError";
     return res.status(error.status || (expired ? 410 : 401)).json({ message: expired ? "Your verification session has expired. Sign in again." : error.message || "Unable to resend the code." });

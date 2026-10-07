@@ -7,8 +7,10 @@ import {
   BudgetPlannerEntry,
   BudgetPlannerSettings,
 } from "../models/Employee/budgetPlannerModel.js";
+import { validateObjectIdParam } from "../middleware/validateObjectId.js";
 
 const router = express.Router();
+router.param("id", validateObjectIdParam);
 const allowedTypes = new Set(["income", "expense"]);
 
 router.use(protect, authorize("employee"));
@@ -33,7 +35,7 @@ const validateEntry = (entry) => {
 const syncProjectIncomeEntries = async (employeeId) => {
   const [tasks, existingSourcePayments] = await Promise.all([
     Task.find({ "employeePayments.employee": employeeId })
-      .select("title employeePayments.employee employeePayments.amount employeePayments.paidAt employeePayments.paidBy")
+      .select("title employeePayments")
       .maxTimeMS(8000)
       .lean(),
     BudgetPlannerEntry.distinct("sourceEmployeePayment", {
@@ -45,9 +47,15 @@ const syncProjectIncomeEntries = async (employeeId) => {
   const operations = tasks.flatMap((task) =>
     (task.employeePayments || [])
       .filter((payment) => String(payment.employee?._id || payment.employee) === String(employeeId))
-      .filter((payment) => !existingSources.has(`${task._id}:${employeeId}`))
+      .filter((payment) => {
+        const sourceKey = payment._id ? `${task._id}:${payment._id}` : `${task._id}:${employeeId}`;
+        const legacyKey = `${task._id}:${employeeId}`;
+        return !existingSources.has(sourceKey) && !existingSources.has(legacyKey);
+      })
       .map((payment) => {
-        const sourceEmployeePayment = `${task._id}:${employeeId}`;
+        const sourceEmployeePayment = payment._id
+          ? `${task._id}:${payment._id}`
+          : `${task._id}:${employeeId}`;
         const entryId = createHash("sha256")
           .update(`employee-budget-income:${sourceEmployeePayment}`)
           .digest("hex")
