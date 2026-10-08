@@ -47,7 +47,11 @@ const fullTaskFields = [
   "requestedBy", "requestedByName", "revisionRequests.user", "revisionRequests.title",
   "revisionRequests.section", "revisionRequests.priority", "revisionRequests.description",
   "revisionRequests.preferredCompletionDate", "revisionRequests.createdAt",
-  "revisionRequests.startedAt", "revisionRequests.startedBy", "finalOutput.submittedBy",
+  "revisionRequests.startedAt", "revisionRequests.startedBy",
+  "revisionRequests.attachment.fileName", "revisionRequests.attachment.fileUrl",
+  "revisionRequests.attachment.publicId", "revisionRequests.attachment.resourceType",
+  "revisionRequests.attachment.storedName",
+  "finalOutput.submittedBy",
   "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName",
   "finalOutput.fileUrl", "finalOutput.previewFileName", "finalOutput.mimeType",
   "finalOutput.watermarked", "finalOutput.link",
@@ -64,28 +68,37 @@ const fullTaskFields = [
   "createdAt", "updatedAt",
 ].join(" ");
 
+const projectViewFields = [
+  "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
+  "downPayment.mode", "downPayment.value", "downPayment.amount", "downPayment.paidAt",
+  "assignedTo", "assignees", "requestedBy", "requestedByName",
+  "subtasks._id", "subtasks.title", "subtasks.completed", "subtasks.assignedTo",
+  "activities.type",
+  "revisionRequests._id", "revisionRequests.user", "revisionRequests.title", "revisionRequests.section",
+  "revisionRequests.priority", "revisionRequests.description", "revisionRequests.preferredCompletionDate",
+  "revisionRequests.createdAt", "revisionRequests.startedAt", "revisionRequests.startedBy",
+  "revisionRequests.attachment.fileName", "revisionRequests.attachment.fileUrl",
+  "revisionRequests.attachment.publicId", "revisionRequests.attachment.resourceType",
+  "revisionRequests.attachment.storedName",
+  "finalOutput.submittedBy", "finalOutput.submittedAt",
+  "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName", "finalOutput.fileUrl",
+  "finalOutput.link", "finalOutput.mimeType", "finalOutput.watermarked",
+  "attachments.fileName", "attachments.fileUrl", "feedback.rating", "feedback.overallRating",
+  "feedback.comment", "feedback.submittedAt", "feedback.reply.message", "archived", "archivedAt",
+  "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
+  "employeePayments.employee", "employeePayments.amount", "employeePayments.paidAt",
+  "employeePayments.paidBy", "employeePayments.budgetEntry", "employeePayments.employeeBudgetEntry",
+  "createdAt", "updatedAt",
+].join(" ");
+
 const taskFieldsByView = {
-  projects: [
-    "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
-    "downPayment.mode", "downPayment.value", "downPayment.amount", "downPayment.paidAt",
-    "assignedTo", "assignees", "requestedBy", "requestedByName",
-    "subtasks._id", "subtasks.title", "subtasks.completed", "subtasks.assignedTo",
-    "activities.type", "revisionRequests._id", "finalOutput.submittedBy", "finalOutput.submittedAt",
-    "finalOutput.message", "finalOutput.outputMethod", "finalOutput.fileName", "finalOutput.fileUrl",
-    "finalOutput.link", "finalOutput.mimeType", "finalOutput.watermarked",
-    "attachments.fileName", "attachments.fileUrl", "feedback.rating", "feedback.overallRating",
-    "feedback.comment", "feedback.submittedAt", "feedback.reply.message", "archived", "archivedAt",
-    "newsfeedPermission.allowed", "newsfeedPermission.grantedAt", "newsfeedPermission.grantedBy",
-    "employeePayments.employee", "employeePayments.amount", "employeePayments.paidAt",
-    "employeePayments.paidBy", "employeePayments.budgetEntry", "employeePayments.employeeBudgetEntry",
-    "createdAt", "updatedAt",
-  ].join(" "),
+  projects: projectViewFields,
+  employee: projectViewFields,
   notification: [
     "title", "assignedTo", "assignees", "subtasks.assignedTo", "createdBy",
     "activities._id", "activities.type", "activities.actor", "activities.actorName",
     "activities.title", "activities.details", "activities.createdAt", "createdAt", "updatedAt",
   ].join(" "),
-  employee: "title status dueDate assignedTo assignees subtasks.assignedTo archived createdAt updatedAt",
   calendar: "title status startDate dueDate assignedTo assignees subtasks._id archived createdAt updatedAt",
   dashboard: [
     "title", "description", "status", "priority", "startDate", "dueDate", "amount", "paid",
@@ -414,6 +427,13 @@ const addTaskAvatarUrls = (task, viewer) => {
         grantedBy: withAvatarUrl(task.newsfeedPermission.grantedBy),
       }
     : task.newsfeedPermission,
+  revisionRequests: Array.isArray(task.revisionRequests)
+    ? task.revisionRequests.map((rev) => ({
+        ...rev,
+        user: withAvatarUrl(rev.user),
+        startedBy: withAvatarUrl(rev.startedBy),
+      }))
+    : [],
   };
 
   responseTask.finalOutput = getTaskFinalOutputForViewer(responseTask, viewer);
@@ -859,7 +879,6 @@ router.get("/", protect, async (req, res) => {
       if (req.query.dueTo) query.dueDate.$lte = new Date(req.query.dueTo);
     }
     if (view === "employee") {
-      query.status = { $ne: "done" };
       query.archived = { $ne: true };
     }
 
@@ -875,18 +894,20 @@ router.get("/", protect, async (req, res) => {
       // lightweight signed image URL instead of repeating Base64 image data.
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role updatedAt")
-      .populate("assignees", "firstName lastName email role updatedAt")
-      .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
-      .populate("createdBy", "firstName lastName companyName email role updatedAt")
-      .populate("requestedBy", "firstName lastName companyName email role updatedAt")
-      .populate("finalOutput.submittedBy", "firstName lastName email role updatedAt")
-      .populate("employeePayments.employee", "firstName lastName email role updatedAt")
-      .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
-      .populate("feedback.user", "firstName lastName companyName email role updatedAt")
-      .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
+        .populate("assignees", "firstName lastName email role updatedAt")
+        .populate("subtasks.assignedTo", "firstName lastName email role updatedAt")
+        .populate("createdBy", "firstName lastName companyName email role updatedAt")
+        .populate("requestedBy", "firstName lastName companyName email role updatedAt")
+        .populate("finalOutput.submittedBy", "firstName lastName email role updatedAt")
+        .populate("employeePayments.employee", "firstName lastName email role updatedAt")
+        .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
+        .populate("feedback.user", "firstName lastName companyName email role updatedAt")
+        .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
         .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
-        .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role updatedAt");
-    } else if (view === "projects") {
+        .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role updatedAt")
+        .populate("revisionRequests.user", "firstName lastName companyName email role updatedAt")
+        .populate("revisionRequests.startedBy", "firstName lastName email role updatedAt");
+    } else if (view === "projects" || view === "employee") {
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role updatedAt")
         .populate("assignees", "firstName lastName email role updatedAt")
@@ -894,7 +915,9 @@ router.get("/", protect, async (req, res) => {
         .populate("requestedBy", "firstName lastName companyName email role updatedAt")
         .populate("finalOutput.submittedBy", "firstName lastName email role updatedAt")
         .populate("employeePayments.employee", "firstName lastName email role updatedAt")
-        .populate("employeePayments.paidBy", "firstName lastName email role updatedAt");
+        .populate("employeePayments.paidBy", "firstName lastName email role updatedAt")
+        .populate("revisionRequests.user", "firstName lastName companyName email role updatedAt")
+        .populate("revisionRequests.startedBy", "firstName lastName email role updatedAt");
     } else if (view === "dashboard" || view === "notification") {
       taskRequest = taskRequest
         .populate("assignedTo", "firstName lastName email role position avatar updatedAt")
@@ -937,6 +960,8 @@ router.get("/:id", protect, async (req, res) => {
       .populate("feedback.submittedBy", "firstName lastName companyName email role updatedAt")
       .populate("feedback.reply.repliedBy", "firstName lastName companyName email role updatedAt")
       .populate("newsfeedPermission.grantedBy", "firstName lastName companyName email role updatedAt")
+      .populate("revisionRequests.user", "firstName lastName companyName email role updatedAt")
+      .populate("revisionRequests.startedBy", "firstName lastName email role updatedAt")
       .maxTimeMS(8000)
       .lean();
 
@@ -1726,11 +1751,13 @@ router.post("/:id/revisions", protect, async (req, res) => {
     if (req.body.file?.dataUrl) {
       const parsedFile = parseOutputFile(req.body.file);
       const savedFile = await saveTaskOutput(task._id, parsedFile, { private: true });
+      const revIndex = task.revisionRequests.length;
       attachment = {
         fileName: savedFile.fileName,
-        fileUrl: savedFile.fileUrl,
+        fileUrl: savedFile.fileUrl || `/api/tasks/${task._id}/revisions/${revIndex}/download`,
         publicId: savedFile.publicId,
         resourceType: savedFile.resourceType,
+        storedName: savedFile.storedName,
       };
     }
 
@@ -1756,6 +1783,8 @@ router.post("/:id/revisions", protect, async (req, res) => {
       .populate("subtasks.assignedTo", "firstName lastName email role")
       .populate("createdBy", "firstName lastName email role")
       .populate("requestedBy", "firstName lastName companyName email role")
+      .populate("revisionRequests.user", "firstName lastName companyName email role")
+      .populate("revisionRequests.startedBy", "firstName lastName email role")
       .lean();
 
     res.status(201).json(addTaskAvatarUrls(updatedTask, req.user));
@@ -2235,6 +2264,78 @@ router.get("/:id/attachments/:index/download", protect, async (req, res) => {
     }
     console.error("Download task attachment error:", error);
     return res.status(500).json({ message: "Unable to download task attachment" });
+  }
+});
+
+router.get("/:id/revisions/:index/download", protect, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      ...taskQueryForUser(req.user),
+    }).select("revisionRequests");
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    const revisionIndex = Number(req.params.index);
+    const revision = Number.isInteger(revisionIndex) && revisionIndex >= 0
+      ? task.revisionRequests?.[revisionIndex]
+      : null;
+    if (!revision || !revision.attachment) {
+      return res.status(404).json({ message: "Revision attachment not found" });
+    }
+
+    const attachment = revision.attachment;
+    const downloadName = attachment.fileName || "revision-attachment";
+
+    if (attachment.fileUrl?.startsWith("http")) {
+      const response = await fetch(attachment.fileUrl);
+      if (!response.ok) {
+        return res.status(404).json({ message: "The revision attachment file could not be retrieved" });
+      }
+
+      const contentType = response.headers.get("content-type") || "application/octet-stream";
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(downloadName)}"`);
+      res.setHeader("Content-Type", contentType);
+      const contentLength = response.headers.get("content-length");
+      if (contentLength) res.setHeader("Content-Length", contentLength);
+
+      const { Readable } = await import("stream");
+      return Readable.fromWeb(response.body).pipe(res);
+    }
+
+    const storedFileName = path.basename(
+      String(attachment.storedName || attachment.fileUrl || "")
+    );
+    if (!storedFileName) {
+      return res.status(400).json({ message: "Invalid revision attachment file" });
+    }
+
+    let filePath = await findStoredTaskFile(
+      privateUploadsRoot,
+      legacyPrivateUploadsRoot,
+      task._id,
+      storedFileName
+    );
+
+    if (!filePath) {
+      filePath = await findStoredTaskFile(
+        uploadsRoot,
+        legacyUploadsRoot,
+        task._id,
+        storedFileName
+      );
+    }
+
+    if (!filePath) {
+      return res.status(404).json({ message: "The revision attachment file could not be found" });
+    }
+
+    return res.download(filePath, safeFileName(downloadName));
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return res.status(404).json({ message: "The revision attachment file could not be found" });
+    }
+    console.error("Download revision attachment error:", error);
+    return res.status(500).json({ message: "Unable to download revision attachment" });
   }
 });
 

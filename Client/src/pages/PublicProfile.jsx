@@ -118,7 +118,7 @@ const mergePostPreservingMedia = (currentPost, updatedPost) => {
 const mergePostPage = (currentPosts, incomingPosts) => {
   const mergedPosts = [...currentPosts];
   const indexById = new Map(
-    mergedPosts.map((post, index) => [post.id, index])
+    mergedPosts.map((post, index) => [getEntityId(post), index])
   );
 
   incomingPosts.forEach((incomingPost) => {
@@ -245,17 +245,17 @@ const PostPreview = ({
 
       {post.media?.url && (
         <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200">
-          {post.media.type === "image" ? (
-            <img
-              src={post.media.url}
-              alt={post.media.name || "Post media"}
-              className="max-h-[440px] w-full bg-neutral-50 object-contain"
-            />
-          ) : (
+          {post.media.type === "video" ? (
             <video
               src={post.media.url}
               controls
               className="max-h-[440px] w-full bg-black"
+            />
+          ) : (
+            <img
+              src={post.media.url}
+              alt={post.media.name || "Post media"}
+              className="max-h-[440px] w-full bg-neutral-50 object-contain"
             />
           )}
         </div>
@@ -515,7 +515,7 @@ const PublicProfile = () => {
       updateFeedCache((old) => ({
         ...old,
         posts: old.posts.map((post) =>
-          post.id === normalizedPost.id
+          getEntityId(post) === normalizedPost.id
             ? mergePostPreservingMedia(normalizePost(post), normalizedPost)
             : post
         ),
@@ -526,7 +526,7 @@ const PublicProfile = () => {
 
   useEffect(() => {
     const postsMissingMedia = posts.filter(
-      (post) => post.media?.type && !post.media?.url
+      (post) => (post.media?.type || post.media?.name) && !post.media?.url
     );
 
     if (postsMissingMedia.length === 0) return;
@@ -553,11 +553,12 @@ const PublicProfile = () => {
       if (mediaByPostId.size > 0) {
         updateFeedCache((old) => ({
           ...old,
-          posts: old.posts.map((currentPost) =>
-            mediaByPostId.has(currentPost.id)
-              ? { ...currentPost, media: mediaByPostId.get(currentPost.id) }
-              : currentPost
-          ),
+          posts: old.posts.map((currentPost) => {
+            const id = getEntityId(currentPost);
+            return mediaByPostId.has(id)
+              ? { ...currentPost, media: mediaByPostId.get(id) }
+              : currentPost;
+          }),
         }));
       }
 

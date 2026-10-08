@@ -1327,6 +1327,8 @@ const Tasks = ({
 
   const [isApprovingCustomClientId, setIsApprovingCustomClientId] = useState("");
   const [isDownloadingOutputId, setIsDownloadingOutputId] = useState("");
+  const [isDownloadingRevisionAttachmentId, setIsDownloadingRevisionAttachmentId] = useState("");
+  const [isStartingRevisionId, setIsStartingRevisionId] = useState("");
   const [isMarkingPaidId, setIsMarkingPaidId] = useState("");
   const [isPayingEmployeeId, setIsPayingEmployeeId] = useState("");
   const [employeePaymentTask, setEmployeePaymentTask] = useState(null);
@@ -1766,6 +1768,35 @@ const Tasks = ({
     }
   };
 
+  const handleDownloadRevisionAttachment = async (task, revisionIndex, fileName) => {
+    try {
+      setIsDownloadingRevisionAttachmentId(task.id);
+      setErrorMessage("");
+      await taskAPI.downloadRevisionAttachment(task.id, revisionIndex, fileName);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to download the revision attachment."));
+    } finally {
+      setIsDownloadingRevisionAttachmentId("");
+    }
+  };
+
+  const handleStartRevision = async (task) => {
+    if (!task || isStartingRevisionId) return;
+
+    try {
+      setIsStartingRevisionId(task.id);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = await taskAPI.startRevision(task.id);
+      updateTaskInCache(updatedTask);
+      setNoticeMessage(`${task.title} revision is now in progress.`);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to start revision."));
+    } finally {
+      setIsStartingRevisionId("");
+    }
+  };
+
   const handleApproveCustomClient = async (task) => {
     try {
       setIsApprovingCustomClientId(task.id);
@@ -2054,12 +2085,15 @@ const Tasks = ({
               currentUserId={currentUserId}
               isApprovingCustomClient={isApprovingCustomClientId === selectedTask.id}
               isDownloadingOutput={isDownloadingOutputId === selectedTask.id}
+              isDownloadingRevisionAttachment={isDownloadingRevisionAttachmentId === selectedTask.id}
               isMarkingPaid={isMarkingPaidId === selectedTask.id}
               isPayingEmployee={isPayingEmployeeId === selectedTask.id}
+              isStartingRevision={isStartingRevisionId === selectedTask.id}
               item={selectedTask}
               onClose={() => setSelectedTaskId("")}
               onDelete={requestDeleteTask}
               onDownloadOutput={handleDownloadOutput}
+              onDownloadRevisionAttachment={handleDownloadRevisionAttachment}
               onEdit={handleEditTask}
               onMarkPaid={user?.role === "admin" ? requestMarkPaid : undefined}
               onPayEmployee={
@@ -2070,6 +2104,7 @@ const Tasks = ({
                   : undefined
               }
               onApproveCustomClient={requestCustomClientApproval}
+              onStartRevision={handleStartRevision}
               onSubmitOutput={handleSubmitOutput}
               onToggleTask={handleToggleSubtask}
             />

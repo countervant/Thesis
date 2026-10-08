@@ -266,6 +266,7 @@ const taskSchema = new mongoose.Schema(
           fileUrl: String,
           publicId: String,
           resourceType: String,
+          storedName: String,
         },
       },
     ],

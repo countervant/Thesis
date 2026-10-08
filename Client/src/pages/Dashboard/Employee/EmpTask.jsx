@@ -218,6 +218,16 @@ const normalizeTask = (task) => {
   };
 };
 
+const isTaskInRevision = (task) => {
+  if (!task) return false;
+  const revisions = Array.isArray(task.revisionRequests) ? task.revisionRequests : [];
+  if (revisions.length === 0) return false;
+  const latestRevision = revisions[revisions.length - 1];
+  if (latestRevision?.startedAt) return false;
+  const statusStr = String(task.apiStatus || task.status || "").toLowerCase();
+  return statusStr.includes("pending") || Boolean(task.finalOutput?.submittedAt);
+};
+
 const TaskRow = ({ currentUserId, isExpanded, isOverlay = false, item, onSubmitOutput, onToggleExpand, onToggleSubtask, onViewCalendar }) => {
   const progressValue = item.progress ?? getTaskProgress(item.subtasks);
   const completedSubtasks = item.subtasks.filter((subtask) => subtask.completed).length;
@@ -727,8 +737,18 @@ const CompletedTaskModal = ({ completion, errorMessage, isSubmitting, onClose, o
   );
 };
 
-const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
-  const revision = task.revisionRequests[task.revisionRequests.length - 1] || {};
+const RevisionDetailsModal = ({
+  isDownloadingAttachment,
+  isStarting,
+  onClose,
+  onDownloadAttachment,
+  onStart,
+  task,
+}) => {
+  const revision =
+    (Array.isArray(task?.revisionRequests) && task.revisionRequests.length > 0
+      ? task.revisionRequests[task.revisionRequests.length - 1]
+      : null) || {};
   const priority = revision.priority
     ? revision.priority[0].toUpperCase() + revision.priority.slice(1)
     : "Medium";
@@ -761,6 +781,52 @@ const RevisionDetailsModal = ({ isStarting, onClose, onStart, task }) => {
           <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{revision.description || "No additional instructions were provided."}</p>
         </div>
 
+        {revision.attachment && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-pink-100 text-[#c72fb2] dark:bg-pink-950/40">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Client Reference Attachment</span>
+                <p className="truncate text-xs font-bold text-slate-800 dark:text-white">{revision.attachment.fileName || "Revision reference file"}</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                disabled={isDownloadingAttachment}
+                onClick={() =>
+                  onDownloadAttachment
+                    ? onDownloadAttachment(task, (task.revisionRequests?.length || 1) - 1, revision.attachment.fileName)
+                    : taskAPI.downloadRevisionAttachment(task.id, (task.revisionRequests?.length || 1) - 1, revision.attachment.fileName)
+                }
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#c72fb2] px-4 text-xs font-bold text-white shadow-xs transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
+                </svg>
+                {isDownloadingAttachment ? "Downloading..." : "Download File"}
+              </button>
+              {revision.attachment.fileUrl && (
+                <a
+                  href={revision.attachment.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                >
+                  Open
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
+                  </svg>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button type="button" onClick={onClose} disabled={isStarting} className="h-11 rounded-xl border border-slate-200 bg-white px-7 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-white">Close</button>
           <button type="button" onClick={onStart} disabled={isStarting} className="inline-flex h-11 items-center justify-center rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-7 text-sm font-black text-white shadow-[0_10px_22px_rgba(199,47,178,0.28)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60">
@@ -776,14 +842,14 @@ const EmpTask = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const currentUserId = getEntityId(user);
-  const tasksParams = useMemo(() => ({ view: "employee" }), []);
+  const tasksParams = useMemo(() => ({ limit: 100, view: "employee" }), []);
 
   const {
     data: rawTasks,
     isLoading,
     error: tasksError,
   } = useTasksQuery(
-    { view: "employee" },
+    tasksParams,
     {
       refetchInterval: 10000,
       refetchIntervalInBackground: true,
@@ -813,6 +879,8 @@ const EmpTask = () => {
   const [completionDraft, setCompletionDraft] = useState(null);
   const [revisionDraft, setRevisionDraft] = useState(null);
   const [isStartingRevision, setIsStartingRevision] = useState(false);
+  const [isDownloadingRevisionAttachment, setIsDownloadingRevisionAttachment] = useState(false);
+  const [isDownloadingOutput, setIsDownloadingOutput] = useState(false);
   const pendingTaskUpdateIdsRef = useRef(new Set());
 
   const tasks = useMemo(() => {
@@ -864,6 +932,19 @@ const EmpTask = () => {
     [invalidateTaskData, queryClient, selectedTaskId, tasksParams]
   );
 
+  const handleSelectTask = useCallback(
+    (taskId) => {
+      const task = tasks.find((t) => String(t.id) === String(taskId));
+      if (task && isTaskInRevision(task)) {
+        setRevisionDraft({ task, subtaskIndex: getSubmissionSubtaskIndex(task.subtasks) });
+        setSelectedTaskId("");
+        return;
+      }
+      setSelectedTaskId(String(taskId));
+    },
+    [tasks]
+  );
+
   useEffect(() => {
     const openNotificationTarget = () => {
       const rawTarget = sessionStorage.getItem(notificationTargetKey);
@@ -878,7 +959,7 @@ const EmpTask = () => {
 
         setVisibleGroup("All");
         setSearchQuery("");
-        setSelectedTaskId(String(target.taskId));
+        handleSelectTask(String(target.taskId));
         sessionStorage.removeItem(notificationTargetKey);
       } catch {
         sessionStorage.removeItem(notificationTargetKey);
@@ -888,7 +969,7 @@ const EmpTask = () => {
     openNotificationTarget();
     window.addEventListener("clientra:notification-target", openNotificationTarget);
     return () => window.removeEventListener("clientra:notification-target", openNotificationTarget);
-  }, [isLoading, tasks]);
+  }, [handleSelectTask, isLoading, tasks]);
 
   const visibleTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -1035,12 +1116,58 @@ const EmpTask = () => {
       setNoticeMessage("");
       const updatedTask = await taskAPI.startRevision(revisionDraft.task.id);
       updateTaskInCache(updatedTask);
+      setSelectedTaskId("");
       setRevisionDraft(null);
       setNoticeMessage(`${revisionDraft.task.title} revision is now in progress.`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Unable to start revision."));
     } finally {
       setIsStartingRevision(false);
+    }
+  };
+
+  const handleStartRevisionDirect = async (task) => {
+    if (!task || isStartingRevision) return;
+
+    try {
+      setIsStartingRevision(true);
+      setErrorMessage("");
+      setNoticeMessage("");
+      const updatedTask = await taskAPI.startRevision(task.id);
+      updateTaskInCache(updatedTask);
+      setSelectedTaskId("");
+      setRevisionDraft(null);
+      setNoticeMessage(`${task.title} revision is now in progress.`);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to start revision."));
+    } finally {
+      setIsStartingRevision(false);
+    }
+  };
+
+  const handleDownloadRevisionAttachment = async (task, revisionIndex, fileName) => {
+    try {
+      setIsDownloadingRevisionAttachment(true);
+      setErrorMessage("");
+      await taskAPI.downloadRevisionAttachment(task.id, revisionIndex, fileName);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to download the revision attachment."));
+    } finally {
+      setIsDownloadingRevisionAttachment(false);
+    }
+  };
+
+  const handleDownloadOutput = async (task) => {
+    if (!task?.finalOutput?.fileName) return;
+
+    try {
+      setIsDownloadingOutput(true);
+      setErrorMessage("");
+      await taskAPI.downloadOutput(task.id, task.finalOutput.fileName);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to download the submitted output."));
+    } finally {
+      setIsDownloadingOutput(false);
     }
   };
 
@@ -1195,13 +1322,14 @@ const EmpTask = () => {
           <ProjectGroupTable
             tasks={visibleTasks}
             showAssignee={false}
-            onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+            hideEmptyGroups={visibleGroup !== "All"}
+            onSelectTask={handleSelectTask}
           />
         ) : (
           <ProjectBoard
             tasks={visibleTasks}
             showAssignee={false}
-            onSelectTask={(taskId) => setSelectedTaskId(String(taskId))}
+            onSelectTask={handleSelectTask}
           />
         )
       )}
@@ -1213,14 +1341,31 @@ const EmpTask = () => {
         </div>
       )}
       {selectedTaskId && selectedTask && !isLoadingTaskDetails && (
-        <ProjectDetailsModal
-          currentUserId={currentUserId}
-          item={selectedTask}
-          onClose={() => setSelectedTaskId("")}
-          onSubmitOutput={handleSubmitOutput}
-          onToggleSubtask={handleToggleSubtask}
-          onViewCalendar={handleViewCalendar}
-        />
+        isTaskInRevision(selectedTask) ? (
+          <RevisionDetailsModal
+            isDownloadingAttachment={isDownloadingRevisionAttachment}
+            isStarting={isStartingRevision}
+            onClose={() => setSelectedTaskId("")}
+            onDownloadAttachment={handleDownloadRevisionAttachment}
+            onStart={() => handleStartRevisionDirect(selectedTask)}
+            task={selectedTask}
+          />
+        ) : (
+          <ProjectDetailsModal
+            currentUserId={currentUserId}
+            isDownloadingOutput={isDownloadingOutput}
+            isDownloadingRevisionAttachment={isDownloadingRevisionAttachment}
+            isStartingRevision={isStartingRevision}
+            item={selectedTask}
+            onClose={() => setSelectedTaskId("")}
+            onDownloadOutput={handleDownloadOutput}
+            onDownloadRevisionAttachment={handleDownloadRevisionAttachment}
+            onStartRevision={handleStartRevisionDirect}
+            onSubmitOutput={handleSubmitOutput}
+            onToggleSubtask={handleToggleSubtask}
+            onViewCalendar={handleViewCalendar}
+          />
+        )
       )}
       {completionDraft && (
         <CompletedTaskModal
@@ -1238,8 +1383,10 @@ const EmpTask = () => {
       )}
       {revisionDraft && (
         <RevisionDetailsModal
+          isDownloadingAttachment={isDownloadingRevisionAttachment}
           isStarting={isStartingRevision}
           onClose={() => setRevisionDraft(null)}
+          onDownloadAttachment={handleDownloadRevisionAttachment}
           onStart={handleStartRevision}
           task={revisionDraft.task}
         />

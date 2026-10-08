@@ -818,6 +818,14 @@ export const taskAPI = {
   viewAttachment: async (id, attachmentIndex, fileName = "task-attachment") => {
     return viewTaskFile(`/tasks/${id}/attachments/${attachmentIndex}/download`, fileName);
   },
+
+  downloadRevisionAttachment: async (id, revisionIndex = 0, fileName = "revision-attachment") => {
+    return downloadTaskFile(`/tasks/${id}/revisions/${revisionIndex}/download`, fileName);
+  },
+
+  viewRevisionAttachment: async (id, revisionIndex = 0, fileName = "revision-attachment") => {
+    return viewTaskFile(`/tasks/${id}/revisions/${revisionIndex}/download`, fileName);
+  },
   submitOutput: async (id, output) => {
     const [filePayload, watermarkedFilePayload] = await Promise.all([
       output.file

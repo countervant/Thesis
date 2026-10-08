@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { taskAPI } from "../../services/api";
 
 const getEntityId = (entity) => {
   if (!entity) return "";
@@ -10,7 +11,7 @@ const getPersonName = (person) => {
   if (!person) return "Unassigned";
   if (typeof person === "string") return person;
   const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ").trim();
-  return fullName || person.username || person.email || person.name || "Assigned user";
+  return fullName || person.companyName || person.username || person.email || person.name || "Assigned user";
 };
 
 const getClientName = (task) => {
@@ -98,23 +99,65 @@ export const ProjectDetailsModal = ({
   headerCategory = "PROJECT MANAGEMENT",
   isApprovingCustomClient = false,
   isDownloadingOutput = false,
+  isDownloadingRevisionAttachment = false,
   isMarkingPaid = false,
   isPayingEmployee = false,
+  isStartingRevision = false,
   item,
   onApproveCustomClient,
   onClose,
   onDelete,
   onDownloadOutput,
+  onDownloadRevisionAttachment,
   onEdit,
   onMarkPaid,
   onPayWithPayMongo,
   onPayEmployee,
+  onStartRevision,
   onSubmitOutput,
   onToggleSubtask,
   onToggleTask,
   onViewCalendar,
 }) => {
   const handleToggleTask = onToggleTask || onToggleSubtask;
+  const [downloadingRevIdx, setDownloadingRevIdx] = useState(null);
+  const [showRevisionHistory, setShowRevisionHistory] = useState(false);
+
+  const revisionRequests = useMemo(() => {
+    return Array.isArray(item?.revisionRequests) ? item.revisionRequests : [];
+  }, [item?.revisionRequests]);
+
+  const activeRevision = useMemo(() => {
+    if (!revisionRequests.length) return null;
+    return revisionRequests[revisionRequests.length - 1];
+  }, [revisionRequests]);
+
+  const handleDownloadRevision = async (revIndex, fileName) => {
+    if (onDownloadRevisionAttachment) {
+      return onDownloadRevisionAttachment(item, revIndex, fileName);
+    }
+    try {
+      setDownloadingRevIdx(revIndex);
+      await taskAPI.downloadRevisionAttachment(item.id, revIndex, fileName);
+    } catch (error) {
+      console.error("Unable to download revision attachment:", error);
+    } finally {
+      setDownloadingRevIdx(null);
+    }
+  };
+
+  const handleDownloadOutputFile = async () => {
+    if (onDownloadOutput) {
+      return onDownloadOutput(item);
+    }
+    if (item?.finalOutput?.fileName) {
+      try {
+        await taskAPI.downloadOutput(item.id, item.finalOutput.fileName);
+      } catch (error) {
+        console.error("Unable to download output:", error);
+      }
+    }
+  };
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -179,9 +222,10 @@ export const ProjectDetailsModal = ({
   const hasSubmittedOutput = Boolean(item.finalOutput?.submittedAt);
   const isUnderReview = hasSubmittedOutput && item.apiStatus === "review";
   const isApproved = hasSubmittedOutput && item.clientApproved;
+  const isRevisionPending = Boolean(activeRevision && !activeRevision.startedAt);
   const needsRevision =
     hasSubmittedOutput &&
-    item.apiStatus === "pending" &&
+    (item.apiStatus === "pending" || isRevisionPending) &&
     (item.revisionRequests || []).length > 0;
 
   const isPaid = Number(item.amount || 0) > 0 && Number(item.paid || 0) >= Number(item.amount || 0);
@@ -467,6 +511,21 @@ export const ProjectDetailsModal = ({
                                 {needsRevision ? "Needs Revision" : "Submit Output"}
                               </button>
                             )}
+
+                            {/* Start Revision button when revision is requested */}
+                            {isSubmissionSubtask && isRevisionPending && onStartRevision && (
+                              <button
+                                type="button"
+                                disabled={isStartingRevision}
+                                onClick={() => onStartRevision(item)}
+                                className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"
+                              >
+                                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polygon points="5 3 19 12 5 21 5 3" />
+                                </svg>
+                                {isStartingRevision ? "Starting..." : "Start Revision"}
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -590,6 +649,222 @@ export const ProjectDetailsModal = ({
             </div>
           </div>
 
+          {/* Client Revision Request Section */}
+          {activeRevision && (
+            <section className="mt-6 rounded-2xl border border-rose-200/90 bg-rose-50/40 p-4 dark:border-rose-900/40 dark:bg-rose-950/20 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                        !activeRevision.startedAt
+                          ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {!activeRevision.startedAt ? "Needs Revision" : "Revision in Progress"}
+                    </span>
+
+                    {activeRevision.priority && (
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-black capitalize ${
+                          priorityBadgeStyles[String(activeRevision.priority).toLowerCase()] ||
+                          priorityBadgeStyles.medium
+                        }`}
+                      >
+                        {activeRevision.priority} Priority
+                      </span>
+                    )}
+
+                    {revisionRequests.length > 1 && (
+                      <span className="text-[10px] font-bold text-slate-500">
+                        Revision #{revisionRequests.length} of {revisionRequests.length}
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="mt-2 text-base font-black text-[#10142d] dark:text-white">
+                    {activeRevision.title || "Client Revision Request"}
+                  </h3>
+
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500 dark:text-neutral-400">
+                    <span>
+                      Requested by{" "}
+                      <strong className="text-slate-700 dark:text-neutral-200">
+                        {getPersonName(activeRevision.user || item.requestedBy || item.createdBy)}
+                      </strong>
+                    </span>
+                    {activeRevision.createdAt && (
+                      <span>• {formatSubmittedDate(activeRevision.createdAt)}</span>
+                    )}
+                    {activeRevision.section && (
+                      <span>
+                        • Section:{" "}
+                        <strong className="text-slate-700 dark:text-neutral-200">
+                          {activeRevision.section}
+                        </strong>
+                      </span>
+                    )}
+                    {activeRevision.preferredCompletionDate && (
+                      <span>
+                        • Preferred completion:{" "}
+                        <strong className="text-slate-700 dark:text-neutral-200">
+                          {formatReadableDate(activeRevision.preferredCompletionDate)}
+                        </strong>
+                      </span>
+                    )}
+                  </div>
+
+                  {activeRevision.startedAt && (
+                    <p className="mt-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                      Revision started on {formatSubmittedDate(activeRevision.startedAt)}
+                      {activeRevision.startedBy ? ` by ${getPersonName(activeRevision.startedBy)}` : ""}
+                    </p>
+                  )}
+                </div>
+
+                {/* Start Revision CTA */}
+                {!activeRevision.startedAt && onStartRevision && (
+                  <button
+                    type="button"
+                    disabled={isStartingRevision}
+                    onClick={() => onStartRevision(item)}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#df4bb4] to-[#c72fb2] px-5 text-xs font-black text-white shadow-[0_8px_18px_rgba(199,47,178,0.25)] transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    {isStartingRevision ? "Starting..." : "Start Revision"}
+                  </button>
+                )}
+              </div>
+
+              {/* Description of Changes */}
+              <div className="mt-3.5 rounded-xl border border-rose-200/70 bg-white/90 p-3.5 dark:border-neutral-800 dark:bg-neutral-900/70">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+                  Requested Changes / Client Feedback
+                </span>
+                <p className="mt-1.5 whitespace-pre-wrap text-xs font-medium leading-relaxed text-slate-700 dark:text-neutral-200">
+                  {activeRevision.description || "No description of changes provided."}
+                </p>
+              </div>
+
+              {/* Revision Reference Attachment */}
+              {activeRevision.attachment && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-pink-100 text-[#c72fb2] dark:bg-pink-950/40">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Client Reference Attachment
+                      </span>
+                      <p className="truncate text-xs font-bold text-slate-800 dark:text-white" title={activeRevision.attachment.fileName || "Revision file"}>
+                        {activeRevision.attachment.fileName || "Revision attachment"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isDownloadingRevisionAttachment || downloadingRevIdx === revisionRequests.length - 1}
+                      onClick={() => handleDownloadRevision(revisionRequests.length - 1, activeRevision.attachment.fileName)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#c72fb2] px-3.5 text-xs font-bold text-white shadow-xs transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
+                      </svg>
+                      {isDownloadingRevisionAttachment || downloadingRevIdx === revisionRequests.length - 1
+                        ? "Downloading..."
+                        : "Download File"}
+                    </button>
+
+                    {activeRevision.attachment.fileUrl && (
+                      <a
+                        href={activeRevision.attachment.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                      >
+                        Open
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Earlier Revision Requests History Accordion */}
+              {revisionRequests.length > 1 && (
+                <div className="mt-3.5 pt-3 border-t border-rose-200/60 dark:border-neutral-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowRevisionHistory((prev) => !prev)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#c72fb2] hover:underline"
+                  >
+                    <span>{showRevisionHistory ? "Hide" : "View"} Earlier Revision Requests ({revisionRequests.length - 1})</span>
+                    <svg
+                      className={`h-3.5 w-3.5 transition-transform ${showRevisionHistory ? "rotate-180" : ""}`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  {showRevisionHistory && (
+                    <div className="mt-3 space-y-3">
+                      {revisionRequests.slice(0, -1).map((rev, revIdx) => (
+                        <div
+                          key={`rev-hist-${revIdx}`}
+                          className="rounded-xl border border-slate-200 bg-white/70 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-900/60"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-black text-slate-800 dark:text-white">
+                              Revision #{revIdx + 1}: {rev.title || "Revision request"}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {formatSubmittedDate(rev.createdAt)}
+                            </span>
+                          </div>
+                          {rev.description && (
+                            <p className="mt-1 whitespace-pre-wrap text-slate-600 dark:text-neutral-300">
+                              {rev.description}
+                            </p>
+                          )}
+                          {rev.attachment && (
+                            <div className="mt-2 flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-neutral-800">
+                              <span className="truncate text-[11px] font-semibold text-slate-500">
+                                📎 {rev.attachment.fileName || "Attachment"}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={isDownloadingRevisionAttachment || downloadingRevIdx === revIdx}
+                                onClick={() => handleDownloadRevision(revIdx, rev.attachment.fileName)}
+                                className="text-[11px] font-bold text-[#c72fb2] hover:underline"
+                              >
+                                {downloadingRevIdx === revIdx ? "Downloading..." : "Download"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Submitted Output Section (Preserved for workflow continuity) */}
           {item.finalOutput?.submittedAt && (
             <section className="mt-6 rounded-2xl border border-pink-100 bg-pink-50/40 p-4 dark:border-pink-900/30 dark:bg-pink-950/10 sm:p-5">
@@ -615,11 +890,11 @@ export const ProjectDetailsModal = ({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  {item.finalOutput.fileName && onDownloadOutput && (
+                  {item.finalOutput.fileName && (
                     <button
                       type="button"
                       disabled={isDownloadingOutput}
-                      onClick={() => onDownloadOutput(item)}
+                      onClick={handleDownloadOutputFile}
                       className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#c72fb2] px-4 text-xs font-black text-white transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
                     >
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

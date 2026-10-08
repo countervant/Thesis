@@ -270,7 +270,7 @@ const EmpDashboard = () => {
     data: rawTasks = [],
     isLoading: isTasksLoading,
     error: tasksError,
-  } = useTasksQuery({ view: "employee" }, {
+  } = useTasksQuery({ limit: 100, view: "employee" }, {
     refetchInterval: 10000,
     refetchIntervalInBackground: true,
   });

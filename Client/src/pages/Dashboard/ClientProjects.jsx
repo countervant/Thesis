@@ -611,6 +611,77 @@ const ProjectDetails = ({
       )}
 
 
+      {project.revisionRequests.length > 0 && (
+        <Card className="border-amber-200/90 bg-amber-50/40 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                {project.status === "Pending Revisions" ? "Revision Requested" : "Revision Request"}
+              </span>
+              <h2 className="mt-2 text-base font-black text-[#10142d] dark:text-white">
+                {project.revisionRequests[project.revisionRequests.length - 1].title || "Client Revision Request"}
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Submitted on {formatDateTime(project.revisionRequests[project.revisionRequests.length - 1].createdAt)}
+                {project.revisionRequests[project.revisionRequests.length - 1].section ? ` • Area: ${project.revisionRequests[project.revisionRequests.length - 1].section}` : ""}
+                {project.revisionRequests[project.revisionRequests.length - 1].preferredCompletionDate ? ` • Preferred Date: ${formatDate(project.revisionRequests[project.revisionRequests.length - 1].preferredCompletionDate)}` : ""}
+              </p>
+            </div>
+            {project.revisionRequests[project.revisionRequests.length - 1].priority && (
+              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 capitalize">
+                {project.revisionRequests[project.revisionRequests.length - 1].priority} Priority
+              </span>
+            )}
+          </div>
+          <div className="mt-3 rounded-xl border border-amber-200/60 bg-white/80 p-3 text-xs font-medium leading-relaxed text-slate-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
+            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Requested Changes</span>
+            {project.revisionRequests[project.revisionRequests.length - 1].description}
+          </div>
+          {project.revisionRequests[project.revisionRequests.length - 1].attachment && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200/60 bg-white/80 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-900">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-pink-100 text-[#c72fb2] dark:bg-pink-950/40">
+                  <Icon name="file" className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Attached Reference</span>
+                  <span className="block truncate font-bold text-slate-800 dark:text-white">
+                    {project.revisionRequests[project.revisionRequests.length - 1].attachment.fileName || "Revision reference file"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    taskAPI.downloadRevisionAttachment(
+                      project.id,
+                      project.revisionRequests.length - 1,
+                      project.revisionRequests[project.revisionRequests.length - 1].attachment.fileName
+                    )
+                  }
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#c72fb2]/40 bg-white px-3 text-xs font-black text-[#c72fb2] shadow-2xs transition hover:bg-pink-50 dark:bg-neutral-900"
+                >
+                  Download
+                  <Icon name="download" className="h-3 w-3" />
+                </button>
+                {project.revisionRequests[project.revisionRequests.length - 1].attachment.fileUrl && (
+                  <a
+                    href={project.revisionRequests[project.revisionRequests.length - 1].attachment.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                  >
+                    Open
+                    <Icon name="external" className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
       <div className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
         <Card className="p-5">
           <h2 className="text-lg font-black">Submitted Output</h2>
@@ -1479,6 +1550,10 @@ const ClientProjects = () => {
         }
         return;
       }
+      if (output.source === "revision_attachment") {
+        await taskAPI.downloadRevisionAttachment(project.id, output.revisionIndex, output.title);
+        return;
+      }
       await taskAPI.downloadOutput(project.id, output.title, {
         watermark: project.paymentPending && !project.finalOutput?.watermarked,
       });
@@ -1499,6 +1574,14 @@ const ClientProjects = () => {
           window.open(output.url, "_blank", "noopener,noreferrer");
         } else {
           throw new Error("This attachment is unavailable.");
+        }
+        return;
+      }
+      if (output.source === "revision_attachment") {
+        if (output.url && output.url.startsWith("http")) {
+          window.open(output.url, "_blank", "noopener,noreferrer");
+        } else {
+          await taskAPI.viewRevisionAttachment(project.id, output.revisionIndex, output.title);
         }
         return;
       }
